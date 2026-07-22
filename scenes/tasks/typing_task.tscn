@@ -1,40 +1,47 @@
 [gd_scene format=3 uid="uid://bfdkuypkrwl5t"]
 
-[ext_resource type="PackedScene" uid="uid://4g1aoviidfta" path="res://scenes/tasks/task_base.tscn" id="1_63kbg"]
-[ext_resource type="Script" uid="uid://cagbw7t6sbqqb" path="res://scenes/tasks/typing_task.gd" id="2_tbi26"]
-
-[sub_resource type="LabelSettings" id="LabelSettings_6ko1l"]
-font_size = 86
-font_color = Color(0.48570347, 0.48570353, 0.48570347, 1)
+[ext_resource type="PackedScene" uid="uid://4g1aoviidfta" path="res://Scenes/tasks/task_base.tscn" id="1_63kbg"]
+[ext_resource type="Script" uid="uid://cagbw7t6sbqqb" path="res://Scenes/tasks/typing_task.gd" id="2_tbi26"]
+[ext_resource type="Script" uid="uid://bsexbjc2q0o37" path="res://Scenes/tasks/stacked_TextLabel.gd" id="3_b6t0l"]
 
 [node name="Task" unique_id=1113953500 instance=ExtResource("1_63kbg")]
 script = ExtResource("2_tbi26")
 path_to_task_words = "res://resources/word_library.txt"
+total_words_to_type = 3
+words_typed = 0
 
-[node name="MarginContainer" type="MarginContainer" parent="PanelContainer" parent_id_path=PackedInt32Array(1165573392) index="0" unique_id=680791123]
-layout_mode = 2
-theme_override_constants/margin_left = 8
-theme_override_constants/margin_top = 8
-theme_override_constants/margin_right = 8
-theme_override_constants/margin_bottom = 8
-
-[node name="VBoxContainer" type="VBoxContainer" parent="PanelContainer/MarginContainer" index="0" unique_id=2024574842]
-layout_mode = 2
-alignment = 1
-
-[node name="Label" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer" index="0" unique_id=1534875244]
+[node name="TextArea" type="Control" parent="PanelContainer/PanelContainer/MarginContainer/VBoxContainer" parent_id_path=PackedInt32Array(884116960) index="0" unique_id=535408561]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
-text = "Goal Word"
-label_settings = SubResource("LabelSettings_6ko1l")
+script = ExtResource("3_b6t0l")
+
+[node name="BottomLbl" type="RichTextLabel" parent="PanelContainer/PanelContainer/MarginContainer/VBoxContainer/TextArea" index="0" unique_id=36832710]
+modulate = Color(0.38928655, 0.38928664, 0.38928658, 1)
+layout_mode = 0
+offset_top = 4.0
+offset_right = 853.0
+offset_bottom = 394.0
+size_flags_vertical = 3
+theme_override_font_sizes/normal_font_size = 86
+text = "Test Words That Are Super Long"
+fit_content = true
+scroll_active = false
 horizontal_alignment = 1
 vertical_alignment = 1
-uppercase = true
 
-[node name="HBoxContainer" type="HBoxContainer" parent="PanelContainer/MarginContainer/VBoxContainer" index="1" unique_id=1558478093]
-layout_mode = 2
-alignment = 1
-
-[node name="Button2" type="Button" parent="PanelContainer/MarginContainer/VBoxContainer/HBoxContainer" index="0" unique_id=1181336299]
-layout_mode = 2
-text = "Exit"
+[node name="TopLbl" type="RichTextLabel" parent="PanelContainer/PanelContainer/MarginContainer/VBoxContainer/TextArea" index="1" unique_id=1419558670]
+layout_mode = 0
+offset_top = 4.0
+offset_right = 853.0
+offset_bottom = 394.0
+size_flags_vertical = 3
+theme_override_font_sizes/normal_font_size = 86
+text = "Test Words That Are Super Long"
+fit_content = true
+scroll_active = false
+horizontal_alignment = 1
+vertical_alignment = 1
+visible_characters = 0
+visible_characters_behavior = 1
+visible_ratio = 0.0

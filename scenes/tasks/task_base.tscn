@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://4g1aoviidfta"]
 
-[ext_resource type="Script" uid="uid://bi64yvyl8oqy5" path="res://scripts/task.gd" id="1_kbro5"]
+[ext_resource type="Script" uid="uid://cx4fqawahhggv" path="res://scripts/task.gd" id="1_kbro5"]
 
 [node name="Task" type="Control" unique_id=1113953500]
 layout_mode = 3
@@ -12,8 +12,32 @@ grow_vertical = 2
 script = ExtResource("1_kbro5")
 
 [node name="PanelContainer" type="PanelContainer" parent="." unique_id=1165573392]
+custom_maximum_size = Vector2(869, 445)
 layout_mode = 0
 offset_left = 118.0
 offset_top = 78.0
 offset_right = 987.0
 offset_bottom = 523.0
+
+[node name="PanelContainer" type="PanelContainer" parent="PanelContainer" unique_id=2013410690]
+custom_maximum_size = Vector2(869, 445)
+layout_mode = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="PanelContainer/PanelContainer" unique_id=847712020]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="VBoxContainer" type="VBoxContainer" parent="PanelContainer/PanelContainer/MarginContainer" unique_id=884116960]
+layout_mode = 2
+alignment = 1
+
+[node name="HBoxContainer" type="HBoxContainer" parent="PanelContainer/PanelContainer/MarginContainer/VBoxContainer" unique_id=1928162619]
+layout_mode = 2
+alignment = 1
+
+[node name="ExitButton" type="Button" parent="PanelContainer/PanelContainer/MarginContainer/VBoxContainer/HBoxContainer" unique_id=707331258]
+layout_mode = 2
+text = "Exit"

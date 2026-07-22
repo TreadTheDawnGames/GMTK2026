@@ -56,7 +56,7 @@ heal
 maintain
 restitution
 verify
-band aid
+band
 doctor
 rebuilt
 darn
@@ -69,16 +69,12 @@ remodel
 unpair
 restoring
 craft
-furbish up
 rehabilitating
 refurbish
-auto body
 repairable
 rebuild
-asbestos removal
 reconditioned
 undamaged
-touch on
 reanimate
 reuse
 travel
@@ -90,9 +86,6 @@ redo
 renew
 saving
 cartilage
-quick fix
-patch up
-perk up
 cure
 ready
 amendment
@@ -101,26 +94,19 @@ mends
 tailor
 touchup
 refinisher
-fix up
-spare part
-supply chain
-stamping ground
 better
 parts
 repairmen
-preventative maintenance
 refurbishing
 reinstall
 restorations
 install
-badly damaged
 rehabilitate
 warranty
 rewiring
 refuel
 rebuilds
 refit
-severely damaged
 retrofit
 mended
 reattach
@@ -128,12 +114,10 @@ installation
 return
 recovery
 rearm
-spare parts
 make
 repainting
 change
 support
-structurally sound
 scan
 modify
 fuel
@@ -146,7 +130,6 @@ reconstructing
 check
 refitting
 reset
-thorough inspection
 sales
 buy
 resupply
@@ -354,8 +337,6 @@ facility
 services
 emend
 plans
-come to
-gathering place
 resurfacing
 precondition
 recondition
@@ -412,7 +393,6 @@ goodish
 patchset
 prescribe
 honorably
-preventive maintenance
 alright
 optimum
 needle
@@ -432,7 +412,6 @@ repaving
 prearrange
 rewire
 melioration
-make whole
 fixative
 misset
 spay
@@ -474,8 +453,3 @@ putable
 puttable
 suppletion
 hapiness
-set up
-good to go
-get well
-set point
-fix point
