@@ -1,4 +1,4 @@
-extends RepairTask
+extends "res://scripts/task.gd"
 @export var path_to_task_words : String = "res://resources/word_library.txt"
 
 @onready var text_area: TextTaskVisual = %TextArea

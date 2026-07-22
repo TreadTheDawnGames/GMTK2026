@@ -1,8 +1,8 @@
 [gd_scene format=3 uid="uid://bfdkuypkrwl5t"]
 
-[ext_resource type="PackedScene" uid="uid://4g1aoviidfta" path="res://Scenes/tasks/task_base.tscn" id="1_63kbg"]
-[ext_resource type="Script" uid="uid://cagbw7t6sbqqb" path="res://Scenes/tasks/typing_task.gd" id="2_tbi26"]
-[ext_resource type="Script" uid="uid://bsexbjc2q0o37" path="res://Scenes/tasks/stacked_TextLabel.gd" id="3_b6t0l"]
+[ext_resource type="PackedScene" uid="uid://4g1aoviidfta" path="res://scenes/tasks/task_base.tscn" id="1_63kbg"]
+[ext_resource type="Script" uid="uid://cagbw7t6sbqqb" path="res://scenes/tasks/typing_task.gd" id="2_tbi26"]
+[ext_resource type="Script" uid="uid://bsexbjc2q0o37" path="res://scenes/tasks/stacked_TextLabel.gd" id="3_b6t0l"]
 
 [node name="Task" unique_id=1113953500 instance=ExtResource("1_63kbg")]
 script = ExtResource("2_tbi26")

@@ -1,12 +1,27 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Texture2D" path="res://assets/ship/objectives/task_placeholder.png" id="1_placeholder"]
+[ext_resource type="Script" path="res://scripts/ship/task_objective.gd" id="2_objective"]
 
-[node name="TaskPlaceholder" type="Node2D"]
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_objective"]
+size = Vector2(32, 32)
+
+[node name="TaskPlaceholder" type="Area2D"]
+collision_layer = 2
+collision_mask = 0
+script = ExtResource("2_objective")
 
 [node name="Artwork" type="Sprite2D" parent="."]
+unique_name_in_owner = true
 scale = Vector2(0.110727, 0.110727)
 texture = ExtResource("1_placeholder")
 
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_objective")
+
 [node name="WorkPoint" type="Marker2D" parent="."]
 unique_name_in_owner = true
+
+[node name="TaskOverlay" type="CanvasLayer" parent="."]
+unique_name_in_owner = true
+layer = 20

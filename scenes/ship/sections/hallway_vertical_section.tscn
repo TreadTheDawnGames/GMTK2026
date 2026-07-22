@@ -4,8 +4,8 @@
 [ext_resource type="Texture2D" path="res://assets/third_party/cptfoorman_spaceship_tileset/spaceship_tiles.png" id="2_tiles"]
 
 [sub_resource type="NavigationPolygon" id="NavigationPolygon_section"]
-vertices = PackedVector2Array(-48, -32, 48, -32, 48, 32, -48, 32)
-polygons = Array[PackedInt32Array]([PackedInt32Array(0, 1, 2, 3)])
+vertices = PackedVector2Array(-40, -32, 40, -32, 40, 30, -40, 30, -30, 30, 30, 30, 30, 32, -30, 32)
+polygons = Array[PackedInt32Array]([PackedInt32Array(0, 1, 2, 3), PackedInt32Array(4, 5, 6, 7)])
 
 [node name="HallwayVerticalSection" instance=ExtResource("1_base")]
 section_id = &"hallway_vertical"
@@ -15,13 +15,13 @@ connections = 5
 position = Vector2(0, -32)
 
 [node name="ConnectionRight" parent="ConnectionMarkers" index="1"]
-position = Vector2(48, 0)
+position = Vector2(40, 0)
 
 [node name="ConnectionDown" parent="ConnectionMarkers" index="2"]
 position = Vector2(0, 32)
 
 [node name="ConnectionLeft" parent="ConnectionMarkers" index="3"]
-position = Vector2(-48, 0)
+position = Vector2(-40, 0)
 
 [node name="Artwork" type="Sprite2D" parent="."]
 texture_filter = 1

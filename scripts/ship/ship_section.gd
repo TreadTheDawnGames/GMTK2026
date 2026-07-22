@@ -18,7 +18,7 @@ enum Connection {
 		connections = value
 		if is_node_ready():
 			_update_connection_markers()
-@export_range(1, 64, 1) var editor_snap_size := 16
+@export_range(1, 64, 1) var editor_snap_size := 8
 @export var snap_in_editor := true
 @export var show_connections_in_game := false
 
