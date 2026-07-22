@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://c2ruy478g7ua7"]
+
+[ext_resource type="Script" uid="uid://ch5q5y5v2x36" path="res://scripts/globals/task_picker.gd" id="1_044fu"]
+
+[node name="TaskPicker" type="Node" unique_id=859688646]
+script = ExtResource("1_044fu")
