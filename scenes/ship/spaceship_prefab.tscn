@@ -1,0 +1,33 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/third_party/cptfoorman_spaceship_tileset/spaceship_tiles.png" id="1_ship"]
+
+[sub_resource type="NavigationPolygon" id="NavigationPolygon_ship_interior"]
+vertices = PackedVector2Array(-42, -76, 42, -76, 42, -28, 26, -8, -26, -8, -42, -28, -18, -16, 18, -16, 18, 58, -18, 58, -22, 52, 22, 52, 22, 78, -22, 78)
+polygons = Array[PackedInt32Array]([PackedInt32Array(0, 1, 2, 3, 4, 5), PackedInt32Array(6, 7, 8, 9), PackedInt32Array(10, 11, 12, 13)])
+
+[sub_resource type="RectangleShape2D" id="RectangleShape_spawn_area"]
+size = Vector2(48, 32)
+
+[node name="SpaceshipPrefab" type="Node2D"]
+scale = Vector2(3, 3)
+
+[node name="ShipArtwork" type="Sprite2D" parent="."]
+texture_filter = 1
+texture = ExtResource("1_ship")
+region_enabled = true
+region_rect = Rect2(96, 48, 112, 176)
+
+[node name="NavigationRegion2D" type="NavigationRegion2D" parent="."]
+navigation_polygon = SubResource("NavigationPolygon_ship_interior")
+
+[node name="PlayerSpawn" type="Marker2D" parent="."]
+position = Vector2(0, -48)
+
+[node name="CrewSpawnArea" type="Area2D" parent="."]
+position = Vector2(0, -44)
+collision_layer = 0
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CrewSpawnArea"]
+shape = SubResource("RectangleShape_spawn_area")

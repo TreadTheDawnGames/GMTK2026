@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://jf5ujd8xeiah"
-path="res://.godot/imported/corridor_atlas.png-c71e9e30a437415c5efb4ba4299567ad.ctex"
+uid="uid://cvpi2hy33bb8j"
+path="res://.godot/imported/ship_stuff_tiles.png-ea54948f9b5a04d0b74d6c0bde7d1388.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/tiles/corridors/corridor_atlas.png"
-dest_files=["res://.godot/imported/corridor_atlas.png-c71e9e30a437415c5efb4ba4299567ad.ctex"]
+source_file="res://assets/third_party/cptfoorman_spaceship_tileset/ship_stuff_tiles.png"
+dest_files=["res://.godot/imported/ship_stuff_tiles.png-ea54948f9b5a04d0b74d6c0bde7d1388.ctex"]
 
 [params]
 
