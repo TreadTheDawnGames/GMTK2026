@@ -54,6 +54,31 @@ func rebuild_navigation_links() -> void:
 	NavigationServer2D.map_force_update(get_world_2d().navigation_map)
 
 
+func get_ship_bounds() -> Rect2:
+	var bounds := Rect2()
+	var has_bounds := false
+	for child in get_children():
+		var section := child as ShipSection
+		if section == null:
+			continue
+		var section_bounds := section.get_visual_bounds()
+		if not section_bounds.has_area():
+			continue
+		for corner: Vector2 in [
+			section_bounds.position,
+			Vector2(section_bounds.end.x, section_bounds.position.y),
+			section_bounds.end,
+			Vector2(section_bounds.position.x, section_bounds.end.y),
+		]:
+			var point: Vector2 = section.transform * corner
+			if not has_bounds:
+				bounds = Rect2(point, Vector2.ZERO)
+				has_bounds = true
+			else:
+				bounds = bounds.expand(point)
+	return bounds
+
+
 func _find_connected_section(
 	section: ShipSection,
 	direction: ShipSection.Connection,

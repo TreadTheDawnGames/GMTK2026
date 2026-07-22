@@ -7,6 +7,8 @@
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_vertical_section.tscn" id="4_vertical"]
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/cargo_section.tscn" id="5_cargo"]
 [ext_resource type="PackedScene" path="res://scenes/ship/objectives/task_placeholder.tscn" id="6_task"]
+[ext_resource type="PackedScene" path="res://scenes/ship/sections/crew_section.tscn" id="7_crew"]
+[ext_resource type="PackedScene" path="res://scenes/ship/sections/airlock_section.tscn" id="8_airlock"]
 
 [node name="ShipBuilder" type="Node2D" unique_id=1637252056]
 script = ExtResource("1_builder")
@@ -35,4 +37,28 @@ editor_snap_size = 16
 
 [node name="CargoRoom" parent="." unique_id=21569011 instance=ExtResource("5_cargo")]
 position = Vector2(-288, 208)
+editor_snap_size = 16
+
+[node name="RightHallway" parent="." unique_id=603534944 instance=ExtResource("2_horizontal")]
+position = Vector2(128, -32)
+editor_snap_size = 16
+
+[node name="CrewQuarters" parent="." unique_id=1749278390 instance=ExtResource("7_crew")]
+position = Vector2(272, -32)
+editor_snap_size = 16
+
+[node name="OuterRightHallway" parent="." unique_id=678457168 instance=ExtResource("2_horizontal")]
+position = Vector2(416, -32)
+editor_snap_size = 16
+
+[node name="Airlock" parent="." unique_id=1134824858 instance=ExtResource("8_airlock")]
+position = Vector2(560, -32)
+editor_snap_size = 16
+
+[node name="BottomHallway" parent="." unique_id=1503846120 instance=ExtResource("4_vertical")]
+position = Vector2(-16, 256)
+editor_snap_size = 16
+
+[node name="EngineeringRoom" parent="." unique_id=1941311586 instance=ExtResource("5_cargo")]
+position = Vector2(-16, 368)
 editor_snap_size = 16

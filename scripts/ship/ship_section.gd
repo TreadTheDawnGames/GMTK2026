@@ -95,6 +95,29 @@ func get_world_connection_position(direction: Connection) -> Vector2:
 	return marker.global_position if marker != null else global_position
 
 
+func get_visual_bounds() -> Rect2:
+	var bounds := Rect2()
+	var has_bounds := false
+	for child in get_children():
+		var artwork := child as Sprite2D
+		if artwork == null:
+			continue
+		var artwork_rect := artwork.get_rect()
+		for corner: Vector2 in [
+			artwork_rect.position,
+			Vector2(artwork_rect.end.x, artwork_rect.position.y),
+			artwork_rect.end,
+			Vector2(artwork_rect.position.x, artwork_rect.end.y),
+		]:
+			var point: Vector2 = artwork.transform * corner
+			if not has_bounds:
+				bounds = Rect2(point, Vector2.ZERO)
+				has_bounds = true
+			else:
+				bounds = bounds.expand(point)
+	return bounds
+
+
 func can_connect_to(other: ShipSection, direction: Connection) -> bool:
 	return other != null and has_connection(direction) and other.has_connection(opposite(direction))
 

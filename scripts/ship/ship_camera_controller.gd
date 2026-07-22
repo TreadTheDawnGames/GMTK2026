@@ -1,14 +1,20 @@
 class_name ShipCameraController
 extends Camera2D
-## Keyboard, middle-mouse, and wheel controls for inspecting the ship.
+## Starts with the complete ship framed, then allows manual inspection.
 
+@export var framing_target: ShipBuilder
+@export_range(0.0, 160.0, 1.0) var screen_margin := 56.0
 @export_range(50.0, 1200.0, 10.0) var pan_speed := 420.0
 @export_range(0.05, 1.0, 0.05) var zoom_step := 0.15
-@export_range(0.25, 1.0, 0.05) var minimum_zoom := 0.75
+@export_range(0.1, 1.0, 0.05) var minimum_zoom := 0.4
 @export_range(1.0, 5.0, 0.05) var maximum_zoom := 2.5
-@export var pan_bounds := Rect2(320, -80, 640, 880)
 
 var _is_dragging := false
+
+
+func _ready() -> void:
+	get_viewport().size_changed.connect(frame_ship)
+	frame_ship.call_deferred()
 
 
 func _process(delta: float) -> void:
@@ -41,12 +47,26 @@ func _unhandled_input(event: InputEvent) -> void:
 		pan_by(-(event as InputEventMouseMotion).relative / zoom.x)
 
 
+func frame_ship() -> void:
+	if framing_target == null:
+		return
+	var ship_bounds := framing_target.get_ship_bounds()
+	if not ship_bounds.has_area():
+		return
+	var available_size := get_viewport_rect().size - Vector2.ONE * screen_margin * 2.0
+	if available_size.x <= 0.0 or available_size.y <= 0.0:
+		return
+	var fit_zoom := minf(
+		available_size.x / ship_bounds.size.x,
+		available_size.y / ship_bounds.size.y
+	)
+	zoom = Vector2.ONE * clampf(fit_zoom, minimum_zoom, maximum_zoom)
+	global_position = framing_target.to_global(ship_bounds.get_center())
+
+
 func pan_by(offset: Vector2) -> void:
 	position += offset
-	position.x = clampf(position.x, pan_bounds.position.x, pan_bounds.end.x)
-	position.y = clampf(position.y, pan_bounds.position.y, pan_bounds.end.y)
 
 
 func set_zoom_level(value: float) -> void:
-	var clamped_zoom := clampf(value, minimum_zoom, maximum_zoom)
-	zoom = Vector2.ONE * clamped_zoom
+	zoom = Vector2.ONE * clampf(value, minimum_zoom, maximum_zoom)

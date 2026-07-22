@@ -28,10 +28,9 @@ crew_texture = ExtResource("4_crew_b")
 script = ExtResource("5_commands")
 crew_container = NodePath("../CrewContainer")
 
-[node name="Camera2D" type="Camera2D" parent="." unique_id=424725088]
-position = Vector2(640, 360)
-zoom = Vector2(1.35, 1.35)
+[node name="Camera2D" type="Camera2D" parent="." unique_id=424725088 node_paths=PackedStringArray("framing_target")]
 script = ExtResource("6_camera")
+framing_target = NodePath("../BaseShip")
 
 [node name="Controls" type="CanvasLayer" parent="." unique_id=1856149281]
 
