@@ -1,4 +1,9 @@
 extends Node
+## Selects a playable task scene for ship-room objectives.
+
+@export var task_scenes: Array[PackedScene] = [
+	preload("res://scenes/tasks/typing_task.tscn"),
+]
 
 @export var _all_tasks : Array[PackedScene]
 

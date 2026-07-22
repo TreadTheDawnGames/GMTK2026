@@ -7,13 +7,29 @@ signal task_completed(objective: TaskObjective, repair_amount: float)
 signal task_cancelled(objective: TaskObjective)
 
 @export var task_scene: PackedScene = preload("res://scenes/tasks/typing_task.tscn")
+## Durability decay multiplier while one or more crew members occupy this room.
+@export_range(0.0, 1.0, 0.05) var crew_present_decay_multiplier := 0.35
 
 @onready var damage: SystemDamage = %Damage
 @onready var artwork: Sprite2D = %Artwork
 @onready var task_overlay: CanvasLayer = %TaskOverlay
 
-var _active_task: RepairTask
-var _next_task_scene : PackedScene
+var _active_task: Control
+var _room: ShipSection
+
+
+func _ready() -> void:
+	var ancestor := get_parent()
+	while ancestor != null and not ancestor is ShipSection:
+		ancestor = ancestor.get_parent()
+	_room = ancestor as ShipSection
+
+
+func _physics_process(_delta: float) -> void:
+	damage.set_decay_rate_scale(
+		crew_present_decay_multiplier if has_crew_in_room() else 1.0
+	)
+
 
 func _input_event(_viewport: Node, event: InputEvent, _shape_index: int) -> void:
 	var mouse_event := event as InputEventMouseButton
@@ -24,12 +40,20 @@ func _input_event(_viewport: Node, event: InputEvent, _shape_index: int) -> void
 
 
 func open_task() -> void:
+	# Reuse an unfinished task instead of creating stacked modal overlays.
 	if _active_task != null:
 		_active_task.show()
 		return
-	
-		
-	var task := task_scene.instantiate() as Control
+	var selected_task_scene: PackedScene
+	var task_picker := get_node_or_null("/root/TaskPicker")
+	if task_picker != null and task_picker.has_method("pick_scene"):
+		selected_task_scene = task_picker.call("pick_scene") as PackedScene
+	if selected_task_scene == null:
+		selected_task_scene = task_scene
+	if selected_task_scene == null:
+		push_error("TaskObjective requires a task scene.")
+		return
+	var task := selected_task_scene.instantiate() as Control
 	if task == null:
 		push_error("TaskObjective task scene root must be a Control.")
 		return
@@ -38,12 +62,10 @@ func open_task() -> void:
 		task.queue_free()
 		return
 	_active_task = task
-	task_scene = TaskPicker.get_task(_active_task)
-	
-	_active_task.task_exit.connect(_on_task_exit)
+	_active_task.connect("task_exit", _on_task_exit)
 	task_overlay.add_child(_active_task)
 	task_opened.emit(self)
-	
+
 
 func _on_task_exit(repair_amount: float) -> void:
 	if _active_task == null:
@@ -58,5 +80,15 @@ func _on_task_exit(repair_amount: float) -> void:
 	_active_task = null
 
 
-func _exit_tree() -> void:
-	pass
+func has_crew_in_room() -> bool:
+	if _room == null:
+		return false
+	for node in get_tree().get_nodes_in_group("crew_members"):
+		var crew_member := node as CrewMember
+		if crew_member != null and _room.contains_world_point(crew_member.global_position):
+			return true
+	return false
+
+
+func has_active_task() -> bool:
+	return _active_task != null

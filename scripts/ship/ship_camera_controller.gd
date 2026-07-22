@@ -2,6 +2,7 @@ class_name ShipCameraController
 extends Camera2D
 ## Starts with the complete ship framed, then allows manual inspection.
 
+## Ship whose composed artwork should fit in the initial viewport.
 @export var framing_target: ShipBuilder
 @export_range(0.0, 160.0, 1.0) var screen_margin := 56.0
 @export_range(50.0, 1200.0, 10.0) var pan_speed := 420.0
@@ -18,14 +19,15 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	# Do not steal movement keys while a task or other text control has focus.
 	var focused_control := get_viewport().gui_get_focus_owner()
 	if focused_control is LineEdit or focused_control is TextEdit:
 		return
 	var direction := Vector2(
-		float(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT))
-			- float(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)),
-		float(Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN))
-			- float(Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP))
+		float(Input.is_physical_key_pressed(KEY_RIGHT))
+			- float(Input.is_physical_key_pressed(KEY_LEFT)),
+		float(Input.is_physical_key_pressed(KEY_DOWN))
+			- float(Input.is_physical_key_pressed(KEY_UP))
 	)
 	if not direction.is_zero_approx():
 		pan_by(direction.normalized() * pan_speed * delta / zoom.x)
@@ -56,6 +58,7 @@ func frame_ship() -> void:
 	var available_size := get_viewport_rect().size - Vector2.ONE * screen_margin * 2.0
 	if available_size.x <= 0.0 or available_size.y <= 0.0:
 		return
+	# The smaller axis ratio guarantees the entire ship remains on-screen.
 	var fit_zoom := minf(
 		available_size.x / ship_bounds.size.x,
 		available_size.y / ship_bounds.size.y

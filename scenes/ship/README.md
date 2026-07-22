@@ -14,4 +14,4 @@ Each section owns a `NavigationRegion2D` fitted to the visible, nontransparent s
 
 The source art uses a 16-pixel base grid. Keep texture filtering set to Nearest when adding sprites from the sheets. Open `spaceship_pack_gallery.tscn` to view every imported source sheet.
 
-The playable `spaceship_level.tscn` adds MRdiabetes and MrDpwnSyndrome. Left-click selects a crew member, Shift+left-click adds or removes crew from the selection, and right-click issues a navigation order. Pan with WASD, arrow keys, or middle-mouse drag; zoom with the mouse wheel.
+The playable `spaceship_level.tscn` adds MRdiabetes and MrDpwnSyndrome. Left-click selects a crew member, Shift+left-click adds or removes crew from the selection, and right-click issues a navigation order. Pan with the arrow keys or middle-mouse drag; zoom with the mouse wheel. WASD is reserved for gameplay and task input.

@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://4g1aoviidfta"]
 
-[ext_resource type="Script" uid="uid://cx4fqawahhggv" path="res://scripts/ship/tasks/task.gd" id="1_kbro5"]
+[ext_resource type="Script" path="res://scripts/task.gd" id="1_kbro5"]
 
 [node name="Task" type="Control" unique_id=1113953500]
 layout_mode = 3

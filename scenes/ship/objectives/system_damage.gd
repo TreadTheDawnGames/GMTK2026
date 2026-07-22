@@ -1,30 +1,46 @@
 extends TextureProgressBar
 class_name SystemDamage
+## Tracks objective durability with a runtime-adjustable decay rate.
 
 signal system_destroyed()
 
-@onready var timer: Timer = %TimeBeforeDestruction
-
-@export var max_health : float = 10:
+@export var max_health: float = 10.0:
 	set(value):
-		max_health = value
+		max_health = maxf(value, 0.0)
 		max_value = max_health
+		if is_node_ready():
+			durability = minf(durability, max_health)
 
-func _ready():
+var durability := 0.0
+var decay_rate_scale := 1.0
+var _is_destroyed := false
+
+
+func _ready() -> void:
 	max_value = max_health
-	timer.timeout.connect(system_destroyed.emit)
-	start_timer()
+	reset_durability()
 
-func repair_damage(amount : float):
-	timer.start(clamp(timer.time_left + amount, 0.0, max_health))
+func _process(delta: float) -> void:
+	if _is_destroyed:
+		return
+	durability = maxf(durability - delta * decay_rate_scale, 0.0)
+	value = durability
+	if is_zero_approx(durability):
+		_is_destroyed = true
+		system_destroyed.emit()
 
-func start_timer():
-	timer.start(max_health)
-	pass
 
-func on_timeout():
-	system_destroyed.emit()
-	pass
+func repair_damage(amount: float) -> void:
+	durability = clampf(durability + amount, 0.0, max_health)
+	value = durability
+	_is_destroyed = false
 
-func _process(_delta: float) -> void:
-	value = timer.time_left
+
+func reset_durability() -> void:
+	durability = max_health
+	value = durability
+	_is_destroyed = false
+
+
+func set_decay_rate_scale(rate_scale: float) -> void:
+	decay_rate_scale = maxf(rate_scale, 0.0)
