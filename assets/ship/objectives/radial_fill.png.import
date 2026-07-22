@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cd5eqegldwqh0"
-path="res://.godot/imported/RadialFill.png-b3f8a54d29efdacc57bade31e4a41a6b.ctex"
+path="res://.godot/imported/radial_fill.png-0d7879af1f9b60cb3492de90663a0362.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ship/objectives/RadialFill.png"
-dest_files=["res://.godot/imported/RadialFill.png-b3f8a54d29efdacc57bade31e4a41a6b.ctex"]
+source_file="res://assets/ship/objectives/radial_fill.png"
+dest_files=["res://.godot/imported/radial_fill.png-0d7879af1f9b60cb3492de90663a0362.ctex"]
 
 [params]
 
