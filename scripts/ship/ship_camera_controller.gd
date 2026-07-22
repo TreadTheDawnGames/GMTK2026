@@ -24,10 +24,10 @@ func _process(delta: float) -> void:
 	if focused_control is LineEdit or focused_control is TextEdit:
 		return
 	var direction := Vector2(
-		float(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT))
-			- float(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)),
-		float(Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN))
-			- float(Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP))
+		float(Input.is_physical_key_pressed(KEY_RIGHT))
+			- float(Input.is_physical_key_pressed(KEY_LEFT)),
+		float(Input.is_physical_key_pressed(KEY_DOWN))
+			- float(Input.is_physical_key_pressed(KEY_UP))
 	)
 	if not direction.is_zero_approx():
 		pan_by(direction.normalized() * pan_speed * delta / zoom.x)

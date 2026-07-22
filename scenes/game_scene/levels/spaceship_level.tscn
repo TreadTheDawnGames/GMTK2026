@@ -57,4 +57,4 @@ offset_bottom = 52.0
 
 [node name="Label" type="Label" parent="Controls/ControlsPanel" unique_id=1783932633]
 layout_mode = 2
-text = "Left click: crew/room | Drag: select crew | Shift: add crew | Right click: move | WASD/middle drag: pan | Wheel: zoom"
+text = "Left click: crew/room | Drag: select crew | Shift: add crew | Right click: move | Arrows/middle drag: pan | Wheel: zoom"
