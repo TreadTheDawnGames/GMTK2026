@@ -11,11 +11,14 @@ config_version=5
 [application]
 
 config/name="GMTK2026"
+run/main_scene="res://scenes/corridor_tiles_preview.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 
 [display]
 
+window/size/viewport_width=768
+window/size/viewport_height=512
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 
