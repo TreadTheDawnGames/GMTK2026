@@ -9,6 +9,8 @@
 [ext_resource type="PackedScene" path="res://scenes/ship/objectives/task_placeholder.tscn" id="6_task"]
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/crew_section.tscn" id="7_crew"]
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/airlock_section.tscn" id="8_airlock"]
+[ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_horizontal_80_section.tscn" id="9_horizontal_80"]
+[ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_vertical_102_section.tscn" id="10_vertical_102"]
 
 [node name="ShipBuilder" type="Node2D" unique_id=1637252056]
 script = ExtResource("1_builder")
@@ -18,67 +20,48 @@ unique_name_in_owner = true
 
 [node name="MainHull" parent="." unique_id=123633979 instance=ExtResource("1_hull")]
 position = Vector2(-16, 48)
-editor_snap_size = 16
 
 [node name="TaskPlaceholder" parent="MainHull" unique_id=109450670 instance=ExtResource("6_task")]
 position = Vector2(64, -80)
 
 [node name="LeftHallway" parent="." unique_id=1726546278 instance=ExtResource("2_horizontal")]
-position = Vector2(-160, -32)
-editor_snap_size = 16
+position = Vector2(-152, -32)
 
 [node name="LeftTJunction" parent="." unique_id=272993486 instance=ExtResource("3_t_junction")]
-position = Vector2(-288, -32)
-editor_snap_size = 16
+position = Vector2(-280, -32)
 
 [node name="PortCrewQuarters" parent="." unique_id=1132758648 instance=ExtResource("7_crew")]
-position = Vector2(-496, -32)
-editor_snap_size = 16
+position = Vector2(-480, -32)
 
 [node name="CargoRoom" parent="." unique_id=21569011 instance=ExtResource("5_cargo")]
-position = Vector2(-288, 208)
-editor_snap_size = 16
+position = Vector2(-280, 200)
 
 [node name="DownHallway" parent="." unique_id=370243936 instance=ExtResource("4_vertical")]
-position = Vector2(-288, 96)
-editor_snap_size = 16
+position = Vector2(-280, 96)
 
 [node name="LowerTJunction" parent="." unique_id=1369595513 instance=ExtResource("3_t_junction")]
-position = Vector2(-288, 384)
-rotation = 3.14159265358979
-editor_snap_size = 16
+position = Vector2(-280, 368)
+rotation = 3.1415927
 
-[node name="LowerEngineeringHallway" parent="." unique_id=961218568 instance=ExtResource("4_vertical")]
-position = Vector2(-152, 384)
-rotation = -1.5707963267949
-scale = Vector2(1, 1.25)
-editor_snap_size = 8
+[node name="LowerEngineeringHallway" parent="." unique_id=961218568 instance=ExtResource("9_horizontal_80")]
+position = Vector2(-144, 368)
 
 [node name="RightHallway" parent="." unique_id=603534944 instance=ExtResource("2_horizontal")]
-position = Vector2(128, -32)
-editor_snap_size = 16
+position = Vector2(120, -32)
 
 [node name="CrewQuarters" parent="." unique_id=1749278390 instance=ExtResource("7_crew")]
-position = Vector2(272, -32)
-editor_snap_size = 16
+position = Vector2(256, -32)
 
 [node name="OuterRightHallway" parent="." unique_id=678457168 instance=ExtResource("2_horizontal")]
-position = Vector2(416, -32)
-editor_snap_size = 16
+position = Vector2(392, -32)
 
 [node name="Airlock" parent="." unique_id=1134824858 instance=ExtResource("8_airlock")]
-position = Vector2(560, -32)
-editor_snap_size = 16
+position = Vector2(528, -32)
 
-[node name="BottomHallway" parent="." unique_id=1503846120 instance=ExtResource("4_vertical")]
-position = Vector2(-16, 256)
-editor_snap_size = 16
-
-[node name="EngineeringExtensionHallway" parent="." unique_id=434237489 instance=ExtResource("4_vertical")]
-position = Vector2(-16, 304)
-scale = Vector2(1, 0.5)
-editor_snap_size = 16
+[node name="BottomEngineeringHallway" parent="." unique_id=1503846120 instance=ExtResource("10_vertical_102")]
+position = Vector2(-16, 265)
+editor_snap_size = 1
 
 [node name="EngineeringRoom" parent="." unique_id=1941311586 instance=ExtResource("5_cargo")]
-position = Vector2(-16, 400)
-editor_snap_size = 16
+position = Vector2(-16, 388)
+editor_snap_size = 2

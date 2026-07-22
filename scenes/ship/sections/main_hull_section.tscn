@@ -12,16 +12,16 @@ section_id = &"main_hull"
 connections = 15
 
 [node name="ConnectionUp" parent="ConnectionMarkers" index="0"]
-position = Vector2(0, -176)
+position = Vector2(0, -168)
 
 [node name="ConnectionRight" parent="ConnectionMarkers" index="1"]
-position = Vector2(112, -80)
+position = Vector2(104, -80)
 
 [node name="ConnectionDown" parent="ConnectionMarkers" index="2"]
-position = Vector2(0, 176)
+position = Vector2(0, 166)
 
 [node name="ConnectionLeft" parent="ConnectionMarkers" index="3"]
-position = Vector2(-112, -80)
+position = Vector2(-104, -80)
 
 [node name="Artwork" type="Sprite2D" parent="."]
 texture_filter = 1
