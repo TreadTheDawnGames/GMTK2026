@@ -22,17 +22,17 @@ editor_snap_size = 16
 position = Vector2(64, -80)
 
 [node name="LeftHallway" parent="." unique_id=1726546278 instance=ExtResource("2_horizontal")]
-position = Vector2(-144, -80)
+position = Vector2(-160, -32)
 editor_snap_size = 16
 
 [node name="LeftDownCorner" parent="." unique_id=272993486 instance=ExtResource("3_corner")]
-position = Vector2(-272, -80)
+position = Vector2(-288, -32)
 editor_snap_size = 16
 
 [node name="DownHallway" parent="." unique_id=370243936 instance=ExtResource("4_vertical")]
-position = Vector2(-272, 48)
+position = Vector2(-288, 96)
 editor_snap_size = 16
 
 [node name="CargoRoom" parent="." unique_id=21569011 instance=ExtResource("5_cargo")]
-position = Vector2(-272, 144)
+position = Vector2(-288, 208)
 editor_snap_size = 16

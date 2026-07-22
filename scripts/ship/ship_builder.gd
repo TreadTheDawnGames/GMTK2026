@@ -3,7 +3,7 @@ extends Node2D
 ## Joins navigation between manually placed ship sections at matching connectors.
 
 @export_range(0.1, 8.0, 0.1) var connection_tolerance := 1.0
-@export_range(0.1, 4.0, 0.1) var navigation_link_inset := 0.5
+@export_range(1.0, 32.0, 1.0) var navigation_link_inset := 12.0
 
 @onready var navigation_links: Node2D = %NavigationLinks
 
