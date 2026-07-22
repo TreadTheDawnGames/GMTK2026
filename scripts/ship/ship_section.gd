@@ -95,6 +95,20 @@ func get_world_connection_position(direction: Connection) -> Vector2:
 	return marker.global_position if marker != null else global_position
 
 
+func get_world_connection_direction(direction: Connection) -> Vector2:
+	var local_direction := Vector2.ZERO
+	match direction:
+		Connection.UP:
+			local_direction = Vector2.UP
+		Connection.RIGHT:
+			local_direction = Vector2.RIGHT
+		Connection.DOWN:
+			local_direction = Vector2.DOWN
+		Connection.LEFT:
+			local_direction = Vector2.LEFT
+	return global_transform.basis_xform(local_direction).normalized()
+
+
 func get_visual_bounds() -> Rect2:
 	var bounds := Rect2()
 	var has_bounds := false
@@ -116,24 +130,6 @@ func get_visual_bounds() -> Rect2:
 			else:
 				bounds = bounds.expand(point)
 	return bounds
-
-
-func can_connect_to(other: ShipSection, direction: Connection) -> bool:
-	return other != null and has_connection(direction) and other.has_connection(opposite(direction))
-
-
-static func opposite(direction: Connection) -> Connection:
-	match direction:
-		Connection.UP:
-			return Connection.DOWN
-		Connection.RIGHT:
-			return Connection.LEFT
-		Connection.DOWN:
-			return Connection.UP
-		Connection.LEFT:
-			return Connection.RIGHT
-		_:
-			return Connection.UP
 
 
 func _update_connection_markers() -> void:

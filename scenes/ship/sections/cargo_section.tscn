@@ -4,8 +4,8 @@
 [ext_resource type="Texture2D" path="res://assets/third_party/cptfoorman_spaceship_tileset/spaceship_tiles.png" id="2_tiles"]
 
 [sub_resource type="NavigationPolygon" id="NavigationPolygon_section"]
-vertices = PackedVector2Array(-96, -80, 96, -80, 96, 80, -96, 80)
-polygons = Array[PackedInt32Array]([PackedInt32Array(0, 1, 2, 3)])
+vertices = PackedVector2Array(-88, -72, -56, -72, -56, 8, -88, 8, -56, -72, 56, -72, 56, 8, -56, 8, 56, -72, 88, -72, 88, 8, 56, 8, -56, 8, 56, 8, 56, 72, -56, 72)
+polygons = Array[PackedInt32Array]([PackedInt32Array(0, 1, 2, 3), PackedInt32Array(4, 5, 6, 7), PackedInt32Array(8, 9, 10, 11), PackedInt32Array(12, 13, 14, 15)])
 
 [node name="CargoSection" instance=ExtResource("1_base")]
 section_id = &"cargo"
