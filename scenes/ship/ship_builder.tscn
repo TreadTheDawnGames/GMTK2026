@@ -1,6 +1,6 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene format=3 uid="uid://dudpxx04vy3wp"]
 
-[ext_resource type="Script" path="res://scripts/ship/ship_builder.gd" id="1_builder"]
+[ext_resource type="Script" uid="uid://c074tui02p5if" path="res://scripts/ship/ship_builder.gd" id="1_builder"]
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/main_hull_section.tscn" id="1_hull"]
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_horizontal_section.tscn" id="2_horizontal"]
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_corner_right_down_section.tscn" id="3_corner"]
@@ -8,25 +8,31 @@
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/cargo_section.tscn" id="5_cargo"]
 [ext_resource type="PackedScene" path="res://scenes/ship/objectives/task_placeholder.tscn" id="6_task"]
 
-[node name="ShipBuilder" type="Node2D"]
+[node name="ShipBuilder" type="Node2D" unique_id=1637252056]
 script = ExtResource("1_builder")
 
-[node name="NavigationLinks" type="Node2D" parent="."]
+[node name="NavigationLinks" type="Node2D" parent="." unique_id=847097301]
 unique_name_in_owner = true
 
-[node name="MainHull" parent="." instance=ExtResource("1_hull")]
+[node name="MainHull" parent="." unique_id=123633979 instance=ExtResource("1_hull")]
+position = Vector2(-16, 48)
+editor_snap_size = 16
 
-[node name="TaskPlaceholder" parent="MainHull" instance=ExtResource("6_task")]
+[node name="TaskPlaceholder" parent="MainHull" unique_id=109450670 instance=ExtResource("6_task")]
 position = Vector2(64, -80)
 
-[node name="LeftHallway" parent="." instance=ExtResource("2_horizontal")]
+[node name="LeftHallway" parent="." unique_id=1726546278 instance=ExtResource("2_horizontal")]
 position = Vector2(-144, -80)
+editor_snap_size = 16
 
-[node name="LeftDownCorner" parent="." instance=ExtResource("3_corner")]
+[node name="LeftDownCorner" parent="." unique_id=272993486 instance=ExtResource("3_corner")]
 position = Vector2(-272, -80)
+editor_snap_size = 16
 
-[node name="DownHallway" parent="." instance=ExtResource("4_vertical")]
+[node name="DownHallway" parent="." unique_id=370243936 instance=ExtResource("4_vertical")]
 position = Vector2(-272, 48)
+editor_snap_size = 16
 
-[node name="CargoRoom" parent="." instance=ExtResource("5_cargo")]
-position = Vector2(-272, 160)
+[node name="CargoRoom" parent="." unique_id=21569011 instance=ExtResource("5_cargo")]
+position = Vector2(-272, 144)
+editor_snap_size = 16

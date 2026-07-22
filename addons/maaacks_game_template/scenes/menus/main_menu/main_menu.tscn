@@ -13,6 +13,15 @@ confirm_new_game = true
 options_packed_scene = ExtResource("3_0jpat")
 credits_packed_scene = ExtResource("4_m0ubd")
 
+[node name="BackgroundMusicPlayer" parent="." index="1" unique_id=1141822549]
+bus = &"Master"
+
+[node name="TitleLabel" parent="MenuContainer/TitleMargin/TitleContainer" parent_id_path=PackedInt32Array(556427956) index="0" unique_id=359406872]
+text = "GMTK2026"
+
+[node name="SubTitleLabel" parent="MenuContainer/SubTitleMargin/SubTitleContainer" parent_id_path=PackedInt32Array(930520368) index="0" unique_id=1037003361]
+text = "Blast Off!"
+
 [node name="ContinueGameButton" type="Button" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer" parent_id_path=PackedInt32Array(2017477786) index="1" unique_id=1495566523]
 unique_name_in_owner = true
 visible = false
@@ -34,10 +43,14 @@ offset_left = -210.0
 offset_top = -100.0
 offset_right = 210.0
 offset_bottom = 100.0
+ignore_siblings = false
 title = "New Game"
 text = "Are you sure you want to start a new game?
 
 All progress in the current game will be lost."
+
+[node name="ExitConfirmation" parent="." index="6" unique_id=912502155]
+ignore_siblings = false
 
 [connection signal="pressed" from="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/ContinueGameButton" to="." method="_on_continue_game_button_pressed"]
 [connection signal="pressed" from="MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/LevelSelectButton" to="." method="_on_level_select_button_pressed"]
