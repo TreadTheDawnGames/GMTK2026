@@ -7,14 +7,12 @@ signal task_completed(objective: TaskObjective, repair_amount: float)
 signal task_cancelled(objective: TaskObjective)
 
 @export var task_scene: PackedScene = preload("res://scenes/tasks/typing_task.tscn")
-@export var disable_after_completion := true
 
+@onready var damage: SystemDamage = %Damage
 @onready var artwork: Sprite2D = %Artwork
 @onready var task_overlay: CanvasLayer = %TaskOverlay
 
-var is_completed := false
-var _active_task: Control
-var _was_tree_paused := false
+var _active_task: RepairTask
 
 
 func _input_event(_viewport: Node, event: InputEvent, _shape_index: int) -> void:
@@ -26,9 +24,11 @@ func _input_event(_viewport: Node, event: InputEvent, _shape_index: int) -> void
 
 
 func open_task() -> void:
-	if _active_task != null or (is_completed and disable_after_completion):
+	if _active_task != null:
+		_active_task.show()
 		return
 	if task_scene == null:
+		#task_scene = TaskPicker.pick_scene()
 		push_error("TaskObjective requires a task scene.")
 		return
 	var task := task_scene.instantiate() as Control
@@ -40,30 +40,23 @@ func open_task() -> void:
 		task.queue_free()
 		return
 	_active_task = task
-	_active_task.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
-	_active_task.connect("task_exit", _on_task_exit)
+	_active_task.task_exit.connect(_on_task_exit)
 	task_overlay.add_child(_active_task)
-	_was_tree_paused = get_tree().paused
-	get_tree().paused = true
 	task_opened.emit(self)
-
+	
 
 func _on_task_exit(repair_amount: float) -> void:
 	if _active_task == null:
 		return
-	_active_task.queue_free()
-	_active_task = null
-	get_tree().paused = _was_tree_paused
+	_active_task.hide()
 	if repair_amount < 0.0:
 		task_cancelled.emit(self)
 		return
-	is_completed = true
-	if disable_after_completion:
-		input_pickable = false
-		artwork.modulate = Color(0.35, 0.65, 0.35, 1.0)
+	damage.repair_damage(repair_amount)
 	task_completed.emit(self, repair_amount)
+	_active_task.queue_free()
+	_active_task = null
 
 
 func _exit_tree() -> void:
-	if _active_task != null and get_tree() != null:
-		get_tree().paused = _was_tree_paused
+	pass

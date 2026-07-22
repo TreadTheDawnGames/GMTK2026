@@ -46,7 +46,6 @@ func update_visual():
 	if num_correct_letters != goal_word.length():
 		return
 	words_typed += 1
-	print("word finished. Words typed:", words_typed)
 	if words_typed < total_words_to_type:
 		set_goal_word()
 	else:
