@@ -5,7 +5,7 @@ class_name RepairTask
 
 signal task_exit(repair_amount : float)
 
-@export var repair_value : float = 30.0
+@export var repair_value : float = 20.0
 
 var complete : bool = false
 

@@ -10,7 +10,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_kbro5")
-repair_value = 30.0
+repair_value = 20.0
 
 [node name="PanelContainer" type="PanelContainer" parent="." unique_id=1165573392]
 custom_maximum_size = Vector2(869, 445)

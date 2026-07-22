@@ -5,7 +5,7 @@
 
 [node name="WinButtonTask" unique_id=1113953500 instance=ExtResource("1_q5tle")]
 script = ExtResource("2_hkji3")
-repair_value = 30.0
+repair_value = 20.0
 
 [node name="Control" type="Control" parent="PanelContainer/PanelContainer/MarginContainer/VBoxContainer" parent_id_path=PackedInt32Array(884116960) index="0" unique_id=1396418202]
 layout_mode = 2

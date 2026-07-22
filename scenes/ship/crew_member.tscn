@@ -35,4 +35,4 @@ radius = 4.0
 neighbor_distance = 32.0
 max_neighbors = 4
 time_horizon_agents = 0.5
-max_speed = 72.0
+max_speed = 144.0
