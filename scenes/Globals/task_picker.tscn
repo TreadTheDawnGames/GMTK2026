@@ -1,9 +1,9 @@
 [gd_scene format=3 uid="uid://c2ruy478g7ua7"]
 
 [ext_resource type="Script" uid="uid://ch5q5y5v2x36" path="res://scripts/globals/task_picker.gd" id="1_044fu"]
-[ext_resource type="PackedScene" uid="uid://bfdkuypkrwl5t" path="res://Scenes/tasks/typing_task.tscn" id="2_5fch3"]
-[ext_resource type="PackedScene" uid="uid://dh4sggkyy3780" path="res://Scenes/tasks/win_button_task.tscn" id="3_5rtq5"]
+[ext_resource type="PackedScene" uid="uid://bfdkuypkrwl5t" path="res://scenes/tasks/typing_task.tscn" id="2_5fch3"]
+[ext_resource type="PackedScene" uid="uid://dh4sggkyy3780" path="res://scenes/tasks/win_button_task.tscn" id="3_5rtq5"]
 
 [node name="TaskPicker" type="Node" unique_id=859688646]
 script = ExtResource("1_044fu")
-_all_tasks = Array[PackedScene]([ExtResource("2_5fch3"), ExtResource("3_5rtq5")])
+task_scenes = Array[PackedScene]([ExtResource("2_5fch3"), ExtResource("3_5rtq5")])

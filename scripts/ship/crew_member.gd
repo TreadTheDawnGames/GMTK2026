@@ -12,7 +12,7 @@ signal move_order_received(crew_member: CrewMember, destination: Vector2)
 		crew_texture = value
 		if is_node_ready():
 			crew_sprite.texture = crew_texture
-@export_range(10.0, 300.0, 1.0) var move_speed := 72.0
+@export_range(10.0, 300.0, 1.0) var move_speed := 144.0
 @export_range(4.0, 40.0, 1.0) var selection_radius := 16.0
 
 @onready var crew_sprite: Sprite2D = %CrewSprite

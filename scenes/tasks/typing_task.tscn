@@ -1,11 +1,16 @@
 [gd_scene format=3 uid="uid://bfdkuypkrwl5t"]
 
-[ext_resource type="PackedScene" uid="uid://4g1aoviidfta" path="res://Scenes/tasks/task_base.tscn" id="1_63kbg"]
+[ext_resource type="PackedScene" uid="uid://4g1aoviidfta" path="res://scenes/tasks/task_base.tscn" id="1_63kbg"]
 [ext_resource type="Script" uid="uid://cagbw7t6sbqqb" path="res://scripts/ship/tasks/typing_task.gd" id="2_tbi26"]
-[ext_resource type="Script" uid="uid://bsexbjc2q0o37" path="res://Scenes/tasks/stacked_TextLabel.gd" id="3_b6t0l"]
+[ext_resource type="Script" uid="uid://bsexbjc2q0o37" path="res://scenes/tasks/stacked_text_label.gd" id="3_b6t0l"]
 
 [node name="Task" unique_id=1113953500 instance=ExtResource("1_63kbg")]
 script = ExtResource("2_tbi26")
+path_to_task_words = "res://resources/word_library.txt"
+total_words_to_type = 3
+words_typed = 0
+acceptable_word_length = 6
+repair_value = 20.0
 
 [node name="TextArea" type="Control" parent="PanelContainer/PanelContainer/MarginContainer/VBoxContainer" parent_id_path=PackedInt32Array(884116960) index="0" unique_id=535408561]
 unique_name_in_owner = true

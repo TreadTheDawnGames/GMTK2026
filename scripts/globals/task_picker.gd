@@ -1,18 +1,12 @@
 extends Node
 ## Selects a playable task scene for ship-room objectives.
 
-@export var task_scenes: Array[PackedScene] = [
-	preload("res://scenes/tasks/typing_task.tscn"),
-]
+@export var task_scenes: Array[PackedScene] = []
 
-@export var _all_tasks : Array[PackedScene]
 
-func get_task(not_task : RepairTask = null) -> PackedScene:
-	var picked_task : PackedScene = _all_tasks.pick_random()
-	var rerolls : int = 5
-	if not_task:
-		while picked_task.get_script() != not_task.get_script() and rerolls > 0:
-			picked_task = _all_tasks.pick_random()
-			rerolls -= 1
-			print("rerolled")
-	return picked_task
+func get_task(excluded_scene: PackedScene = null) -> PackedScene:
+	var available_tasks: Array[PackedScene] = []
+	for task_scene in task_scenes:
+		if task_scene != null and (task_scene != excluded_scene or task_scenes.size() == 1):
+			available_tasks.append(task_scene)
+	return available_tasks.pick_random() if not available_tasks.is_empty() else null

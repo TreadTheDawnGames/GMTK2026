@@ -1,8 +1,8 @@
 extends RepairTask
 class_name WinButtonTask
+## Completes when the player presses its authored confirmation button.
 
-# Called when the node enters the scene tree for the first time.
+
 func _ready() -> void:
 	super._ready()
 	%Button.pressed.connect(_succeed)
-	pass # Replace with function body.

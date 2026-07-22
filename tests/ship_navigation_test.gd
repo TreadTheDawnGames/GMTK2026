@@ -4,6 +4,8 @@ extends SceneTree
 const LEVEL_SCENE := preload("res://scenes/game_scene/levels/spaceship_level.tscn")
 const EXPECTED_SECTION_COUNT := 14
 const EXPECTED_TRANSITION_COUNT := 14
+const EXPECTED_CREW_COUNT := 4
+const EXPECTED_CREW_SPEED := 144.0
 
 
 func _initialize() -> void:
@@ -16,6 +18,20 @@ func _initialize() -> void:
 	await physics_frame
 
 	var ship := level.get_node("BaseShip") as ShipBuilder
+	var crew_container := level.get_node("CrewContainer")
+	if crew_container.get_child_count() != EXPECTED_CREW_COUNT:
+		_fail(
+			"Expected %d starter crew members, found %d." % [
+				EXPECTED_CREW_COUNT,
+				crew_container.get_child_count(),
+			]
+		)
+		return
+	for child in crew_container.get_children():
+		var starter_crew := child as CrewMember
+		if starter_crew == null or not is_equal_approx(starter_crew.move_speed, EXPECTED_CREW_SPEED):
+			_fail("Starter crew does not use the expected 2x movement speed.")
+			return
 	var sections: Array[ShipSection] = []
 	for descendant in ship.find_children("*", "ShipSection", true, false):
 		var section := descendant as ShipSection

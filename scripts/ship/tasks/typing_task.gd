@@ -39,7 +39,7 @@ func _pick_word() -> String:
 	
 	var picked_word : String = valid_words.pick_random()
 	var rerolls : int = 5
-	while picked_word != goal_word and rerolls > 0:
+	while picked_word == goal_word and rerolls > 0:
 		picked_word = valid_words.pick_random()
 		rerolls -= 1
 	
