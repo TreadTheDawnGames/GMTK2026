@@ -1,0 +1,18 @@
+[gd_resource type="TileSet" format=3]
+
+[ext_resource type="Texture2D" uid="uid://jf5ujd8xeiah" path="res://addons/maaacks_game_template/assets (2)/tiles/corridors/corridor_atlas.png" id="1_atlas"]
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_corridors"]
+texture = ExtResource("1_atlas")
+texture_region_size = Vector2i(32, 32)
+0:0/0 = 0
+1:0/0 = 0
+2:0/0 = 0
+3:0/0 = 0
+4:0/0 = 0
+5:0/0 = 0
+
+[resource]
+resource_name = "Corridor Tile Set"
+tile_size = Vector2i(32, 32)
+sources/0 = SubResource("TileSetAtlasSource_corridors")
