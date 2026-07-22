@@ -5,7 +5,7 @@ class_name RepairTask
 
 signal task_exit(repair_amount : float)
 
-@export var repair_value : float = 1.0
+@export var repair_value : float = 30.0
 
 var complete : bool = false
 
@@ -19,8 +19,8 @@ func _task_ready():
 
 ## Call this when a task is succeeded. Emits the repair value for the task.
 func _succeed():
-	task_exit.emit(repair_value)
 	complete = true
+	task_exit.emit(repair_value)
 
 ## Call this when a task is exited (not succeeded). Emits -1 as the repair value for the task.
 func _exit():
@@ -29,5 +29,5 @@ func _exit():
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var key_event : InputEventKey = event as InputEventKey
-		if key_event.keycode == Key.KEY_ESCAPE:
+		if key_event.pressed and not key_event.echo and key_event.keycode == Key.KEY_ESCAPE:
 			_exit()

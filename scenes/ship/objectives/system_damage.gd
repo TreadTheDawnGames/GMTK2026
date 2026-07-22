@@ -4,7 +4,7 @@ class_name SystemDamage
 
 signal system_destroyed()
 
-@export var max_health: float = 10.0:
+@export var max_health: float = 90.0:
 	set(value):
 		max_health = maxf(value, 0.0)
 		max_value = max_health

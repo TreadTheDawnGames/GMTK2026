@@ -13,9 +13,11 @@ signal task_cancelled(objective: TaskObjective)
 @onready var damage: SystemDamage = %Damage
 @onready var artwork: Sprite2D = %Artwork
 @onready var task_overlay: CanvasLayer = %TaskOverlay
+@onready var _task_picker: Variant = get_node("/root/TaskPicker")
 
 var _active_task: Control
 var _room: ShipSection
+var _last_task_scene: PackedScene
 
 
 func _ready() -> void:
@@ -44,10 +46,7 @@ func open_task() -> void:
 	if _active_task != null:
 		_active_task.show()
 		return
-	var selected_task_scene: PackedScene
-	var task_picker := get_node_or_null("/root/TaskPicker")
-	if task_picker != null and task_picker.has_method("pick_scene"):
-		selected_task_scene = task_picker.call("pick_scene") as PackedScene
+	var selected_task_scene: PackedScene = _task_picker.get_task(_last_task_scene)
 	if selected_task_scene == null:
 		selected_task_scene = task_scene
 	if selected_task_scene == null:
@@ -61,6 +60,7 @@ func open_task() -> void:
 		push_error("TaskObjective task scene must define a task_exit signal.")
 		task.queue_free()
 		return
+	_last_task_scene = selected_task_scene
 	_active_task = task
 	_active_task.connect("task_exit", _on_task_exit)
 	task_overlay.add_child(_active_task)
