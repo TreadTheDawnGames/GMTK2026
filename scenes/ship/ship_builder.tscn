@@ -6,7 +6,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_t_right_down_left_section.tscn" id="3_t_junction"]
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_vertical_section.tscn" id="4_vertical"]
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/cargo_section.tscn" id="5_cargo"]
-[ext_resource type="PackedScene" path="res://scenes/ship/objectives/task_placeholder.tscn" id="6_task"]
+[ext_resource type="PackedScene" uid="uid://rotvs88lgq2" path="res://scenes/ship/objectives/task_placeholder.tscn" id="6_task"]
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/crew_section.tscn" id="7_crew"]
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/airlock_section.tscn" id="8_airlock"]
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_horizontal_80_section.tscn" id="9_horizontal_80"]
