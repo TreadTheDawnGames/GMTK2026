@@ -5,7 +5,9 @@ class_name RepairTask
 
 signal task_exit(repair_amount : float)
 
-@export var repair_value : float = 20.0
+const DEFAULT_REPAIR_SECONDS := 15.0
+
+@export var repair_value: float = DEFAULT_REPAIR_SECONDS
 
 var complete : bool = false
 
