@@ -4,8 +4,10 @@ extends Node
 
 signal selection_changed(selected_crew: Array[CrewMember])
 signal move_order_issued(destination: Vector2, crew_count: int)
+signal room_selected(room: ShipSection)
 
 @export var crew_container: Node2D
+@export var ship_builder: ShipBuilder
 @export var selection_box: Control
 @export_range(0.0, 32.0, 1.0) var formation_spacing := 10.0
 ## Pointer movement required before a left click becomes a drag selection.
@@ -50,6 +52,18 @@ func select_at_world_position(world_position: Vector2, additive := false) -> voi
 			_selected_crew.append(selected_target)
 			selected_target.set_selected(true)
 	selection_changed.emit(get_selected_crew())
+	if selected_target == null and not additive:
+		select_room_at_world_position(world_position)
+
+
+func select_room_at_world_position(world_position: Vector2) -> ShipSection:
+	if ship_builder == null:
+		return null
+	var room := ship_builder.get_room_at_world_position(world_position)
+	if room != null and room.select_room():
+		room_selected.emit(room)
+		return room
+	return null
 
 
 func select_in_screen_rect(screen_rect: Rect2, additive := false) -> void:

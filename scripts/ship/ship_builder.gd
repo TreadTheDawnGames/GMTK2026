@@ -96,6 +96,20 @@ func get_ship_bounds() -> Rect2:
 	return bounds
 
 
+func get_room_at_world_position(world_position: Vector2) -> ShipSection:
+	var closest_room: ShipSection
+	var smallest_area := INF
+	for section in _get_sections():
+		if section.get_task_objective() == null or not section.contains_world_point(world_position):
+			continue
+		var visual_size := section.get_visual_bounds().size
+		var visual_area := visual_size.x * visual_size.y
+		if visual_area < smallest_area:
+			closest_room = section
+			smallest_area = visual_area
+	return closest_room
+
+
 func _get_sections() -> Array[ShipSection]:
 	var sections: Array[ShipSection] = []
 	for descendant in find_children("*", "ShipSection", true, false):

@@ -9,7 +9,6 @@
 size = Vector2(32, 32)
 
 [node name="SystemPlaceholder" type="Area2D" unique_id=1968074279]
-position = Vector2(399, 244)
 collision_layer = 2
 collision_mask = 0
 script = ExtResource("2_objective")
@@ -40,10 +39,6 @@ texture_progress = ExtResource("3_tfjgi")
 tint_under = Color(0.5330367, 0.5330367, 0.5330367, 1)
 script = ExtResource("4_yew4t")
 metadata/_edit_use_anchors_ = true
-
-[node name="TimeBeforeDestruction" type="Timer" parent="Damage" unique_id=2071377005]
-unique_name_in_owner = true
-one_shot = true
 
 [node name="TaskOverlay" type="CanvasLayer" parent="." unique_id=1665560322]
 unique_name_in_owner = true

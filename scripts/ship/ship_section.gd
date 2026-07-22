@@ -4,6 +4,7 @@ extends Node2D
 ## Manually placed, grid-snapped ship section with explicit connection points.
 
 signal placement_changed(section: ShipSection)
+signal room_selected(room: ShipSection)
 
 enum Connection {
 	UP = 1,
@@ -137,6 +138,27 @@ func get_visual_bounds() -> Rect2:
 			else:
 				bounds = bounds.expand(point)
 	return bounds
+
+
+func contains_world_point(world_point: Vector2) -> bool:
+	return get_visual_bounds().has_point(to_local(world_point))
+
+
+func get_task_objective() -> TaskObjective:
+	for descendant in find_children("*", "TaskObjective", true, false):
+		var objective := descendant as TaskObjective
+		if objective != null:
+			return objective
+	return null
+
+
+func select_room() -> bool:
+	var objective := get_task_objective()
+	if objective == null:
+		return false
+	room_selected.emit(self)
+	objective.open_task()
+	return true
 
 
 func _update_connection_markers() -> void:

@@ -23,6 +23,7 @@ var is_selected := false
 
 
 func _ready() -> void:
+	add_to_group("crew_members")
 	crew_sprite.texture = crew_texture
 	selection_indicator.visible = is_selected
 

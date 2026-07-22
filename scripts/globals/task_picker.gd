@@ -1,11 +1,14 @@
 extends Node
+## Selects a playable task scene for ship-room objectives.
+
+@export var task_scenes: Array[PackedScene] = [
+	preload("res://scenes/tasks/typing_task.tscn"),
+]
 
 
-# Called when the node enters the scene tree for the first time.
-func _ready() -> void:
-	pass # Replace with function body.
-
-
-# Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(delta: float) -> void:
-	pass
+func pick_scene() -> PackedScene:
+	var available_tasks: Array[PackedScene] = []
+	for task_scene in task_scenes:
+		if task_scene != null:
+			available_tasks.append(task_scene)
+	return available_tasks.pick_random() if not available_tasks.is_empty() else null

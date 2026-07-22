@@ -32,9 +32,10 @@ position = Vector2(680, 264)
 display_name = "MrDpwnSyndrome"
 crew_texture = ExtResource("4_crew_b")
 
-[node name="ShipCommandController" type="Node" parent="." unique_id=808510608 node_paths=PackedStringArray("crew_container", "selection_box")]
+[node name="ShipCommandController" type="Node" parent="." unique_id=808510608 node_paths=PackedStringArray("crew_container", "ship_builder", "selection_box")]
 script = ExtResource("5_commands")
 crew_container = NodePath("../CrewContainer")
+ship_builder = NodePath("../BaseShip")
 selection_box = NodePath("../Controls/SelectionBox")
 
 [node name="Camera2D" type="Camera2D" parent="." unique_id=424725088 node_paths=PackedStringArray("framing_target")]
@@ -56,4 +57,4 @@ offset_bottom = 52.0
 
 [node name="Label" type="Label" parent="Controls/ControlsPanel" unique_id=1783932633]
 layout_mode = 2
-text = "Left click or drag: select crew | Shift: add selection | Right click: move | WASD/middle drag: pan | Wheel: zoom"
+text = "Left click: crew/room | Drag: select crew | Shift: add crew | Right click: move | WASD/middle drag: pan | Wheel: zoom"
