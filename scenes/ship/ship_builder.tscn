@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://c074tui02p5if" path="res://scripts/ship/ship_builder.gd" id="1_builder"]
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/main_hull_section.tscn" id="1_hull"]
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_horizontal_section.tscn" id="2_horizontal"]
-[ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_corner_right_down_section.tscn" id="3_corner"]
+[ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_t_right_down_left_section.tscn" id="3_t_junction"]
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_vertical_section.tscn" id="4_vertical"]
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/cargo_section.tscn" id="5_cargo"]
 [ext_resource type="PackedScene" path="res://scenes/ship/objectives/task_placeholder.tscn" id="6_task"]
@@ -27,8 +27,12 @@ position = Vector2(64, -80)
 position = Vector2(-160, -32)
 editor_snap_size = 16
 
-[node name="LeftDownCorner" parent="." unique_id=272993486 instance=ExtResource("3_corner")]
+[node name="LeftTJunction" parent="." unique_id=272993486 instance=ExtResource("3_t_junction")]
 position = Vector2(-288, -32)
+editor_snap_size = 16
+
+[node name="PortCrewQuarters" parent="." unique_id=1132758648 instance=ExtResource("7_crew")]
+position = Vector2(-496, -32)
 editor_snap_size = 16
 
 [node name="DownHallway" parent="." unique_id=370243936 instance=ExtResource("4_vertical")]
