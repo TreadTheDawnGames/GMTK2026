@@ -1,47 +1,45 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene format=3 uid="uid://daf6x67e5v3oj"]
 
-[ext_resource type="PackedScene" path="res://scenes/ship/ship_builder.tscn" id="1_ship"]
+[ext_resource type="PackedScene" uid="uid://dudpxx04vy3wp" path="res://scenes/ship/ship_builder.tscn" id="1_ship"]
 [ext_resource type="PackedScene" path="res://scenes/ship/crew_member.tscn" id="2_crew"]
-[ext_resource type="Texture2D" path="res://assets/crew/mr_diabetes.png" id="3_crew_a"]
-[ext_resource type="Texture2D" path="res://assets/crew/mr_dpwn_syndrome.png" id="4_crew_b"]
-[ext_resource type="Script" path="res://scripts/ship/ship_command_controller.gd" id="5_commands"]
-[ext_resource type="Script" path="res://scripts/ship/ship_camera_controller.gd" id="6_camera"]
+[ext_resource type="Texture2D" uid="uid://b2ulxjoktkfwa" path="res://assets/crew/mr_diabetes.png" id="3_crew_a"]
+[ext_resource type="Texture2D" uid="uid://c364kiex35fse" path="res://assets/crew/mr_dpwn_syndrome.png" id="4_crew_b"]
+[ext_resource type="Script" uid="uid://bvsynalhfs5sr" path="res://scripts/ship/ship_command_controller.gd" id="5_commands"]
+[ext_resource type="Script" uid="uid://dte6imxwmipyc" path="res://scripts/ship/ship_camera_controller.gd" id="6_camera"]
 
-[node name="SpaceshipLevel" type="Node2D"]
+[node name="SpaceshipLevel" type="Node2D" unique_id=32480790]
 
-[node name="BaseShip" parent="." instance=ExtResource("1_ship")]
-position = Vector2(640, 360)
+[node name="BaseShip" parent="." unique_id=1287973060 instance=ExtResource("1_ship")]
+position = Vector2(631, 360)
 
-[node name="CrewContainer" type="Node2D" parent="."]
+[node name="CrewContainer" type="Node2D" parent="." unique_id=1374625032]
 
-[node name="CrewOne" parent="CrewContainer" instance=ExtResource("2_crew")]
+[node name="CrewOne" parent="CrewContainer" unique_id=1438182807 instance=ExtResource("2_crew")]
 position = Vector2(600, 264)
 display_name = "MRdiabetes"
 crew_texture = ExtResource("3_crew_a")
 
-[node name="CrewTwo" parent="CrewContainer" instance=ExtResource("2_crew")]
+[node name="CrewTwo" parent="CrewContainer" unique_id=1748148262 instance=ExtResource("2_crew")]
 position = Vector2(680, 264)
 display_name = "MrDpwnSyndrome"
 crew_texture = ExtResource("4_crew_b")
 
-[node name="ShipCommandController" type="Node" parent="." node_paths=PackedStringArray("crew_container")]
+[node name="ShipCommandController" type="Node" parent="." unique_id=808510608 node_paths=PackedStringArray("crew_container")]
 script = ExtResource("5_commands")
 crew_container = NodePath("../CrewContainer")
 
-[node name="Camera2D" type="Camera2D" parent="."]
-position = Vector2(640, 360)
-zoom = Vector2(1.35, 1.35)
-enabled = true
+[node name="Camera2D" type="Camera2D" parent="." unique_id=424725088 node_paths=PackedStringArray("framing_target")]
 script = ExtResource("6_camera")
+framing_target = NodePath("../BaseShip")
 
-[node name="Controls" type="CanvasLayer" parent="."]
+[node name="Controls" type="CanvasLayer" parent="." unique_id=1856149281]
 
-[node name="ControlsPanel" type="PanelContainer" parent="Controls"]
+[node name="ControlsPanel" type="PanelContainer" parent="Controls" unique_id=1361714112]
 offset_left = 16.0
 offset_top = 16.0
 offset_right = 575.0
 offset_bottom = 52.0
 
-[node name="Label" type="Label" parent="Controls/ControlsPanel"]
+[node name="Label" type="Label" parent="Controls/ControlsPanel" unique_id=1783932633]
 layout_mode = 2
 text = "Left click: select crew | Right click: move | WASD/Arrows or middle drag: pan | Wheel: zoom"

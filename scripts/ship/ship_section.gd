@@ -95,22 +95,41 @@ func get_world_connection_position(direction: Connection) -> Vector2:
 	return marker.global_position if marker != null else global_position
 
 
-func can_connect_to(other: ShipSection, direction: Connection) -> bool:
-	return other != null and has_connection(direction) and other.has_connection(opposite(direction))
-
-
-static func opposite(direction: Connection) -> Connection:
+func get_world_connection_direction(direction: Connection) -> Vector2:
+	var local_direction := Vector2.ZERO
 	match direction:
 		Connection.UP:
-			return Connection.DOWN
+			local_direction = Vector2.UP
 		Connection.RIGHT:
-			return Connection.LEFT
+			local_direction = Vector2.RIGHT
 		Connection.DOWN:
-			return Connection.UP
+			local_direction = Vector2.DOWN
 		Connection.LEFT:
-			return Connection.RIGHT
-		_:
-			return Connection.UP
+			local_direction = Vector2.LEFT
+	return global_transform.basis_xform(local_direction).normalized()
+
+
+func get_visual_bounds() -> Rect2:
+	var bounds := Rect2()
+	var has_bounds := false
+	for child in get_children():
+		var artwork := child as Sprite2D
+		if artwork == null:
+			continue
+		var artwork_rect := artwork.get_rect()
+		for corner: Vector2 in [
+			artwork_rect.position,
+			Vector2(artwork_rect.end.x, artwork_rect.position.y),
+			artwork_rect.end,
+			Vector2(artwork_rect.position.x, artwork_rect.end.y),
+		]:
+			var point: Vector2 = artwork.transform * corner
+			if not has_bounds:
+				bounds = Rect2(point, Vector2.ZERO)
+				has_bounds = true
+			else:
+				bounds = bounds.expand(point)
+	return bounds
 
 
 func _update_connection_markers() -> void:
