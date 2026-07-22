@@ -1,14 +1,15 @@
 [gd_scene format=3 uid="uid://bfdkuypkrwl5t"]
 
-[ext_resource type="PackedScene" uid="uid://4g1aoviidfta" path="res://Scenes/Tasks/task_base.tscn" id="1_t73im"]
-[ext_resource type="Script" uid="uid://cagbw7t6sbqqb" path="res://Scenes/Tasks/typing_task.gd" id="2_tbi26"]
+[ext_resource type="PackedScene" uid="uid://4g1aoviidfta" path="res://Scenes/Tasks/task_base.tscn" id="1_63kbg"]
+[ext_resource type="Script" uid="uid://cagbw7t6sbqqb" path="res://Scenes/tasks/typing_task.gd" id="2_tbi26"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_6ko1l"]
 font_size = 86
 font_color = Color(0.48570347, 0.48570353, 0.48570347, 1)
 
-[node name="Task" unique_id=1113953500 instance=ExtResource("1_t73im")]
+[node name="Task" unique_id=1113953500 instance=ExtResource("1_63kbg")]
 script = ExtResource("2_tbi26")
+path_to_task_words = "res://Resources/WordLibrary.txt"
 
 [node name="MarginContainer" type="MarginContainer" parent="PanelContainer" parent_id_path=PackedInt32Array(1165573392) index="0" unique_id=680791123]
 layout_mode = 2
