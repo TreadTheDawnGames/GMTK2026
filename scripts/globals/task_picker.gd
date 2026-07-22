@@ -14,4 +14,5 @@ func get_task(not_task : RepairTask = null) -> PackedScene:
 		while picked_task.get_script() != not_task.get_script() and rerolls > 0:
 			picked_task = _all_tasks.pick_random()
 			rerolls -= 1
+			print("rerolled")
 	return picked_task

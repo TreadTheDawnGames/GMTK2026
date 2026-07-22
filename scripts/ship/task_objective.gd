@@ -44,16 +44,8 @@ func open_task() -> void:
 	if _active_task != null:
 		_active_task.show()
 		return
-	var selected_task_scene: PackedScene
-	var task_picker := get_node_or_null("/root/TaskPicker")
-	if task_picker != null and task_picker.has_method("pick_scene"):
-		selected_task_scene = task_picker.call("pick_scene") as PackedScene
-	if selected_task_scene == null:
-		selected_task_scene = task_scene
-	if selected_task_scene == null:
-		push_error("TaskObjective requires a task scene.")
-		return
-	var task := selected_task_scene.instantiate() as Control
+	
+	var task := task_scene.instantiate() as Control
 	if task == null:
 		push_error("TaskObjective task scene root must be a Control.")
 		return
@@ -63,6 +55,8 @@ func open_task() -> void:
 		return
 	_active_task = task
 	_active_task.connect("task_exit", _on_task_exit)
+	task_scene = TaskPicker.get_task(_active_task)
+
 	task_overlay.add_child(_active_task)
 	task_opened.emit(self)
 
