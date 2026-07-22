@@ -20,16 +20,35 @@ func _initialize() -> void:
 		_fail("CargoRoom does not contain a selectable task objective.")
 		return
 
-	var selected_room := controller.select_room_at_world_position(cargo_room.global_position)
-	if selected_room != cargo_room or not objective.has_active_task():
-		_fail("Selecting CargoRoom did not ask TaskPicker to open a task.")
+	# Exercise the same press/release path used by a real mouse click, away from
+	# the smaller objective icon so the room itself is the input target.
+	var room_click_world := cargo_room.global_transform * Vector2(48.0, 40.0)
+	var room_click_screen := level.get_viewport().get_canvas_transform() * room_click_world
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.position = room_click_screen
+	press.pressed = true
+	controller._unhandled_input(press)
+	var release := InputEventMouseButton.new()
+	release.button_index = MOUSE_BUTTON_LEFT
+	release.position = room_click_screen
+	release.pressed = false
+	controller._unhandled_input(release)
+	if not objective.has_active_task():
+		_fail("Clicking CargoRoom did not ask TaskPicker to open a task.")
 		return
 
-	objective.set_physics_process(false)
 	objective.damage.set_process(false)
-	crew.global_position = cargo_room.global_position
 	second_crew.global_position = Vector2(5000.0, 5000.0)
-	objective._physics_process(0.0)
+	crew.move_to(cargo_room.global_position)
+	for _frame in range(480):
+		await physics_frame
+		if objective.has_crew_in_room():
+			break
+	if not objective.has_crew_in_room():
+		_fail("Crew navigation reached its timeout before entering CargoRoom.")
+		return
+	await physics_frame
 	if not is_equal_approx(
 		objective.damage.decay_rate_scale,
 		objective.crew_present_decay_multiplier
@@ -41,7 +60,7 @@ func _initialize() -> void:
 	objective.damage._process(1.0)
 	var assisted_loss := 5.0 - objective.damage.durability
 	crew.global_position = Vector2(5000.0, 5000.0)
-	objective._physics_process(0.0)
+	await physics_frame
 	var durability_before_unassisted_decay := objective.damage.durability
 	objective.damage._process(1.0)
 	var unassisted_loss := durability_before_unassisted_decay - objective.damage.durability

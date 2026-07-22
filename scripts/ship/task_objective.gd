@@ -14,7 +14,7 @@ signal task_cancelled(objective: TaskObjective)
 @onready var artwork: Sprite2D = %Artwork
 @onready var task_overlay: CanvasLayer = %TaskOverlay
 
-var _active_task: RepairTask
+var _active_task: Control
 var _room: ShipSection
 
 
@@ -62,7 +62,7 @@ func open_task() -> void:
 		task.queue_free()
 		return
 	_active_task = task
-	_active_task.task_exit.connect(_on_task_exit)
+	_active_task.connect("task_exit", _on_task_exit)
 	task_overlay.add_child(_active_task)
 	task_opened.emit(self)
 
