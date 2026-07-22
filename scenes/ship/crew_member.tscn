@@ -1,0 +1,38 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ship/crew_member.gd" id="1_crew"]
+
+[sub_resource type="CircleShape2D" id="CircleShape_crew"]
+radius = 4.0
+
+[node name="CrewMember" type="CharacterBody2D"]
+z_index = 10
+collision_layer = 2
+collision_mask = 2
+script = ExtResource("1_crew")
+
+[node name="CrewSprite" type="Sprite2D" parent="."]
+unique_name_in_owner = true
+texture_filter = 1
+scale = Vector2(3, 3)
+
+[node name="SelectionIndicator" type="Line2D" parent="."]
+unique_name_in_owner = true
+visible = false
+points = PackedVector2Array(15, 0, 13, 7.5, 7.5, 13, 0, 15, -7.5, 13, -13, 7.5, -15, 0, -13, -7.5, -7.5, -13, 0, -15, 7.5, -13, 13, -7.5)
+width = 2.0
+default_color = Color(0.1, 0.9, 1, 1)
+closed = true
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape_crew")
+
+[node name="NavigationAgent2D" type="NavigationAgent2D" parent="."]
+unique_name_in_owner = true
+path_desired_distance = 2.0
+target_desired_distance = 3.0
+radius = 4.0
+neighbor_distance = 32.0
+max_neighbors = 4
+time_horizon_agents = 0.5
+max_speed = 72.0

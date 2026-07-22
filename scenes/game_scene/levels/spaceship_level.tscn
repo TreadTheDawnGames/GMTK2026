@@ -1,12 +1,47 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/ship/spaceship_prefab.tscn" id="1_ship"]
+[ext_resource type="PackedScene" path="res://scenes/ship/crew_member.tscn" id="2_crew"]
+[ext_resource type="Texture2D" path="res://assets/crew/mr_diabetes.png" id="3_crew_a"]
+[ext_resource type="Texture2D" path="res://assets/crew/mr_dpwn_syndrome.png" id="4_crew_b"]
+[ext_resource type="Script" path="res://scripts/ship/ship_command_controller.gd" id="5_commands"]
+[ext_resource type="Script" path="res://scripts/ship/ship_camera_controller.gd" id="6_camera"]
 
 [node name="SpaceshipLevel" type="Node2D"]
 
 [node name="Spaceship" parent="." instance=ExtResource("1_ship")]
 position = Vector2(640, 360)
 
+[node name="CrewContainer" type="Node2D" parent="."]
+
+[node name="CrewOne" parent="CrewContainer" instance=ExtResource("2_crew")]
+position = Vector2(600, 264)
+display_name = "MRdiabetes"
+crew_texture = ExtResource("3_crew_a")
+
+[node name="CrewTwo" parent="CrewContainer" instance=ExtResource("2_crew")]
+position = Vector2(680, 264)
+display_name = "MrDpwnSyndrome"
+crew_texture = ExtResource("4_crew_b")
+
+[node name="ShipCommandController" type="Node" parent="." node_paths=PackedStringArray("crew_container")]
+script = ExtResource("5_commands")
+crew_container = NodePath("../CrewContainer")
+
 [node name="Camera2D" type="Camera2D" parent="."]
 position = Vector2(640, 360)
+zoom = Vector2(1.35, 1.35)
 enabled = true
+script = ExtResource("6_camera")
+
+[node name="Controls" type="CanvasLayer" parent="."]
+
+[node name="ControlsPanel" type="PanelContainer" parent="Controls"]
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 575.0
+offset_bottom = 52.0
+
+[node name="Label" type="Label" parent="Controls/ControlsPanel"]
+layout_mode = 2
+text = "Left click: select crew   •   Right click: move   •   WASD/Arrows or middle drag: pan   •   Wheel: zoom"

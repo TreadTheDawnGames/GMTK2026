@@ -1,6 +1,6 @@
 extends Task
 
-@export var path_to_task_words : String = "res://Resources/WordLibrary.txt"
+@export var path_to_task_words : String = "res://resources/word_library.txt"
 
 func _task_ready() -> void:
 	print(_pick_word())

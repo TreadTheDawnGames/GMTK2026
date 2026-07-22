@@ -3,26 +3,86 @@
 [ext_resource type="Texture2D" path="res://assets/third_party/cptfoorman_spaceship_tileset/spaceship_tiles.png" id="1_ship"]
 
 [sub_resource type="NavigationPolygon" id="NavigationPolygon_ship_interior"]
-vertices = PackedVector2Array(-42, -76, 42, -76, 42, -28, 26, -8, -26, -8, -42, -28, -18, -16, 18, -16, 18, 58, -18, 58, -22, 52, 22, 52, 22, 78, -22, 78)
-polygons = Array[PackedInt32Array]([PackedInt32Array(0, 1, 2, 3, 4, 5), PackedInt32Array(6, 7, 8, 9), PackedInt32Array(10, 11, 12, 13)])
+vertices = PackedVector2Array(-42, -76, 42, -76, 42, -28, 26, -8, -26, -8, -42, -28, -18, -16, 18, -16, 18, 58, -18, 58, -22, 52, 22, 52, 22, 78, -22, 78, -5, 70, 5, 70, 5, 134, -5, 134, -42, 132, 42, 132, 42, 152, 30, 180, -30, 180, -42, 152, -5, 175, 5, 175, 5, 242, -5, 242, -16, 240, 16, 240, 16, 268, -16, 268, -5, 268, 5, 268, 5, 308, -5, 308, -16, 308, 16, 308, 16, 336, -16, 336)
+polygons = Array[PackedInt32Array]([PackedInt32Array(0, 1, 2, 3, 4, 5), PackedInt32Array(6, 7, 8, 9), PackedInt32Array(10, 11, 12, 13), PackedInt32Array(14, 15, 16, 17), PackedInt32Array(18, 19, 20, 21, 22, 23), PackedInt32Array(24, 25, 26, 27), PackedInt32Array(28, 29, 30, 31), PackedInt32Array(32, 33, 34, 35), PackedInt32Array(36, 37, 38, 39)])
 
 [sub_resource type="RectangleShape2D" id="RectangleShape_spawn_area"]
 size = Vector2(48, 32)
 
 [node name="SpaceshipPrefab" type="Node2D"]
-scale = Vector2(3, 3)
+scale = Vector2(2, 2)
 
-[node name="ShipArtwork" type="Sprite2D" parent="."]
+[node name="MainDeck" type="Node2D" parent="."]
+
+[node name="Artwork" type="Sprite2D" parent="MainDeck"]
 texture_filter = 1
 texture = ExtResource("1_ship")
 region_enabled = true
 region_rect = Rect2(96, 48, 112, 176)
+
+[node name="SternCargoDeck" type="Node2D" parent="."]
+position = Vector2(0, 160)
+
+[node name="Artwork" type="Sprite2D" parent="SternCargoDeck"]
+texture_filter = 1
+texture = ExtResource("1_ship")
+region_enabled = true
+region_rect = Rect2(0, 48, 96, 80)
+
+[node name="CargoHallway" type="Sprite2D" parent="."]
+z_index = 2
+texture_filter = 1
+position = Vector2(0, 104)
+texture = ExtResource("1_ship")
+region_enabled = true
+region_rect = Rect2(128, 128, 48, 32)
+
+[node name="AftCrewDeck" type="Node2D" parent="."]
+position = Vector2(0, 288)
+rotation = 1.5707963267949
+
+[node name="Artwork" type="Sprite2D" parent="AftCrewDeck"]
+texture_filter = 1
+texture = ExtResource("1_ship")
+region_enabled = true
+region_rect = Rect2(80, 0, 112, 48)
+
+[node name="AftHallway" type="Sprite2D" parent="."]
+z_index = 2
+texture_filter = 1
+position = Vector2(0, 216)
+texture = ExtResource("1_ship")
+region_enabled = true
+region_rect = Rect2(128, 128, 48, 32)
 
 [node name="NavigationRegion2D" type="NavigationRegion2D" parent="."]
 navigation_polygon = SubResource("NavigationPolygon_ship_interior")
 
 [node name="PlayerSpawn" type="Marker2D" parent="."]
 position = Vector2(0, -48)
+
+[node name="MainRoomSpawn" type="Marker2D" parent="."]
+position = Vector2(-20, -48)
+
+[node name="SternRoomSpawn" type="Marker2D" parent="."]
+position = Vector2(0, 147)
+
+[node name="AftRoomSpawn" type="Marker2D" parent="."]
+position = Vector2(0, 320)
+
+[node name="CargoConnection" type="Marker2D" parent="."]
+position = Vector2(0, 104)
+
+[node name="Indicator" type="Polygon2D" parent="CargoConnection"]
+polygon = PackedVector2Array(-3, 0, 0, -3, 3, 0, 0, 3)
+color = Color(0.1, 0.85, 1, 0.8)
+
+[node name="AftConnection" type="Marker2D" parent="."]
+position = Vector2(0, 216)
+
+[node name="Indicator" type="Polygon2D" parent="AftConnection"]
+polygon = PackedVector2Array(-3, 0, 0, -3, 3, 0, 0, 3)
+color = Color(0.1, 0.85, 1, 0.8)
 
 [node name="CrewSpawnArea" type="Area2D" parent="."]
 position = Vector2(0, -44)
