@@ -1,7 +1,7 @@
 extends Control
 class_name RepairTask
 ## A task used to repair damage systems
-@onready var exit_button: Button = $PanelContainer/PanelContainer/MarginContainer/VBoxContainer/HBoxContainer/ExitButton
+@onready var exit_button: Button = %ExitButton
 
 signal task_exit(repair_amount : float)
 
@@ -33,3 +33,4 @@ func _input(event: InputEvent) -> void:
 		var key_event : InputEventKey = event as InputEventKey
 		if key_event.pressed and not key_event.echo and key_event.keycode == Key.KEY_ESCAPE:
 			_exit()
+			get_viewport().set_input_as_handled()

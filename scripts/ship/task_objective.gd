@@ -5,6 +5,7 @@ extends Area2D
 signal task_opened(objective: TaskObjective)
 signal task_completed(objective: TaskObjective, repair_amount: float)
 signal task_cancelled(objective: TaskObjective)
+signal durability_expired(objective: TaskObjective)
 
 @export var task_scene: PackedScene = preload("res://scenes/tasks/typing_task.tscn")
 ## Durability decay multiplier while one or more crew members occupy this room.
@@ -18,9 +19,11 @@ signal task_cancelled(objective: TaskObjective)
 var _active_task: RepairTask
 var _room: ShipSection
 var _last_task_scene: PackedScene
+var _global_decay_multiplier := 1.0
 
 
 func _ready() -> void:
+	damage.system_destroyed.connect(_on_damage_destroyed)
 	var ancestor := get_parent()
 	while ancestor != null and not ancestor is ShipSection:
 		ancestor = ancestor.get_parent()
@@ -28,9 +31,8 @@ func _ready() -> void:
 
 
 func _physics_process(_delta: float) -> void:
-	damage.set_decay_rate_scale(
-		crew_present_decay_multiplier if has_crew_in_room() else 1.0
-	)
+	var crew_multiplier := crew_present_decay_multiplier if has_crew_in_room() else 1.0
+	damage.set_decay_rate_scale(_global_decay_multiplier * crew_multiplier)
 
 
 func _input_event(_viewport: Node, event: InputEvent, _shape_index: int) -> void:
@@ -92,3 +94,11 @@ func has_crew_in_room() -> bool:
 
 func has_active_task() -> bool:
 	return _active_task != null
+
+
+func set_global_decay_multiplier(multiplier: float) -> void:
+	_global_decay_multiplier = maxf(multiplier, 1.0)
+
+
+func _on_damage_destroyed() -> void:
+	durability_expired.emit(self)

@@ -43,5 +43,6 @@ layout_mode = 2
 alignment = 1
 
 [node name="ExitButton" type="Button" parent="PanelContainer2/VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer" unique_id=707331258]
+unique_name_in_owner = true
 layout_mode = 2
 text = "Exit"
