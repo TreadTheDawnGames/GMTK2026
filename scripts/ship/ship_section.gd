@@ -12,7 +12,9 @@ enum Connection {
 	LEFT = 8,
 }
 
+## Stable content identifier used independently of a scene instance's node name.
 @export var section_id: StringName
+## Declares which authored edge markers may connect to another section.
 @export_flags("Up", "Right", "Down", "Left") var connections := 0:
 	set(value):
 		connections = value
@@ -42,6 +44,7 @@ func _notification(what: int) -> void:
 	if what != NOTIFICATION_TRANSFORM_CHANGED:
 		return
 	if Engine.is_editor_hint() and snap_in_editor and not _is_applying_snap:
+		# Apply section-level snapping even when Godot's global grid is disabled.
 		var snap_vector := Vector2(editor_snap_size, editor_snap_size)
 		var snapped_position := position.snapped(snap_vector)
 		if not position.is_equal_approx(snapped_position):
@@ -55,6 +58,7 @@ func _notification(what: int) -> void:
 func _refresh_navigation_transform() -> void:
 	if not is_inside_tree():
 		return
+	# NavigationServer updates can otherwise trail behind editor/runtime moves.
 	for child in get_children():
 		var navigation_region := child as NavigationRegion2D
 		if navigation_region == null:
@@ -96,6 +100,8 @@ func get_world_connection_position(direction: Connection) -> Vector2:
 
 
 func get_world_connection_direction(direction: Connection) -> Vector2:
+	# Transform the authored local edge direction so rotated/scaled modules can
+	# be matched by their actual world-facing direction.
 	var local_direction := Vector2.ZERO
 	match direction:
 		Connection.UP:
@@ -110,6 +116,7 @@ func get_world_connection_direction(direction: Connection) -> Vector2:
 
 
 func get_visual_bounds() -> Rect2:
+	# A section may be composed from several sprites, as with corners and T's.
 	var bounds := Rect2()
 	var has_bounds := false
 	for child in get_children():

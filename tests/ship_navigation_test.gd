@@ -7,6 +7,8 @@ const EXPECTED_TRANSITION_COUNT := 14
 
 
 func _initialize() -> void:
+	# Load the real level so crew spawns, section transforms, and runtime links
+	# are tested together rather than as isolated navigation resources.
 	var level := LEVEL_SCENE.instantiate()
 	root.add_child.call_deferred(level)
 	await physics_frame
@@ -38,6 +40,8 @@ func _initialize() -> void:
 		)
 		return
 
+	# First verify graph-level coverage for every convex polygon. A section-center
+	# check alone cannot detect a disconnected wing or hull tier.
 	var navigation_map := ship.get_world_2d().navigation_map
 	NavigationServer2D.map_force_update(navigation_map)
 	var main_hull := ship.get_node("MainHull") as ShipSection
@@ -82,6 +86,8 @@ func _initialize() -> void:
 				)
 				return
 
+	# Then exercise NavigationAgent2D and CharacterBody2D movement from the two
+	# authored spawn points; a server path alone does not prove agents can walk it.
 	var crew := level.get_node("CrewContainer/CrewOne") as CrewMember
 	var second_crew := level.get_node("CrewContainer/CrewTwo") as CrewMember
 	for crew_member in [crew, second_crew]:

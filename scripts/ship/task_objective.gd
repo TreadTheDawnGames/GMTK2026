@@ -24,11 +24,11 @@ func _input_event(_viewport: Node, event: InputEvent, _shape_index: int) -> void
 
 
 func open_task() -> void:
+	# Reuse an unfinished task instead of creating stacked modal overlays.
 	if _active_task != null:
 		_active_task.show()
 		return
 	if task_scene == null:
-		#task_scene = TaskPicker.pick_scene()
 		push_error("TaskObjective requires a task scene.")
 		return
 	var task := task_scene.instantiate() as Control
@@ -43,7 +43,7 @@ func open_task() -> void:
 	_active_task.task_exit.connect(_on_task_exit)
 	task_overlay.add_child(_active_task)
 	task_opened.emit(self)
-	
+
 
 func _on_task_exit(repair_amount: float) -> void:
 	if _active_task == null:
@@ -56,7 +56,3 @@ func _on_task_exit(repair_amount: float) -> void:
 	task_completed.emit(self, repair_amount)
 	_active_task.queue_free()
 	_active_task = null
-
-
-func _exit_tree() -> void:
-	pass

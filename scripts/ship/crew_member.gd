@@ -49,6 +49,8 @@ func set_selected(selected: bool) -> void:
 
 
 func move_to(world_destination: Vector2) -> void:
+	# Orders may land on transparent pixels or outside a section. Projecting the
+	# click onto the shared map keeps the agent's target reachable.
 	var navigation_map := get_world_2d().navigation_map
 	var reachable_destination := NavigationServer2D.map_get_closest_point(
 		navigation_map,

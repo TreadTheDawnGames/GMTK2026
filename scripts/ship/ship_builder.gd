@@ -2,8 +2,11 @@ class_name ShipBuilder
 extends Node2D
 ## Joins navigation between manually placed ship sections at matching connectors.
 
+## Maximum world-space gap between connector markers that should snap together.
 @export_range(0.1, 16.0, 0.1) var connection_tolerance := 4.0
+## Maximum facing error allowed between two opposing, possibly rotated connectors.
 @export_range(0.0, 45.0, 1.0) var connector_angle_tolerance := 15.0
+## Moves link endpoints inside each polygon so Godot attaches them reliably.
 @export_range(1.0, 32.0, 1.0) var navigation_link_inset := 12.0
 
 @onready var navigation_links: Node2D = %NavigationLinks
@@ -18,6 +21,7 @@ func _ready() -> void:
 
 
 func rebuild_navigation_links() -> void:
+	# Links are runtime-derived so designers only need to position section scenes.
 	for child in navigation_links.get_children():
 		navigation_links.remove_child(child)
 		child.queue_free()
@@ -33,6 +37,8 @@ func rebuild_navigation_links() -> void:
 		ShipSection.Connection.DOWN,
 		ShipSection.Connection.LEFT,
 	]
+	# Compare every active marker in world space. This keeps nested, rotated, and
+	# scaled sections working without orientation-specific builder code.
 	var minimum_opposition := cos(deg_to_rad(connector_angle_tolerance))
 	for first_index in range(sections.size()):
 		var first_section := sections[first_index]
@@ -66,6 +72,8 @@ func rebuild_navigation_links() -> void:
 
 
 func get_ship_bounds() -> Rect2:
+	# Convert every artwork corner back into builder space. Using global
+	# transforms here is required for nested or rotated section instances.
 	var bounds := Rect2()
 	var has_bounds := false
 	for section in _get_sections():
