@@ -2,7 +2,9 @@
 
 Open `ship_builder.tscn` to edit the current base ship. This is a manually authored scene: there is no procedural ship generation.
 
-Drag reusable `.tscn` sections from `scenes/ship/sections/` into `ShipBuilder`. Every section snaps to the 16-pixel source-art grid in the editor. Move complete section instances and align matching cyan connection markers; connected artwork should meet at the marker without overlapping.
+`ship_builder.tscn` is the single ship-layout scene. Every section in it owns navigation that follows the section automatically.
+
+Drag reusable `.tscn` sections from `scenes/ship/sections/` into `ShipBuilder`. Every section snaps to the 16-pixel source-art grid in the editor. Move complete section instances and align matching cyan connection markers; connected artwork should meet at the marker without overlapping. The section navigation and connector links update automatically when a section moves.
 
 Available sections include the main hull, cargo room, crew room, airlock room, horizontal hallway, vertical hallway, and a right-to-down hallway corner. Duplicate or inherit a section scene when another connector layout is needed.
 

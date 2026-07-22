@@ -3,6 +3,8 @@ class_name ShipSection
 extends Node2D
 ## Manually placed, grid-snapped ship section with explicit connection points.
 
+signal placement_changed(section: ShipSection)
+
 enum Connection {
 	UP = 1,
 	RIGHT = 2,
@@ -37,20 +39,37 @@ func _ready() -> void:
 
 
 func _notification(what: int) -> void:
-	if (
-		what != NOTIFICATION_TRANSFORM_CHANGED
-		or not Engine.is_editor_hint()
-		or not snap_in_editor
-		or _is_applying_snap
-	):
+	if what != NOTIFICATION_TRANSFORM_CHANGED:
 		return
-	var snap_vector := Vector2(editor_snap_size, editor_snap_size)
-	var snapped_position := position.snapped(snap_vector)
-	if position.is_equal_approx(snapped_position):
+	if Engine.is_editor_hint() and snap_in_editor and not _is_applying_snap:
+		var snap_vector := Vector2(editor_snap_size, editor_snap_size)
+		var snapped_position := position.snapped(snap_vector)
+		if not position.is_equal_approx(snapped_position):
+			_is_applying_snap = true
+			position = snapped_position
+			_is_applying_snap = false
+			return
+	_refresh_navigation_transform.call_deferred()
+
+
+func _refresh_navigation_transform() -> void:
+	if not is_inside_tree():
 		return
-	_is_applying_snap = true
-	position = snapped_position
-	_is_applying_snap = false
+	for child in get_children():
+		var navigation_region := child as NavigationRegion2D
+		if navigation_region == null:
+			continue
+		var navigation_map := NavigationServer2D.region_get_map(navigation_region.get_rid())
+		if navigation_map.is_valid():
+			NavigationServer2D.map_set_use_async_iterations(navigation_map, false)
+		navigation_region.force_update_transform()
+		NavigationServer2D.region_set_transform(
+			navigation_region.get_rid(),
+			navigation_region.global_transform
+		)
+		if navigation_map.is_valid():
+			NavigationServer2D.map_force_update(navigation_map)
+	placement_changed.emit(self)
 
 
 func has_connection(direction: Connection) -> bool:

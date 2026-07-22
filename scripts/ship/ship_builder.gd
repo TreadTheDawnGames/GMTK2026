@@ -9,11 +9,16 @@ extends Node2D
 
 
 func _ready() -> void:
+	NavigationServer2D.map_set_use_async_iterations(
+		get_world_2d().navigation_map,
+		false
+	)
 	rebuild_navigation_links()
 
 
 func rebuild_navigation_links() -> void:
 	for child in navigation_links.get_children():
+		navigation_links.remove_child(child)
 		child.queue_free()
 
 	var sections: Array[ShipSection] = []
@@ -21,6 +26,8 @@ func rebuild_navigation_links() -> void:
 		var section := child as ShipSection
 		if section != null:
 			sections.append(section)
+			if not section.placement_changed.is_connected(_on_section_placement_changed):
+				section.placement_changed.connect(_on_section_placement_changed)
 
 	for section in sections:
 		for direction: ShipSection.Connection in [
@@ -44,6 +51,7 @@ func rebuild_navigation_links() -> void:
 				connector_position + outward * navigation_link_inset
 			)
 			navigation_links.add_child(navigation_link)
+	NavigationServer2D.map_force_update(get_world_2d().navigation_map)
 
 
 func _find_connected_section(
@@ -59,3 +67,7 @@ func _find_connected_section(
 		if candidate.get_world_connection_position(opposite_direction).distance_to(connector_position) <= connection_tolerance:
 			return candidate
 	return null
+
+
+func _on_section_placement_changed(_section: ShipSection) -> void:
+	rebuild_navigation_links.call_deferred()
