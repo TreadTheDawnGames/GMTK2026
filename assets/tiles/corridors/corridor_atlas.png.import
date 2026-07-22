@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://jf5ujd8xeiah"
-path="res://.godot/imported/corridor_atlas.png-2c9340a06d7c2bd65c504ed4a6e090b7.ctex"
+path="res://.godot/imported/corridor_atlas.png-c71e9e30a437415c5efb4ba4299567ad.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://addons/maaacks_game_template/assets (2)/tiles/corridors/corridor_atlas.png"
-dest_files=["res://.godot/imported/corridor_atlas.png-2c9340a06d7c2bd65c504ed4a6e090b7.ctex"]
+source_file="res://assets/tiles/corridors/corridor_atlas.png"
+dest_files=["res://.godot/imported/corridor_atlas.png-c71e9e30a437415c5efb4ba4299567ad.ctex"]
 
 [params]
 
