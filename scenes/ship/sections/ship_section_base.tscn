@@ -1,0 +1,36 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ship/ship_section.gd" id="1_section"]
+
+[node name="ShipSection" type="Node2D"]
+script = ExtResource("1_section")
+
+[node name="ConnectionMarkers" type="Node2D" parent="."]
+
+[node name="ConnectionUp" type="Marker2D" parent="ConnectionMarkers"]
+unique_name_in_owner = true
+
+[node name="Indicator" type="Polygon2D" parent="ConnectionMarkers/ConnectionUp"]
+polygon = PackedVector2Array(-5, 0, 5, 0, 0, -8)
+color = Color(0.1, 0.9, 1, 0.9)
+
+[node name="ConnectionRight" type="Marker2D" parent="ConnectionMarkers"]
+unique_name_in_owner = true
+
+[node name="Indicator" type="Polygon2D" parent="ConnectionMarkers/ConnectionRight"]
+polygon = PackedVector2Array(0, -5, 0, 5, 8, 0)
+color = Color(0.1, 0.9, 1, 0.9)
+
+[node name="ConnectionDown" type="Marker2D" parent="ConnectionMarkers"]
+unique_name_in_owner = true
+
+[node name="Indicator" type="Polygon2D" parent="ConnectionMarkers/ConnectionDown"]
+polygon = PackedVector2Array(-5, 0, 5, 0, 0, 8)
+color = Color(0.1, 0.9, 1, 0.9)
+
+[node name="ConnectionLeft" type="Marker2D" parent="ConnectionMarkers"]
+unique_name_in_owner = true
+
+[node name="Indicator" type="Polygon2D" parent="ConnectionMarkers/ConnectionLeft"]
+polygon = PackedVector2Array(0, -5, 0, 5, -8, 0)
+color = Color(0.1, 0.9, 1, 0.9)

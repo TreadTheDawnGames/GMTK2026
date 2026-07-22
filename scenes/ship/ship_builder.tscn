@@ -1,0 +1,28 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/ship/ship_builder.gd" id="1_builder"]
+[ext_resource type="PackedScene" path="res://scenes/ship/sections/main_hull_section.tscn" id="1_hull"]
+[ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_horizontal_section.tscn" id="2_horizontal"]
+[ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_corner_right_down_section.tscn" id="3_corner"]
+[ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_vertical_section.tscn" id="4_vertical"]
+[ext_resource type="PackedScene" path="res://scenes/ship/sections/cargo_section.tscn" id="5_cargo"]
+
+[node name="ShipBuilder" type="Node2D"]
+script = ExtResource("1_builder")
+
+[node name="NavigationLinks" type="Node2D" parent="."]
+unique_name_in_owner = true
+
+[node name="MainHull" parent="." instance=ExtResource("1_hull")]
+
+[node name="LeftHallway" parent="." instance=ExtResource("2_horizontal")]
+position = Vector2(-144, -80)
+
+[node name="LeftDownCorner" parent="." instance=ExtResource("3_corner")]
+position = Vector2(-272, -80)
+
+[node name="DownHallway" parent="." instance=ExtResource("4_vertical")]
+position = Vector2(-272, 48)
+
+[node name="CargoRoom" parent="." instance=ExtResource("5_cargo")]
+position = Vector2(-272, 160)

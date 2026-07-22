@@ -1,0 +1,34 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/ship/sections/ship_section_base.tscn" id="1_base"]
+[ext_resource type="Texture2D" path="res://assets/third_party/cptfoorman_spaceship_tileset/spaceship_tiles.png" id="2_tiles"]
+
+[sub_resource type="NavigationPolygon" id="NavigationPolygon_section"]
+vertices = PackedVector2Array(-96, -80, 96, -80, 96, 80, -96, 80)
+polygons = Array[PackedInt32Array]([PackedInt32Array(0, 1, 2, 3)])
+
+[node name="CargoSection" instance=ExtResource("1_base")]
+section_id = &"cargo"
+connections = 15
+
+[node name="ConnectionUp" parent="ConnectionMarkers" index="0"]
+position = Vector2(0, -80)
+
+[node name="ConnectionRight" parent="ConnectionMarkers" index="1"]
+position = Vector2(96, 0)
+
+[node name="ConnectionDown" parent="ConnectionMarkers" index="2"]
+position = Vector2(0, 80)
+
+[node name="ConnectionLeft" parent="ConnectionMarkers" index="3"]
+position = Vector2(-96, 0)
+
+[node name="Artwork" type="Sprite2D" parent="."]
+texture_filter = 1
+scale = Vector2(2, 2)
+texture = ExtResource("2_tiles")
+region_enabled = true
+region_rect = Rect2(0, 48, 96, 80)
+
+[node name="NavigationRegion2D" type="NavigationRegion2D" parent="."]
+navigation_polygon = SubResource("NavigationPolygon_section")
