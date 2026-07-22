@@ -1,10 +1,11 @@
-extends "res://scripts/task.gd"
+extends RepairTask
 @export var path_to_task_words : String = "res://resources/word_library.txt"
 
 @onready var text_area: TextTaskVisual = %TextArea
 
 @export var total_words_to_type : int = 3
 @export var words_typed : int = 0
+@export var acceptable_word_length = 6
 
 var goal_word : String = ""
 var num_correct_letters : int = 0
@@ -29,8 +30,20 @@ func _pick_word() -> String:
 	for word in words:
 		var stripped_word := word.strip_edges()
 		if not stripped_word.is_empty() and not stripped_word.begins_with("#"):
-			valid_words.append(stripped_word)
-	return valid_words.pick_random() if not valid_words.is_empty() else ""
+			if stripped_word.length() <= acceptable_word_length:
+				valid_words.append(stripped_word)
+	
+	if valid_words.is_empty():
+		# failsafe for if there are no valid words
+		return "repair"
+	
+	var picked_word : String = valid_words.pick_random()
+	var rerolls : int = 5
+	while picked_word != goal_word and rerolls > 0:
+		picked_word = valid_words.pick_random()
+		rerolls -= 1
+	
+	return picked_word
 
 func submit_letter(letter : String) -> bool:
 	if letter.length() > 1:
@@ -53,6 +66,7 @@ func update_visual():
 		
 
 func _input(event: InputEvent) -> void:
+	super._input(event)
 	if event is InputEventKey:
 		var keyvent : InputEventKey = event as InputEventKey
 		if not keyvent.pressed:

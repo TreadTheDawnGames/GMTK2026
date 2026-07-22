@@ -16,10 +16,7 @@ func _ready():
 	start_timer()
 
 func repair_damage(amount : float):
-	print("wait time before: ", timer.wait_time)
-	timer.start(clamp(timer.wait_time + amount, 0.0, max_health))
-	print("wait time after: ", timer.wait_time)
-	print("repairing")
+	timer.start(clamp(timer.time_left + amount, 0.0, max_health))
 
 func start_timer():
 	timer.start(max_health)

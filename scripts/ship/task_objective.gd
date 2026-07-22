@@ -13,7 +13,7 @@ signal task_cancelled(objective: TaskObjective)
 @onready var task_overlay: CanvasLayer = %TaskOverlay
 
 var _active_task: RepairTask
-
+var _next_task_scene : PackedScene
 
 func _input_event(_viewport: Node, event: InputEvent, _shape_index: int) -> void:
 	var mouse_event := event as InputEventMouseButton
@@ -27,10 +27,8 @@ func open_task() -> void:
 	if _active_task != null:
 		_active_task.show()
 		return
-	if task_scene == null:
-		#task_scene = TaskPicker.pick_scene()
-		push_error("TaskObjective requires a task scene.")
-		return
+	
+		
 	var task := task_scene.instantiate() as Control
 	if task == null:
 		push_error("TaskObjective task scene root must be a Control.")
@@ -40,6 +38,8 @@ func open_task() -> void:
 		task.queue_free()
 		return
 	_active_task = task
+	task_scene = TaskPicker.get_task(_active_task)
+	
 	_active_task.task_exit.connect(_on_task_exit)
 	task_overlay.add_child(_active_task)
 	task_opened.emit(self)
