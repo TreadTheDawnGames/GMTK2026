@@ -29,8 +29,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_6wfpp")
-combo_speed_multiplier = 1.5
-recovery_speed_multiplier = 1.1
+mining_config = ExtResource("14_mining_config")
 mine_sounds = Array[AudioStream]([ExtResource("2_4e5kf"), ExtResource("3_74xn3"), ExtResource("4_2plp5"), ExtResource("5_53pw3"), ExtResource("6_af75q"), ExtResource("7_cprbh"), ExtResource("8_gxysw")])
 
 [node name="MiningWindow" parent="." unique_id=677199030 instance=ExtResource("2_73j0v")]
