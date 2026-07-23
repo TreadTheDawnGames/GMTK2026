@@ -1,0 +1,27 @@
+[gd_scene format=3 uid="uid://bloqxjotiu5og"]
+
+[ext_resource type="PackedScene" uid="uid://4g1aoviidfta" path="res://Scenes/tasks/task_base.tscn" id="1_lr8ck"]
+[ext_resource type="Script" uid="uid://drk4gha40bb41" path="res://scripts/ship/tasks/SpamTask.gd" id="2_dpsen"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_8s06a"]
+font_size = 86
+
+[node name="Task" unique_id=1113953500 instance=ExtResource("1_lr8ck")]
+script = ExtResource("2_dpsen")
+required_pressed = 50
+
+[node name="Instructions" type="Label" parent="PanelContainer2/VBoxContainer/MarginContainer/VBoxContainer" parent_id_path=PackedInt32Array(884116960) index="0" unique_id=1827173090]
+layout_mode = 2
+size_flags_vertical = 1
+text = "Press Spacebar"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="TimesPressed" type="Label" parent="PanelContainer2/VBoxContainer/MarginContainer/VBoxContainer" parent_id_path=PackedInt32Array(884116960) index="1" unique_id=1350452209]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+text = "asdf"
+label_settings = SubResource("LabelSettings_8s06a")
+horizontal_alignment = 1
+vertical_alignment = 1
