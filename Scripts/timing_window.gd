@@ -55,12 +55,14 @@ func _mining_window_pressed(success : bool):
 			mining_window.remove_all_extra_targets()
 			mining_window.speed_multiplier = 1.0+(combo_speed_multiplier*combo)
 			streak_lost_sound.play()
+			mining_window.reset_all_targets()
 
 
 ## Resolves recovery and restarts the main timing bar.
 func _recovery_window_pressed(success : bool):
 	if not success:
 		combo = 0
+		mining_window.reset_all_targets()
 		pressed.emit(false, combo)
 		recovery_window.stop()
 		mining_window.speed_multiplier = 1.0

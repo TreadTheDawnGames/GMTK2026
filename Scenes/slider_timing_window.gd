@@ -6,7 +6,7 @@ signal pressed(success:bool)
 
 const TARGET = preload("uid://16edwc1adi0x")
 
-@onready var targets: Array[Panel]
+@onready var targets: Array[TimingTarget]
 @onready var slider: Panel = %Slider
 @onready var backing: Control = %Backing
 @onready var bounce_sound: AudioStreamPlayer2D = %BounceSound
@@ -33,8 +33,8 @@ var direction : float = 1.0
 
 func _ready():
 	add_target()
-	slider.offset_right = slider.offset_left + slider_size
-	slider.offset_transform_position.x = -slider.size.x * 0.5
+	slider.size.x = slider_size
+	#slider.offset_transform_position.x = -slider.size.x * 0.5
 	await get_tree().process_frame
 	for target in targets:
 		randomize_target(target)
@@ -78,8 +78,9 @@ func stop():
 ## Adds and positions one valid hit target.
 func add_target():
 	var new_target = TARGET.instantiate()
-	new_target.offset_right = new_target.offset_left + max_target_size
-	new_target.offset_transform_position.x = -max_target_size * 0.5
+	new_target.size.x = max_target_size
+	#new_target.offset_right = new_target.offset_left + max_target_size
+	#new_target.offset_transform_position.x = -max_target_size * 0.5
 	backing.add_child(new_target)
 	backing.move_child(new_target, 0)
 	targets.append(new_target)
@@ -96,14 +97,15 @@ func remove_all_extra_targets():
 		return
 	var primary_target := targets[0]
 	current_target_size = max_target_size
-	primary_target.offset_right = (
-		primary_target.offset_left + current_target_size
-	)
-	primary_target.offset_transform_position.x = -current_target_size * 0.5
+	#primary_target.offset_right = (
+		#primary_target.offset_left + current_target_size
+	#)
+	primary_target.size.x = current_target_size
+	
 	primary_target.position.x = clampf(
 		primary_target.position.x,
-		current_target_size * 0.5,
-		backing.size.x - current_target_size * 0.5
+		current_target_size, # * 0.5,
+		backing.size.x - current_target_size# * 0.5
 	)
 
 
@@ -112,30 +114,42 @@ func remove_target():
 	if targets.size() > 0:
 		targets.pop_back().queue_free()
 
+func reset_all_targets():
+	for _target in targets:
+		_target.unhit()
+		randomize_target(_target)
 
 ## Moves the slider and resolves one press against every visible target.
 func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("Space"):
-		var hit_targets: Array[Panel] = targets.filter(
-			func(target: Panel) -> bool:
+		var hit_targets: Array[TimingTarget] = targets.filter(
+			func(target: TimingTarget) -> bool:
 				var hit_distance := (
 					target.size.x * 0.5
 					+ slider.size.x * 0.5
 					+ grace
 				)
-				return absf(slider.position.x - target.position.x) <= hit_distance
+				return absf(slider.position.x - target.position.x) <= hit_distance and not target.is_hit
 		)
-		for target : Panel in hit_targets:
-			randomize_target(target)
+		for target : TimingTarget in hit_targets:
+			target.hit()
+			#randomize_target(target)
+			
+		
 		if hit_targets.size() > 0:
 			pressed.emit(true)
 		else:
 			pressed.emit(false)
+	
+		if targets.filter(func(_target:TimingTarget): return not _target.is_hit).size() == 0:
+			reset_all_targets()
+			
 		if one_shot:
 			stop()
 		
+	#slider.position.x = lerp(slider.position.x, slider.position.x+speed * direction * delta * speed_multiplier, 0.9)
+	slider.position.x += speed * direction * delta * speed_multiplier
 	
-	slider.position.x = lerp(slider.position.x, slider.position.x+speed * direction * delta * speed_multiplier, 0.9)
 	if (slider.position.x <= 0.0+slider_half_width() and direction < 0) or (slider.position.x >= backing.size.x-slider_half_width() and direction > 0):
 		direction *= -1
 		bounce_sound.play()
@@ -145,21 +159,22 @@ func _process(delta: float) -> void:
 
 
 ## Moves one target to a valid position inside its backing bar.
-func randomize_target(target_panel : Panel):
+func randomize_target(target_panel : TimingTarget):
 	current_target_size = clampf(
 		target_panel.size.x * target_shrink_rate,
 		min_target_size,
 		max_target_size
 	)
-	target_panel.offset_right = (
-		target_panel.offset_left + current_target_size
-	)
-	target_panel.offset_transform_position.x = -current_target_size * 0.5
+	target_panel.size.x = current_target_size
+	#target_panel.offset_right = (
+		#target_panel.offset_left + current_target_size
+	#)
+	#target_panel.offset_transform_position.x = -current_target_size #* 0.5
 	var target_center_x := (
 		(randf() if fixed_window < 0 else fixed_window) * backing.size.x
 	)
 	target_panel.position.x = clampf(
 		target_center_x,
-		current_target_size * 0.5,
-		backing.size.x - current_target_size * 0.5
+		current_target_size ,#* 0.5,
+		backing.size.x - current_target_size,# * 0.5
 	)
