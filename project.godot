@@ -21,8 +21,7 @@ buses/default_bus_layout=""
 
 [autoload]
 
-Conductor="*uid://c5rvmkaorxynb"
-GameState="*uid://b3qdwfp50rbw7"
+GameState="*res://Scenes/globals/game_state.tscn"
 
 [display]
 
