@@ -111,10 +111,11 @@ func _spawn_dig_number(
 		return null
 	add_child(dig_number)
 	_active_numbers.append(dig_number)
+	# Each label independently chooses a side so repeated impacts do not
+	# produce a visually biased stream in one direction.
 	var horizontal_direction := (
 		-1.0
-		if impact_screen_position.x
-			>= get_viewport().get_visible_rect().size.x * 0.5
+		if _random.randi_range(0, 1) == 0
 		else 1.0
 	)
 	var bottom_screen_limit_y := (

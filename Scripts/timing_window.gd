@@ -14,21 +14,27 @@ class_name TimingWindowTask
 
 signal pressed(success: bool, combo: int)
 
+@export var mining_config: MiningConfig
+
 var combo: int = 0:
 	set(value):
 		combo = value
 		combo_label.text = "Combo: " + str(-combo)
 
-@export_range(1, 100, 1) var recovery_combo_count: int = 5
-@export_range(1, 100, 1) var combo_count_for_additional_target: int = 10
-@export var combo_speed_multiplier: float = 1.1
-@export var recovery_speed_multiplier: float = 1.2
 @export var mine_sounds: Array[AudioStream]
 @export var combo_saved_color: Color = Color.CYAN
 @export var combo_lost_color: Color = Color.RED
 
 ## Connects both timing bars to the combo flow.
 func _ready() -> void:
+	if mining_config == null:
+		push_error("TimingWindowTask requires a MiningConfig.")
+		return
+	mining_window.speed = mining_config.mining_bar_speed
+	recovery_window.speed = mining_config.recovery_bar_speed
+	mining_window.set_starting_target_count(
+		mining_config.starting_mining_target_count
+	)
 	combo_label.text = (
 		"Combo: "
 		+ str(-combo)
@@ -49,7 +55,7 @@ func _mining_window_pressed(success: bool) -> void:
 		combo += 1
 		pressed.emit(true, combo)
 		mining_window.speed_multiplier = (
-			(combo_speed_multiplier)
+			(mining_config.combo_speed_multiplier)
 		)
 		if not mine_sounds.is_empty():
 			hit_sound.stream = mine_sounds[
@@ -57,10 +63,13 @@ func _mining_window_pressed(success: bool) -> void:
 			]
 			hit_sound.play()
 
-		if combo % combo_count_for_additional_target == 0:
+		if (
+			combo
+			% mining_config.combo_hits_for_additional_target == 0
+		):
 			mining_window.add_target.call_deferred()
 	else:
-		if combo >= recovery_combo_count:
+		if combo >= mining_config.recovery_combo_threshold:
 			warning_sound.play()
 			await mining_window.pause(true)
 			recovery_window.start()
@@ -90,7 +99,7 @@ func _recovery_window_pressed(success: bool) -> void:
 
 	else:
 		recovery_window.speed_multiplier *= (
-		(recovery_speed_multiplier)
+			(mining_config.recovery_speed_multiplier)
 		)
 
 		streak_saved_sound.play()

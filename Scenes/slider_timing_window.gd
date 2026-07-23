@@ -30,11 +30,13 @@ const TARGET = preload("uid://16edwc1adi0x")
 
 var direction: float = 1.0
 var targets: Array[TimingTarget] = []
+var _starting_target_count: int = 1
 
 
-## Creates the first target and prepares one-shot recovery bars.
+## Creates the configured target baseline and prepares one-shot recovery bars.
 func _ready() -> void:
-	add_target()
+	while targets.size() < _starting_target_count:
+		add_target()
 	_set_control_width(slider, slider_size)
 	await get_tree().process_frame
 	for target in targets:
@@ -91,20 +93,26 @@ func add_target() -> void:
 		randomize_target(new_target)
 
 
-## Restores the timing bar to its original single target.
+## Sets the target baseline restored whenever a streak ends.
+func set_starting_target_count(target_count: int) -> void:
+	_starting_target_count = maxi(target_count, 1)
+	if is_node_ready():
+		remove_all_extra_targets()
+
+
+## Restores the timing bar to its configured starting target count.
 func remove_all_extra_targets() -> void:
-	while targets.size() > 1:
+	while targets.size() > _starting_target_count:
 		remove_target()
-	if targets.size() < 1:
-		printerr("Removed all targets instead of all but one.")
-		return
-	var primary_target := targets[0]
-	_set_control_width(primary_target, max_target_size)
-	primary_target.position.x = clampf(
-		primary_target.position.x,
-		max_target_size * 0.5,
-		backing.size.x - max_target_size * 0.5
-	)
+	while targets.size() < _starting_target_count:
+		add_target()
+	for baseline_target in targets:
+		_set_control_width(baseline_target, max_target_size)
+		baseline_target.position.x = clampf(
+			baseline_target.position.x,
+			max_target_size * 0.5,
+			backing.size.x - max_target_size * 0.5
+		)
 
 
 ## Removes the most recently added target.

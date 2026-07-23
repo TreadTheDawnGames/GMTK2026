@@ -47,7 +47,7 @@ const EMPTY_MASK_COLOR := Color.TRANSPARENT
 
 @export_category("Impact Reveal")
 ## Layer four remains covered until the active hit reaches this combo.
-@export_range(1, 100, 1) var deepest_layer_combo_threshold: int = 10
+@export_range(1, 100, 1) var deepest_layer_combo_threshold: int = 7
 
 @export_category("Web Performance")
 ## Limits reusable resized masks so repeated hit sizes avoid image allocations.
@@ -511,7 +511,7 @@ func _apply_impact_stamp(
 			profile.keep_back_layer_solid
 			and layer_index == layer_count - 2
 		)
-		# Orange remains the decorative tunnel backdrop below combo ten.
+		# Orange remains the decorative tunnel backdrop below combo seven.
 		# At or above the combo gate, the size threshold still prevents a
 		# physically small secondary path from exposing the brown back wall.
 		if is_layer_covering_backdrop and not stamp.use_big_hole:
