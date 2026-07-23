@@ -11,13 +11,12 @@ config_version=5
 [application]
 
 config/name="GMTK2026"
-run/main_scene="res://addons/maaacks_game_template/scenes/opening/opening.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 
 [audio]
 
-buses/default_bus_layout="uid://ct33mw21k8ao4"
+buses/default_bus_layout=""
 
 [autoload]
 
