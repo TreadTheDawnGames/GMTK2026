@@ -1,6 +1,6 @@
 # Terrain Layering Guide
 
-`TerrainManager` owns solid cells, depth, ore yields, and encounter openings.
+`TerrainManager` owns solid cells, depth, and encounter openings.
 `TerrainLayerRenderer` turns those results into streamed art. Changing artwork
 does not change where the player can stand or how much depth a hit earns.
 

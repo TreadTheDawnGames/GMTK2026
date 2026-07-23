@@ -1,22 +1,16 @@
 class_name TerrainManager
 extends Node
 
-## Owns terrain occupancy, mining damage, ore yields, and encounter openings.
+## Owns terrain occupancy, mining damage, and encounter openings.
 
 class DigResult:
-	## Carries terrain damage and collectible yields from one mining hit.
+	## Carries the terrain damage caused by one mining hit.
 	var cells_removed: int = 0
-	var ore_yields: Dictionary[StringName, int] = {}
 
 
 	## Combines consecutive terrain damage into one resolved mining hit.
 	func absorb(other: DigResult) -> void:
 		cells_removed += other.cells_removed
-		for ore_id: StringName in other.ore_yields:
-			ore_yields[ore_id] = (
-				int(ore_yields.get(ore_id, 0))
-				+ int(other.ore_yields[ore_id])
-			)
 
 
 ## Reports newly opened terrain so presentation can reveal the damage.
@@ -76,12 +70,6 @@ func dig_tunnel(
 			var cell := Vector2i(cell_x, cell_y)
 			if not _is_mineable_cell(cell):
 				continue
-			var ore_definition := _ore_definition_for_cell(cell)
-			if ore_definition != null:
-				var ore_id := ore_definition.ore_id
-				result.ore_yields[ore_id] = (
-					int(result.ore_yields.get(ore_id, 0)) + 1
-				)
 			_set_cell_destroyed(cell)
 			destroyed_cells.append(cell)
 			result.cells_removed += 1
@@ -280,25 +268,3 @@ func _get_or_create_mask(chunk_index: int) -> PackedByteArray:
 ## Returns the chunk index containing a terrain row.
 func _world_to_chunk_index(world_y: int) -> int:
 	return floori(float(world_y) / float(config.chunk_height_cells))
-
-
-## Returns the deterministic ore occupying a solid terrain cell.
-func _ore_definition_for_cell(cell: Vector2i) -> OreDefinition:
-	if cell.y >= config.get_bottom_surface_row():
-		return null
-	var depth := cell.y - config.initial_surface_row
-	var cell_hash := config.global_seed ^ 0x4F5245
-	cell_hash ^= cell.x * 928_371_011
-	cell_hash ^= cell.y * 689_287_499
-	var roll := float(posmod(cell_hash, 10_000)) / 100.0
-	var cumulative_chance := 0.0
-	for ore_definition in config.ore_definitions:
-		if (
-			ore_definition == null
-			or not ore_definition.can_spawn_at_depth(depth)
-		):
-			continue
-		cumulative_chance += ore_definition.spawn_chance_percent
-		if roll < cumulative_chance:
-			return ore_definition
-	return null

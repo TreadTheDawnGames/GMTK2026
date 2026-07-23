@@ -5,7 +5,6 @@ extends Node
 
 @export_category("Run")
 @export var run_state: RunState
-@export var ore_inventory: OreInventoryState
 
 @export_category("Mining")
 @export var mining_controller: MiningController
@@ -20,8 +19,6 @@ extends Node
 @export var hud: MiningHud
 @export var encounter_controller: DepthEncounterController
 @export var dialogue_director: DialogueDirector
-@export var aim_mode_prompt: AimModePrompt
-@export var aim_controller: MinerAimController
 
 
 ## Establishes every signal that crosses a mining subsystem boundary.
@@ -31,11 +28,6 @@ func _ready() -> void:
 		encounter_controller._on_depth_changed
 	)
 	_connect_once(run_state.depth_changed, hud._on_depth_changed)
-	_connect_once(run_state.run_reset, ore_inventory.reset_inventory)
-	_connect_once(
-		ore_inventory.inventory_changed,
-		hud._on_ore_inventory_changed
-	)
 	_connect_once(
 		miner_rig.impact_contact,
 		mining_controller.resolve_impact
@@ -75,10 +67,6 @@ func _ready() -> void:
 	_connect_once(
 		dialogue_director.conversation_finished,
 		encounter_controller._on_conversation_finished
-	)
-	_connect_once(
-		aim_mode_prompt.mode_selected,
-		aim_controller.set_keyboard_aim_enabled
 	)
 
 

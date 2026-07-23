@@ -68,7 +68,6 @@ signal dig_number_requested(
 
 @export var config: MiningConfig
 @export var run_state: RunState
-@export var ore_inventory: OreInventoryState
 @export var terrain_manager: TerrainManager
 @export var view_controller: ViewController
 @export var fall_origin: Marker2D
@@ -234,7 +233,6 @@ func resolve_impact(impact_screen_position: Vector2) -> void:
 			requested_half_width_cells
 		)
 		dig_result.absorb(aftershock_result)
-	ore_inventory.add_ore_batch(dig_result.ore_yields)
 	var new_mining_y := terrain_manager.find_surface_row(
 		fall_cell.x,
 		run_state.mining_y

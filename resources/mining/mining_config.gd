@@ -17,8 +17,6 @@ extends Resource
 ## Three cells on each side make a seven-cell-wide starting tunnel.
 @export_range(0, 32, 1) var base_tunnel_half_width_cells: int = 3
 @export_range(0, 8, 1) var combo_tunnel_half_width_cells_per_step: int = 1
-@export var global_seed: int = 2026
-@export var ore_definitions: Array[OreDefinition] = []
 
 @export_category("View")
 @export var terrain_screen_center_x: float = 576.0
