@@ -1,11 +1,12 @@
 [gd_scene format=3 uid="uid://c2ruy478g7ua7"]
 
 [ext_resource type="Script" uid="uid://ch5q5y5v2x36" path="res://scripts/globals/task_picker.gd" id="1_044fu"]
-[ext_resource type="PackedScene" uid="uid://dh4sggkyy3780" path="res://Scenes/tasks/win_button_task.tscn" id="3_5rtq5"]
+[ext_resource type="PackedScene" uid="uid://bfdkuypkrwl5t" path="res://scenes/tasks/typing_task.tscn" id="2_5fch3"]
+[ext_resource type="PackedScene" uid="uid://dh4sggkyy3780" path="res://scenes/tasks/win_button_task.tscn" id="3_5rtq5"]
 [ext_resource type="PackedScene" path="res://scenes/tasks/timing_window_task.tscn" id="4_timing"]
 [ext_resource type="PackedScene" path="res://scenes/tasks/switch_match_task.tscn" id="5_switches"]
-[ext_resource type="PackedScene" uid="uid://bloqxjotiu5og" path="res://Scenes/tasks/SpamTask.tscn" id="5_w84d4"]
+[ext_resource type="PackedScene" uid="uid://bloqxjotiu5og" path="res://scenes/tasks/spam_task.tscn" id="5_w84d4"]
 
 [node name="TaskPicker" type="Node" unique_id=859688646]
 script = ExtResource("1_044fu")
-task_scenes = Array[PackedScene]([ExtResource("3_5rtq5"), ExtResource("4_timing"), ExtResource("5_switches"), ExtResource("5_w84d4")])
+task_scenes = Array[PackedScene]([ExtResource("2_5fch3"), ExtResource("3_5rtq5"), ExtResource("4_timing"), ExtResource("5_switches"), ExtResource("5_w84d4")])

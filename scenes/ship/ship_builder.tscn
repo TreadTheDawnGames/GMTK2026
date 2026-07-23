@@ -11,7 +11,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/airlock_section.tscn" id="8_airlock"]
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_horizontal_80_section.tscn" id="9_horizontal_80"]
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_vertical_102_section.tscn" id="10_vertical_102"]
-[ext_resource type="Script" path="res://scripts/ship/ship_task_coordinator.gd" id="11_task_coordinator"]
+[ext_resource type="Script" uid="uid://nwmpqyjkw1fb" path="res://scripts/ship/ship_task_coordinator.gd" id="11_task_coordinator"]
 
 [node name="ShipBuilder" type="Node2D" unique_id=1637252056]
 script = ExtResource("1_builder")
@@ -79,6 +79,6 @@ editor_snap_size = 2
 
 [node name="TaskPlaceholder" parent="EngineeringRoom" unique_id=856420059 instance=ExtResource("6_task")]
 
-[node name="TaskCoordinator" type="Node" parent="." node_paths=PackedStringArray("objectives_root")]
+[node name="TaskCoordinator" type="Node" parent="." unique_id=1950812434 node_paths=PackedStringArray("objectives_root")]
 script = ExtResource("11_task_coordinator")
 objectives_root = NodePath("..")

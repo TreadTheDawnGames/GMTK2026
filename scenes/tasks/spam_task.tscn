@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://bloqxjotiu5og"]
 
-[ext_resource type="PackedScene" uid="uid://4g1aoviidfta" path="res://Scenes/tasks/task_base.tscn" id="1_lr8ck"]
-[ext_resource type="Script" uid="uid://drk4gha40bb41" path="res://scripts/ship/tasks/SpamTask.gd" id="2_dpsen"]
+[ext_resource type="PackedScene" uid="uid://4g1aoviidfta" path="res://scenes/tasks/task_base.tscn" id="1_lr8ck"]
+[ext_resource type="Script" uid="uid://drk4gha40bb41" path="res://scripts/ship/tasks/spam_task.gd" id="2_dpsen"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_8s06a"]
 font_size = 86

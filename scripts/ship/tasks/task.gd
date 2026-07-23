@@ -37,12 +37,16 @@ func _input(event: InputEvent) -> void:
 		var key_event : InputEventKey = event as InputEventKey
 		if key_event.pressed and not key_event.echo and key_event.keycode == Key.KEY_ESCAPE:
 			_exit()
+			get_viewport().set_input_as_handled()
 
 var grabbed : bool
 var _hovered : bool
 var _lastMousePos : Vector2
 var _grabbedOffset : Vector2
 
+# Jared - Issues possibly seeing with this: it moves the full-screen root rather than the
+# visible task panel, the clamp minimum can exceed its maximum, _grabbedOffset is unused,
+# and releasing the mouse outside the header can leave grabbed enabled.
 func _process(_delta : float):
 	if(_hovered):
 		if(Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not grabbed):
