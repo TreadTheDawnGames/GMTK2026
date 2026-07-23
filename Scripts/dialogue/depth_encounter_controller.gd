@@ -66,16 +66,21 @@ func _begin_encounter() -> void:
 	_active_floor_depth_px = -1
 
 
-## Restores the timing bar after the encounter dialogue ends.
+## Waits briefly after dialogue, then restores mining input.
 func _on_conversation_finished(conversation_id: StringName) -> void:
 	if (
 		_active_floor_depth_px < 0
 		or conversation_id != conversation.conversation_id
 	):
 		return
-	_restore_timing_window()
 	_completed_floor_depth_px = _active_floor_depth_px
 	_active_floor_depth_px = -1
+	if encounter_config.post_dialogue_buffer_seconds > 0.0:
+		await get_tree().create_timer(
+			encounter_config.post_dialogue_buffer_seconds,
+			true
+		).timeout
+	_restore_timing_window()
 
 
 ## Makes the timing bar visible and usable after an encounter.

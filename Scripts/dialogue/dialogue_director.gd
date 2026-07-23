@@ -28,11 +28,18 @@ func _ready() -> void:
 	dialogue_root.hide()
 
 
-## Advances dialogue when the player presses Space or Enter.
+## Advances dialogue when the player presses Space, Enter, or left click.
 func _unhandled_input(event: InputEvent) -> void:
+	var is_continue_press := event.is_action_pressed(&"ui_accept")
+	if event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		is_continue_press = (
+			mouse_event.button_index == MOUSE_BUTTON_LEFT
+			and mouse_event.pressed
+		)
 	if (
 		not is_conversation_active()
-		or not event.is_action_pressed(&"ui_accept")
+		or not is_continue_press
 		or event.is_echo()
 	):
 		return
@@ -106,7 +113,7 @@ func _present_current_line() -> void:
 	continue_label.text = (
 		"Continuing..."
 		if line.auto_advance_delay_seconds > 0.0
-		else "Space / Enter"
+		else "Space / Enter / Left Click"
 	)
 	line_presented.emit(
 		_active_conversation.conversation_id,

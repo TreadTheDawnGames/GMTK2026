@@ -12,6 +12,9 @@ extends Resource
 @export_range(8, 2_000, 1) var chamber_height_px: int = 100
 @export_range(64, 2_000, 8) var chamber_width_px: int = 800
 
+@export_category("Flow")
+@export_range(0.0, 5.0, 0.1) var post_dialogue_buffer_seconds: float = 0.5
+
 
 ## Returns the next encounter floor below the player's current depth.
 func get_next_floor_depth(current_depth_px: int) -> int:
