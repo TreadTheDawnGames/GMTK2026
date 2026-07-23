@@ -30,13 +30,10 @@ func resolve_attempt(success: bool, resolved_combo: int) -> void:
 		return
 
 	var chip_combo := mini(safe_combo, config.maximum_effect_combo)
-	var requested_cells := (
-		config.base_chip_cells
-		+ config.combo_chip_cells_per_step * chip_combo
-	)
-	var requested_depth_rows := (
-		config.base_chip_depth_rows
-		+ config.combo_chip_depth_rows_per_step * chip_combo
+	var combo_radius_steps := maxi(chip_combo - 1, 0)
+	var requested_radius_cells := (
+		config.base_chip_radius_cells
+		+ config.combo_chip_radius_cells_per_step * combo_radius_steps
 	)
 	var impact_cell := Vector2i(
 		terrain_manager.screen_x_to_terrain_cell_x(
@@ -47,9 +44,8 @@ func resolve_attempt(success: bool, resolved_combo: int) -> void:
 	_impact_seed += 1
 	var cells_removed := terrain_manager.chip_at(
 		impact_cell,
-		requested_cells,
-		_impact_seed,
-		requested_depth_rows
+		requested_radius_cells,
+		_impact_seed
 	)
 	var new_mining_y := terrain_manager.find_surface_row(
 		impact_cell.x,

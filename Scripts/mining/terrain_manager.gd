@@ -27,71 +27,51 @@ func _ready() -> void:
 	set_view_y(float(config.initial_surface_row))
 
 
-## Removes connected terrain cells around an impact point.
+## Removes a connected semicircle of dirt beneath an impact point.
 func chip_at(
 	terrain_position: Vector2i,
-	requested_cells: int,
-	_impact_seed: int,
-	requested_depth_rows: int = 1
+	radius_cells: int,
+	_impact_seed: int
 ) -> int:
-	if requested_cells <= 0:
+	if radius_cells <= 0 or not _is_solid_cell(terrain_position):
 		return 0
 
 	var removed_cells := 0
 	var affected_chunks: Dictionary = {}
-	var maximum_radius := maxi(config.terrain_width_cells, requested_cells)
-	var reached_limit := false
+	var radius_squared := radius_cells * radius_cells
+	var pending_cells: Array[Vector2i] = [terrain_position]
+	var visited_cells: Dictionary = {terrain_position: true}
+	var pending_index := 0
+	var directions: Array[Vector2i] = [
+		Vector2i.LEFT,
+		Vector2i.RIGHT,
+		Vector2i.UP,
+		Vector2i.DOWN,
+	]
 
-	# Dig combo depth through connected dirt without crossing an open chamber.
-	for depth_offset in range(maxi(requested_depth_rows, 1)):
-		var depth_cell := terrain_position + Vector2i.DOWN * depth_offset
-		if not _is_solid_cell(depth_cell):
-			if depth_offset > 0:
-				break
-			continue
-		var depth_chunk_index := _world_to_chunk_index(depth_cell.y)
-		_set_cell_destroyed(depth_cell)
-		affected_chunks[depth_chunk_index] = true
+	# Flood filling keeps the bite from crossing an open encounter chamber.
+	while pending_index < pending_cells.size():
+		var cell := pending_cells[pending_index]
+		pending_index += 1
+		var chunk_index := _world_to_chunk_index(cell.y)
+		_set_cell_destroyed(cell)
+		affected_chunks[chunk_index] = true
 		removed_cells += 1
-		if removed_cells >= requested_cells:
-			reached_limit = true
-			break
 
-	# Expanding rings keep every newly removed cell attached to the same bite.
-	for radius in range(maximum_radius + 1):
-		if reached_limit:
-			break
-		var inner_radius_squared := (radius - 1) * (radius - 1)
-		var outer_radius_squared := radius * radius
-		for cell_y in range(
-			terrain_position.y - radius,
-			terrain_position.y + radius + 1
-		):
-			for cell_x in range(
-				terrain_position.x - radius,
-				terrain_position.x + radius + 1
+		for direction: Vector2i in directions:
+			var neighbor: Vector2i = cell + direction
+			if neighbor.y < terrain_position.y:
+				continue
+			if visited_cells.has(neighbor):
+				continue
+			visited_cells[neighbor] = true
+			if (
+				(neighbor - terrain_position).length_squared()
+				> radius_squared
 			):
-				var cell := Vector2i(cell_x, cell_y)
-				var offset := cell - terrain_position
-				var distance_squared := offset.length_squared()
-				if distance_squared > outer_radius_squared:
-					continue
-				if radius > 0 and distance_squared <= inner_radius_squared:
-					continue
-				if not _is_solid_cell(cell):
-					continue
-
-				var chunk_index := _world_to_chunk_index(cell.y)
-				_set_cell_destroyed(cell)
-				affected_chunks[chunk_index] = true
-				removed_cells += 1
-				if removed_cells >= requested_cells:
-					reached_limit = true
-					break
-			if reached_limit:
-				break
-		if reached_limit:
-			break
+				continue
+			if _is_solid_cell(neighbor):
+				pending_cells.append(neighbor)
 
 	for chunk_index: int in affected_chunks:
 		if not _active_chunks.has(chunk_index):

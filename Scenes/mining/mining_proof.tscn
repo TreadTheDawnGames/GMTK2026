@@ -97,6 +97,7 @@ text = "DEPTH  0 px"
 [connection signal="depth_changed" from="RunState" to="MiningScene/HUD" method="_on_depth_changed"]
 [connection signal="success_impact" from="MiningScene/MinerRig" to="MiningScene/MiningHitParticles" method="play_at_impact"]
 [connection signal="attempt_resolved" from="MiningScene/Systems/TimingBridge" to="MiningScene/Systems/MiningController" method="resolve_attempt"]
+[connection signal="landing_reached" from="MiningScene/Systems/ViewController" to="MiningScene/Systems/MarketplaceEncounterController" method="_on_landing_reached"]
 [connection signal="mine_missed" from="MiningScene/Systems/MiningController" to="MiningScene/MinerRig" method="play_miss"]
 [connection signal="mine_resolved" from="MiningScene/Systems/MiningController" to="MiningScene/MinerRig" method="play_success"]
 [connection signal="conversation_finished" from="DialogueDirector" to="MiningScene/Systems/MarketplaceEncounterController" method="_on_conversation_finished"]

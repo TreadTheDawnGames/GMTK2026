@@ -1,6 +1,6 @@
 extends Control
 class_name TimingWindowTask
-## Completes after repeatedly pressing Space while the rotating needle is in the target arc.
+## Resolves timing attempts from Space or left click.
 @onready var mining_window: SliderTimingWindow = %MiningWindow
 @onready var recovery_window: SliderTimingWindow = %RecoveryWindow
 

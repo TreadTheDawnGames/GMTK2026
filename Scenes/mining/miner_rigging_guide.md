@@ -109,7 +109,7 @@ pickaxe separate only if they need an independent swing.
 
 ## Test in gameplay
 
-Open `mining_proof.tscn` and run the scene. Press Space while the timing slider
+Open `mining_proof.tscn` and run the scene. Press Space or left click while the timing slider
 overlaps its target. A correct result should play `mine_success`, break terrain
 under `ChipOrigin`, and advance the player depth. A miss should play
 `mine_miss` without changing terrain or depth.
