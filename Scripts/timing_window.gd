@@ -48,7 +48,7 @@ func _mining_window_pressed(success: bool) -> void:
 		combo += 1
 		pressed.emit(true, combo)
 		mining_window.speed_multiplier = (
-			(combo_speed_multiplier) * combo
+			(combo_speed_multiplier)
 		)
 		if not mine_sounds.is_empty():
 			hit_sound.stream = mine_sounds[
@@ -68,9 +68,7 @@ func _mining_window_pressed(success: bool) -> void:
 			pressed.emit(false, combo)
 			combo = 0
 			mining_window.remove_all_extra_targets()
-			mining_window.speed_multiplier = (
-				1.0 + combo_speed_multiplier * combo
-			)
+			mining_window.speed_multiplier = 1.0
 			streak_lost_sound.play()
 			mining_window.reset_all_targets()
 
