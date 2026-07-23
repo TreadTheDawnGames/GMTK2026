@@ -9,6 +9,7 @@ extends Resource
 @export_range(16, 256, 1) var chunk_height_cells: int = 64
 @export_range(1, 32, 1) var logical_pixel_scale: int = 8
 @export_range(1, 512, 1) var initial_surface_row: int = 38
+@export_range(8, 1_000_000, 8) var total_run_depth_px: int = 100_000
 # Six rows at the default scale makes the first hit descend 48 px.
 @export_range(1, 64, 1) var base_mine_depth_cells: int = 6
 @export_range(0, 16, 1) var combo_mine_depth_cells_per_step: int = 1
@@ -19,6 +20,7 @@ extends Resource
 @export_range(16, 1_024, 1) var depth_band_height_rows: int = 128
 @export var terrain_color: Color = Color("633c31")
 @export var terrain_accent_color: Color = Color("75483a")
+@export var ore_definitions: Array[OreDefinition] = []
 
 @export_category("View")
 @export var terrain_screen_center_x: float = 576.0
@@ -28,3 +30,14 @@ extends Resource
 
 @export_category("Effects")
 @export_range(1, 100, 1) var maximum_effect_combo: int = 20
+
+
+## Returns the final terrain row beneath the player's feet.
+func get_bottom_surface_row() -> int:
+	return (
+		initial_surface_row
+		+ floori(
+			float(total_run_depth_px)
+			/ float(logical_pixel_scale)
+		)
+	)

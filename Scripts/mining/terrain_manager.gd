@@ -11,6 +11,22 @@ class TerrainChunk:
 	var sprite: Sprite2D
 
 
+class DigResult:
+	## Carries terrain damage and collectible yields from one mining hit.
+	var cells_removed: int = 0
+	var ore_yields: Dictionary = {}
+
+
+	## Combines consecutive terrain damage into one resolved mining hit.
+	func absorb(other: DigResult) -> void:
+		cells_removed += other.cells_removed
+		for ore_id: StringName in other.ore_yields:
+			ore_yields[ore_id] = (
+				int(ore_yields.get(ore_id, 0))
+				+ int(other.ore_yields[ore_id])
+			)
+
+
 @export var config: MiningConfig
 @export var encounter_config: DepthEncounterConfig
 
@@ -27,32 +43,52 @@ func _ready() -> void:
 	set_view_y(float(config.initial_surface_row))
 
 
-## Clears a rectangular tunnel straight down from an impact point.
+## Clears a safe vertical shaft with an optional extension toward the aimed side.
 func dig_tunnel(
 	terrain_position: Vector2i,
 	depth_cells: int,
-	half_width_cells: int
-) -> int:
+	half_width_cells: int,
+	surface_contact_x: int = -1,
+	horizontal_direction: int = 0,
+	directional_reach_cells: int = 0
+) -> DigResult:
+	var result := DigResult.new()
 	if depth_cells <= 0 or not _is_solid_cell(terrain_position):
-		return 0
+		return result
 
-	var removed_cells := 0
 	var affected_chunks: Dictionary = {}
-	for cell_y in range(terrain_position.y, terrain_position.y + depth_cells):
+	var final_mineable_row := config.get_bottom_surface_row()
+	var tunnel_end_row := mini(
+		terrain_position.y + depth_cells,
+		final_mineable_row
+	)
+	for cell_y in range(terrain_position.y, tunnel_end_row):
 		# Reaching a chamber opens the full fall without damaging its floor.
 		if _is_encounter_chamber_cell(Vector2i(terrain_position.x, cell_y)):
 			break
-		for cell_x in range(
-			terrain_position.x - half_width_cells,
-			terrain_position.x + half_width_cells + 1
-		):
+		var left_cell_x := terrain_position.x - half_width_cells
+		var right_cell_x := terrain_position.x + half_width_cells
+		if horizontal_direction < 0:
+			left_cell_x -= maxi(directional_reach_cells, 0)
+		elif horizontal_direction > 0:
+			right_cell_x += maxi(directional_reach_cells, 0)
+		if cell_y == terrain_position.y and surface_contact_x >= 0:
+			left_cell_x = mini(left_cell_x, surface_contact_x)
+			right_cell_x = maxi(right_cell_x, surface_contact_x)
+		for cell_x in range(left_cell_x, right_cell_x + 1):
 			var cell := Vector2i(cell_x, cell_y)
 			if not _is_solid_cell(cell):
 				continue
+			var ore_definition := _ore_definition_for_cell(cell)
+			if ore_definition != null:
+				var ore_id := ore_definition.ore_id
+				result.ore_yields[ore_id] = (
+					int(result.ore_yields.get(ore_id, 0)) + 1
+				)
 			var chunk_index := _world_to_chunk_index(cell.y)
 			_set_cell_destroyed(cell)
 			affected_chunks[chunk_index] = true
-			removed_cells += 1
+			result.cells_removed += 1
 
 	for chunk_index: int in affected_chunks:
 		if not _active_chunks.has(chunk_index):
@@ -60,7 +96,7 @@ func dig_tunnel(
 		var chunk := _active_chunks[chunk_index] as TerrainChunk
 		chunk.texture.update(chunk.image)
 
-	return removed_cells
+	return result
 
 
 ## Converts a screen x-coordinate into a terrain column.
@@ -116,8 +152,16 @@ func is_solid_at_terrain_position(terrain_position: Vector2) -> bool:
 ## Finds the next solid row beneath a terrain position.
 func find_surface_row(cell_x: int, starting_row: int) -> int:
 	var safe_x := clampi(cell_x, 0, config.terrain_width_cells - 1)
-	var cell_y := maxi(starting_row, config.initial_surface_row)
-	while not _is_solid_cell(Vector2i(safe_x, cell_y)):
+	var bottom_surface_row := config.get_bottom_surface_row()
+	var cell_y := clampi(
+		starting_row,
+		config.initial_surface_row,
+		bottom_surface_row
+	)
+	while (
+		cell_y < bottom_surface_row
+		and not _is_solid_cell(Vector2i(safe_x, cell_y))
+	):
 		cell_y += 1
 	return cell_y
 
@@ -153,7 +197,10 @@ func _refresh_active_chunks() -> void:
 		first_chunk
 	)
 	# Keep only visible chunks plus the configured below-view generation margin.
-	var last_chunk := last_visible_chunk + config.preload_chunks_below
+	var last_chunk := mini(
+		last_visible_chunk + config.preload_chunks_below,
+		_world_to_chunk_index(config.get_bottom_surface_row())
+	)
 	if (
 		first_chunk == _loaded_first_chunk
 		and last_chunk == _loaded_last_chunk
@@ -232,6 +279,8 @@ func _build_chunk_image(chunk_index: int) -> Image:
 		var world_y := chunk_start_y + local_y
 		if world_y < config.initial_surface_row:
 			continue
+		if world_y > config.get_bottom_surface_row():
+			continue
 		for cell_x in range(config.terrain_width_cells):
 			var cell := Vector2i(cell_x, world_y)
 			if _is_encounter_chamber_cell(cell):
@@ -242,11 +291,17 @@ func _build_chunk_image(chunk_index: int) -> Image:
 			)
 			if has_destruction and mask[mask_offset] != 0:
 				continue
-			image.set_pixel(
-				cell_x,
-				local_y,
-				_terrain_color_for_cell(cell_x, world_y, chunk_index)
+			var ore_definition := _ore_definition_for_cell(cell)
+			var cell_color := (
+				ore_definition.color
+				if ore_definition != null
+				else _terrain_color_for_cell(
+					cell_x,
+					world_y,
+					chunk_index
+				)
 			)
+			image.set_pixel(cell_x, local_y, cell_color)
 	return image
 
 
@@ -256,6 +311,7 @@ func _is_solid_cell(cell: Vector2i) -> bool:
 		cell.x < 0
 		or cell.x >= config.terrain_width_cells
 		or cell.y < config.initial_surface_row
+		or cell.y > config.get_bottom_surface_row()
 		or _is_encounter_chamber_cell(cell)
 	):
 		return false
@@ -300,10 +356,21 @@ func _is_encounter_chamber_cell(cell: Vector2i) -> bool:
 	if cell.x < chamber_left or cell.x >= chamber_right:
 		return false
 
-	var rows_until_floor := posmod(
-		first_floor_row - depth_row,
-		interval_rows
+	var floor_row := first_floor_row
+	if depth_row > first_floor_row:
+		floor_row += (
+			ceili(
+				float(depth_row - first_floor_row)
+				/ float(interval_rows)
+			)
+			* interval_rows
+		)
+	var maximum_depth_rows := floori(
+		float(config.total_run_depth_px) / float(scale)
 	)
+	if floor_row > maximum_depth_rows:
+		return false
+	var rows_until_floor := floor_row - depth_row
 	return (
 		rows_until_floor > 0
 		and rows_until_floor <= chamber_height_rows
@@ -367,3 +434,27 @@ func _terrain_color_for_cell(
 	if absi(cell_hash) % 17 == 0:
 		return config.terrain_accent_color
 	return config.terrain_color
+
+
+## Returns the deterministic ore occupying a solid terrain cell.
+func _ore_definition_for_cell(cell: Vector2i) -> OreDefinition:
+	if cell.y >= config.get_bottom_surface_row():
+		return null
+	var depth_px := (
+		cell.y - config.initial_surface_row
+	) * config.logical_pixel_scale
+	var cell_hash := config.global_seed ^ 0x4F5245
+	cell_hash ^= cell.x * 928_371_011
+	cell_hash ^= cell.y * 689_287_499
+	var roll := float(posmod(cell_hash, 10_000)) / 100.0
+	var cumulative_chance := 0.0
+	for ore_definition in config.ore_definitions:
+		if (
+			ore_definition == null
+			or not ore_definition.can_spawn_at_depth(depth_px)
+		):
+			continue
+		cumulative_chance += ore_definition.spawn_chance_percent
+		if roll < cumulative_chance:
+			return ore_definition
+	return null

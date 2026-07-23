@@ -33,12 +33,18 @@ func _ready():
 	if one_shot:
 		stop()
 
+
+## Returns the target hit area including input grace.
 func target_half_width() -> float:
 	return target_size * 0.5 + grace
 
+
+## Returns the slider edge area including input grace.
 func slider_half_width() -> float:
 	return slider.size.x*0.5 + grace
 
+
+## Shows the bar and prepares every target for a new attempt.
 func start():
 	if one_shot:
 		slider.position.x = 0.0
@@ -48,13 +54,19 @@ func start():
 	show()
 	set_process(true)
 
+
+## Freezes the slider without hiding the timing bar.
 func pause():
 	set_process(false)
 
+
+## Hides the timing bar and stops its slider.
 func stop():
 	hide()
 	set_process(false)
 
+
+## Adds and positions one valid hit target.
 func add_target():
 	var new_target = TARGET.instantiate()
 	new_target.offset_right = new_target.offset_left + target_size
@@ -62,27 +74,31 @@ func add_target():
 	backing.add_child(new_target)
 	backing.move_child(new_target, 0)
 	targets.append(new_target)
+	if is_node_ready():
+		randomize_target(new_target)
 
-	pass
 
+## Restores the timing bar to its original single target.
 func remove_all_extra_targets():
 	while targets.size() > 1:
 		remove_target()
-	pass
 
+
+## Removes the most recently added target.
 func remove_target():
 	if targets.size() > 0:
 		targets.pop_back().queue_free()
-	pass
 
+
+## Moves the slider and resolves one press against every visible target.
 func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("Space"):
 		var hit_targets : Array[Panel] = targets.filter(func(target:Panel): return slider.position.x < target.position.x + target_half_width() and slider.position.x > target.position.x - target_half_width())
 		for target : Panel in hit_targets:
 			randomize_target(target)
+		if hit_targets.size() > 0:
 			pressed.emit(true)
-			
-		if hit_targets.size() == 0:
+		else:
 			pressed.emit(false)
 		if one_shot:
 			stop()
@@ -94,8 +110,8 @@ func _process(delta: float) -> void:
 		if one_shot:
 			pressed.emit(false)
 			stop()
-	
 
-func randomize_target(target_hit : Panel):
-	target_hit.position.x = clamp((randf() if fixed_window < 0 else fixed_window)* backing.size.x, target_half_width(), backing.size.x - target_half_width())
-	
+
+## Moves one target to a valid position inside its backing bar.
+func randomize_target(target_panel : Panel):
+	target_panel.position.x = clamp((randf() if fixed_window < 0 else fixed_window)* backing.size.x, target_half_width(), backing.size.x - target_half_width())

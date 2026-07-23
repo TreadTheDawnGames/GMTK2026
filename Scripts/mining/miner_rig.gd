@@ -3,7 +3,8 @@ extends Node2D
 
 ## Plays animations for the miner cutout rig.
 
-signal success_impact(screen_position: Vector2, effect_strength: float)
+signal impact_contact(screen_position: Vector2)
+signal swing_finished
 
 @export_category("Playback")
 @export_range(0.1, 4.0, 0.05) var animation_speed_multiplier: float = 1.0
@@ -11,10 +12,12 @@ signal success_impact(screen_position: Vector2, effect_strength: float)
 
 @export_category("References")
 @export var animation_player: AnimationPlayer
+@export var visual_root: Node2D
 @export var impact_point: Marker2D
+@export var stand_in_hammer_head: Line2D
+@export var final_hammer_head_sprite: Sprite2D
 
 var _playing_full_swing: bool = false
-var _pending_effect_strength: float = 0.0
 
 
 ## Starts the idle animation when the rig loads.
@@ -22,14 +25,12 @@ func _ready() -> void:
 	_play_idle()
 
 
-## Plays the successful hit animation faster for stronger combo hits.
+## Plays the successful strike at its combo and equipped-pickaxe speed.
 func play_success(
-	_depth_advanced_px: int,
-	_cells_removed: int,
 	_combo: int,
-	effect_strength: float
+	effect_strength: float,
+	swing_speed_multiplier: float
 ) -> void:
-	_pending_effect_strength = effect_strength
 	var combo_multiplier := lerpf(
 		1.0,
 		1.0 + combo_speed_bonus,
@@ -41,16 +42,13 @@ func play_success(
 	animation_player.play(
 		&"mine_success",
 		-1.0,
-		combo_multiplier
+		combo_multiplier * maxf(swing_speed_multiplier, 0.1)
 	)
 
 
-## Reports the hammer-tip position at the contact keyframe.
+## Reports the hammer-tip position when the animation reaches the ground.
 func _emit_success_impact() -> void:
-	success_impact.emit(
-		impact_point.global_position,
-		_pending_effect_strength
-	)
+	impact_contact.emit(impact_point.global_position)
 
 
 ## Plays the missed-swing animation.
@@ -94,9 +92,29 @@ func set_animation_speed_multiplier(value: float) -> void:
 		animation_player.speed_scale = animation_speed_multiplier
 
 
+## Applies the equipped pickaxe color to both placeholder and final tool art.
+func set_hammer_head_color(color: Color) -> void:
+	if is_instance_valid(stand_in_hammer_head):
+		stand_in_hammer_head.default_color = color
+	if is_instance_valid(final_hammer_head_sprite):
+		final_hammer_head_sprite.self_modulate = color
+
+
+## Faces the visible miner toward the selected mining side.
+func set_facing_direction(direction: int) -> void:
+	if not is_instance_valid(visual_root) or direction == 0:
+		return
+	visual_root.scale.x = absf(visual_root.scale.x) * signi(direction)
+
+
 ## Returns finished actions to idle after any queued strike plays.
 func _on_animation_finished(animation_name: StringName) -> void:
 	if animation_name == &"wind_up" and _playing_full_swing:
+		return
+	if animation_name == &"mine_success":
+		_playing_full_swing = false
+		_play_idle()
+		swing_finished.emit()
 		return
 	if animation_name != &"idle" and animation_name != &"wind_up":
 		_playing_full_swing = false

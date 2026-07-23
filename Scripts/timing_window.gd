@@ -17,11 +17,15 @@ var combo : int = 0 :
 @export var combo_count_for_additional_target : int = 10
 @export var combo_speed_multiplier : float = 0.1
 
+
+## Connects both timing bars to the combo flow.
 func _ready():
 	combo_label.text = "Next bar in: " + str(combo_count_for_additional_target - combo)
 	mining_window.pressed.connect(_mining_window_pressed)
 	recovery_window.pressed.connect(_recovery_window_pressed)
-	
+
+
+## Updates the combo or opens recovery after the main timing result.
 func _mining_window_pressed(success : bool):
 	if success:
 		combo += 1
@@ -38,9 +42,9 @@ func _mining_window_pressed(success : bool):
 			combo = 0
 			mining_window.remove_all_extra_targets()
 			mining_window.speed_multiplier = 1.0+(combo_speed_multiplier*combo)
-			
-	pass
 
+
+## Resolves recovery and restarts the main timing bar.
 func _recovery_window_pressed(success : bool):
 	if not success:
 		combo = 0
@@ -48,7 +52,5 @@ func _recovery_window_pressed(success : bool):
 		recovery_window.stop()
 		mining_window.speed_multiplier = 1.0
 		mining_window.remove_all_extra_targets()
-		
+
 	mining_window.start()
-	
-	pass

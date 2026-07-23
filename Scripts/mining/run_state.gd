@@ -4,6 +4,8 @@ extends Node
 ## Stores depth, combo, and hit counts for one run.
 
 signal depth_changed(depth_px: int)
+signal bottom_reached
+signal run_reset
 
 @export var config: MiningConfig
 
@@ -12,6 +14,11 @@ var mining_y: int = 0 # Authoritative terrain row beneath the player's feet.
 var combo: int = 0
 var successful_hits: int = 0
 var failed_hits: int = 0
+var has_reached_bottom: bool = false
+
+var remaining_depth_px: int:
+	get:
+		return maxi(config.total_run_depth_px - depth_px, 0)
 
 
 ## Starts a new run when the node loads.
@@ -26,20 +33,34 @@ func reset_run() -> void:
 	combo = 0
 	successful_hits = 0
 	failed_hits = 0
+	has_reached_bottom = false
 	depth_changed.emit(depth_px)
+	run_reset.emit()
 
 
 ## Records a successful hit and the player's new depth.
 func record_success(
 	depth_advanced_px: int,
 	new_mining_y: int,
-	resolved_combo: int
+	resolved_combo: int,
+	count_as_timing_success: bool = true
 ) -> void:
-	depth_px += maxi(depth_advanced_px, 0)
-	mining_y = maxi(new_mining_y, mining_y)
+	depth_px = mini(
+		depth_px + maxi(depth_advanced_px, 0),
+		config.total_run_depth_px
+	)
+	mining_y = clampi(
+		maxi(new_mining_y, mining_y),
+		config.initial_surface_row,
+		config.get_bottom_surface_row()
+	)
 	combo = resolved_combo
-	successful_hits += 1
+	if count_as_timing_success:
+		successful_hits += 1
 	depth_changed.emit(depth_px)
+	if depth_px >= config.total_run_depth_px and not has_reached_bottom:
+		has_reached_bottom = true
+		bottom_reached.emit()
 
 
 ## Records a missed hit without changing depth.

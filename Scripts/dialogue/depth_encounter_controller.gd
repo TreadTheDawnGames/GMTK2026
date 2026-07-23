@@ -4,10 +4,13 @@ extends Node
 ## Starts NPC dialogue at recurring depth floors.
 
 @export var encounter_config: DepthEncounterConfig
+@export var mining_config: MiningConfig
 @export var conversation: DialogueConversation
 @export var dialogue_director: DialogueDirector
 @export var timing_window: TimingWindowTask
 @export var encounter_npc: Node2D
+@export var pickaxe_shop: PickaxeShop
+@export var mining_controller: MiningController
 
 var _next_floor_depth_px: int
 var _pending_floor_depth_px: int = -1
@@ -19,7 +22,10 @@ var _is_initialized: bool = false
 ## Hides the NPC and prepares the first encounter depth.
 func _ready() -> void:
 	encounter_npc.hide()
-	_next_floor_depth_px = encounter_config.first_floor_depth_px
+	_next_floor_depth_px = encounter_config.get_next_floor_depth(
+		0,
+		mining_config.total_run_depth_px
+	)
 	_is_initialized = true
 
 
@@ -29,6 +35,8 @@ func _on_depth_changed(depth_px: int) -> void:
 	if not _is_initialized:
 		return
 	if _active_floor_depth_px >= 0 or _pending_floor_depth_px >= 0:
+		return
+	if _next_floor_depth_px < 0:
 		return
 	if (
 		_completed_floor_depth_px >= 0
@@ -40,10 +48,12 @@ func _on_depth_changed(depth_px: int) -> void:
 
 	_pending_floor_depth_px = _next_floor_depth_px
 	_next_floor_depth_px = encounter_config.get_next_floor_depth(
-		_pending_floor_depth_px
+		_pending_floor_depth_px,
+		mining_config.total_run_depth_px
 	)
 	# Prevent another mining input while the floor moves up to the miner.
 	timing_window.process_mode = Node.PROCESS_MODE_DISABLED
+	mining_controller.set_swing_queue_paused(true)
 
 
 ## Starts the armed encounter after the rendered floor reaches the miner's feet.
@@ -66,7 +76,7 @@ func _begin_encounter() -> void:
 	_active_floor_depth_px = -1
 
 
-## Waits briefly after dialogue, then restores mining input.
+## Opens the marketplace after dialogue, then restores mining input.
 func _on_conversation_finished(conversation_id: StringName) -> void:
 	if (
 		_active_floor_depth_px < 0
@@ -75,6 +85,9 @@ func _on_conversation_finished(conversation_id: StringName) -> void:
 		return
 	_completed_floor_depth_px = _active_floor_depth_px
 	_active_floor_depth_px = -1
+	if pickaxe_shop != null:
+		pickaxe_shop.open_shop()
+		await pickaxe_shop.shop_closed
 	if encounter_config.post_dialogue_buffer_seconds > 0.0:
 		await get_tree().create_timer(
 			encounter_config.post_dialogue_buffer_seconds,
@@ -85,5 +98,6 @@ func _on_conversation_finished(conversation_id: StringName) -> void:
 
 ## Makes the timing bar visible and usable after an encounter.
 func _restore_timing_window() -> void:
+	mining_controller.set_swing_queue_paused(false)
 	timing_window.process_mode = Node.PROCESS_MODE_INHERIT
 	timing_window.show()

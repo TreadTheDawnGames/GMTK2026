@@ -16,15 +16,23 @@ extends Resource
 @export_range(0.0, 5.0, 0.1) var post_dialogue_buffer_seconds: float = 0.5
 
 
-## Returns the next encounter floor below the player's current depth.
-func get_next_floor_depth(current_depth_px: int) -> int:
+## Returns the next valid encounter floor, or -1 after the run bottom.
+func get_next_floor_depth(
+	current_depth_px: int,
+	maximum_depth_px: int
+) -> int:
+	var next_floor_depth_px: int
 	if current_depth_px < first_floor_depth_px:
-		return first_floor_depth_px
-	var completed_intervals := floori(
-		float(current_depth_px - first_floor_depth_px)
-		/ float(repeat_interval_px)
-	) + 1
-	return (
-		first_floor_depth_px
-		+ completed_intervals * repeat_interval_px
-	)
+		next_floor_depth_px = first_floor_depth_px
+	else:
+		var completed_intervals := floori(
+			float(current_depth_px - first_floor_depth_px)
+			/ float(repeat_interval_px)
+		) + 1
+		next_floor_depth_px = (
+			first_floor_depth_px
+			+ completed_intervals * repeat_interval_px
+		)
+	if next_floor_depth_px > maximum_depth_px:
+		return -1
+	return next_floor_depth_px

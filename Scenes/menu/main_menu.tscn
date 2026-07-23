@@ -1,0 +1,107 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/menu/main_menu.gd" id="1_menu"]
+
+[node name="MainMenu" type="Control" node_paths=PackedStringArray("title_group", "subtitle_group", "button_group", "start_button", "exit_button", "exit_confirmation", "status_label")]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_menu")
+game_scene_path = "res://Scenes/mining/mining_proof.tscn"
+title_group = NodePath("MenuLayout/Title")
+subtitle_group = NodePath("MenuLayout/Subtitle")
+button_group = NodePath("MenuLayout/ButtonCenter/Buttons")
+start_button = NodePath("MenuLayout/ButtonCenter/Buttons/StartButton")
+exit_button = NodePath("MenuLayout/ButtonCenter/Buttons/ExitButton")
+exit_confirmation = NodePath("ExitConfirmation")
+status_label = NodePath("MenuLayout/ButtonCenter/Buttons/Status")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.075, 0.095, 0.13, 1)
+
+[node name="MenuLayout" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Title" type="Label" parent="MenuLayout"]
+custom_minimum_size = Vector2(0, 67)
+layout_mode = 2
+theme_override_font_sizes/font_size = 48
+text = "GMTK2026"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Subtitle" type="Label" parent="MenuLayout"]
+custom_minimum_size = Vector2(0, 34)
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Keep Digging."
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ButtonCenter" type="CenterContainer" parent="MenuLayout"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Buttons" type="VBoxContainer" parent="MenuLayout/ButtonCenter"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="StartButton" type="Button" parent="MenuLayout/ButtonCenter/Buttons"]
+custom_minimum_size = Vector2(160, 44)
+layout_mode = 2
+text = "Start"
+
+[node name="ExitButton" type="Button" parent="MenuLayout/ButtonCenter/Buttons"]
+custom_minimum_size = Vector2(160, 44)
+layout_mode = 2
+text = "Exit"
+
+[node name="Status" type="Label" parent="MenuLayout/ButtonCenter/Buttons"]
+custom_minimum_size = Vector2(320, 24)
+layout_mode = 2
+horizontal_alignment = 1
+
+[node name="Version" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -120.0
+offset_top = -34.0
+offset_right = -12.0
+offset_bottom = -10.0
+grow_horizontal = 0
+grow_vertical = 0
+text = "JAM BUILD"
+horizontal_alignment = 2
+
+[node name="ExitConfirmation" type="ConfirmationDialog" parent="."]
+title = "Exit Game?"
+dialog_text = "Really exit the game?"
+ok_button_text = "Exit"
+
+[connection signal="pressed" from="MenuLayout/ButtonCenter/Buttons/StartButton" to="." method="_on_start_button_pressed"]
+[connection signal="pressed" from="MenuLayout/ButtonCenter/Buttons/ExitButton" to="." method="_on_exit_button_pressed"]
+[connection signal="confirmed" from="ExitConfirmation" to="." method="_on_exit_confirmation_confirmed"]

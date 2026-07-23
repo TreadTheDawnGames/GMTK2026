@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PickaxeDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/pickaxes/pickaxe_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"wide_pickaxe"
+display_name = "Excavator Pickaxe"
+description = "Clears a wider path, but swings with less force."
+cost = 12
+power_multiplier = 0.9
+width_multiplier = 1.5
+swing_speed_multiplier = 0.9
+debris_multiplier = 1.2
+hammer_head_color = Color(0.36, 0.76, 1, 1)

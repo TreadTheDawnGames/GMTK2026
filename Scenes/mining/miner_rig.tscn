@@ -291,12 +291,15 @@ _data = {
 &"wind_up": SubResource("Animation_wind_up")
 }
 
-[node name="MinerRig" type="Node2D" unique_id=1134346491 node_paths=PackedStringArray("animation_player", "impact_point")]
+[node name="MinerRig" type="Node2D" unique_id=1134346491 node_paths=PackedStringArray("animation_player", "visual_root", "impact_point", "stand_in_hammer_head", "final_hammer_head_sprite")]
 editor_description = "Presentation-only character rig. Keep this root fixed so the player stays centered. Animate VisualRoot and its pivots instead."
 position = Vector2(576, 282)
 script = ExtResource("1_rig")
 animation_player = NodePath("AnimationPlayer")
+visual_root = NodePath("VisualRoot")
 impact_point = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/ImpactPoint")
+stand_in_hammer_head = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/StandInToolHead")
+final_hammer_head_sprite = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/PickaxeHeadSprite")
 
 [node name="VisualRoot" type="Node2D" parent="." unique_id=465234156]
 editor_description = "Animate this for whole-character bounce, squash, recoil, and small fall offsets. Do not use it to calculate mining progress."
@@ -364,6 +367,9 @@ rotation = -0.28
 
 [node name="PickaxeSprite" type="Sprite2D" parent="VisualRoot/BodyPivot/ArmPivot/PickaxePivot" unique_id=824686595]
 editor_description = "Final pickaxe/tool art slot. Align its grip point to PickaxePivot, then hide the StandInTool nodes."
+
+[node name="PickaxeHeadSprite" type="Sprite2D" parent="VisualRoot/BodyPivot/ArmPivot/PickaxePivot"]
+editor_description = "Optional head-only art layer. Assign the hammer head texture here so equipped pickaxes can tint it without tinting the handle."
 
 [node name="StandInToolHandle" type="Line2D" parent="VisualRoot/BodyPivot/ArmPivot/PickaxePivot" unique_id=2121169759]
 position = Vector2(23.077713, -0.6475649)

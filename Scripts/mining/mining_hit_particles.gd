@@ -6,8 +6,9 @@ extends Node2D
 class DirtPiece:
 	var terrain_position: Vector2
 	var velocity: Vector2
+	var total_lifetime: float
 	var remaining_lifetime: float
-	var radius: float
+	var half_size: float
 	var color: Color
 	var settled: bool = false
 
@@ -16,48 +17,86 @@ class DirtPiece:
 @export var terrain_manager: TerrainManager
 
 @export_category("Burst")
-@export_range(1, 128, 1) var base_particle_amount: int = 14
-@export_range(0.0, 4.0, 0.1) var combo_amount_multiplier: float = 1.0
-@export_range(0.1, 3.0, 0.05) var particle_lifetime: float = 1.1
-@export_range(1.0, 16.0, 0.5) var minimum_radius: float = 3.0
-@export_range(1.0, 16.0, 0.5) var maximum_radius: float = 6.0
+@export_range(0.1, 2.0, 0.05) var pieces_per_removed_cell: float = 0.6
+@export_range(1, 128, 1) var minimum_piece_amount: int = 18
+@export_range(1, 256, 1) var maximum_piece_amount: int = 128
+@export_range(0.1, 3.0, 0.05) var piece_lifetime: float = 1.0
+@export_range(0.1, 1.0, 0.05) var fade_portion: float = 0.55
+@export_range(0.25, 1.0, 0.05) var minimum_cell_scale: float = 0.5
+@export_range(0.25, 1.5, 0.05) var maximum_cell_scale: float = 1.0
 
 @export_category("Motion")
-@export_range(0.0, 1_000.0, 5.0) var minimum_launch_speed: float = 105.0
-@export_range(0.0, 1_000.0, 5.0) var maximum_launch_speed: float = 205.0
-@export_range(0.0, 180.0, 1.0) var launch_spread_degrees: float = 68.0
-@export_range(0.0, 2_000.0, 10.0) var gravity: float = 310.0
-@export_range(0.0, 1.0, 0.05) var bounce_factor: float = 0.35
+@export_range(0.0, 1_000.0, 5.0) var minimum_launch_speed: float = 180.0
+@export_range(0.0, 1_000.0, 5.0) var maximum_launch_speed: float = 330.0
+@export_range(0.0, 180.0, 1.0) var launch_spread_degrees: float = 140.0
+@export_range(0.0, 2_000.0, 10.0) var gravity: float = 420.0
+@export_range(0.0, 1.0, 0.05) var bounce_factor: float = 0.3
 @export_range(0.0, 1.0, 0.05) var surface_friction: float = 0.65
 @export_range(0.0, 200.0, 1.0) var settle_speed: float = 35.0
 
-@export_category("Color")
-@export var primary_color: Color = Color("8c5740")
-@export var accent_color: Color = Color("75483a")
+@export_category("Performance")
+## Limits simultaneous dirt pixels so repeated hits stay inexpensive.
+@export_range(1, 512, 1) var maximum_active_pieces: int = 192
+## Applies a lower simultaneous-pixel limit in browser exports.
+@export_range(1, 256, 1) var web_maximum_active_pieces: int = 64
 
 var _pieces: Array[DirtPiece] = []
 var _random := RandomNumberGenerator.new()
 
 
-## Prepares random values for particle bursts.
+## Prepares random values and sleeps processing until the first burst.
 func _ready() -> void:
 	_random.randomize()
+	set_process(false)
 
 
 ## Creates a dirt burst at the hammer's animated impact point.
 func play_at_impact(
 	impact_screen_position: Vector2,
-	effect_strength: float
+	cells_removed: int,
+	effect_strength: float,
+	debris_multiplier: float = 1.0
 ) -> void:
-	var particle_amount := base_particle_amount + roundi(
-		base_particle_amount * combo_amount_multiplier * effect_strength
+	if cells_removed <= 0:
+		return
+	var requested_piece_amount := clampi(
+		roundi(
+			float(cells_removed)
+			* pieces_per_removed_cell
+			* maxf(debris_multiplier, 0.0)
+		),
+		minimum_piece_amount,
+		maximum_piece_amount
 	)
+	var active_piece_budget := maximum_active_pieces
+	if OS.has_feature("web"):
+		active_piece_budget = mini(
+			active_piece_budget,
+			web_maximum_active_pieces
+		)
+	var piece_amount := mini(requested_piece_amount, active_piece_budget)
+	var oldest_pieces_to_remove := maxi(
+		0,
+		_pieces.size() + piece_amount - active_piece_budget
+	)
+	# Keep the newest impact readable by discarding oldest pieces first.
+	for _piece_index in range(oldest_pieces_to_remove):
+		_pieces.remove_at(0)
+
 	var spawn_position := terrain_manager.screen_to_terrain_position(
 		impact_screen_position + Vector2.UP * 2.0
 	)
 	var half_spread := deg_to_rad(launch_spread_degrees) * 0.5
+	var speed_bonus := lerpf(
+		1.0,
+		1.35,
+		clampf(effect_strength, 0.0, 1.0)
+	)
+	var logical_cell_size := float(
+		terrain_manager.config.logical_pixel_scale
+	)
 
-	for particle_index in range(particle_amount):
+	for _piece_index in range(piece_amount):
 		var piece := DirtPiece.new()
 		piece.terrain_position = spawn_position
 		piece.velocity = Vector2.UP.rotated(
@@ -65,18 +104,20 @@ func play_at_impact(
 		) * _random.randf_range(
 			minimum_launch_speed,
 			maximum_launch_speed
-		)
-		piece.remaining_lifetime = particle_lifetime
-		piece.radius = _random.randf_range(
-			minimum_radius,
-			maximum_radius
+		) * speed_bonus
+		piece.total_lifetime = piece_lifetime
+		piece.remaining_lifetime = piece.total_lifetime
+		piece.half_size = logical_cell_size * 0.5 * _random.randf_range(
+			minimum_cell_scale,
+			maximum_cell_scale
 		)
 		piece.color = (
-			accent_color
-			if _random.randf() < 0.3
-			else primary_color
+			terrain_manager.config.terrain_accent_color
+			if _random.randf() < 0.25
+			else terrain_manager.config.terrain_color
 		)
 		_pieces.append(piece)
+	set_process(true)
 	queue_redraw()
 
 
@@ -92,17 +133,30 @@ func _process(delta: float) -> void:
 			piece.velocity.y += gravity * delta
 			_move_piece(piece, delta)
 	queue_redraw()
+	if _pieces.is_empty():
+		set_process(false)
 
 
-## Draws each dirt piece at its current terrain position.
+## Draws each fading dirt pixel at its current terrain position.
 func _draw() -> void:
 	for piece in _pieces:
-		draw_circle(
-			terrain_manager.terrain_to_screen_position(
-				piece.terrain_position
+		var screen_position := terrain_manager.terrain_to_screen_position(
+			piece.terrain_position
+		)
+		var fade_duration := piece.total_lifetime * fade_portion
+		var fade_alpha := clampf(
+			piece.remaining_lifetime / fade_duration,
+			0.0,
+			1.0
+		)
+		var draw_color := piece.color
+		draw_color.a *= fade_alpha
+		draw_rect(
+			Rect2(
+				screen_position - Vector2.ONE * piece.half_size,
+				Vector2.ONE * piece.half_size * 2.0
 			),
-			piece.radius,
-			piece.color
+			draw_color
 		)
 
 
@@ -154,12 +208,12 @@ func _position_collides(
 	piece: DirtPiece
 ) -> bool:
 	var horizontal_edge := terrain_position + Vector2(
-		signf(piece.velocity.x) * piece.radius,
+		signf(piece.velocity.x) * piece.half_size,
 		0.0
 	)
 	var vertical_edge := terrain_position + Vector2(
 		0.0,
-		signf(piece.velocity.y) * piece.radius
+		signf(piece.velocity.y) * piece.half_size
 	)
 	return (
 		terrain_manager.is_solid_at_terrain_position(horizontal_edge)
