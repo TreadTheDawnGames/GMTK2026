@@ -17,8 +17,6 @@ signal mine_missed(combo: int)
 @export var view_controller: ViewController
 @export var chip_origin: Marker2D
 
-var _impact_seed: int = 0
-
 
 ## Resolves one timing result. Successful hits break ground and move the player;
 ## misses only update the failed-hit count.
@@ -30,10 +28,14 @@ func resolve_attempt(success: bool, resolved_combo: int) -> void:
 		return
 
 	var chip_combo := mini(safe_combo, config.maximum_effect_combo)
-	var combo_radius_steps := maxi(chip_combo - 1, 0)
-	var requested_radius_cells := (
-		config.base_chip_radius_cells
-		+ config.combo_chip_radius_cells_per_step * combo_radius_steps
+	var combo_steps := maxi(chip_combo - 1, 0)
+	var requested_depth_cells := (
+		config.base_mine_depth_cells
+		+ config.combo_mine_depth_cells_per_step * combo_steps
+	)
+	var requested_half_width_cells := (
+		config.base_tunnel_half_width_cells
+		+ config.combo_tunnel_half_width_cells_per_step * combo_steps
 	)
 	var impact_cell := Vector2i(
 		terrain_manager.screen_x_to_terrain_cell_x(
@@ -41,11 +43,10 @@ func resolve_attempt(success: bool, resolved_combo: int) -> void:
 		),
 		run_state.mining_y
 	)
-	_impact_seed += 1
-	var cells_removed := terrain_manager.chip_at(
+	var cells_removed := terrain_manager.dig_tunnel(
 		impact_cell,
-		requested_radius_cells,
-		_impact_seed
+		requested_depth_cells,
+		requested_half_width_cells
 	)
 	var new_mining_y := terrain_manager.find_surface_row(
 		impact_cell.x,

@@ -27,51 +27,32 @@ func _ready() -> void:
 	set_view_y(float(config.initial_surface_row))
 
 
-## Removes a connected semicircle of dirt beneath an impact point.
-func chip_at(
+## Clears a rectangular tunnel straight down from an impact point.
+func dig_tunnel(
 	terrain_position: Vector2i,
-	radius_cells: int,
-	_impact_seed: int
+	depth_cells: int,
+	half_width_cells: int
 ) -> int:
-	if radius_cells <= 0 or not _is_solid_cell(terrain_position):
+	if depth_cells <= 0 or not _is_solid_cell(terrain_position):
 		return 0
 
 	var removed_cells := 0
 	var affected_chunks: Dictionary = {}
-	var radius_squared := radius_cells * radius_cells
-	var pending_cells: Array[Vector2i] = [terrain_position]
-	var visited_cells: Dictionary = {terrain_position: true}
-	var pending_index := 0
-	var directions: Array[Vector2i] = [
-		Vector2i.LEFT,
-		Vector2i.RIGHT,
-		Vector2i.UP,
-		Vector2i.DOWN,
-	]
-
-	# Flood filling keeps the bite from crossing an open encounter chamber.
-	while pending_index < pending_cells.size():
-		var cell := pending_cells[pending_index]
-		pending_index += 1
-		var chunk_index := _world_to_chunk_index(cell.y)
-		_set_cell_destroyed(cell)
-		affected_chunks[chunk_index] = true
-		removed_cells += 1
-
-		for direction: Vector2i in directions:
-			var neighbor: Vector2i = cell + direction
-			if neighbor.y < terrain_position.y:
+	for cell_y in range(terrain_position.y, terrain_position.y + depth_cells):
+		# Reaching a chamber opens the full fall without damaging its floor.
+		if _is_encounter_chamber_cell(Vector2i(terrain_position.x, cell_y)):
+			break
+		for cell_x in range(
+			terrain_position.x - half_width_cells,
+			terrain_position.x + half_width_cells + 1
+		):
+			var cell := Vector2i(cell_x, cell_y)
+			if not _is_solid_cell(cell):
 				continue
-			if visited_cells.has(neighbor):
-				continue
-			visited_cells[neighbor] = true
-			if (
-				(neighbor - terrain_position).length_squared()
-				> radius_squared
-			):
-				continue
-			if _is_solid_cell(neighbor):
-				pending_cells.append(neighbor)
+			var chunk_index := _world_to_chunk_index(cell.y)
+			_set_cell_destroyed(cell)
+			affected_chunks[chunk_index] = true
+			removed_cells += 1
 
 	for chunk_index: int in affected_chunks:
 		if not _active_chunks.has(chunk_index):

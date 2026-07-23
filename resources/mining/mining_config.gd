@@ -9,9 +9,12 @@ extends Resource
 @export_range(16, 256, 1) var chunk_height_cells: int = 64
 @export_range(1, 32, 1) var logical_pixel_scale: int = 8
 @export_range(1, 512, 1) var initial_surface_row: int = 38
-# Six cells at the default scale gives the first hit a 48 px radius.
-@export_range(1, 64, 1) var base_chip_radius_cells: int = 6
-@export_range(0, 16, 1) var combo_chip_radius_cells_per_step: int = 1
+# Six rows at the default scale makes the first hit descend 48 px.
+@export_range(1, 64, 1) var base_mine_depth_cells: int = 6
+@export_range(0, 16, 1) var combo_mine_depth_cells_per_step: int = 1
+# Three cells on each side makes a 56 px tunnel for the 44 px stand-in miner.
+@export_range(0, 32, 1) var base_tunnel_half_width_cells: int = 3
+@export_range(0, 8, 1) var combo_tunnel_half_width_cells_per_step: int = 1
 @export var global_seed: int = 2026
 @export_range(16, 1_024, 1) var depth_band_height_rows: int = 128
 @export var terrain_color: Color = Color("633c31")
