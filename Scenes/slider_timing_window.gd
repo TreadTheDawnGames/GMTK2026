@@ -19,6 +19,7 @@ const TARGET = preload("uid://16edwc1adi0x")
 @export var max_target_size: float = 128.0
 @export var min_target_size: float = 16.0
 @export var target_shrink_rate: float = 0.9
+@export var targets_use_image: bool = true
 
 @export var slider_size: float = 5.0
 
@@ -81,6 +82,7 @@ func add_target() -> void:
 	if new_target == null:
 		push_error("The timing target scene must create a TimingTarget.")
 		return
+	new_target.use_image = targets_use_image
 	_set_control_width(new_target, max_target_size)
 	backing.add_child(new_target)
 	backing.move_child(new_target, 0)

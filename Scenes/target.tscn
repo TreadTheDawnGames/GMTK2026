@@ -2,6 +2,7 @@
 
 [ext_resource type="StyleBox" uid="uid://c4v0glcf75hd" path="res://resources/themes/target.tres" id="1_vq1qf"]
 [ext_resource type="Script" uid="uid://b8g3lwxrab4uc" path="res://Scripts/target.gd" id="2_ls7vh"]
+[ext_resource type="Texture2D" uid="uid://1midkroux0r2" path="res://Assets/TimeBar/Pickaxe.png" id="3_2228f"]
 
 [node name="Target" type="Panel" unique_id=980051362]
 anchors_preset = 13
@@ -15,3 +16,20 @@ offset_transform_enabled = true
 offset_transform_position_ratio = Vector2(-0.5, 0)
 theme_override_styles/panel = ExtResource("1_vq1qf")
 script = ExtResource("2_ls7vh")
+
+[node name="TextureRect" type="TextureRect" parent="." unique_id=1601954937]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -17.0
+offset_top = -17.0
+offset_right = 17.0
+offset_bottom = 17.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("3_2228f")
+expand_mode = 2
+stretch_mode = 4

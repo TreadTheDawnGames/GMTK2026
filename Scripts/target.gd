@@ -5,6 +5,10 @@ extends Panel
 
 var is_hit: bool = false
 
+var use_image:bool=true:
+	set(value):
+		use_image = value
+		$TextureRect.visible = value
 
 ## Marks this target collected and hides it until the set resets.
 func hit() -> void:
