@@ -61,14 +61,16 @@ layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -110.0
-offset_top = -25.0
-offset_bottom = -2.0
+offset_left = -705.0
+offset_top = -26.0
+offset_right = -595.0
+offset_bottom = -3.0
 grow_horizontal = 0
 text = "Combo: "
 
 [node name="TimingDial" type="Control" parent="." unique_id=1247238614]
 unique_name_in_owner = true
+visible = false
 anchors_preset = 0
 offset_left = 346.0
 offset_top = 374.0
