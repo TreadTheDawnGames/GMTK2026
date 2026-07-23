@@ -11,7 +11,6 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_6wfpp")
-recovery_combo_count = 0
 
 [node name="ComboLabel" type="Label" parent="." unique_id=1967208941]
 unique_name_in_owner = true
