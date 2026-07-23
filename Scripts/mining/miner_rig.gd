@@ -20,6 +20,8 @@ signal swing_finished
 @export var animation_player: AnimationPlayer
 @export var visual_root: Node2D
 @export var drawn_miner_sprite: Sprite2D
+@export var idle_miner_texture: Texture2D
+@export var impact_miner_texture: Texture2D
 @export var impact_point: Marker2D
 @export var stand_in_hammer_head: Line2D
 @export var final_hammer_head_sprite: Sprite2D
@@ -34,6 +36,7 @@ var _visual_root_rest_y: float
 func _ready() -> void:
 	_rest_position = position
 	_visual_root_rest_y = visual_root.position.y
+	_set_miner_texture(idle_miner_texture)
 	show_intact_floor_grounding()
 	if not animation_player.animation_finished.is_connected(
 		_on_animation_finished
@@ -50,6 +53,7 @@ func play_success(
 	combo_strength: float,
 	swing_speed_multiplier: float
 ) -> void:
+	_set_miner_texture(idle_miner_texture)
 	var combo_multiplier := lerpf(
 		1.0,
 		1.0 + combo_speed_bonus,
@@ -67,6 +71,7 @@ func play_success(
 
 ## Reports the hammer-tip position when the animation reaches the ground.
 func _emit_success_impact() -> void:
+	_set_miner_texture(impact_miner_texture)
 	if impact_audio_player.stream != null:
 		impact_audio_player.play()
 	impact_contact.emit(impact_point.global_position)
@@ -74,6 +79,7 @@ func _emit_success_impact() -> void:
 
 ## Plays the missed-swing animation.
 func play_miss(_combo: int) -> void:
+	_set_miner_texture(idle_miner_texture)
 	_playing_full_swing = false
 	animation_player.stop()
 	animation_player.speed_scale = animation_speed_multiplier
@@ -82,6 +88,7 @@ func play_miss(_combo: int) -> void:
 
 ## Holds the miner in the raised pickaxe pose.
 func play_wind_up() -> void:
+	_set_miner_texture(idle_miner_texture)
 	_playing_full_swing = false
 	animation_player.stop()
 	animation_player.speed_scale = animation_speed_multiplier
@@ -90,6 +97,7 @@ func play_wind_up() -> void:
 
 ## Holds the miner in the downward impact pose.
 func play_wind_down() -> void:
+	_set_miner_texture(impact_miner_texture)
 	_playing_full_swing = false
 	animation_player.stop()
 	animation_player.speed_scale = animation_speed_multiplier
@@ -99,6 +107,7 @@ func play_wind_down() -> void:
 ## Previews the raised and impact poses in sequence.
 func play_full_swing() -> void:
 	# Authoring preview for the two discrete mining poses.
+	_set_miner_texture(idle_miner_texture)
 	_playing_full_swing = true
 	animation_player.stop()
 	animation_player.speed_scale = animation_speed_multiplier
@@ -166,9 +175,16 @@ func _set_grounding_offset(offset_y: float) -> void:
 	visual_root.position.y = _visual_root_rest_y + offset_y
 
 
+## Swaps authored full-frame poses without changing gameplay coordinates.
+func _set_miner_texture(texture: Texture2D) -> void:
+	if texture != null and is_instance_valid(drawn_miner_sprite):
+		drawn_miner_sprite.texture = texture
+
+
 ## Returns finished actions to idle after any queued strike plays.
 func _on_animation_finished(animation_name: StringName) -> void:
 	if animation_name == &"wind_up" and _playing_full_swing:
+		_set_miner_texture(impact_miner_texture)
 		return
 	if animation_name == &"two_frame_success":
 		_playing_full_swing = false
@@ -182,5 +198,6 @@ func _on_animation_finished(animation_name: StringName) -> void:
 
 ## Plays idle at the current speed setting.
 func _play_idle() -> void:
+	_set_miner_texture(idle_miner_texture)
 	animation_player.speed_scale = animation_speed_multiplier
 	animation_player.play(&"idle")
