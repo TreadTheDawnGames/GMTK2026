@@ -11,19 +11,23 @@
 [ext_resource type="Script" uid="uid://cl8v0x0ammlnj" path="res://Scripts/mining/view_controller.gd" id="9_view_controller"]
 [ext_resource type="PackedScene" path="res://Scenes/mining/mining_hit_particles.tscn" id="10_hit_particles"]
 [ext_resource type="PackedScene" uid="uid://bwnqpopl5iayr" path="res://Scenes/dialogue/dialogue_overlay.tscn" id="11_dialogue_overlay"]
-[ext_resource type="Resource" uid="uid://bd616ftdm0c7c" path="res://resources/dialogue/marketplace_intro.tres" id="12_marketplace_dialogue"]
+[ext_resource type="Resource" path="res://resources/encounters/stone_pickaxe_gift.tres" id="12_stone_gift"]
 [ext_resource type="Script" uid="uid://bmv66cgstojt0" path="res://Scripts/dialogue/depth_encounter_controller.gd" id="13_depth_encounter"]
 [ext_resource type="Resource" path="res://resources/encounters/depth_encounter_config.tres" id="14_encounter_config"]
 [ext_resource type="Script" uid="uid://bqcbj6fw6q7ef" path="res://Scripts/mining/ore_inventory_state.gd" id="15_ore_inventory"]
 [ext_resource type="PackedScene" path="res://Scenes/input/aim_mode_prompt.tscn" id="16_aim_prompt"]
 [ext_resource type="Script" uid="uid://dqb7nfeq5f2h1" path="res://Scripts/input/miner_aim_controller.gd" id="17_aim_controller"]
-[ext_resource type="PackedScene" path="res://Scenes/shop/pickaxe_shop.tscn" id="18_pickaxe_shop"]
-[ext_resource type="Script" uid="uid://doewt38dim4rc" path="res://Scripts/shop/pickaxe_shop_coordinator.gd" id="19_shop_coordinator"]
+[ext_resource type="Script" path="res://Scripts/pickaxes/pickaxe_progression.gd" id="19_pickaxe_progression"]
 [ext_resource type="Resource" path="res://resources/pickaxes/basic_pickaxe.tres" id="20_basic_pickaxe"]
 [ext_resource type="Script" uid="uid://c4nd03mddc2vw" path="res://Scripts/mining/impact_shake.gd" id="21_impact_shake"]
 [ext_resource type="Script" uid="uid://boq33gsihoh51" path="res://Scripts/ui/playtime_reveal.gd" id="22_playtime_reveal"]
-[ext_resource type="Script" path="res://Scripts/mining/terrain_break_animator.gd" id="24_break_animator"]
 [ext_resource type="Script" path="res://Scripts/mining/mining_scene_wiring.gd" id="25_wiring"]
+[ext_resource type="Script" path="res://resources/encounters/pickaxe_gift_encounter.gd" id="26_gift_type"]
+[ext_resource type="Resource" path="res://resources/encounters/excavator_pickaxe_gift.tres" id="27_excavator_gift"]
+[ext_resource type="Resource" path="res://resources/encounters/swift_pickaxe_gift.tres" id="28_swift_gift"]
+[ext_resource type="Resource" path="res://resources/encounters/heavy_pickaxe_gift.tres" id="29_heavy_gift"]
+[ext_resource type="Script" path="res://Scripts/mining/dig_number_presenter.gd" id="30_dig_number_presenter"]
+[ext_resource type="PackedScene" path="res://Scenes/mining/dig_number.tscn" id="31_dig_number"]
 
 [node name="GameRoot" type="Node" unique_id=1769413368]
 
@@ -49,11 +53,10 @@ color = Color(0.075, 0.095, 0.13, 1)
 script = ExtResource("3_terrain")
 config = ExtResource("1_config")
 encounter_config = ExtResource("14_encounter_config")
-progressive_breaking_enabled = true
 
 [node name="MinerRig" parent="MiningScene" unique_id=726963260 instance=ExtResource("7_miner_rig")]
 
-[node name="MarketplaceNpc" parent="MiningScene" unique_id=174482703 instance=ExtResource("7_miner_rig")]
+[node name="EncounterNpc" parent="MiningScene" unique_id=174482703 instance=ExtResource("7_miner_rig")]
 visible = false
 position = Vector2(760, 282)
 
@@ -62,20 +65,19 @@ terrain_manager = NodePath("../TerrainManager")
 
 [node name="Systems" type="Node" parent="MiningScene" unique_id=1573949011]
 
-[node name="SceneWiring" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("run_state", "ore_inventory", "terrain_manager", "terrain_break_animator", "mining_controller", "timing_bridge", "view_controller", "miner_rig", "hit_particles", "impact_shake", "hud", "encounter_controller", "dialogue_director", "aim_mode_prompt", "aim_controller")]
+[node name="SceneWiring" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("run_state", "ore_inventory", "mining_controller", "timing_bridge", "view_controller", "miner_rig", "hit_particles", "dig_number_presenter", "impact_shake", "hud", "encounter_controller", "dialogue_director", "aim_mode_prompt", "aim_controller")]
 script = ExtResource("25_wiring")
 run_state = NodePath("../../../RunState")
 ore_inventory = NodePath("../../../OreInventoryState")
-terrain_manager = NodePath("../../TerrainManager")
-terrain_break_animator = NodePath("../TerrainBreakAnimator")
 mining_controller = NodePath("../MiningController")
 timing_bridge = NodePath("../TimingBridge")
 view_controller = NodePath("../ViewController")
 miner_rig = NodePath("../../MinerRig")
 hit_particles = NodePath("../../MiningHitParticles")
+dig_number_presenter = NodePath("../../../DigNumberPresenter")
 impact_shake = NodePath("../ImpactShake")
 hud = NodePath("../../HUD")
-encounter_controller = NodePath("../MarketplaceEncounterController")
+encounter_controller = NodePath("../UpgradeEncounterController")
 dialogue_director = NodePath("../../../DialogueDirector")
 aim_mode_prompt = NodePath("../../../AimModePrompt")
 aim_controller = NodePath("../MinerAimController")
@@ -93,10 +95,6 @@ terrain_manager = NodePath("../../TerrainManager")
 script = ExtResource("21_impact_shake")
 camera = NodePath("../../ImpactCamera")
 
-[node name="TerrainBreakAnimator" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("terrain_manager")]
-script = ExtResource("24_break_animator")
-terrain_manager = NodePath("../../TerrainManager")
-
 [node name="MiningController" type="Node" parent="MiningScene/Systems" unique_id=1389910536 node_paths=PackedStringArray("run_state", "ore_inventory", "terrain_manager", "view_controller", "fall_origin")]
 script = ExtResource("5_controller")
 config = ExtResource("1_config")
@@ -112,23 +110,21 @@ miner_rig = NodePath("../../MinerRig")
 mining_controller = NodePath("../MiningController")
 timing_window = NodePath("../../HUD/TimingWindow")
 
-[node name="PickaxeShopCoordinator" type="Node" parent="MiningScene/Systems" unique_id=905831664 node_paths=PackedStringArray("ore_inventory", "shop", "miner_rig", "mining_controller")]
-script = ExtResource("19_shop_coordinator")
-ore_inventory = NodePath("../../../OreInventoryState")
-shop = NodePath("../../../PickaxeShopLayer/PickaxeShop")
+[node name="PickaxeProgression" type="Node" parent="MiningScene/Systems" unique_id=905831664 node_paths=PackedStringArray("miner_rig", "mining_controller")]
+script = ExtResource("19_pickaxe_progression")
 miner_rig = NodePath("../../MinerRig")
 mining_controller = NodePath("../MiningController")
 starter_pickaxe = ExtResource("20_basic_pickaxe")
 
-[node name="MarketplaceEncounterController" type="Node" parent="MiningScene/Systems" unique_id=797816739 node_paths=PackedStringArray("dialogue_director", "timing_window", "encounter_npc", "pickaxe_shop", "mining_controller")]
+[node name="UpgradeEncounterController" type="Node" parent="MiningScene/Systems" unique_id=797816739 node_paths=PackedStringArray("dialogue_director", "timing_window", "encounter_npc", "pickaxe_progression", "mining_controller")]
 script = ExtResource("13_depth_encounter")
 encounter_config = ExtResource("14_encounter_config")
 mining_config = ExtResource("1_config")
-conversation = ExtResource("12_marketplace_dialogue")
+gift_encounters = Array[ExtResource("26_gift_type")]([ExtResource("12_stone_gift"), ExtResource("27_excavator_gift"), ExtResource("28_swift_gift"), ExtResource("29_heavy_gift")])
 dialogue_director = NodePath("../../../DialogueDirector")
 timing_window = NodePath("../../HUD/TimingWindow")
-encounter_npc = NodePath("../../MarketplaceNpc")
-pickaxe_shop = NodePath("../../../PickaxeShopLayer/PickaxeShop")
+encounter_npc = NodePath("../../EncounterNpc")
+pickaxe_progression = NodePath("../PickaxeProgression")
 mining_controller = NodePath("../MiningController")
 
 [node name="HUD" type="CanvasLayer" parent="MiningScene" unique_id=557922213 node_paths=PackedStringArray("run_state", "ore_inventory", "depth_label", "ore_label")]
@@ -152,7 +148,7 @@ theme_override_constants/separation = 5
 
 [node name="DepthLabel" type="Label" parent="MiningScene/HUD/Layout/Content" unique_id=677929986]
 layout_mode = 2
-text = "DEPTH  100,000 px"
+text = "DEPTH  100,000"
 
 [node name="OreLabel" type="Label" parent="MiningScene/HUD/Layout/Content" unique_id=1048321338]
 layout_mode = 2
@@ -170,9 +166,10 @@ script = ExtResource("22_playtime_reveal")
 
 [node name="DialogueDirector" parent="." unique_id=1751798570 instance=ExtResource("11_dialogue_overlay")]
 
-[node name="PickaxeShopLayer" type="CanvasLayer" parent="." unique_id=534694703]
-layer = 15
-
-[node name="PickaxeShop" parent="PickaxeShopLayer" unique_id=1090459810 instance=ExtResource("18_pickaxe_shop")]
+[node name="DigNumberPresenter" type="CanvasLayer" parent="." groups=["dig_number_presenter"]]
+layer = 12
+process_mode = 3
+script = ExtResource("30_dig_number_presenter")
+dig_number_scene = ExtResource("31_dig_number")
 
 [node name="AimModePrompt" parent="." unique_id=1449813641 instance=ExtResource("16_aim_prompt")]

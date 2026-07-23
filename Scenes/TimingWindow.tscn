@@ -22,6 +22,9 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_6wfpp")
+recovery_combo_count = null
+combo_count_for_additional_target = null
+combo_speed_multiplier = null
 mine_sounds = Array[AudioStream]([ExtResource("2_4e5kf"), ExtResource("3_74xn3"), ExtResource("4_2plp5"), ExtResource("5_53pw3"), ExtResource("6_af75q"), ExtResource("7_cprbh"), ExtResource("8_gxysw")])
 
 [node name="ComboLabel" type="Label" parent="." unique_id=1967208941]

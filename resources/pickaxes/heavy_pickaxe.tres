@@ -1,16 +1,15 @@
-[gd_resource type="Resource" script_class="PickaxeDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="PickaxeDefinition" format=3 uid="uid://b4mmi0cxboa5g"]
 
-[ext_resource type="Script" path="res://resources/pickaxes/pickaxe_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://bvbd25ebtqkh8" path="res://resources/pickaxes/pickaxe_definition.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
 id = &"heavy_pickaxe"
 display_name = "Heavy Pickaxe"
 description = "A slow, crushing strike followed by a full-width aftershock."
-cost = 24
 power_multiplier = 1.2
 swing_speed_multiplier = 0.75
 debris_multiplier = 1.6
 special_effect = 1
-aftershock_depth_cells = 4
+aftershock_depth_rows = 4
 hammer_head_color = Color(1, 0.48, 0.22, 1)

@@ -1,20 +1,18 @@
-[gd_resource type="Resource" script_class="PickaxeDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="PickaxeDefinition" format=3 uid="uid://bbndt540njrcm"]
 
-[ext_resource type="Script" path="res://resources/pickaxes/pickaxe_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://bvbd25ebtqkh8" path="res://resources/pickaxes/pickaxe_definition.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
 id = &"swift_pickaxe"
 display_name = "Swift Pickaxe"
 description = "Every successful timing hit earns a quick follow-up strike."
-cost = 18
 power_multiplier = 0.7
 width_multiplier = 0.9
 swing_speed_multiplier = 1.6
 debris_multiplier = 0.7
 special_effect = 2
 follow_up_power_scale = 0.55
-follow_up_width_scale = 1.0
 follow_up_speed_scale = 1.35
 follow_up_debris_scale = 0.6
 hammer_head_color = Color(0.45, 1, 0.65, 1)

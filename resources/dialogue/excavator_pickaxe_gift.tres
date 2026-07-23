@@ -1,0 +1,46 @@
+[gd_resource type="Resource" script_class="DialogueConversation" format=3 uid="uid://d7c16l3b54ku"]
+
+[ext_resource type="Script" uid="uid://c55utdbjdwaui" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
+[ext_resource type="Script" uid="uid://ivfntthetp0i" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
+[ext_resource type="Script" uid="uid://bwwpoalvqb7ni" path="res://resources/dialogue/dialogue_line.gd" id="3_line"]
+
+[sub_resource type="Resource" id="Line_warning"]
+script = ExtResource("3_line")
+speaker_slot = &"surveyor"
+text = "The passages below get tight. A narrow tunnel will slow you down."
+
+[sub_resource type="Resource" id="Line_bag"]
+script = ExtResource("3_line")
+speaker_slot = &"surveyor"
+text = "(The surveyor pulls a broad pickaxe from their pack.)"
+
+[sub_resource type="Resource" id="Line_reveal"]
+script = ExtResource("3_line")
+speaker_slot = &"surveyor"
+text = "An Excavator Pickaxe! This one clears a much wider path."
+
+[sub_resource type="Resource" id="Line_response"]
+script = ExtResource("3_line")
+speaker_slot = &"miner"
+text = "That will give me room to aim for anything buried nearby."
+
+[sub_resource type="Resource" id="Line_departure"]
+script = ExtResource("3_line")
+speaker_slot = &"surveyor"
+text = "Exactly. Take it, and keep moving."
+
+[sub_resource type="Resource" id="Participant_miner"]
+script = ExtResource("2_participant")
+slot = &"miner"
+display_name = "Miner"
+
+[sub_resource type="Resource" id="Participant_surveyor"]
+script = ExtResource("2_participant")
+slot = &"surveyor"
+display_name = "Tunnel Surveyor"
+
+[resource]
+script = ExtResource("1_conversation")
+conversation_id = &"excavator_pickaxe_gift"
+participants = Array[ExtResource("2_participant")]([SubResource("Participant_miner"), SubResource("Participant_surveyor")])
+lines = Array[ExtResource("3_line")]([SubResource("Line_warning"), SubResource("Line_bag"), SubResource("Line_reveal"), SubResource("Line_response"), SubResource("Line_departure")])

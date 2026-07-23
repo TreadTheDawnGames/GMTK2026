@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b8fbimxtvg3i2"
-path="res://.godot/imported/Pickaxe Shop Item Example.png-1bc63233fd2972f58b74ae9d16dda7da.ctex"
+uid="uid://v50k56fierk7"
+path="res://.godot/imported/BigHole1.png-5f9fa36ac57e8b5fb200f8ed4e1c9fa8.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Assets/Pickaxe Shop Item Example.png"
-dest_files=["res://.godot/imported/Pickaxe Shop Item Example.png-1bc63233fd2972f58b74ae9d16dda7da.ctex"]
+source_file="res://Assets/Terrain/BigHole1.png"
+dest_files=["res://.godot/imported/BigHole1.png-5f9fa36ac57e8b5fb200f8ed4e1c9fa8.ctex"]
 
 [params]
 

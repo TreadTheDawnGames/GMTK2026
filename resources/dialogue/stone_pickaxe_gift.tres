@@ -1,0 +1,51 @@
+[gd_resource type="Resource" script_class="DialogueConversation" format=3 uid="uid://dpq8sc2bjy7bw"]
+
+[ext_resource type="Script" uid="uid://c55utdbjdwaui" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
+[ext_resource type="Script" uid="uid://ivfntthetp0i" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
+[ext_resource type="Script" uid="uid://bwwpoalvqb7ni" path="res://resources/dialogue/dialogue_line.gd" id="3_line"]
+
+[sub_resource type="Resource" id="Line_offer"]
+script = ExtResource("3_line")
+speaker_slot = &"traveler"
+text = "Oh, you're trying to make it to the thief? I might be able to help."
+
+[sub_resource type="Resource" id="Line_question"]
+script = ExtResource("3_line")
+speaker_slot = &"miner"
+text = "You have something that can get through this dirt?"
+
+[sub_resource type="Resource" id="Line_bag"]
+script = ExtResource("3_line")
+speaker_slot = &"traveler"
+text = "(They dig around in their bag...)"
+
+[sub_resource type="Resource" id="Line_reveal"]
+script = ExtResource("3_line")
+speaker_slot = &"traveler"
+text = "Ta-da! A Stone Pickaxe!"
+
+[sub_resource type="Resource" id="Line_gift"]
+script = ExtResource("3_line")
+speaker_slot = &"traveler"
+text = "Here you go. It isn't much, but it should be faster than that wooden one."
+
+[sub_resource type="Resource" id="Line_thanks"]
+script = ExtResource("3_line")
+speaker_slot = &"miner"
+text = "That should help. Thank you."
+
+[sub_resource type="Resource" id="Participant_miner"]
+script = ExtResource("2_participant")
+slot = &"miner"
+display_name = "Miner"
+
+[sub_resource type="Resource" id="Participant_traveler"]
+script = ExtResource("2_participant")
+slot = &"traveler"
+display_name = "Traveler"
+
+[resource]
+script = ExtResource("1_conversation")
+conversation_id = &"stone_pickaxe_gift"
+participants = Array[ExtResource("2_participant")]([SubResource("Participant_miner"), SubResource("Participant_traveler")])
+lines = Array[ExtResource("3_line")]([SubResource("Line_offer"), SubResource("Line_question"), SubResource("Line_bag"), SubResource("Line_reveal"), SubResource("Line_gift"), SubResource("Line_thanks")])

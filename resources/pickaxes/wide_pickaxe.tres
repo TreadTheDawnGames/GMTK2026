@@ -1,13 +1,12 @@
-[gd_resource type="Resource" script_class="PickaxeDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="PickaxeDefinition" format=3 uid="uid://bxr253ocfnjf8"]
 
-[ext_resource type="Script" path="res://resources/pickaxes/pickaxe_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://bvbd25ebtqkh8" path="res://resources/pickaxes/pickaxe_definition.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
 id = &"wide_pickaxe"
 display_name = "Excavator Pickaxe"
 description = "Clears a wider path, but swings with less force."
-cost = 12
 power_multiplier = 0.9
 width_multiplier = 1.5
 swing_speed_multiplier = 0.9

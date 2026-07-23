@@ -11,29 +11,29 @@ extends CanvasLayer
 
 ## Displays the starting depth.
 func _ready() -> void:
-	_update_remaining_depth(run_state.remaining_depth_px)
+	_update_remaining_depth(run_state.remaining_depth)
 	_update_ore_count()
 
 
 ## Refreshes the label when depth changes.
-func _on_depth_changed(_depth_px: int) -> void:
-	_update_remaining_depth(run_state.remaining_depth_px)
+func _on_depth_changed(_depth: int) -> void:
+	_update_remaining_depth(run_state.remaining_depth)
 
 
-## Refreshes the ore total after collection or a shop purchase.
+## Refreshes the ore total after collection.
 func _on_ore_inventory_changed() -> void:
 	_update_ore_count()
 
 
-## Shows how many rendered pixels remain before the run bottom.
-func _update_remaining_depth(remaining_depth_px: int) -> void:
+## Shows how much gameplay depth remains before the run bottom.
+func _update_remaining_depth(remaining_depth: int) -> void:
 	depth_label.text = (
-		"DEPTH  %s px"
-		% _format_number(remaining_depth_px)
+		"DEPTH  %s"
+		% _format_number(remaining_depth)
 	)
 
 
-## Shows the placeholder ore available to spend.
+## Shows the placeholder ore collected during this run.
 func _update_ore_count() -> void:
 	ore_label.text = (
 		"ORE  %s"
