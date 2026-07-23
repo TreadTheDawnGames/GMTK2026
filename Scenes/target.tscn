@@ -1,0 +1,15 @@
+[gd_scene format=3 uid="uid://16edwc1adi0x"]
+
+[ext_resource type="StyleBox" uid="uid://c4v0glcf75hd" path="res://resources/themes/target.tres" id="1_vq1qf"]
+
+[node name="Target" type="Panel" unique_id=980051362]
+anchors_preset = 13
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -12.0
+grow_horizontal = 2
+grow_vertical = 2
+offset_transform_enabled = true
+offset_transform_position = Vector2(-12.5, 0)
+theme_override_styles/panel = ExtResource("1_vq1qf")

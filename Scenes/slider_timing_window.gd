@@ -1,9 +1,12 @@
 extends PanelContainer
 class_name SliderTimingWindow
 
+
 signal pressed(success:bool)
 
-@onready var target: Panel = %Target
+const TARGET = preload("uid://16edwc1adi0x")
+
+@onready var targets: Array[Panel]
 @onready var slider: Panel = %Slider
 @onready var backing: Control = %Backing
 
@@ -21,18 +24,17 @@ var direction : float = 1.0
 
 
 func _ready():
-	target.offset_right = target.offset_left + target_size
-	target.offset_transform_position.x = -target.size.x * 0.5
-	
+	add_target()
 	slider.offset_right = slider.offset_left + slider_size
 	slider.offset_transform_position.x = -slider.size.x * 0.5
 	await get_tree().process_frame
-	randomize_target()
+	for target in targets:
+		randomize_target(target)
 	if one_shot:
 		stop()
 
 func target_half_width() -> float:
-	return target.size.x*0.5 + grace
+	return target_size * 0.5 + grace
 
 func slider_half_width() -> float:
 	return slider.size.x*0.5 + grace
@@ -41,7 +43,8 @@ func start():
 	if one_shot:
 		slider.position.x = 0.0
 		direction = 1.0
-	randomize_target()
+	for target in targets:
+		randomize_target(target)
 	show()
 	set_process(true)
 
@@ -52,12 +55,34 @@ func stop():
 	hide()
 	set_process(false)
 
+func add_target():
+	var new_target = TARGET.instantiate()
+	new_target.offset_right = new_target.offset_left + target_size
+	new_target.offset_transform_position.x = -new_target.size.x * 0.5
+	backing.add_child(new_target)
+	backing.move_child(new_target, 0)
+	targets.append(new_target)
+
+	pass
+
+func remove_all_extra_targets():
+	while targets.size() > 1:
+		remove_target()
+	pass
+
+func remove_target():
+	if targets.size() > 0:
+		targets.pop_back().queue_free()
+	pass
+
 func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("Space"):
-		if slider.position.x < target.position.x + target_half_width() and slider.position.x > target.position.x - target_half_width():
-			randomize_target()
+		var hit_targets : Array[Panel] = targets.filter(func(target:Panel): return slider.position.x < target.position.x + target_half_width() and slider.position.x > target.position.x - target_half_width())
+		for target : Panel in hit_targets:
+			randomize_target(target)
 			pressed.emit(true)
-		else:
+			
+		if hit_targets.size() == 0:
 			pressed.emit(false)
 		if one_shot:
 			stop()
@@ -71,6 +96,6 @@ func _process(delta: float) -> void:
 			stop()
 	
 
-func randomize_target():
-	target.position.x = clamp((randf() if fixed_window < 0 else fixed_window)* backing.size.x, target_half_width(), backing.size.x - target_half_width())
+func randomize_target(target_hit : Panel):
+	target_hit.position.x = clamp((randf() if fixed_window < 0 else fixed_window)* backing.size.x, target_half_width(), backing.size.x - target_half_width())
 	

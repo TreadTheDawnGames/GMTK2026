@@ -9,29 +9,26 @@ signal pressed(success : bool, combo : int)
 var combo : int = 0 :
 	set(value):
 		combo = value
-		combo_label.text = "Combo: " + str(value)
-var losing_combo : bool = false
+		combo_label.text = "Next bar in: " + str(wrapi(combo_count_for_additional_target - value,1, combo_count_for_additional_target+1))
 
 @onready var combo_label: Label = %ComboLabel
 
 @export var recovery_combo_count : int = 5
+@export var combo_count_for_additional_target : int = 10
+@export var combo_speed_multiplier : float = 0.1
 
 func _ready():
+	combo_label.text = "Next bar in: " + str(combo_count_for_additional_target - combo)
 	mining_window.pressed.connect(_mining_window_pressed)
 	recovery_window.pressed.connect(_recovery_window_pressed)
-	#.pressed.connect(
-		#func(success : bool): 
-			#if not success:
-				#combo = 0
-				#print("failed")
-			#losing_combo = false
-				#)
 	
 func _mining_window_pressed(success : bool):
 	if success:
 		combo += 1
 		pressed.emit(true, combo)
-		mining_window.speed_multiplier = 1.0+(0.1*combo)
+		mining_window.speed_multiplier = 1.0+(combo_speed_multiplier*combo)
+		if combo % combo_count_for_additional_target == 0:
+			mining_window.add_target.call_deferred()
 	else:
 		if combo >= recovery_combo_count:
 			recovery_window.start()
@@ -39,6 +36,7 @@ func _mining_window_pressed(success : bool):
 		else:
 			pressed.emit(false, combo)
 			combo = 0
+			mining_window.remove_all_extra_targets()
 	pass
 
 func _recovery_window_pressed(success : bool):
@@ -47,6 +45,8 @@ func _recovery_window_pressed(success : bool):
 		pressed.emit(false, combo)
 		recovery_window.stop()
 		mining_window.speed_multiplier = 1.0
+		mining_window.remove_all_extra_targets()
+		
 	mining_window.start()
 	
 	pass
