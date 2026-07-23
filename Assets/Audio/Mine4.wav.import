@@ -2,13 +2,13 @@
 
 importer="wav"
 type="AudioStreamWAV"
-uid="uid://xd7dlv2rg765"
-path="res://.godot/imported/Mine7.wav-4b571a37489fff8ef77834456c67c091.sample"
+uid="uid://clnua3p8lih58"
+path="res://.godot/imported/Mine4.wav-ef47039042d761198d3d2f9ba3e34dd6.sample"
 
 [deps]
 
-source_file="res://Assets/Sounds/Mine7.wav"
-dest_files=["res://.godot/imported/Mine7.wav-4b571a37489fff8ef77834456c67c091.sample"]
+source_file="res://Assets/Audio/Mine4.wav"
+dest_files=["res://.godot/imported/Mine4.wav-ef47039042d761198d3d2f9ba3e34dd6.sample"]
 
 [params]
 

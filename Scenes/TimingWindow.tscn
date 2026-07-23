@@ -1,7 +1,16 @@
 [gd_scene format=3 uid="uid://bwq8rrtdf55gq"]
 
 [ext_resource type="Script" uid="uid://bcafu266b27ml" path="res://Scripts/timing_window.gd" id="1_6wfpp"]
+[ext_resource type="AudioStream" uid="uid://dv0xbfqt1h8x2" path="res://Assets/Audio/Mine1.wav" id="2_4e5kf"]
 [ext_resource type="PackedScene" uid="uid://cf8q7ylnplo6c" path="res://Scenes/slider_timing_window.tscn" id="2_73j0v"]
+[ext_resource type="AudioStream" uid="uid://css4yiv58xd3q" path="res://Assets/Audio/Mine2.wav" id="3_74xn3"]
+[ext_resource type="AudioStream" uid="uid://bfywstx2s5dmy" path="res://Assets/Audio/StreakLost.wav" id="3_pu0v2"]
+[ext_resource type="AudioStream" uid="uid://dfvmr4e88u610" path="res://Assets/Audio/Mine3.wav" id="4_2plp5"]
+[ext_resource type="AudioStream" uid="uid://clnua3p8lih58" path="res://Assets/Audio/Mine4.wav" id="5_53pw3"]
+[ext_resource type="AudioStream" uid="uid://4fna4pvybite" path="res://Assets/Audio/Mine5.wav" id="6_af75q"]
+[ext_resource type="AudioStream" uid="uid://i0bh02k308nf" path="res://Assets/Audio/Mine6.wav" id="7_cprbh"]
+[ext_resource type="AudioStream" uid="uid://xd7dlv2rg765" path="res://Assets/Audio/Mine7.wav" id="8_gxysw"]
+[ext_resource type="AudioStream" uid="uid://da4n2chd7wsvw" path="res://Assets/Audio/Save.wav" id="11_74xn3"]
 
 [node name="Control" type="Control" unique_id=633006767]
 layout_mode = 3
@@ -11,6 +20,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_6wfpp")
+mine_sounds = Array[AudioStream]([ExtResource("2_4e5kf"), ExtResource("3_74xn3"), ExtResource("4_2plp5"), ExtResource("5_53pw3"), ExtResource("6_af75q"), ExtResource("7_cprbh"), ExtResource("8_gxysw")])
 
 [node name="ComboLabel" type="Label" parent="." unique_id=1967208941]
 unique_name_in_owner = true
@@ -47,3 +57,14 @@ max_target_size = 32.0
 target_shrink_rate = 1.0
 one_shot = true
 fixed_window = 0.9
+
+[node name="StreakLostSound" type="AudioStreamPlayer2D" parent="." unique_id=1610083567]
+unique_name_in_owner = true
+stream = ExtResource("3_pu0v2")
+
+[node name="HitSound" type="AudioStreamPlayer2D" parent="." unique_id=2047278541]
+unique_name_in_owner = true
+
+[node name="StreakSavedSound" type="AudioStreamPlayer2D" parent="." unique_id=1410887463]
+unique_name_in_owner = true
+stream = ExtResource("11_74xn3")

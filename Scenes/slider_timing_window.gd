@@ -9,6 +9,9 @@ const TARGET = preload("uid://16edwc1adi0x")
 @onready var targets: Array[Panel]
 @onready var slider: Panel = %Slider
 @onready var backing: Control = %Backing
+@onready var bounce_sound: AudioStreamPlayer2D = %BounceSound
+
+
 
 @export var speed : float = 500.0
 @export var speed_multiplier : float = 1.0
@@ -117,6 +120,7 @@ func _process(delta: float) -> void:
 	slider.position.x = lerp(slider.position.x, slider.position.x+speed * direction * delta * speed_multiplier, 0.9)
 	if (slider.position.x <= 0.0+slider_half_width() and direction < 0) or (slider.position.x >= backing.size.x-slider_half_width() and direction > 0):
 		direction *= -1
+		bounce_sound.play()
 		if one_shot:
 			pressed.emit(false)
 			stop()

@@ -2,13 +2,13 @@
 
 importer="wav"
 type="AudioStreamWAV"
-uid="uid://i0bh02k308nf"
-path="res://.godot/imported/Mine6.wav-5718b6bd7c510b3c895ecd7c69f11d5b.sample"
+uid="uid://bfywstx2s5dmy"
+path="res://.godot/imported/StreakLost.wav-116d90fcc720970ec31371ba7555022c.sample"
 
 [deps]
 
-source_file="res://Assets/Sounds/Mine6.wav"
-dest_files=["res://.godot/imported/Mine6.wav-5718b6bd7c510b3c895ecd7c69f11d5b.sample"]
+source_file="res://Assets/Audio/StreakLost.wav"
+dest_files=["res://.godot/imported/StreakLost.wav-116d90fcc720970ec31371ba7555022c.sample"]
 
 [params]
 

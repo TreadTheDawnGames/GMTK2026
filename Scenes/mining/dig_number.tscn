@@ -1,0 +1,13 @@
+[gd_scene format=3 uid="uid://faai1irb202y"]
+
+[ext_resource type="Script" uid="uid://iemqq3i56276" path="res://Scripts/mining/dig_number.gd" id="1_fj50p"]
+
+[node name="Node2D" type="Node2D" unique_id=2108976628]
+script = ExtResource("1_fj50p")
+
+[node name="RichTextLabel" type="RichTextLabel" parent="." unique_id=139234545]
+offset_right = 197.0
+offset_bottom = 143.0
+theme_override_font_sizes/normal_font_size = 100
+bbcode_enabled = true
+text = "[rainbow]500[/rainbow]"
