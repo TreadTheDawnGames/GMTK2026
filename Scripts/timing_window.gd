@@ -36,7 +36,9 @@ func _mining_window_pressed(success : bool):
 	else:
 		if combo >= recovery_combo_count:
 			recovery_window.start()
-		mining_window.pause()
+			mining_window.pause()
+		else:
+			combo = 0
 	pass
 
 func _recovery_window_pressed(success : bool):
