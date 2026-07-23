@@ -12,6 +12,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_horizontal_80_section.tscn" id="9_horizontal_80"]
 [ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_vertical_102_section.tscn" id="10_vertical_102"]
 [ext_resource type="Script" uid="uid://nwmpqyjkw1fb" path="res://scripts/ship/ship_task_coordinator.gd" id="11_task_coordinator"]
+[ext_resource type="Script" path="res://scripts/ship/task_escalation_clock.gd" id="12_escalation_clock"]
 
 [node name="ShipBuilder" type="Node2D" unique_id=1637252056]
 script = ExtResource("1_builder")
@@ -82,3 +83,25 @@ editor_snap_size = 2
 [node name="TaskCoordinator" type="Node" parent="." unique_id=1950812434 node_paths=PackedStringArray("objectives_root")]
 script = ExtResource("11_task_coordinator")
 objectives_root = NodePath("..")
+
+[node name="TaskClock" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="TaskClockPanel" type="PanelContainer" parent="TaskClock" node_paths=PackedStringArray("coordinator")]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -224.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 72.0
+grow_horizontal = 0
+script = ExtResource("12_escalation_clock")
+coordinator = NodePath("../../TaskCoordinator")
+
+[node name="CountdownLabel" type="Label" parent="TaskClock/TaskClockPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "TASK SPEEDUP IN 00:30\nDECAY SPEED 1.00x"
+horizontal_alignment = 1
+vertical_alignment = 1
