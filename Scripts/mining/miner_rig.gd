@@ -12,7 +12,7 @@ signal swing_finished
 
 @export_category("Placement")
 ## Seats the artwork into the layered opening without moving ChipOrigin logic.
-@export_range(0.0, 64.0, 1.0) var terrain_grounding_offset_y: float = 16.0
+@export_range(0.0, 64.0, 1.0) var terrain_grounding_offset_y: float = 32.0
 
 @export_category("References")
 @export var animation_player: AnimationPlayer
