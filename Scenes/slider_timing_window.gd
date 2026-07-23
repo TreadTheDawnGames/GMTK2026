@@ -8,6 +8,8 @@ signal pressed(success:bool)
 @onready var backing: Control = %Backing
 
 @export var speed : float = 500.0
+@export var speed_multiplier : float = 1.0
+
 @export var grace : float = 10.0
 @export var target_size : float = 32.0
 @export var slider_size : float = 9.0
@@ -61,7 +63,7 @@ func _process(delta: float) -> void:
 			stop()
 		
 	
-	slider.position.x += speed * direction * delta
+	slider.position.x += speed * direction * delta * speed_multiplier
 	if (slider.position.x <= 0.0+slider_half_width() and direction < 0) or (slider.position.x >= backing.size.x-slider_half_width() and direction > 0):
 		direction *= -1
 		if one_shot:

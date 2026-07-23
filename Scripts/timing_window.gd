@@ -31,6 +31,7 @@ func _mining_window_pressed(success : bool):
 	if success:
 		combo += 1
 		pressed.emit(true, combo)
+		mining_window.speed_multiplier = 1.0+(0.1*combo)
 	else:
 		if combo >= recovery_combo_count:
 			recovery_window.start()
