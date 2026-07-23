@@ -21,7 +21,7 @@ var combo: int = 0:
 
 @export_range(1, 100, 1) var recovery_combo_count: int = 5
 @export_range(1, 100, 1) var combo_count_for_additional_target: int = 10
-@export var combo_speed_multiplier: float = 0.1
+@export var combo_speed_multiplier: float = 1.1
 @export var mine_sounds: Array[AudioStream]
 @export var combo_saved_color: Color = Color.CYAN
 @export var combo_lost_color: Color = Color.RED
@@ -48,7 +48,7 @@ func _mining_window_pressed(success: bool) -> void:
 		combo += 1
 		pressed.emit(true, combo)
 		mining_window.speed_multiplier = (
-			1.0 + combo_speed_multiplier * combo
+			(combo_speed_multiplier) * combo
 		)
 		if not mine_sounds.is_empty():
 			hit_sound.stream = mine_sounds[
