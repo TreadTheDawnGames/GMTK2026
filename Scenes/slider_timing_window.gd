@@ -58,15 +58,16 @@ func start():
 	set_process(true)
 
 
-## Freezes the slider without hiding the timing bar.
-func pause(animate : bool):
+## Freezes the slider and optionally flashes its recovery warning.
+func pause(animate: bool) -> void:
 	set_process(false)
-	if animate:
-		var tween : Tween = create_tween()
-		for i in warning_repeats:
-			tween.tween_property(slider, "modulate", Color.RED, 0.1)
-			tween.tween_property(slider, "modulate", Color.WHITE, 0.1)
-		await tween.finished
+	if not animate:
+		return
+	var tween: Tween = create_tween()
+	for _repeat_index in range(warning_repeats):
+		tween.tween_property(slider, "modulate", Color.RED, 0.1)
+		tween.tween_property(slider, "modulate", Color.WHITE, 0.1)
+	await tween.finished
 
 ## Hides the timing bar and stops its slider.
 func stop():
@@ -77,9 +78,8 @@ func stop():
 ## Adds and positions one valid hit target.
 func add_target():
 	var new_target = TARGET.instantiate()
-	new_target.size.x = max_target_size
 	new_target.offset_right = new_target.offset_left + max_target_size
-	new_target.offset_transform_position.x = -new_target.size.x * 0.5
+	new_target.offset_transform_position.x = -max_target_size * 0.5
 	backing.add_child(new_target)
 	backing.move_child(new_target, 0)
 	targets.append(new_target)
@@ -94,7 +94,17 @@ func remove_all_extra_targets():
 	if targets.size() < 1:
 		printerr("Removed all targets instead of all but one.")
 		return
-	targets[0].size.x = max_target_size
+	var primary_target := targets[0]
+	current_target_size = max_target_size
+	primary_target.offset_right = (
+		primary_target.offset_left + current_target_size
+	)
+	primary_target.offset_transform_position.x = -current_target_size * 0.5
+	primary_target.position.x = clampf(
+		primary_target.position.x,
+		current_target_size * 0.5,
+		backing.size.x - current_target_size * 0.5
+	)
 
 
 ## Removes the most recently added target.
@@ -141,7 +151,9 @@ func randomize_target(target_panel : Panel):
 		min_target_size,
 		max_target_size
 	)
-	target_panel.size.x = current_target_size
+	target_panel.offset_right = (
+		target_panel.offset_left + current_target_size
+	)
 	target_panel.offset_transform_position.x = -current_target_size * 0.5
 	var target_center_x := (
 		(randf() if fixed_window < 0 else fixed_window) * backing.size.x

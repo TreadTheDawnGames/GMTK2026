@@ -16,12 +16,19 @@ signal swing_finished
 @export var impact_point: Marker2D
 @export var stand_in_hammer_head: Line2D
 @export var final_hammer_head_sprite: Sprite2D
+@export var impact_audio_player: AudioStreamPlayer2D
 
 var _playing_full_swing: bool = false
 
 
-## Starts the idle animation when the rig loads.
+## Connects animation events and starts the idle animation.
 func _ready() -> void:
+	if not animation_player.animation_finished.is_connected(
+		_on_animation_finished
+	):
+		animation_player.animation_finished.connect(
+			_on_animation_finished
+		)
 	_play_idle()
 
 
@@ -48,6 +55,8 @@ func play_success(
 
 ## Reports the hammer-tip position when the animation reaches the ground.
 func _emit_success_impact() -> void:
+	if impact_audio_player.stream != null:
+		impact_audio_player.play()
 	impact_contact.emit(impact_point.global_position)
 
 

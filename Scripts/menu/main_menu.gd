@@ -21,8 +21,22 @@ var _intro_tween: Tween
 var _intro_complete: bool = false
 
 
-## Starts the staged title, subtitle, and button reveal.
+## Connects menu actions and starts the staged interface reveal.
 func _ready() -> void:
+	if not start_button.pressed.is_connected(
+		_on_start_button_pressed
+	):
+		start_button.pressed.connect(_on_start_button_pressed)
+	if not exit_button.pressed.is_connected(
+		_on_exit_button_pressed
+	):
+		exit_button.pressed.connect(_on_exit_button_pressed)
+	if not exit_confirmation.confirmed.is_connected(
+		_on_exit_confirmation_confirmed
+	):
+		exit_confirmation.confirmed.connect(
+			_on_exit_confirmation_confirmed
+		)
 	title_group.modulate.a = 0.0
 	subtitle_group.modulate.a = 0.0
 	button_group.modulate.a = 0.0

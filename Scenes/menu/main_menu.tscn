@@ -101,7 +101,3 @@ horizontal_alignment = 2
 title = "Exit Game?"
 dialog_text = "Really exit the game?"
 ok_button_text = "Exit"
-
-[connection signal="pressed" from="MenuLayout/ButtonCenter/Buttons/StartButton" to="." method="_on_start_button_pressed"]
-[connection signal="pressed" from="MenuLayout/ButtonCenter/Buttons/ExitButton" to="." method="_on_exit_button_pressed"]
-[connection signal="confirmed" from="ExitConfirmation" to="." method="_on_exit_confirmation_confirmed"]

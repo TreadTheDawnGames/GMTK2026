@@ -3,6 +3,11 @@ extends Node2D
 
 ## Generates, damages, loads, and unloads terrain chunks.
 
+signal terrain_cells_destroyed(
+	cells: Array[Vector2i],
+	impact_cell: Vector2i
+)
+
 class TerrainChunk:
 	## Holds the image and sprite for one loaded chunk.
 	var index: int
@@ -29,10 +34,14 @@ class DigResult:
 
 @export var config: MiningConfig
 @export var encounter_config: DepthEncounterConfig
+@export var progressive_breaking_enabled: bool = false
 
 var _active_chunks: Dictionary = {}
-# Masks exist only for damaged chunks, so untouched chunks unload completely.
+# Reserved masks prevent queued hits from collecting the same cell twice.
 var _destruction_masks: Dictionary = {}
+# Revealed masks determine visible terrain and the player's physical surface.
+var _revealed_destruction_masks: Dictionary = {}
+var _cell_fade_alphas: Dictionary = {}
 var _current_view_y: float # Logical terrain row anchored at the mining face.
 var _loaded_first_chunk: int = -1
 var _loaded_last_chunk: int = -1
@@ -53,10 +62,10 @@ func dig_tunnel(
 	directional_reach_cells: int = 0
 ) -> DigResult:
 	var result := DigResult.new()
-	if depth_cells <= 0 or not _is_solid_cell(terrain_position):
+	if depth_cells <= 0 or not _is_mineable_cell(terrain_position):
 		return result
 
-	var affected_chunks: Dictionary = {}
+	var destroyed_cells: Array[Vector2i] = []
 	var final_mineable_row := config.get_bottom_surface_row()
 	var tunnel_end_row := mini(
 		terrain_position.y + depth_cells,
@@ -77,7 +86,7 @@ func dig_tunnel(
 			right_cell_x = maxi(right_cell_x, surface_contact_x)
 		for cell_x in range(left_cell_x, right_cell_x + 1):
 			var cell := Vector2i(cell_x, cell_y)
-			if not _is_solid_cell(cell):
+			if not _is_mineable_cell(cell):
 				continue
 			var ore_definition := _ore_definition_for_cell(cell)
 			if ore_definition != null:
@@ -85,16 +94,19 @@ func dig_tunnel(
 				result.ore_yields[ore_id] = (
 					int(result.ore_yields.get(ore_id, 0)) + 1
 				)
-			var chunk_index := _world_to_chunk_index(cell.y)
 			_set_cell_destroyed(cell)
-			affected_chunks[chunk_index] = true
+			destroyed_cells.append(cell)
 			result.cells_removed += 1
 
-	for chunk_index: int in affected_chunks:
-		if not _active_chunks.has(chunk_index):
-			continue
-		var chunk := _active_chunks[chunk_index] as TerrainChunk
-		chunk.texture.update(chunk.image)
+	_present_destroyed_cells(
+		destroyed_cells,
+		Vector2i(
+			surface_contact_x
+				if surface_contact_x >= 0
+				else terrain_position.x,
+			terrain_position.y
+		)
+	)
 
 	#Create a big fancy number that shows how much you dug this hit
 	#DigNumber.create(terrain_position, depth_cells, get_tree())
@@ -167,6 +179,55 @@ func find_surface_row(cell_x: int, starting_row: int) -> int:
 	):
 		cell_y += 1
 	return cell_y
+
+
+## Finds the final surface after every cell already reserved by a hit.
+func find_reserved_surface_row(cell_x: int, starting_row: int) -> int:
+	var safe_x := clampi(cell_x, 0, config.terrain_width_cells - 1)
+	var bottom_surface_row := config.get_bottom_surface_row()
+	var cell_y := clampi(
+		starting_row,
+		config.initial_surface_row,
+		bottom_surface_row
+	)
+	while (
+		cell_y < bottom_surface_row
+		and not _is_mineable_cell(Vector2i(safe_x, cell_y))
+	):
+		cell_y += 1
+	return cell_y
+
+
+## Commits reserved cells as visible and physical air.
+func reveal_destroyed_cells(cells: Array[Vector2i]) -> void:
+	var cell_alphas: Dictionary = {}
+	for cell in cells:
+		cell_alphas[cell] = 0.0
+	apply_destroyed_cell_fades(cell_alphas)
+
+
+## Fades reserved pixels and commits cells whose alpha reaches zero.
+func apply_destroyed_cell_fades(cell_alphas: Dictionary) -> void:
+	var affected_chunks: Dictionary = {}
+	for cell: Vector2i in cell_alphas:
+		var alpha := clampf(float(cell_alphas[cell]), 0.0, 1.0)
+		if alpha <= 0.0:
+			_cell_fade_alphas.erase(cell)
+			_set_cell_revealed_destroyed(cell)
+		else:
+			_cell_fade_alphas[cell] = alpha
+		var chunk_index := _world_to_chunk_index(cell.y)
+		if not _active_chunks.has(chunk_index):
+			continue
+		var chunk := _active_chunks[chunk_index] as TerrainChunk
+		var local_y := (
+			cell.y - chunk_index * config.chunk_height_cells
+		)
+		var cell_color := chunk.image.get_pixel(cell.x, local_y)
+		cell_color.a = alpha
+		chunk.image.set_pixel(cell.x, local_y, cell_color)
+		affected_chunks[chunk_index] = true
+	_refresh_affected_chunks(affected_chunks)
 
 
 ## Loads and positions terrain for a new view depth.
@@ -272,10 +333,13 @@ func _build_chunk_image(chunk_index: int) -> Image:
 		Image.FORMAT_RGBA8
 	)
 	image.fill(Color.TRANSPARENT)
-	var has_destruction := _destruction_masks.has(chunk_index)
+	var has_destruction := _revealed_destruction_masks.has(chunk_index)
 	var mask := PackedByteArray()
 	if has_destruction:
-		mask = _destruction_masks[chunk_index] as PackedByteArray
+		mask = (
+			_revealed_destruction_masks[chunk_index]
+			as PackedByteArray
+		)
 	var chunk_start_y := chunk_index * config.chunk_height_cells
 
 	for local_y in range(config.chunk_height_cells):
@@ -304,12 +368,27 @@ func _build_chunk_image(chunk_index: int) -> Image:
 					chunk_index
 				)
 			)
+			if _cell_fade_alphas.has(cell):
+				cell_color.a = float(_cell_fade_alphas[cell])
 			image.set_pixel(cell_x, local_y, cell_color)
 	return image
 
 
 ## Returns whether a terrain cell is solid.
 func _is_solid_cell(cell: Vector2i) -> bool:
+	if (
+		cell.x < 0
+		or cell.x >= config.terrain_width_cells
+		or cell.y < config.initial_surface_row
+		or cell.y > config.get_bottom_surface_row()
+		or _is_encounter_chamber_cell(cell)
+	):
+		return false
+	return not _is_cell_revealed_destroyed(cell)
+
+
+## Returns whether a terrain cell can be reserved by a new hit.
+func _is_mineable_cell(cell: Vector2i) -> bool:
 	if (
 		cell.x < 0
 		or cell.x >= config.terrain_width_cells
@@ -380,7 +459,7 @@ func _is_encounter_chamber_cell(cell: Vector2i) -> bool:
 	)
 
 
-## Returns whether a cell has already been destroyed.
+## Returns whether a cell has already been reserved by a hit.
 func _is_cell_destroyed(cell: Vector2i) -> bool:
 	if cell.y < 0:
 		return false
@@ -393,7 +472,23 @@ func _is_cell_destroyed(cell: Vector2i) -> bool:
 	return mask[mask_offset] != 0
 
 
-## Saves a destroyed cell and clears its visible pixel.
+## Returns whether a reserved cell has become physical air.
+func _is_cell_revealed_destroyed(cell: Vector2i) -> bool:
+	if cell.y < 0:
+		return false
+	var chunk_index := _world_to_chunk_index(cell.y)
+	if not _revealed_destruction_masks.has(chunk_index):
+		return false
+	var local_y := cell.y - chunk_index * config.chunk_height_cells
+	var mask := (
+		_revealed_destruction_masks[chunk_index]
+		as PackedByteArray
+	)
+	var mask_offset := local_y * config.terrain_width_cells + cell.x
+	return mask[mask_offset] != 0
+
+
+## Reserves one cell so later queued hits cannot collect it again.
 func _set_cell_destroyed(cell: Vector2i) -> void:
 	var chunk_index := _world_to_chunk_index(cell.y)
 	var local_y := cell.y - chunk_index * config.chunk_height_cells
@@ -402,9 +497,15 @@ func _set_cell_destroyed(cell: Vector2i) -> void:
 	mask[mask_offset] = 1
 	_destruction_masks[chunk_index] = mask
 
-	if _active_chunks.has(chunk_index):
-		var chunk := _active_chunks[chunk_index] as TerrainChunk
-		chunk.image.set_pixel(cell.x, local_y, Color.TRANSPARENT)
+
+## Commits one reserved cell as visible and physical air.
+func _set_cell_revealed_destroyed(cell: Vector2i) -> void:
+	var chunk_index := _world_to_chunk_index(cell.y)
+	var local_y := cell.y - chunk_index * config.chunk_height_cells
+	var mask := _get_or_create_revealed_mask(chunk_index)
+	var mask_offset := local_y * config.terrain_width_cells + cell.x
+	mask[mask_offset] = 1
+	_revealed_destruction_masks[chunk_index] = mask
 
 
 ## Gets or creates the saved damage mask for a chunk.
@@ -415,6 +516,43 @@ func _get_or_create_mask(chunk_index: int) -> PackedByteArray:
 	mask.resize(config.terrain_width_cells * config.chunk_height_cells)
 	_destruction_masks[chunk_index] = mask
 	return mask
+
+
+## Gets or creates physical-air data for a damaged chunk.
+func _get_or_create_revealed_mask(
+	chunk_index: int
+) -> PackedByteArray:
+	if _revealed_destruction_masks.has(chunk_index):
+		return (
+			_revealed_destruction_masks[chunk_index]
+			as PackedByteArray
+		)
+	var mask := PackedByteArray()
+	mask.resize(config.terrain_width_cells * config.chunk_height_cells)
+	_revealed_destruction_masks[chunk_index] = mask
+	return mask
+
+
+## Starts a progressive break wave or commits the hit immediately.
+func _present_destroyed_cells(
+	cells: Array[Vector2i],
+	impact_cell: Vector2i
+) -> void:
+	if cells.is_empty():
+		return
+	if progressive_breaking_enabled:
+		terrain_cells_destroyed.emit(cells, impact_cell)
+		return
+	reveal_destroyed_cells(cells)
+
+
+## Uploads changed terrain pixels once per affected chunk.
+func _refresh_affected_chunks(affected_chunks: Dictionary) -> void:
+	for chunk_index: int in affected_chunks:
+		if not _active_chunks.has(chunk_index):
+			continue
+		var chunk := _active_chunks[chunk_index] as TerrainChunk
+		chunk.texture.update(chunk.image)
 
 
 ## Returns the chunk index containing a terrain row.

@@ -66,18 +66,6 @@ tracks/4/keys = {
 "update": 0,
 "values": [-0.28]
 }
-tracks/5/type = "value"
-tracks/5/imported = false
-tracks/5/enabled = true
-tracks/5/path = NodePath("AudioStreamPlayer2D:playing")
-tracks/5/interp = 1
-tracks/5/loop_wrap = true
-tracks/5/keys = {
-"times": PackedFloat32Array(0),
-"transitions": PackedFloat32Array(1),
-"update": 1,
-"values": [false]
-}
 
 [sub_resource type="Animation" id="Animation_idle"]
 resource_name = "idle"
@@ -213,18 +201,6 @@ tracks/3/keys = {
 "method": &"_emit_success_impact"
 }]
 }
-tracks/4/type = "value"
-tracks/4/imported = false
-tracks/4/enabled = true
-tracks/4/path = NodePath("AudioStreamPlayer2D:playing")
-tracks/4/interp = 1
-tracks/4/loop_wrap = true
-tracks/4/keys = {
-"times": PackedFloat32Array(0.13333334),
-"transitions": PackedFloat32Array(1),
-"update": 1,
-"values": [true]
-}
 
 [sub_resource type="Animation" id="Animation_wind_down"]
 resource_name = "wind_down"
@@ -316,7 +292,7 @@ _data = {
 &"wind_up": SubResource("Animation_wind_up")
 }
 
-[node name="MinerRig" type="Node2D" unique_id=1134346491 node_paths=PackedStringArray("animation_player", "visual_root", "impact_point", "stand_in_hammer_head", "final_hammer_head_sprite")]
+[node name="MinerRig" type="Node2D" unique_id=1134346491 node_paths=PackedStringArray("animation_player", "visual_root", "impact_point", "stand_in_hammer_head", "final_hammer_head_sprite", "impact_audio_player")]
 editor_description = "Presentation-only character rig. Keep this root fixed so the player stays centered. Animate VisualRoot and its pivots instead."
 position = Vector2(576, 282)
 script = ExtResource("1_rig")
@@ -325,6 +301,7 @@ visual_root = NodePath("VisualRoot")
 impact_point = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/ImpactPoint")
 stand_in_hammer_head = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/StandInToolHead")
 final_hammer_head_sprite = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/PickaxeHeadSprite")
+impact_audio_player = NodePath("ImpactAudio")
 
 [node name="VisualRoot" type="Node2D" parent="." unique_id=465234156]
 editor_description = "Animate this for whole-character bounce, squash, recoil, and small fall offsets. Do not use it to calculate mining progress."
@@ -423,7 +400,5 @@ position = Vector2(0, 57)
 editor_description = "Choose idle, mine_success, or mine_miss in the bottom Animation panel. RESET stores the neutral pose and should not be used as the authored action animation."
 libraries/ = SubResource("AnimationLibrary_rig")
 
-[node name="AudioStreamPlayer2D" type="AudioStreamPlayer2D" parent="." unique_id=233120121]
+[node name="ImpactAudio" type="AudioStreamPlayer2D" parent="." unique_id=233120121]
 stream = ExtResource("2_avhsd")
-
-[connection signal="animation_finished" from="AnimationPlayer" to="." method="_on_animation_finished"]

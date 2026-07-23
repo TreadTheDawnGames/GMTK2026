@@ -25,14 +25,23 @@ signal equip_result(definition: PickaxeDefinition, equipped: bool)
 @export var stats_label: Label
 @export var status_label: Label
 @export var primary_button: Button
+@export var close_button: Button
 
 var _balance: ShopBalance
 var _loadout: PickaxeLoadout
 var _selected_index: int = 0
 
 
-## Prepares the authored shop and applies its requested startup visibility.
+## Connects shop controls and applies the requested startup visibility.
 func _ready() -> void:
+	if not item_list.item_selected.is_connected(_on_item_selected):
+		item_list.item_selected.connect(_on_item_selected)
+	if not close_button.pressed.is_connected(_on_close_button_pressed):
+		close_button.pressed.connect(_on_close_button_pressed)
+	if not primary_button.pressed.is_connected(
+		_on_primary_button_pressed
+	):
+		primary_button.pressed.connect(_on_primary_button_pressed)
 	visible = starts_open
 	_refresh()
 
@@ -204,6 +213,7 @@ func _references_are_ready() -> bool:
 		and stats_label != null
 		and status_label != null
 		and primary_button != null
+		and close_button != null
 	)
 
 

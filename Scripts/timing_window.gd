@@ -35,8 +35,11 @@ func _mining_window_pressed(success : bool):
 		combo += 1
 		pressed.emit(true, combo)
 		mining_window.speed_multiplier = 1.0+(combo_speed_multiplier*combo)
-		hit_sound.stream = mine_sounds[clamp(combo, 0, mine_sounds.size()-1)]
-		hit_sound.play()
+		if not mine_sounds.is_empty():
+			hit_sound.stream = mine_sounds[
+				clampi(combo - 1, 0, mine_sounds.size() - 1)
+			]
+			hit_sound.play()
 
 		if combo % combo_count_for_additional_target == 0:
 			mining_window.add_target.call_deferred()

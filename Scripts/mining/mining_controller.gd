@@ -15,6 +15,7 @@ class SwingRequest:
 	var counts_as_timing_success: bool
 
 
+	## Captures the tool and modifiers earned by one timing result.
 	func _init(
 		requested_combo: int,
 		requested_pickaxe: PickaxeDefinition,
@@ -33,6 +34,14 @@ class SwingRequest:
 		speed_scale = requested_speed_scale
 		debris_scale = requested_debris_scale
 		counts_as_timing_success = requested_counts_as_timing_success
+
+
+class PendingMineResolution:
+	## Retains one hit summary until its progressive break reaches the floor.
+	var starting_depth_px: int
+	var cells_removed: int
+	var combo: int
+	var effect_strength: float
 
 
 signal mine_resolved(
@@ -68,7 +77,9 @@ var _pending_effect_strength: float = 0.0
 var _is_swing_pending: bool = false
 var _has_resolved_pending_impact: bool = false
 var _is_swing_queue_paused: bool = false
+var _is_break_pending: bool = false
 var _queued_swings: Array[SwingRequest] = []
+var _pending_mine_resolution: PendingMineResolution
 
 
 ## Starts a swing for a successful timing result or records a miss.
@@ -90,7 +101,11 @@ func resolve_attempt(success: bool, resolved_combo: int) -> void:
 		_equipped_pickaxe,
 		_aim_direction
 	)
-	if _is_swing_pending or _is_swing_queue_paused:
+	if (
+		_is_swing_pending
+		or _is_swing_queue_paused
+		or _is_break_pending
+	):
 		_queued_swings.append(primary_swing)
 	else:
 		_start_swing(primary_swing)
@@ -191,7 +206,7 @@ func resolve_impact(impact_screen_position: Vector2) -> void:
 		_pending_swing.aim_direction,
 		requested_half_width_cells
 	)
-	var primary_surface_y := terrain_manager.find_surface_row(
+	var primary_surface_y := terrain_manager.find_reserved_surface_row(
 		fall_cell.x,
 		run_state.mining_y
 	)
@@ -217,26 +232,44 @@ func resolve_impact(impact_screen_position: Vector2) -> void:
 		)
 		dig_result.absorb(aftershock_result)
 	ore_inventory.add_ore_batch(dig_result.ore_yields)
-	var new_mining_y := terrain_manager.find_surface_row(
+	var new_mining_y := terrain_manager.find_reserved_surface_row(
 		fall_cell.x,
 		run_state.mining_y
 	)
 	var rows_advanced := maxi(new_mining_y - run_state.mining_y, 0)
 	var depth_advanced_px := rows_advanced * config.logical_pixel_scale
-
-	run_state.record_success(
-		depth_advanced_px,
-		new_mining_y,
-		_pending_swing.combo,
-		_pending_swing.counts_as_timing_success
+	_is_break_pending = (
+		terrain_manager.progressive_breaking_enabled
+		and dig_result.cells_removed > 0
 	)
-	view_controller.follow_mining_y(run_state.mining_y)
-	mine_resolved.emit(
-		depth_advanced_px,
-		dig_result.cells_removed,
-		_pending_swing.combo,
-		_pending_effect_strength
-	)
+	if _is_break_pending:
+		run_state.record_success(
+			0,
+			run_state.mining_y,
+			_pending_swing.combo,
+			_pending_swing.counts_as_timing_success
+		)
+		_pending_mine_resolution = PendingMineResolution.new()
+		_pending_mine_resolution.starting_depth_px = run_state.depth_px
+		_pending_mine_resolution.cells_removed = dig_result.cells_removed
+		_pending_mine_resolution.combo = _pending_swing.combo
+		_pending_mine_resolution.effect_strength = (
+			_pending_effect_strength
+		)
+	else:
+		run_state.record_success(
+			depth_advanced_px,
+			new_mining_y,
+			_pending_swing.combo,
+			_pending_swing.counts_as_timing_success
+		)
+		view_controller.follow_mining_y(run_state.mining_y)
+		mine_resolved.emit(
+			depth_advanced_px,
+			dig_result.cells_removed,
+			_pending_swing.combo,
+			_pending_effect_strength
+		)
 	impact_resolved.emit(
 		impact_screen_position,
 		dig_result.cells_removed,
@@ -258,25 +291,61 @@ func finish_swing() -> void:
 	if run_state.has_reached_bottom:
 		_queued_swings.clear()
 		return
-	if (
-		_is_swing_queue_paused
-		or _queued_swings.is_empty()
-	):
+	if _is_break_pending:
 		return
-	_start_swing(_queued_swings.pop_front())
+	_try_start_queued_swing()
 
 
 ## Pauses retained hits during dialogue floors and resumes them afterward.
 func set_swing_queue_paused(is_paused: bool) -> void:
 	_is_swing_queue_paused = is_paused
-	if (
-		is_paused
-		or _is_swing_pending
-		or _queued_swings.is_empty()
-		or run_state.has_reached_bottom
-	):
+	if is_paused:
 		return
-	_start_swing(_queued_swings.pop_front())
+	_try_start_queued_swing()
+
+
+## Moves the player's feet to the next surface exposed by this frame.
+func advance_with_breakage(_cells: Array[Vector2i]) -> void:
+	if not _is_break_pending:
+		return
+	_advance_to_revealed_surface()
+
+
+## Releases the next earned swing after the break wave reaches its floor.
+func finish_break_sequence() -> void:
+	if not _is_break_pending:
+		return
+	_advance_to_revealed_surface()
+	_is_break_pending = false
+	if _pending_mine_resolution != null:
+		mine_resolved.emit(
+			run_state.depth_px
+				- _pending_mine_resolution.starting_depth_px,
+			_pending_mine_resolution.cells_removed,
+			_pending_mine_resolution.combo,
+			_pending_mine_resolution.effect_strength
+		)
+		_pending_mine_resolution = null
+	_try_start_queued_swing()
+
+
+## Updates depth and camera target from the currently revealed terrain.
+func _advance_to_revealed_surface() -> void:
+	var fall_cell_x := terrain_manager.screen_x_to_terrain_cell_x(
+		fall_origin.global_position.x
+	)
+	var new_mining_y := terrain_manager.find_surface_row(
+		fall_cell_x,
+		run_state.mining_y
+	)
+	var rows_advanced := maxi(new_mining_y - run_state.mining_y, 0)
+	if rows_advanced <= 0:
+		return
+	run_state.advance_depth(
+		rows_advanced * config.logical_pixel_scale,
+		new_mining_y
+	)
+	view_controller.follow_mining_y(run_state.mining_y)
 
 
 ## Applies the pickaxe modifiers used by future swings.
@@ -287,6 +356,19 @@ func set_equipped_pickaxe(definition: PickaxeDefinition) -> void:
 ## Selects the side captured by the next successful timing result.
 func set_aim_direction(direction: int) -> void:
 	_aim_direction = clampi(direction, -1, 1)
+
+
+## Starts the next earned hit when animation, breakage, and dialogue allow it.
+func _try_start_queued_swing() -> void:
+	if (
+		_is_swing_queue_paused
+		or _is_swing_pending
+		or _is_break_pending
+		or _queued_swings.is_empty()
+		or run_state.has_reached_bottom
+	):
+		return
+	_start_swing(_queued_swings.pop_front())
 
 
 ## Returns one strike-pickaxe modifier or the neutral value.
