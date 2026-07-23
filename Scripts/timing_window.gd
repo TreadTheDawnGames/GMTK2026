@@ -37,6 +37,8 @@ func _mining_window_pressed(success : bool):
 			pressed.emit(false, combo)
 			combo = 0
 			mining_window.remove_all_extra_targets()
+			mining_window.speed_multiplier = 1.0+(combo_speed_multiplier*combo)
+			
 	pass
 
 func _recovery_window_pressed(success : bool):
