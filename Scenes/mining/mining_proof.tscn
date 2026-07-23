@@ -11,7 +11,7 @@
 [ext_resource type="Script" uid="uid://cl8v0x0ammlnj" path="res://Scripts/mining/view_controller.gd" id="9_view_controller"]
 [ext_resource type="PackedScene" path="res://Scenes/mining/mining_hit_particles.tscn" id="10_hit_particles"]
 [ext_resource type="PackedScene" path="res://Scenes/dialogue/dialogue_overlay.tscn" id="11_dialogue_overlay"]
-[ext_resource type="Resource" path="res://resources/dialogue/marketplace_intro.tres" id="12_marketplace_dialogue"]
+[ext_resource type="Resource" uid="uid://bd616ftdm0c7c" path="res://resources/dialogue/marketplace_intro.tres" id="12_marketplace_dialogue"]
 [ext_resource type="Script" uid="uid://bmv66cgstojt0" path="res://Scripts/dialogue/depth_encounter_controller.gd" id="13_depth_encounter"]
 [ext_resource type="Resource" path="res://resources/encounters/depth_encounter_config.tres" id="14_encounter_config"]
 
