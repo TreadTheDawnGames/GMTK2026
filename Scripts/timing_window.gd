@@ -29,8 +29,8 @@ func _ready():
 	
 func _mining_window_pressed(success : bool):
 	if success:
-		pressed.emit(success)
 		combo += 1
+		pressed.emit(true, combo)
 	else:
 		recovery_window.start()
 		mining_window.pause()
@@ -39,6 +39,7 @@ func _mining_window_pressed(success : bool):
 func _recovery_window_pressed(success : bool):
 	if not success:
 		combo = 0
+		pressed.emit(false, combo)
 		recovery_window.stop()
 	mining_window.start()
 	
