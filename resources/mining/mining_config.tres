@@ -4,10 +4,3 @@
 
 [resource]
 script = ExtResource("1_config")
-recovery_combo_threshold = 5
-combo_hits_for_additional_target = 10
-starting_mining_target_count = 1
-mining_bar_speed = 500.0
-recovery_bar_speed = 1250.0
-combo_speed_multiplier = 1.5
-recovery_speed_multiplier = 1.2
