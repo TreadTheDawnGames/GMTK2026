@@ -22,6 +22,7 @@ var combo: int = 0:
 @export_range(1, 100, 1) var recovery_combo_count: int = 5
 @export_range(1, 100, 1) var combo_count_for_additional_target: int = 10
 @export var combo_speed_multiplier: float = 1.1
+@export var recovery_speed_multiplier: float = 1.2
 @export var mine_sounds: Array[AudioStream]
 @export var combo_saved_color: Color = Color.CYAN
 @export var combo_lost_color: Color = Color.RED
@@ -85,7 +86,13 @@ func _recovery_window_pressed(success: bool) -> void:
 		mining_window.speed_multiplier = 1.0
 		mining_window.remove_all_extra_targets()
 		recovery_window.animation_color = combo_lost_color
+		recovery_window.speed_multiplier = 1.0
+
 	else:
+		recovery_window.speed_multiplier *= (
+		(recovery_speed_multiplier)
+		)
+
 		streak_saved_sound.play()
 		recovery_window.animation_color = combo_saved_color
 	await recovery_window.pause(true)

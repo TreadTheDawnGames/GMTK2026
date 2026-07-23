@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="DialogueConversation" load_steps=13 format=3]
+[gd_resource type="Resource" script_class="DialogueConversation" format=3 uid="uid://bobmumfyonwg5"]
 
-[ext_resource type="Script" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
-[ext_resource type="Script" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
-[ext_resource type="Script" path="res://resources/dialogue/dialogue_line.gd" id="3_line"]
+[ext_resource type="Script" uid="uid://c55utdbjdwaui" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
+[ext_resource type="Script" uid="uid://ivfntthetp0i" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
+[ext_resource type="Script" uid="uid://bwwpoalvqb7ni" path="res://resources/dialogue/dialogue_line.gd" id="3_line"]
 
 [sub_resource type="Resource" id="Line_greeting"]
 script = ExtResource("3_line")
