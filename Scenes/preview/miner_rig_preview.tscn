@@ -1,0 +1,132 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://Scripts/preview/miner_rig_preview.gd" id="1_preview"]
+[ext_resource type="PackedScene" path="res://Scenes/mining/miner_rig.tscn" id="2_rig"]
+[ext_resource type="Resource" path="res://resources/characters/default_miner_skin.tres" id="3_skin"]
+[ext_resource type="Resource" path="res://resources/pickaxes/basic_pickaxe.tres" id="4_pickaxe"]
+[ext_resource type="Script" path="res://Scripts/preview/rig_guide_overlay.gd" id="5_guides"]
+
+[node name="MinerRigPreview" type="Node2D" node_paths=PackedStringArray("miner_rig", "combo_slider", "speed_slider", "guide_overlay", "status_label")]
+script = ExtResource("1_preview")
+skin = ExtResource("3_skin")
+pickaxe = ExtResource("4_pickaxe")
+miner_rig = NodePath("MinerRig")
+combo_slider = NodePath("UI/Panel/Margin/Controls/ComboSlider")
+speed_slider = NodePath("UI/Panel/Margin/Controls/SpeedSlider")
+guide_overlay = NodePath("RigGuideOverlay")
+status_label = NodePath("UI/Panel/Margin/Controls/Status")
+
+[node name="Background" type="ColorRect" parent="."]
+offset_right = 1152.0
+offset_bottom = 648.0
+mouse_filter = 2
+color = Color(0.075, 0.095, 0.13, 1)
+
+[node name="MinerRig" parent="." instance=ExtResource("2_rig")]
+
+[node name="RigGuideOverlay" type="Node2D" parent="." node_paths=PackedStringArray("visual_root", "body_pivot", "head_pivot", "arm_pivot", "pickaxe_pivot", "chip_origin")]
+visible = false
+script = ExtResource("5_guides")
+visual_root = NodePath("../MinerRig/VisualRoot")
+body_pivot = NodePath("../MinerRig/VisualRoot/BodyPivot")
+head_pivot = NodePath("../MinerRig/VisualRoot/BodyPivot/HeadPivot")
+arm_pivot = NodePath("../MinerRig/VisualRoot/BodyPivot/ArmPivot")
+pickaxe_pivot = NodePath("../MinerRig/VisualRoot/BodyPivot/ArmPivot/PickaxePivot")
+chip_origin = NodePath("../MinerRig/ChipOrigin")
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="Panel" type="PanelContainer" parent="UI"]
+offset_left = 24.0
+offset_top = 24.0
+offset_right = 346.0
+offset_bottom = 486.0
+
+[node name="Margin" type="MarginContainer" parent="UI/Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 18
+
+[node name="Controls" type="VBoxContainer" parent="UI/Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 9
+
+[node name="Title" type="Label" parent="UI/Panel/Margin/Controls"]
+layout_mode = 2
+text = "Miner Rig Preview"
+
+[node name="ArtHint" type="Label" parent="UI/Panel/Margin/Controls"]
+layout_mode = 2
+text = "Assign Skin and Pickaxe on the preview root."
+autowrap_mode = 2
+
+[node name="ComboLabel" type="Label" parent="UI/Panel/Margin/Controls"]
+layout_mode = 2
+text = "Combo"
+
+[node name="ComboSlider" type="HSlider" parent="UI/Panel/Margin/Controls"]
+layout_mode = 2
+min_value = 1.0
+max_value = 20.0
+step = 1.0
+value = 1.0
+
+[node name="SpeedLabel" type="Label" parent="UI/Panel/Margin/Controls"]
+layout_mode = 2
+text = "Animation Speed"
+
+[node name="SpeedSlider" type="HSlider" parent="UI/Panel/Margin/Controls"]
+layout_mode = 2
+min_value = 0.1
+max_value = 4.0
+step = 0.05
+value = 1.0
+
+[node name="RowOne" type="HBoxContainer" parent="UI/Panel/Margin/Controls"]
+layout_mode = 2
+
+[node name="Idle" type="Button" parent="UI/Panel/Margin/Controls/RowOne"]
+layout_mode = 2
+text = "Idle"
+
+[node name="Hit" type="Button" parent="UI/Panel/Margin/Controls/RowOne"]
+layout_mode = 2
+text = "Hit"
+
+[node name="Miss" type="Button" parent="UI/Panel/Margin/Controls/RowOne"]
+layout_mode = 2
+text = "Miss"
+
+[node name="RowTwo" type="HBoxContainer" parent="UI/Panel/Margin/Controls"]
+layout_mode = 2
+
+[node name="Fall" type="Button" parent="UI/Panel/Margin/Controls/RowTwo"]
+layout_mode = 2
+text = "Fall"
+
+[node name="Land" type="Button" parent="UI/Panel/Margin/Controls/RowTwo"]
+layout_mode = 2
+text = "Land"
+
+[node name="Talk" type="Button" parent="UI/Panel/Margin/Controls/RowTwo"]
+layout_mode = 2
+text = "Talk"
+
+[node name="Guides" type="CheckButton" parent="UI/Panel/Margin/Controls"]
+layout_mode = 2
+text = "Show Pivot and ChipOrigin Guides"
+
+[node name="Status" type="Label" parent="UI/Panel/Margin/Controls"]
+layout_mode = 2
+autowrap_mode = 2
+
+[connection signal="value_changed" from="UI/Panel/Margin/Controls/SpeedSlider" to="." method="_on_speed_changed"]
+[connection signal="pressed" from="UI/Panel/Margin/Controls/RowOne/Idle" to="." method="_on_idle_pressed"]
+[connection signal="pressed" from="UI/Panel/Margin/Controls/RowOne/Hit" to="." method="_on_hit_pressed"]
+[connection signal="pressed" from="UI/Panel/Margin/Controls/RowOne/Miss" to="." method="_on_miss_pressed"]
+[connection signal="pressed" from="UI/Panel/Margin/Controls/RowTwo/Fall" to="." method="_on_fall_pressed"]
+[connection signal="pressed" from="UI/Panel/Margin/Controls/RowTwo/Land" to="." method="_on_land_pressed"]
+[connection signal="pressed" from="UI/Panel/Margin/Controls/RowTwo/Talk" to="." method="_on_talk_pressed"]
+[connection signal="toggled" from="UI/Panel/Margin/Controls/Guides" to="." method="_on_guides_toggled"]

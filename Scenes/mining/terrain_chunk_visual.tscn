@@ -1,0 +1,34 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://Scripts/mining/terrain_chunk_visual.gd" id="1_visual"]
+[ext_resource type="Shader" path="res://Shaders/terrain_mask_layer.gdshader" id="2_shader"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_mask"]
+shader = ExtResource("2_shader")
+
+[node name="TerrainChunkVisual" type="Node2D" node_paths=PackedStringArray("cavity_sprite", "surface_sprite", "edge_sprite", "ore_sprite", "legacy_composite_sprite")]
+script = ExtResource("1_visual")
+cavity_sprite = NodePath("CavitySprite")
+surface_sprite = NodePath("SurfaceSprite")
+edge_sprite = NodePath("EdgeSprite")
+ore_sprite = NodePath("OreSprite")
+legacy_composite_sprite = NodePath("LegacyCompositeSprite")
+
+[node name="CavitySprite" type="Sprite2D" parent="."]
+material = SubResource("ShaderMaterial_mask")
+texture_filter = 1
+
+[node name="SurfaceSprite" type="Sprite2D" parent="."]
+material = SubResource("ShaderMaterial_mask")
+texture_filter = 1
+
+[node name="EdgeSprite" type="Sprite2D" parent="."]
+material = SubResource("ShaderMaterial_mask")
+texture_filter = 1
+
+[node name="OreSprite" type="Sprite2D" parent="."]
+material = SubResource("ShaderMaterial_mask")
+texture_filter = 1
+
+[node name="LegacyCompositeSprite" type="Sprite2D" parent="."]
+texture_filter = 1

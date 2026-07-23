@@ -29,8 +29,18 @@ enum SpecialEffect {
 @export_range(0.1, 3.0, 0.05) var follow_up_speed_scale: float = 1.25
 @export_range(0.0, 2.0, 0.05) var follow_up_debris_scale: float = 0.5
 
-@export_category("Appearance")
+@export_category("Tool Artwork")
+@export var handle_texture: Texture2D
+@export var head_texture: Texture2D
+@export var head_offset: Vector2 = Vector2.ZERO
+@export var impact_offset: Vector2 = Vector2(79.44684, -13.451826)
+@export_range(0.1, 4.0, 0.05) var visual_scale: float = 1.0
 @export var hammer_head_color: Color = Color(0.94, 0.94, 0.94, 1.0)
+
+@export_category("Impact Presentation")
+@export var impact_sound: AudioStream
+@export var impact_particles: PackedScene
+@export var swing_sound: AudioStream
 
 
 ## Describes the pickaxe's unique behavior in the shop.

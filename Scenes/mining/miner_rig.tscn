@@ -1,7 +1,8 @@
-[gd_scene format=3 uid="uid://021ecdl5prdm"]
+[gd_scene load_steps=4 format=3 uid="uid://021ecdl5prdm"]
 
 [ext_resource type="Script" uid="uid://doqncdiwvq0t5" path="res://Scripts/mining/miner_rig.gd" id="1_rig"]
 [ext_resource type="AudioStream" uid="uid://bptrknuwih5g2" path="res://Assets/Audio/513694__kasparsj__impact-stone-heavy.wav" id="2_avhsd"]
+[ext_resource type="Resource" path="res://resources/characters/default_miner_skin.tres" id="2_skin"]
 
 [sub_resource type="Animation" id="Animation_reset"]
 resource_name = "RESET"
@@ -65,18 +66,6 @@ tracks/4/keys = {
 "transitions": PackedFloat32Array(1),
 "update": 0,
 "values": [-0.28]
-}
-tracks/5/type = "value"
-tracks/5/imported = false
-tracks/5/enabled = true
-tracks/5/path = NodePath("AudioStreamPlayer2D:playing")
-tracks/5/interp = 1
-tracks/5/loop_wrap = true
-tracks/5/keys = {
-"times": PackedFloat32Array(0),
-"transitions": PackedFloat32Array(1),
-"update": 1,
-"values": [false]
 }
 
 [sub_resource type="Animation" id="Animation_idle"]
@@ -213,18 +202,6 @@ tracks/3/keys = {
 "method": &"_emit_success_impact"
 }]
 }
-tracks/4/type = "value"
-tracks/4/imported = false
-tracks/4/enabled = true
-tracks/4/path = NodePath("AudioStreamPlayer2D:playing")
-tracks/4/interp = 1
-tracks/4/loop_wrap = true
-tracks/4/keys = {
-"times": PackedFloat32Array(0.13333334),
-"transitions": PackedFloat32Array(1),
-"update": 1,
-"values": [true]
-}
 
 [sub_resource type="Animation" id="Animation_wind_down"]
 resource_name = "wind_down"
@@ -316,15 +293,33 @@ _data = {
 &"wind_up": SubResource("Animation_wind_up")
 }
 
-[node name="MinerRig" type="Node2D" unique_id=1134346491 node_paths=PackedStringArray("animation_player", "visual_root", "impact_point", "stand_in_hammer_head", "final_hammer_head_sprite")]
+[node name="MinerRig" type="Node2D" unique_id=1134346491 node_paths=PackedStringArray("animation_player", "visual_root", "impact_point", "back_hair_sprite", "body_sprite", "head_sprite", "front_hair_sprite", "upper_arm_sprite", "forearm_sprite", "hand_sprite", "pickaxe_handle_sprite", "final_hammer_head_sprite", "stand_in_body_outline", "stand_in_body_fill", "stand_in_head_outline", "stand_in_head_fill", "stand_in_arm_outline", "stand_in_arm_fill", "stand_in_hammer_handle", "stand_in_hammer_head", "swing_audio_player", "impact_audio_player")]
 editor_description = "Presentation-only character rig. Keep this root fixed so the player stays centered. Animate VisualRoot and its pivots instead."
 position = Vector2(576, 282)
 script = ExtResource("1_rig")
+skin = ExtResource("2_skin")
 animation_player = NodePath("AnimationPlayer")
 visual_root = NodePath("VisualRoot")
 impact_point = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/ImpactPoint")
-stand_in_hammer_head = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/StandInToolHead")
+back_hair_sprite = NodePath("VisualRoot/BackHairSprite")
+body_sprite = NodePath("VisualRoot/BodyPivot/BodySprite")
+head_sprite = NodePath("VisualRoot/BodyPivot/HeadPivot/HeadSprite")
+front_hair_sprite = NodePath("VisualRoot/BodyPivot/HeadPivot/FrontHairSprite")
+upper_arm_sprite = NodePath("VisualRoot/BodyPivot/ArmPivot/ArmSprite")
+forearm_sprite = NodePath("VisualRoot/BodyPivot/ArmPivot/ForearmSprite")
+hand_sprite = NodePath("VisualRoot/BodyPivot/ArmPivot/HandSprite")
+pickaxe_handle_sprite = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/PickaxeHandleSprite")
 final_hammer_head_sprite = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/PickaxeHeadSprite")
+stand_in_body_outline = NodePath("VisualRoot/BodyPivot/StandInBodyOutline")
+stand_in_body_fill = NodePath("VisualRoot/BodyPivot/StandInBodyBlock")
+stand_in_head_outline = NodePath("VisualRoot/BodyPivot/HeadPivot/StandInHeadOutline")
+stand_in_head_fill = NodePath("VisualRoot/BodyPivot/HeadPivot/StandInHeadCircle")
+stand_in_arm_outline = NodePath("VisualRoot/BodyPivot/ArmPivot/StandInArmOutline")
+stand_in_arm_fill = NodePath("VisualRoot/BodyPivot/ArmPivot/StandInArmLine")
+stand_in_hammer_handle = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/StandInToolHandle")
+stand_in_hammer_head = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/StandInToolHead")
+swing_audio_player = NodePath("SwingAudio")
+impact_audio_player = NodePath("ImpactAudio")
 
 [node name="VisualRoot" type="Node2D" parent="." unique_id=465234156]
 editor_description = "Animate this for whole-character bounce, squash, recoil, and small fall offsets. Do not use it to calculate mining progress."
@@ -338,7 +333,7 @@ editor_description = "Main torso pivot. Rotate this slightly for anticipation an
 position = Vector2(2, 4)
 
 [node name="BodySprite" type="Sprite2D" parent="VisualRoot/BodyPivot" unique_id=922361377]
-editor_description = "Final body/torso art slot. Assign a transparent PNG, align it around BodyPivot, then hide the StandInBody nodes."
+editor_description = "Final body art slot. MinerSkin hides the body stand-in when this texture is assigned."
 
 [node name="StandInBodyOutline" type="Polygon2D" parent="VisualRoot/BodyPivot" unique_id=612648054]
 color = Color(0.04, 0.04, 0.04, 1)
@@ -353,7 +348,7 @@ editor_description = "Head and hair pivot. Animate a small counter-rotation here
 position = Vector2(0, -30)
 
 [node name="HeadSprite" type="Sprite2D" parent="VisualRoot/BodyPivot/HeadPivot" unique_id=1960137901]
-editor_description = "Final head art slot. Assign a transparent PNG and align the neck/base of the head with this pivot."
+editor_description = "Final head art slot. Align its neck with HeadPivot; MinerSkin hides the head stand-in."
 
 [node name="StandInHeadOutline" type="Polygon2D" parent="VisualRoot/BodyPivot/HeadPivot" unique_id=522443127]
 color = Color(0.04, 0.04, 0.04, 1)
@@ -371,7 +366,13 @@ editor_description = "Primary swing control. Put this pivot at the shoulder and 
 position = Vector2(5, 2)
 
 [node name="ArmSprite" type="Sprite2D" parent="VisualRoot/BodyPivot/ArmPivot" unique_id=1186484576]
-editor_description = "Final swinging-arm art slot. The shoulder of the PNG should align with ArmPivot."
+editor_description = "Upper-arm art slot. The complete arm skin hides the arm stand-in when all three arm textures are assigned."
+
+[node name="ForearmSprite" type="Sprite2D" parent="VisualRoot/BodyPivot/ArmPivot"]
+editor_description = "Optional aligned forearm layer. Keep the shared character canvas and origin."
+
+[node name="HandSprite" type="Sprite2D" parent="VisualRoot/BodyPivot/ArmPivot"]
+editor_description = "Optional aligned hand layer. Keep the shared character canvas and origin."
 
 [node name="StandInArmOutline" type="Line2D" parent="VisualRoot/BodyPivot/ArmPivot" unique_id=347213152]
 position = Vector2(1, 6)
@@ -391,11 +392,11 @@ default_color = Color(0.94, 0.94, 0.94, 1)
 editor_description = "Tool follow-through control. Put this pivot at the hand/grip and key rotation after ArmPivot for overlapping motion."
 rotation = -0.28
 
-[node name="PickaxeSprite" type="Sprite2D" parent="VisualRoot/BodyPivot/ArmPivot/PickaxePivot" unique_id=824686595]
-editor_description = "Final pickaxe/tool art slot. Align its grip point to PickaxePivot, then hide the StandInTool nodes."
+[node name="PickaxeHandleSprite" type="Sprite2D" parent="VisualRoot/BodyPivot/ArmPivot/PickaxePivot" unique_id=824686595]
+editor_description = "Final handle-only art slot. Align its grip point to PickaxePivot and its upper end with PickaxeHeadSprite."
 
 [node name="PickaxeHeadSprite" type="Sprite2D" parent="VisualRoot/BodyPivot/ArmPivot/PickaxePivot" unique_id=415614741]
-editor_description = "Optional head-only art layer. Assign the hammer head texture here so equipped pickaxes can tint it without tinting the handle."
+editor_description = "Head-only art slot. PickaxeDefinition colors this independently from the handle."
 
 [node name="StandInToolHandle" type="Line2D" parent="VisualRoot/BodyPivot/ArmPivot/PickaxePivot" unique_id=2121169759]
 position = Vector2(23.077713, -0.6475649)
@@ -412,7 +413,7 @@ width = 9.0
 default_color = Color(0.94, 0.94, 0.94, 1)
 
 [node name="ImpactPoint" type="Marker2D" parent="VisualRoot/BodyPivot/ArmPivot/PickaxePivot" unique_id=1256461983]
-editor_description = "Particle spawn point at the striking end of the hammer head."
+editor_description = "Authored striking tip used for terrain contact, sound, particles, and impact shake."
 position = Vector2(79.44684, -13.451826)
 
 [node name="ChipOrigin" type="Marker2D" parent="." unique_id=1250073857]
@@ -423,7 +424,9 @@ position = Vector2(0, 57)
 editor_description = "Choose idle, mine_success, or mine_miss in the bottom Animation panel. RESET stores the neutral pose and should not be used as the authored action animation."
 libraries/ = SubResource("AnimationLibrary_rig")
 
-[node name="AudioStreamPlayer2D" type="AudioStreamPlayer2D" parent="." unique_id=233120121]
+[node name="SwingAudio" type="AudioStreamPlayer2D" parent="."]
+
+[node name="ImpactAudio" type="AudioStreamPlayer2D" parent="." unique_id=233120121]
 stream = ExtResource("2_avhsd")
 
 [connection signal="animation_finished" from="AnimationPlayer" to="." method="_on_animation_finished"]

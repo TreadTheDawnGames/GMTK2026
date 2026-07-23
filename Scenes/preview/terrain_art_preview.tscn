@@ -1,0 +1,120 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://Scripts/preview/terrain_art_preview.gd" id="1_preview"]
+[ext_resource type="Script" path="res://Scripts/mining/terrain_manager.gd" id="2_terrain"]
+[ext_resource type="Resource" path="res://resources/mining/mining_config.tres" id="3_config"]
+[ext_resource type="Resource" path="res://resources/encounters/depth_encounter_config.tres" id="4_encounter"]
+[ext_resource type="PackedScene" path="res://Scenes/mining/terrain_chunk_visual.tscn" id="5_chunk_visual"]
+[ext_resource type="Resource" path="res://resources/art/default_terrain_art.tres" id="6_art"]
+
+[node name="TerrainArtPreview" type="Node2D" node_paths=PackedStringArray("terrain_manager", "combo_slider", "brush_selector", "view_selector", "status_label")]
+script = ExtResource("1_preview")
+terrain_manager = NodePath("TerrainManager")
+combo_slider = NodePath("UI/Panel/Margin/Controls/ComboSlider")
+brush_selector = NodePath("UI/Panel/Margin/Controls/BrushSelector")
+view_selector = NodePath("UI/Panel/Margin/Controls/ViewSelector")
+status_label = NodePath("UI/Panel/Margin/Controls/Status")
+
+[node name="Background" type="ColorRect" parent="."]
+offset_right = 1152.0
+offset_bottom = 648.0
+mouse_filter = 2
+color = Color(0.075, 0.095, 0.13, 1)
+
+[node name="TerrainManager" type="Node2D" parent="."]
+script = ExtResource("2_terrain")
+config = ExtResource("3_config")
+encounter_config = ExtResource("4_encounter")
+art_profile_override = ExtResource("6_art")
+chunk_visual_scene = ExtResource("5_chunk_visual")
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="Panel" type="PanelContainer" parent="UI"]
+offset_left = 812.0
+offset_top = 24.0
+offset_right = 1128.0
+offset_bottom = 355.0
+
+[node name="Margin" type="MarginContainer" parent="UI/Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 18
+
+[node name="Controls" type="VBoxContainer" parent="UI/Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="UI/Panel/Margin/Controls"]
+layout_mode = 2
+text = "Terrain Art Preview"
+
+[node name="ProfileHint" type="Label" parent="UI/Panel/Margin/Controls"]
+layout_mode = 2
+text = "Swap Art Profile Override in the Inspector."
+autowrap_mode = 2
+
+[node name="BrushLabel" type="Label" parent="UI/Panel/Margin/Controls"]
+layout_mode = 2
+text = "Brush"
+
+[node name="BrushSelector" type="OptionButton" parent="UI/Panel/Margin/Controls"]
+layout_mode = 2
+item_count = 4
+popup/item_0/text = "Current Tunnel"
+popup/item_0/id = 0
+popup/item_1/text = "Circle"
+popup/item_1/id = 1
+popup/item_2/text = "Ellipse"
+popup/item_2/id = 2
+popup/item_3/text = "Capsule"
+popup/item_3/id = 3
+
+[node name="ComboLabel" type="Label" parent="UI/Panel/Margin/Controls"]
+layout_mode = 2
+text = "Combo Preview"
+
+[node name="ComboSlider" type="HSlider" parent="UI/Panel/Margin/Controls"]
+layout_mode = 2
+min_value = 1.0
+max_value = 20.0
+step = 1.0
+value = 1.0
+
+[node name="ViewLabel" type="Label" parent="UI/Panel/Margin/Controls"]
+layout_mode = 2
+text = "View"
+
+[node name="ViewSelector" type="OptionButton" parent="UI/Panel/Margin/Controls"]
+layout_mode = 2
+item_count = 4
+popup/item_0/text = "Final"
+popup/item_0/id = 0
+popup/item_1/text = "Solid Mask"
+popup/item_1/id = 1
+popup/item_2/text = "Edge Mask"
+popup/item_2/id = 2
+popup/item_3/text = "Ore Mask"
+popup/item_3/id = 3
+
+[node name="Buttons" type="HBoxContainer" parent="UI/Panel/Margin/Controls"]
+layout_mode = 2
+
+[node name="Hit" type="Button" parent="UI/Panel/Margin/Controls/Buttons"]
+layout_mode = 2
+text = "Hit"
+
+[node name="Reset" type="Button" parent="UI/Panel/Margin/Controls/Buttons"]
+layout_mode = 2
+text = "Reset"
+
+[node name="Status" type="Label" parent="UI/Panel/Margin/Controls"]
+layout_mode = 2
+autowrap_mode = 2
+
+[connection signal="item_selected" from="UI/Panel/Margin/Controls/BrushSelector" to="." method="_on_brush_selected"]
+[connection signal="item_selected" from="UI/Panel/Margin/Controls/ViewSelector" to="." method="_on_view_selected"]
+[connection signal="pressed" from="UI/Panel/Margin/Controls/Buttons/Hit" to="." method="_on_hit_button_pressed"]
+[connection signal="pressed" from="UI/Panel/Margin/Controls/Buttons/Reset" to="." method="_on_reset_button_pressed"]

@@ -8,6 +8,7 @@ extends Node
 @export var shop: PickaxeShop
 @export var miner_rig: MinerRig
 @export var mining_controller: MiningController
+@export var hit_particles: MiningHitParticles
 
 @export_category("Configuration")
 @export var starter_pickaxe: PickaxeDefinition
@@ -37,7 +38,7 @@ func _sync_balance_from_ore() -> void:
 
 ## Removes the ore already accepted by the shop's affordability check.
 func _on_purchase_result(
-	_definition: PickaxeDefinition,
+	definition: PickaxeDefinition,
 	purchased: bool,
 	_remaining_balance: int
 ) -> void:
@@ -45,7 +46,7 @@ func _on_purchase_result(
 		return
 	if ore_inventory.try_spend_ore(
 		currency_ore_id,
-		_definition.cost
+		definition.cost
 	):
 		return
 	push_error("A completed shop purchase could not spend its currency ore.")
@@ -56,4 +57,5 @@ func _apply_equipped_pickaxe(definition: PickaxeDefinition) -> void:
 	if definition == null:
 		return
 	mining_controller.set_equipped_pickaxe(definition)
-	miner_rig.set_hammer_head_color(definition.hammer_head_color)
+	miner_rig.apply_pickaxe_definition(definition)
+	hit_particles.set_custom_impact_scene(definition.impact_particles)

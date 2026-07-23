@@ -4,6 +4,7 @@ extends Node2D
 ## Plays dirt pieces that collide with the remaining terrain.
 
 class DirtPiece:
+	## Stores one simulated dirt pixel without creating a scene node.
 	var terrain_position: Vector2
 	var velocity: Vector2
 	var total_lifetime: float
@@ -39,9 +40,15 @@ class DirtPiece:
 @export_range(1, 512, 1) var maximum_active_pieces: int = 192
 ## Applies a lower simultaneous-pixel limit in browser exports.
 @export_range(1, 256, 1) var web_maximum_active_pieces: int = 64
+## Limits optional authored effects independently from dirt pixels.
+@export_range(1, 32, 1) var maximum_active_custom_effects: int = 8
+## Reduces authored-effect overlap in browser exports.
+@export_range(1, 16, 1) var web_maximum_active_custom_effects: int = 3
 
 var _pieces: Array[DirtPiece] = []
+var _active_custom_effects: Array[Node2D] = []
 var _random := RandomNumberGenerator.new()
+var _custom_impact_scene: PackedScene
 
 
 ## Prepares random values and sleeps processing until the first burst.
@@ -58,6 +65,9 @@ func play_at_impact(
 	debris_multiplier: float = 1.0
 ) -> void:
 	if cells_removed <= 0:
+		return
+	_spawn_custom_impact(impact_screen_position)
+	if debris_multiplier <= 0.0:
 		return
 	var requested_piece_amount := clampi(
 		roundi(
@@ -119,6 +129,11 @@ func play_at_impact(
 		_pieces.append(piece)
 	set_process(true)
 	queue_redraw()
+
+
+## Selects an optional authored effect added to the existing dirt burst.
+func set_custom_impact_scene(effect_scene: PackedScene) -> void:
+	_custom_impact_scene = effect_scene
 
 
 ## Moves active dirt pieces and removes expired pieces.
@@ -219,3 +234,55 @@ func _position_collides(
 		terrain_manager.is_solid_at_terrain_position(horizontal_edge)
 		or terrain_manager.is_solid_at_terrain_position(vertical_edge)
 	)
+
+
+## Creates a self-contained pickaxe effect at the visual impact point.
+func _spawn_custom_impact(impact_screen_position: Vector2) -> void:
+	if _custom_impact_scene == null:
+		return
+	var effect := _custom_impact_scene.instantiate() as Node2D
+	if effect == null:
+		push_error("Pickaxe impact particle scenes must inherit Node2D.")
+		return
+	if not effect is GPUParticles2D and not effect is CPUParticles2D:
+		push_error(
+			"Pickaxe impact particle scenes must use GPU or CPU particles."
+		)
+		effect.free()
+		return
+
+	for effect_index in range(_active_custom_effects.size() - 1, -1, -1):
+		if not is_instance_valid(_active_custom_effects[effect_index]):
+			_active_custom_effects.remove_at(effect_index)
+	var effect_budget := maximum_active_custom_effects
+	if OS.has_feature("web"):
+		effect_budget = mini(
+			effect_budget,
+			web_maximum_active_custom_effects
+		)
+	while _active_custom_effects.size() >= effect_budget:
+		var oldest_effect: Node2D = _active_custom_effects.pop_front()
+		if is_instance_valid(oldest_effect):
+			oldest_effect.queue_free()
+
+	add_child(effect)
+	effect.global_position = impact_screen_position
+	_active_custom_effects.append(effect)
+	effect.tree_exiting.connect(
+		_on_custom_effect_exiting.bind(effect)
+	)
+	if effect is GPUParticles2D:
+		var gpu_particles := effect as GPUParticles2D
+		gpu_particles.one_shot = true
+		gpu_particles.finished.connect(gpu_particles.queue_free)
+		gpu_particles.emitting = true
+	else:
+		var cpu_particles := effect as CPUParticles2D
+		cpu_particles.one_shot = true
+		cpu_particles.finished.connect(cpu_particles.queue_free)
+		cpu_particles.emitting = true
+
+
+## Removes a completed authored effect from the overlap budget.
+func _on_custom_effect_exiting(effect: Node2D) -> void:
+	_active_custom_effects.erase(effect)

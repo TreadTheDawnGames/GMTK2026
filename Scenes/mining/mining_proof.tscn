@@ -22,6 +22,8 @@
 [ext_resource type="Resource" path="res://resources/pickaxes/basic_pickaxe.tres" id="20_basic_pickaxe"]
 [ext_resource type="Script" uid="uid://c4nd03mddc2vw" path="res://Scripts/mining/impact_shake.gd" id="21_impact_shake"]
 [ext_resource type="Script" uid="uid://boq33gsihoh51" path="res://Scripts/ui/playtime_reveal.gd" id="22_playtime_reveal"]
+[ext_resource type="PackedScene" path="res://Scenes/mining/terrain_chunk_visual.tscn" id="23_chunk_visual"]
+[ext_resource type="Script" path="res://Scripts/mining/terrain_break_animator.gd" id="24_break_animator"]
 
 [node name="GameRoot" type="Node" unique_id=1769413368]
 
@@ -47,6 +49,8 @@ color = Color(0.075, 0.095, 0.13, 1)
 script = ExtResource("3_terrain")
 config = ExtResource("1_config")
 encounter_config = ExtResource("14_encounter_config")
+chunk_visual_scene = ExtResource("23_chunk_visual")
+progressive_breaking_enabled = true
 
 [node name="MinerRig" parent="MiningScene" unique_id=726963260 instance=ExtResource("7_miner_rig")]
 
@@ -72,6 +76,10 @@ terrain_manager = NodePath("../../TerrainManager")
 script = ExtResource("21_impact_shake")
 camera = NodePath("../../ImpactCamera")
 
+[node name="TerrainBreakAnimator" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("terrain_manager")]
+script = ExtResource("24_break_animator")
+terrain_manager = NodePath("../../TerrainManager")
+
 [node name="MiningController" type="Node" parent="MiningScene/Systems" unique_id=1389910536 node_paths=PackedStringArray("run_state", "ore_inventory", "terrain_manager", "view_controller", "fall_origin")]
 script = ExtResource("5_controller")
 config = ExtResource("1_config")
@@ -87,12 +95,13 @@ miner_rig = NodePath("../../MinerRig")
 mining_controller = NodePath("../MiningController")
 timing_window = NodePath("../../HUD/TimingWindow")
 
-[node name="PickaxeShopCoordinator" type="Node" parent="MiningScene/Systems" unique_id=905831664 node_paths=PackedStringArray("ore_inventory", "shop", "miner_rig", "mining_controller")]
+[node name="PickaxeShopCoordinator" type="Node" parent="MiningScene/Systems" unique_id=905831664 node_paths=PackedStringArray("ore_inventory", "shop", "miner_rig", "mining_controller", "hit_particles")]
 script = ExtResource("19_shop_coordinator")
 ore_inventory = NodePath("../../../OreInventoryState")
 shop = NodePath("../../../PickaxeShopLayer/PickaxeShop")
 miner_rig = NodePath("../../MinerRig")
 mining_controller = NodePath("../MiningController")
+hit_particles = NodePath("../../MiningHitParticles")
 starter_pickaxe = ExtResource("20_basic_pickaxe")
 
 [node name="MarketplaceEncounterController" type="Node" parent="MiningScene/Systems" unique_id=797816739 node_paths=PackedStringArray("dialogue_director", "timing_window", "encounter_npc", "pickaxe_shop", "mining_controller")]
@@ -154,6 +163,9 @@ layer = 15
 
 [connection signal="depth_changed" from="RunState" to="MiningScene/Systems/MarketplaceEncounterController" method="_on_depth_changed"]
 [connection signal="depth_changed" from="RunState" to="MiningScene/HUD" method="_on_depth_changed"]
+[connection signal="terrain_cells_destroyed" from="MiningScene/TerrainManager" to="MiningScene/Systems/TerrainBreakAnimator" method="play_break_sequence"]
+[connection signal="all_breaks_finished" from="MiningScene/Systems/TerrainBreakAnimator" to="MiningScene/Systems/MiningController" method="finish_break_sequence"]
+[connection signal="cells_revealed" from="MiningScene/Systems/TerrainBreakAnimator" to="MiningScene/Systems/MiningController" method="advance_with_breakage"]
 [connection signal="run_reset" from="RunState" to="OreInventoryState" method="reset_inventory"]
 [connection signal="inventory_changed" from="OreInventoryState" to="MiningScene/HUD" method="_on_ore_inventory_changed"]
 [connection signal="impact_contact" from="MiningScene/MinerRig" to="MiningScene/Systems/MiningController" method="resolve_impact"]

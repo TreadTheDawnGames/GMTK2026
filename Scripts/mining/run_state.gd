@@ -45,6 +45,14 @@ func record_success(
 	resolved_combo: int,
 	count_as_timing_success: bool = true
 ) -> void:
+	combo = resolved_combo
+	if count_as_timing_success:
+		successful_hits += 1
+	advance_depth(depth_advanced_px, new_mining_y)
+
+
+## Advances the player's feet as newly broken terrain becomes physical.
+func advance_depth(depth_advanced_px: int, new_mining_y: int) -> void:
 	depth_px = mini(
 		depth_px + maxi(depth_advanced_px, 0),
 		config.total_run_depth_px
@@ -54,16 +62,13 @@ func record_success(
 		config.initial_surface_row,
 		config.get_bottom_surface_row()
 	)
-	combo = resolved_combo
-	if count_as_timing_success:
-		successful_hits += 1
 	depth_changed.emit(depth_px)
 	if depth_px >= config.total_run_depth_px and not has_reached_bottom:
 		has_reached_bottom = true
 		bottom_reached.emit()
 
 
-## Records a missed hit without changing depth.
+## Adopts the resolved combo and records one failed hit.
 func record_failure(resolved_combo: int) -> void:
 	combo = resolved_combo
 	failed_hits += 1

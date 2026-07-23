@@ -22,6 +22,12 @@ extends Resource
 @export var terrain_accent_color: Color = Color("75483a")
 @export var ore_definitions: Array[OreDefinition] = []
 
+@export_category("Art Integration")
+## Selects terrain artwork as loaded chunks cross authored depths.
+@export var depth_bands: Array[TerrainDepthBand] = []
+## Supplies editable shapes to the standalone terrain preview.
+@export var mining_brush: MiningBrushDefinition
+
 @export_category("View")
 @export var terrain_screen_center_x: float = 576.0
 @export var mining_face_screen_y: float = 340.0
@@ -41,3 +47,14 @@ func get_bottom_surface_row() -> int:
 			/ float(logical_pixel_scale)
 		)
 	)
+
+
+## Returns the authored terrain artwork for a run depth.
+func get_art_profile_for_depth(depth_px: int) -> TerrainArtProfile:
+	for depth_band in depth_bands:
+		if (
+			depth_band != null
+			and depth_band.contains_depth(depth_px)
+		):
+			return depth_band.art_profile
+	return null
