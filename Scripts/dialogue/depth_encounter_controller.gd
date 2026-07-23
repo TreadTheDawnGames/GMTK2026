@@ -5,6 +5,10 @@ extends Node
 
 signal final_encounter_reached(encounter_id: StringName)
 signal departure_choice_requested
+## Requests completed camera catch-up before the dialogue overlay appears.
+signal encounter_camera_focus_requested
+## Releases encounter framing when mining input becomes available again.
+signal encounter_camera_released
 
 @export_category("Schedule")
 @export var encounter_config: DepthEncounterConfig
@@ -62,6 +66,7 @@ func _on_landing_reached(_mining_y: int) -> void:
 		return
 	_active_encounter_index = _pending_encounter_index
 	_pending_encounter_index = -1
+	encounter_camera_focus_requested.emit()
 	_begin_active_encounter.call_deferred()
 
 
@@ -322,6 +327,7 @@ func _prepare_authored_characters() -> bool:
 
 ## Makes the timing bar usable after a completed character conversation.
 func _restore_timing_window() -> void:
+	encounter_camera_released.emit()
 	mining_controller.set_swing_queue_paused(false)
 	timing_window.process_mode = Node.PROCESS_MODE_INHERIT
 	timing_window.show()

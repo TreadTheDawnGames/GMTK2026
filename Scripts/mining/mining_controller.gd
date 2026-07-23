@@ -51,6 +51,8 @@ signal swing_requested(
 	combo_strength: float,
 	swing_speed_multiplier: float
 )
+## Reports combo before synchronous terrain damage chooses its layer masks.
+signal dig_presentation_started(combo: int)
 ## Requests impact presentation at the hammer contact point.
 signal impact_resolved(
 	screen_position: Vector2,
@@ -204,6 +206,9 @@ func resolve_impact(
 		),
 		run_state.mining_y
 	)
+	# Presentation receives this before TerrainManager emits damage, so every
+	# stamp from the primary hit and its special effect shares one combo gate.
+	dig_presentation_started.emit(capped_combo)
 	var dig_result := terrain_manager.dig_tunnel(
 		fall_cell,
 		requested_depth_rows,

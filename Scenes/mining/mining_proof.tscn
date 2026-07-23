@@ -75,13 +75,14 @@ view_controller = NodePath("../Systems/ViewController")
 
 [node name="Systems" type="Node" parent="MiningScene" unique_id=1573949011]
 
-[node name="SceneWiring" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("run_state", "mining_controller", "timing_bridge", "view_controller", "terrain_manager", "miner_rig", "hit_particles", "impact_smoke", "dig_number_presenter", "impact_shake", "hud", "depth_review_control", "encounter_controller", "dialogue_director", "departure_choice")]
+[node name="SceneWiring" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("run_state", "mining_controller", "timing_bridge", "view_controller", "terrain_manager", "terrain_renderer", "miner_rig", "hit_particles", "impact_smoke", "dig_number_presenter", "impact_shake", "hud", "depth_review_control", "encounter_controller", "dialogue_director", "departure_choice")]
 script = ExtResource("25_wiring")
 run_state = NodePath("../../../RunState")
 mining_controller = NodePath("../MiningController")
 timing_bridge = NodePath("../TimingBridge")
 view_controller = NodePath("../ViewController")
 terrain_manager = NodePath("../../TerrainManager")
+terrain_renderer = NodePath("../../TerrainLayerRenderer")
 miner_rig = NodePath("../../MinerRig")
 hit_particles = NodePath("../../MiningHitParticles")
 impact_smoke = NodePath("../../MiningImpactSmoke")
@@ -205,8 +206,9 @@ script = ExtResource("22_playtime_reveal")
 
 [node name="DepartureChoice" parent="." instance=ExtResource("41_departure_choice")]
 
-[node name="DigNumberPresenter" type="CanvasLayer" parent="." groups=["dig_number_presenter"]]
+[node name="DigNumberPresenter" type="CanvasLayer" parent="." node_paths=PackedStringArray("timing_window") groups=["dig_number_presenter"]]
 layer = 12
 process_mode = 3
 script = ExtResource("30_dig_number_presenter")
 dig_number_scene = ExtResource("31_dig_number")
+timing_window = NodePath("../MiningScene/HUD/TimingWindow")

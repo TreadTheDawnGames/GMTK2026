@@ -11,8 +11,10 @@ signal swing_finished
 @export_range(0.0, 1.0, 0.05) var combo_speed_bonus: float = 0.35
 
 @export_category("Placement")
-## Seats the artwork into the layered opening without moving ChipOrigin logic.
-@export_range(0.0, 64.0, 1.0) var terrain_grounding_offset_y: float = 32.0
+## Seats the miner on the pale top stratum at the surface and merchant floors.
+@export_range(0.0, 64.0, 1.0) var intact_floor_grounding_offset_y: float = 16.0
+## Seats the miner into the orange-edged opening after terrain is struck.
+@export_range(0.0, 64.0, 1.0) var mined_opening_grounding_offset_y: float = 32.0
 
 @export_category("References")
 @export var animation_player: AnimationPlayer
@@ -25,14 +27,14 @@ signal swing_finished
 
 var _playing_full_swing: bool = false
 var _rest_position: Vector2
+var _visual_root_rest_y: float
 
 
 ## Connects animation events and starts the idle animation.
 func _ready() -> void:
 	_rest_position = position
-	# VisualRoot owns presentation placement. Keeping the offset off this
-	# script's root prevents art tuning from changing mining coordinates.
-	visual_root.position.y += terrain_grounding_offset_y
+	_visual_root_rest_y = visual_root.position.y
+	show_intact_floor_grounding()
 	if not animation_player.animation_finished.is_connected(
 		_on_animation_finished
 	):
@@ -147,6 +149,21 @@ func get_facing_direction() -> int:
 ## Places the miner at true screen depth during falls, flips, and review.
 func set_screen_depth_offset(screen_offset_y: float) -> void:
 	position.y = _rest_position.y + screen_offset_y
+
+
+## Places the artwork above the first layer on an authored intact floor.
+func show_intact_floor_grounding() -> void:
+	_set_grounding_offset(intact_floor_grounding_offset_y)
+
+
+## Places the artwork above the second visible layer after a successful hit.
+func show_mined_opening_grounding() -> void:
+	_set_grounding_offset(mined_opening_grounding_offset_y)
+
+
+## Changes presentation placement without moving ChipOrigin mining logic.
+func _set_grounding_offset(offset_y: float) -> void:
+	visual_root.position.y = _visual_root_rest_y + offset_y
 
 
 ## Returns finished actions to idle after any queued strike plays.

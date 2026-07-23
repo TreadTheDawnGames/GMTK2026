@@ -272,6 +272,22 @@ func get_view_y() -> float:
 	return _current_view_y
 
 
+## Reports whether a row is the intact top of the run or an authored room.
+func is_authored_landing_floor(world_row: int) -> bool:
+	if world_row == config.initial_surface_row:
+		return true
+	if encounter_config == null:
+		return false
+	var depth_row := world_row - config.initial_surface_row
+	for encounter in encounter_config.encounters:
+		if (
+			encounter != null
+			and encounter.resolve_depth(config.total_run_depth) == depth_row
+		):
+			return true
+	return false
+
+
 ## Returns whether a cell can be destroyed by a new hit.
 func _is_mineable_cell(cell: Vector2i) -> bool:
 	return is_ground_cell(cell) and not _is_cell_destroyed(cell)

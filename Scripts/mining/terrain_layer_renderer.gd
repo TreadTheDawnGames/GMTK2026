@@ -45,6 +45,10 @@ const EMPTY_MASK_COLOR := Color.TRANSPARENT
 @export var terrain_manager: TerrainManager
 @export var profile: TerrainLayerProfile
 
+@export_category("Impact Reveal")
+## Layer four remains covered until the active hit reaches this combo.
+@export_range(1, 100, 1) var deepest_layer_combo_threshold: int = 10
+
 @export_category("Web Performance")
 ## Limits reusable resized masks so repeated hit sizes avoid image allocations.
 @export_range(0, 48, 1) var resized_stamp_cache_limit: int = 12
@@ -73,6 +77,7 @@ var _loaded_first_chunk: int = -1
 var _loaded_last_chunk: int = -1
 var _latest_foreground_opening_rect := Rect2()
 var _show_logical_overlay: bool = false
+var _active_impact_combo: int = 0
 
 
 ## Connects terrain events and loads the initial visible strata.
@@ -101,6 +106,11 @@ func _ready() -> void:
 	_prepare_hole_masks()
 	_prepare_chamber_transition_stamps()
 	_on_view_y_changed(terrain_manager.get_view_y())
+
+
+## Captures the combo used by synchronous damage stamps for one resolved hit.
+func _on_dig_presentation_started(combo: int) -> void:
+	_active_impact_combo = maxi(combo, 0)
 
 
 ## Saves and applies one organic opening for newly destroyed terrain.
@@ -449,6 +459,7 @@ func _create_impact_stamp(
 	)
 	stamp.use_big_hole = (
 		not is_narrow_path
+		and _active_impact_combo >= deepest_layer_combo_threshold
 		and stamp.core_radius * 2.0
 		>= float(profile.big_hole_minimum_size)
 	)
@@ -500,9 +511,9 @@ func _apply_impact_stamp(
 			profile.keep_back_layer_solid
 			and layer_index == layer_count - 2
 		)
-		# Small hits retain orange as the decorative tunnel backdrop. The
-		# existing big-hole threshold is the single definition of a hard hit,
-		# so mask selection and brown-layer reveal cannot drift apart.
+		# Orange remains the decorative tunnel backdrop below combo ten.
+		# At or above the combo gate, the size threshold still prevents a
+		# physically small secondary path from exposing the brown back wall.
 		if is_layer_covering_backdrop and not stamp.use_big_hole:
 			continue
 		var layer_changed := false

@@ -11,6 +11,7 @@ extends Node
 @export var timing_bridge: TimingBridge
 @export var view_controller: ViewController
 @export var terrain_manager: TerrainManager
+@export var terrain_renderer: TerrainLayerRenderer
 @export var miner_rig: MinerRig
 @export var hit_particles: MiningHitParticles
 @export var impact_smoke: MiningImpactSmoke
@@ -45,12 +46,32 @@ func _ready() -> void:
 		mining_controller.resolve_attempt
 	)
 	_connect_once(
+		mining_controller.dig_presentation_started,
+		terrain_renderer._on_dig_presentation_started
+	)
+	_connect_once(
 		view_controller.landing_reached,
 		encounter_controller._on_landing_reached
 	)
 	_connect_once(
+		view_controller.landing_reached,
+		_on_miner_landing_grounding
+	)
+	_connect_once(
+		encounter_controller.encounter_camera_focus_requested,
+		view_controller.focus_miner_for_encounter
+	)
+	_connect_once(
+		encounter_controller.encounter_camera_released,
+		view_controller.release_encounter_focus
+	)
+	_connect_once(
 		terrain_manager.view_y_changed,
 		encounter_controller._on_view_y_changed
+	)
+	_connect_once(
+		mining_controller.impact_resolved,
+		_on_impact_resolved_grounding
 	)
 	_connect_once(
 		mining_controller.impact_resolved,
@@ -120,6 +141,24 @@ func _on_miner_impact_contact(screen_position: Vector2) -> void:
 		screen_position,
 		miner_rig.get_facing_direction()
 	)
+
+
+## Moves the artwork into the layered opening only when terrain was removed.
+func _on_impact_resolved_grounding(
+	_screen_position: Vector2,
+	cells_removed: int,
+	_combo_strength: float,
+	_debris_multiplier: float,
+	_swing_side: int
+) -> void:
+	if cells_removed > 0:
+		miner_rig.show_mined_opening_grounding()
+
+
+## Restores first-layer footing at the surface and every authored room.
+func _on_miner_landing_grounding(mining_y: int) -> void:
+	if terrain_manager.is_authored_landing_floor(mining_y):
+		miner_rig.show_intact_floor_grounding()
 
 
 ## Connects one cross-system signal without duplicating an existing route.

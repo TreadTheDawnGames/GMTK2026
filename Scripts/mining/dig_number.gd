@@ -27,6 +27,11 @@ extends RichTextLabel
 @export_range(0.0, 300.0, 1.0) var horizontal_travel_px: float = 110.0
 @export_range(0.0, 30.0, 1.0) var launch_rotation_degrees: float = 8.0
 @export_range(0.0, 1.0, 0.05) var fade_portion: float = 0.4
+@export_range(0.0, 64.0, 1.0) var ui_clearance_px: float = 16.0
+
+## Retained for deterministic motion-bound checks without sampling tweens.
+var _arc_end_position: Vector2
+var _arc_maximum_bottom_y: float
 
 
 ## Animates the value from the hammer contact using its captured combo.
@@ -36,7 +41,8 @@ func present(
 	combo: int,
 	combo_strength: float,
 	horizontal_direction: float,
-	random_travel_scale: float
+	random_travel_scale: float,
+	bottom_screen_limit_y: float
 ) -> void:
 	var safe_combo_strength := clampf(combo_strength, 0.0, 1.0)
 	var formatted_text := "-%d\nDEPTH" % depth_gained
@@ -113,17 +119,21 @@ func present(
 	)
 
 	var randomized_launch_scale := maxf(random_travel_scale, 0.1)
+	var viewport_center_x := get_viewport_rect().size.x * 0.5
+	var destination_center_x := (
+		viewport_center_x
+		+ horizontal_direction
+			* horizontal_travel_px
+			* randomized_launch_scale
+			* lerpf(1.0, 1.25, safe_combo_strength)
+	)
 	var horizontal_tween := create_tween()
 	horizontal_tween.set_trans(Tween.TRANS_QUAD)
 	horizontal_tween.set_ease(Tween.EASE_OUT)
 	horizontal_tween.tween_property(
 		self,
 		"position:x",
-		position.x
-			+ horizontal_direction
-			* horizontal_travel_px
-			* randomized_launch_scale
-			* lerpf(1.0, 1.25, safe_combo_strength),
+		destination_center_x - pivot_offset.x,
 		lifetime_seconds
 	)
 
@@ -132,6 +142,25 @@ func present(
 		jump_height_px
 		* randomized_launch_scale
 		* lerpf(1.0, 1.2, safe_combo_strength)
+	)
+	var maximum_visual_scale := final_display_scale * pop_overshoot
+	var maximum_half_height := pivot_offset.y * maximum_visual_scale
+	var safe_end_center_y := (
+		bottom_screen_limit_y
+		- ui_clearance_px
+		- maximum_half_height
+	)
+	var natural_end_center_y := (
+		impact_screen_position.y - jump_height * 0.45
+	)
+	var end_center_y := minf(natural_end_center_y, safe_end_center_y)
+	var end_label_y := end_center_y - pivot_offset.y
+	_arc_end_position = Vector2(
+		destination_center_x - pivot_offset.x,
+		end_label_y
+	)
+	_arc_maximum_bottom_y = (
+		end_center_y + maximum_half_height
 	)
 	var rise_seconds := lifetime_seconds * 0.42
 	var vertical_tween := create_tween()
@@ -147,7 +176,7 @@ func present(
 	vertical_tween.tween_property(
 		self,
 		"position:y",
-		impact_label_y - jump_height * 0.45,
+		end_label_y,
 		lifetime_seconds - rise_seconds
 	)
 

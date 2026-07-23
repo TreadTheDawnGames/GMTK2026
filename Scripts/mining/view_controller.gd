@@ -36,6 +36,7 @@ var _return_velocity: float = 0.0
 var _last_landing_y: int
 var _view_mode: ViewMode = ViewMode.FOLLOWING_MINER
 var _last_miner_screen_offset: float = NAN
+var _is_encounter_focus_active: bool = false
 
 
 ## Starts the view at the ground surface.
@@ -50,14 +51,42 @@ func _ready() -> void:
 
 ## Advances the active follow, review, or free-fall movement.
 func _process(delta: float) -> void:
-	match _view_mode:
-		ViewMode.FOLLOWING_MINER:
-			_follow_miner(delta)
-		ViewMode.REVIEWING:
-			_move_review_view(delta)
-		ViewMode.RETURNING:
-			_fall_to_miner(delta)
+	if not _is_encounter_focus_active:
+		match _view_mode:
+			ViewMode.FOLLOWING_MINER:
+				_follow_miner(delta)
+			ViewMode.REVIEWING:
+				_move_review_view(delta)
+			ViewMode.RETURNING:
+				_fall_to_miner(delta)
 	terrain_manager.set_view_y(current_view_y)
+	_publish_miner_screen_offset()
+
+
+## Finishes camera catch-up before an encounter dialogue covers the screen.
+func focus_miner_for_encounter() -> void:
+	_is_encounter_focus_active = true
+	current_view_y = target_view_y
+	_current_miner_y = target_view_y
+	_review_target_y = target_view_y
+	_mining_fall_velocity = 0.0
+	_return_velocity = 0.0
+	_view_mode = ViewMode.FOLLOWING_MINER
+	terrain_manager.set_view_y(current_view_y)
+	_publish_miner_screen_offset()
+
+
+## Returns camera movement to the selected smooth or chunked mining style.
+func release_encounter_focus() -> void:
+	_is_encounter_focus_active = false
+	if config.mining_camera_style == MiningConfig.MiningCameraStyle.CHUNK_SNAP:
+		current_view_y = _get_chunk_camera_y(target_view_y)
+		terrain_manager.set_view_y(current_view_y)
+		_publish_miner_screen_offset()
+
+
+## Publishes the miner's screen displacement from one coordinate conversion.
+func _publish_miner_screen_offset() -> void:
 	# One conversion path serves both physical mining falls and detached
 	# review, preventing the rig and terrain from using different depth scales.
 	var miner_world_y := (

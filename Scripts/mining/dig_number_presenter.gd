@@ -11,6 +11,9 @@ const PRESENTER_GROUP: StringName = &"dig_number_presenter"
 
 @export_category("Content")
 @export var dig_number_scene: PackedScene
+@export var timing_window: TimingWindowTask
+## Includes the timing bar texture that expands above its Control rectangle.
+@export_range(0.0, 160.0, 1.0) var timing_bar_visual_overhang_px: float = 80.0
 
 @export_category("Performance")
 ## RichText effects and tweens make each active label relatively expensive.
@@ -110,15 +113,29 @@ func _spawn_dig_number(
 	_active_numbers.append(dig_number)
 	var horizontal_direction := (
 		-1.0
-		if _random.randi_range(0, 1) == 0
+		if impact_screen_position.x
+			>= get_viewport().get_visible_rect().size.x * 0.5
 		else 1.0
 	)
+	var bottom_screen_limit_y := (
+		get_viewport().get_visible_rect().end.y
+	)
+	if (
+		timing_window != null
+		and timing_window.visible
+		and timing_window.mining_window != null
+	):
+		bottom_screen_limit_y = (
+			timing_window.mining_window.get_global_rect().position.y
+			- timing_bar_visual_overhang_px
+		)
 	dig_number.present(
 		impact_screen_position,
 		depth_gained,
 		combo,
 		combo_strength,
 		horizontal_direction,
-		_random.randf_range(0.8, 1.2)
+		_random.randf_range(0.8, 1.2),
+		bottom_screen_limit_y
 	)
 	return dig_number
