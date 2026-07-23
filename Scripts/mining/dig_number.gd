@@ -40,21 +40,32 @@ func present(
 ) -> void:
 	var safe_combo_strength := clampf(combo_strength, 0.0, 1.0)
 	var formatted_text := "-%d\nDEPTH" % depth_gained
-	var effect_thresholds: Array[int] = []
+	var selected_effect_threshold := -1
+	var selected_effect_tag := ""
 	for threshold: int in combo_effects:
-		effect_thresholds.append(threshold)
-	effect_thresholds.sort()
-	for threshold: int in effect_thresholds:
-		if combo < threshold:
+		if (
+			combo < threshold
+			or threshold <= selected_effect_threshold
+		):
 			continue
-		var effect_tag := combo_effects[threshold].strip_edges()
-		effect_tag = effect_tag.strip_escapes()
-		effect_tag = effect_tag.lstrip("[]{}()")
-		effect_tag = effect_tag.rstrip("[]{}()")
-		formatted_text = (
-			"[%s]%s[/%s]"
-			% [effect_tag, formatted_text, effect_tag]
-		)
+		selected_effect_threshold = threshold
+		selected_effect_tag = combo_effects[threshold]
+	if not selected_effect_tag.is_empty():
+		selected_effect_tag = selected_effect_tag.strip_edges()
+		selected_effect_tag = selected_effect_tag.strip_escapes()
+		selected_effect_tag = selected_effect_tag.lstrip("[]{}()")
+		selected_effect_tag = selected_effect_tag.rstrip("[]{}()")
+		if not selected_effect_tag.is_empty():
+			# High combos replace lower-tier effects instead of nesting every
+			# RichText animation and multiplying per-character update cost.
+			formatted_text = (
+				"[%s]%s[/%s]"
+				% [
+					selected_effect_tag,
+					formatted_text,
+					selected_effect_tag,
+				]
+			)
 
 	# Combo changes styling and color; actual downward progress changes size.
 	text = formatted_text

@@ -1,13 +1,27 @@
 class_name DigNumberPresenter
 extends CanvasLayer
 
-## Creates floating depth numbers at successful hammer impacts.
+## How it works:
+## - Each successful impact may create one short-lived DigNumber child.
+## - Native and web builds use separate active-label budgets.
+## - At capacity, the oldest label is retired before a new one is added.
+## The invariant is that _active_numbers never exceeds the platform budget.
 
 const PRESENTER_GROUP: StringName = &"dig_number_presenter"
 
+@export_category("Content")
 @export var dig_number_scene: PackedScene
 
+@export_category("Performance")
+## RichText effects and tweens make each active label relatively expensive.
+@export_range(1, 32, 1) var maximum_active_numbers: int = 8
+## Keeps animated RichText work within the itch.io web-export budget.
+@export_range(1, 16, 1) var web_maximum_active_numbers: int = 4
+
 var _random := RandomNumberGenerator.new()
+# Oldest-first references are pruned or retired on every spawn. This array's
+# growth is strictly bounded by the active platform cap above.
+var _active_numbers: Array[DigNumber] = []
 
 
 ## Seeds launch direction and distance variation for this run.
@@ -65,11 +79,35 @@ func _spawn_dig_number(
 ) -> DigNumber:
 	if depth_gained <= 0 or dig_number_scene == null:
 		return null
+
+	# Remove labels that completed between impacts without introducing a
+	# signal connection for this presenter-owned, bounded child collection.
+	for number_index in range(_active_numbers.size() - 1, -1, -1):
+		var active_number := _active_numbers[number_index]
+		if (
+			not is_instance_valid(active_number)
+			or active_number.is_queued_for_deletion()
+		):
+			_active_numbers.remove_at(number_index)
+
+	var active_budget := maximum_active_numbers
+	if OS.has_feature("web"):
+		active_budget = mini(
+			active_budget,
+			web_maximum_active_numbers
+		)
+	active_budget = maxi(active_budget, 1)
+	while _active_numbers.size() >= active_budget:
+		var oldest_number: DigNumber = _active_numbers.pop_front()
+		if is_instance_valid(oldest_number):
+			oldest_number.queue_free()
+
 	var dig_number := dig_number_scene.instantiate() as DigNumber
 	if dig_number == null:
 		push_error("The configured dig number scene is not a DigNumber.")
 		return null
 	add_child(dig_number)
+	_active_numbers.append(dig_number)
 	var horizontal_direction := (
 		-1.0
 		if _random.randi_range(0, 1) == 0
