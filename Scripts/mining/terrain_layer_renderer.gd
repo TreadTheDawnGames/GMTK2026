@@ -296,7 +296,10 @@ func _load_chunk(chunk_index: int) -> void:
 ## Removes rendered chunk nodes while retaining their impact records.
 func _unload_chunk(chunk_index: int) -> void:
 	var chunk := _active_chunks[chunk_index]
-	chunk.root.queue_free()
+	# Streaming can cross many chunk boundaries in one frame during a fast
+	# review or fall. Deferred deletion would retain every old ImageTexture
+	# until the frame ends and can exhaust memory before Godot flushes it.
+	chunk.root.free()
 	_active_chunks.erase(chunk_index)
 
 
@@ -561,19 +564,24 @@ func _get_layer_opening_rect(
 	if stamp.flip_y:
 		layer_offset.y *= -1.0
 	var opening_center := stamp.center + layer_offset
-	var damage_end := stamp.damage_bounds.end
-	var damage_corners := PackedVector2Array([
-		stamp.damage_bounds.position,
-		Vector2(damage_end.x, stamp.damage_bounds.position.y),
-		damage_end,
-		Vector2(stamp.damage_bounds.position.x, damage_end.y),
-	])
-	for damage_corner in damage_corners:
-		opening_radius = maxf(
-			opening_radius,
-			opening_center.distance_to(damage_corner)
-				+ float(profile.core_hole_padding)
-		)
+	# Ordinary mining stamps expand far enough to cover every damaged cell.
+	# Authored chamber stamps intentionally have no logical damage bounds; an
+	# empty Rect2 sits at the world origin. Measuring its corners would make
+	# the opening radius grow with depth and request enormous mask textures.
+	if stamp.damage_bounds.has_area():
+		var damage_end := stamp.damage_bounds.end
+		var damage_corners := PackedVector2Array([
+			stamp.damage_bounds.position,
+			Vector2(damage_end.x, stamp.damage_bounds.position.y),
+			damage_end,
+			Vector2(stamp.damage_bounds.position.x, damage_end.y),
+		])
+		for damage_corner in damage_corners:
+			opening_radius = maxf(
+				opening_radius,
+				opening_center.distance_to(damage_corner)
+					+ float(profile.core_hole_padding)
+			)
 	return Rect2(
 		opening_center - Vector2.ONE * opening_radius,
 		Vector2.ONE * opening_radius * 2.0
