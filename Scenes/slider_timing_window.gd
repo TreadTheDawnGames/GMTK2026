@@ -31,7 +31,8 @@ func _ready():
 	slider.offset_transform_position.x = -slider.size.x * 0.5
 	
 	randomize_target()
-	
+	if one_shot:
+		stop()
 
 
 func target_half_width() -> float:

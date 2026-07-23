@@ -14,10 +14,12 @@ var losing_combo : bool = false
 
 @onready var combo_label: Label = %ComboLabel
 
+@export var recovery_combo_count : int = 5
 
 func _ready():
 	mining_window.pressed.connect(_mining_window_pressed)
 	recovery_window.pressed.connect(_recovery_window_pressed)
+	recovery_window.randomize_target()
 	recovery_window.stop()
 	#.pressed.connect(
 		#func(success : bool): 
@@ -32,7 +34,8 @@ func _mining_window_pressed(success : bool):
 		combo += 1
 		pressed.emit(true, combo)
 	else:
-		recovery_window.start()
+		if combo >= recovery_combo_count:
+			recovery_window.start()
 		mining_window.pause()
 	pass
 
