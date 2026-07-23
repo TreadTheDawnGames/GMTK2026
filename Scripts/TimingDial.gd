@@ -19,7 +19,7 @@ var target_angle := 0.0:
 	set(value):
 		target_angle = value
 		queue_redraw()
-var target_window_radians := deg_to_rad(90.0):#deg_to_rad(35.0):
+var target_window_radians := deg_to_rad(35.0):
 	set(value):
 		target_window_radians = value
 		queue_redraw()

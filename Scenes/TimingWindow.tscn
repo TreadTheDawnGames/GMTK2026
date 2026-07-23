@@ -1,16 +1,7 @@
 [gd_scene format=3 uid="uid://bwq8rrtdf55gq"]
 
 [ext_resource type="Script" uid="uid://bcafu266b27ml" path="res://Scripts/timing_window.gd" id="1_6wfpp"]
-[ext_resource type="Script" uid="uid://b5sa2c4ft404p" path="res://Scripts/TimingDial.gd" id="2_73j0v"]
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_h6xhj"]
-bg_color = Color(0.050980393, 0.050980393, 0.050980393, 0.7529412)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_6ko1l"]
-bg_color = Color(0, 0.60784316, 0, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7muo2"]
-bg_color = Color(1, 1, 1, 1)
+[ext_resource type="PackedScene" uid="uid://cf8q7ylnplo6c" path="res://Scenes/slider_timing_window.tscn" id="2_73j0v"]
 
 [node name="Control" type="Control" unique_id=633006767]
 layout_mode = 3
@@ -21,60 +12,35 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_6wfpp")
 
-[node name="Backing" type="Panel" parent="." unique_id=1220381824]
+[node name="ComboLabel" type="Label" parent="." unique_id=1967208941]
 unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 7
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_left = -350.0
-offset_top = -209.0
-offset_right = 350.0
-offset_bottom = -128.0
-grow_horizontal = 2
-grow_vertical = 0
-theme_override_styles/panel = SubResource("StyleBoxFlat_h6xhj")
-
-[node name="Target" type="Panel" parent="Backing" unique_id=208410465]
-unique_name_in_owner = true
-layout_mode = 0
-offset_left = 700.0
-offset_right = 725.0
-offset_bottom = 81.0
-offset_transform_enabled = true
-offset_transform_position = Vector2(-12.5, 0)
-theme_override_styles/panel = SubResource("StyleBoxFlat_6ko1l")
-
-[node name="Slider" type="Panel" parent="Backing" unique_id=492863997]
-unique_name_in_owner = true
-layout_mode = 0
-offset_right = 9.0
-offset_bottom = 81.0
-offset_transform_enabled = true
-offset_transform_position = Vector2(-4.5, 0)
-theme_override_styles/panel = SubResource("StyleBoxFlat_7muo2")
-
-[node name="ComboLabel" type="Label" parent="Backing" unique_id=1559376340]
 layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -705.0
-offset_top = -26.0
-offset_right = -595.0
-offset_bottom = -3.0
+offset_left = -928.0
+offset_top = 493.0
+offset_right = -818.0
+offset_bottom = 516.0
 grow_horizontal = 0
 text = "Combo: "
 
-[node name="TimingDial" type="Control" parent="." unique_id=1247238614]
+[node name="MiningWindow" parent="." unique_id=677199030 instance=ExtResource("2_73j0v")]
+unique_name_in_owner = true
+layout_mode = 1
+offset_left = -351.0
+offset_top = -128.0
+offset_right = 349.0
+offset_bottom = -47.0
+
+[node name="RecoveryWindow" parent="." unique_id=1324091204 instance=ExtResource("2_73j0v")]
 unique_name_in_owner = true
 visible = false
-anchors_preset = 0
-offset_left = 346.0
-offset_top = 374.0
-offset_right = 461.0
-offset_bottom = 489.0
-script = ExtResource("2_73j0v")
-metadata/_custom_type_script = "uid://b5sa2c4ft404p"
+layout_mode = 1
+offset_left = -351.0
+offset_top = -154.0
+offset_right = 349.0
+offset_bottom = -137.0
+speed = 1000.0
+one_shot = true
+fixed_window = 0.9
