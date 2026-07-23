@@ -10,6 +10,7 @@ extends Node
 @export var encounter_npc: Node2D
 
 var _next_floor_depth_px: int
+var _pending_floor_depth_px: int = -1
 var _active_floor_depth_px: int = -1
 var _completed_floor_depth_px: int = -1
 var _is_initialized: bool = false
@@ -27,7 +28,7 @@ func _on_depth_changed(depth_px: int) -> void:
 	# Ignore the initial depth signal sent before this node is ready.
 	if not _is_initialized:
 		return
-	if _active_floor_depth_px >= 0:
+	if _active_floor_depth_px >= 0 or _pending_floor_depth_px >= 0:
 		return
 	if (
 		_completed_floor_depth_px >= 0
@@ -37,10 +38,20 @@ func _on_depth_changed(depth_px: int) -> void:
 	if depth_px < _next_floor_depth_px:
 		return
 
-	_active_floor_depth_px = _next_floor_depth_px
+	_pending_floor_depth_px = _next_floor_depth_px
 	_next_floor_depth_px = encounter_config.get_next_floor_depth(
-		_active_floor_depth_px
+		_pending_floor_depth_px
 	)
+	# Prevent another mining input while the floor moves up to the miner.
+	timing_window.process_mode = Node.PROCESS_MODE_DISABLED
+
+
+## Starts the armed encounter after the rendered floor reaches the miner's feet.
+func _on_landing_reached(_mining_y: int) -> void:
+	if _pending_floor_depth_px < 0 or _active_floor_depth_px >= 0:
+		return
+	_active_floor_depth_px = _pending_floor_depth_px
+	_pending_floor_depth_px = -1
 	_begin_encounter.call_deferred()
 
 
@@ -50,7 +61,7 @@ func _begin_encounter() -> void:
 	timing_window.hide()
 	if dialogue_director.start_conversation(conversation):
 		return
-	timing_window.show()
+	_restore_timing_window()
 	encounter_npc.hide()
 	_active_floor_depth_px = -1
 
@@ -62,6 +73,12 @@ func _on_conversation_finished(conversation_id: StringName) -> void:
 		or conversation_id != conversation.conversation_id
 	):
 		return
-	timing_window.show()
+	_restore_timing_window()
 	_completed_floor_depth_px = _active_floor_depth_px
 	_active_floor_depth_px = -1
+
+
+## Makes the timing bar visible and usable after an encounter.
+func _restore_timing_window() -> void:
+	timing_window.process_mode = Node.PROCESS_MODE_INHERIT
+	timing_window.show()
