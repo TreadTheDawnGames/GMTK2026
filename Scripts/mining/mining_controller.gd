@@ -70,7 +70,7 @@ signal dig_number_requested(
 )
 
 @export var config: MiningConfig
-@export var run_state: RunState
+#@export var run_state: RunState
 @export var terrain_manager: TerrainManager
 @export var view_controller: ViewController
 @export var fall_origin: Marker2D
@@ -88,10 +88,10 @@ var _queued_swings: Array[SwingRequest] = []
 ## Starts a swing for a successful timing result or records a miss.
 func resolve_attempt(success: bool, resolved_combo: int) -> void:
 	var safe_combo := maxi(resolved_combo, 0)
-	if run_state.has_reached_bottom:
+	if GameState.has_reached_bottom:
 		return
 	if not success:
-		run_state.record_failure(safe_combo)
+		GameState.record_failure(safe_combo)
 		# A miss stops retained future strikes, but an airborne hit still lands.
 		_queued_swings.clear()
 		# Keep an active successful swing intact; the timing UI already shows
@@ -204,7 +204,7 @@ func resolve_impact(
 		terrain_manager.screen_x_to_terrain_cell_x(
 			fall_origin.global_position.x
 		),
-		run_state.mining_y
+		GameState.mining_y
 	)
 	# Presentation receives this before TerrainManager emits damage, so every
 	# stamp from the primary hit and its special effect shares one combo gate.
@@ -219,7 +219,7 @@ func resolve_impact(
 	)
 	var surface_after_primary_hit_y := terrain_manager.find_surface_row(
 		fall_cell.x,
-		run_state.mining_y
+		GameState.mining_y
 	)
 	var crossed_open_chamber := (
 		surface_after_primary_hit_y
@@ -258,16 +258,16 @@ func resolve_impact(
 		dig_result.absorb(lightning_result)
 	var new_mining_y := terrain_manager.find_surface_row(
 		fall_cell.x,
-		run_state.mining_y
+		GameState.mining_y
 	)
-	var depth_gained := maxi(new_mining_y - run_state.mining_y, 0)
-	run_state.record_success(
+	var depth_gained := maxi(new_mining_y - GameState.mining_y, 0)
+	GameState.record_success(
 		depth_gained,
 		new_mining_y,
 		_pending_swing.combo,
 		_pending_swing.counts_as_timing_success
 	)
-	view_controller.follow_mining_y(run_state.mining_y)
+	view_controller.follow_mining_y(GameState.mining_y)
 	mine_resolved.emit(
 		depth_gained,
 		dig_result.cells_removed,
@@ -299,7 +299,7 @@ func finish_swing() -> void:
 	_is_swing_pending = false
 	_has_resolved_pending_impact = false
 	_pending_swing = null
-	if run_state.has_reached_bottom:
+	if GameState.has_reached_bottom:
 		_queued_swings.clear()
 		return
 	_try_start_queued_swing()
@@ -338,7 +338,7 @@ func _try_start_queued_swing() -> void:
 		_is_swing_queue_paused
 		or _is_swing_pending
 		or _queued_swings.is_empty()
-		or run_state.has_reached_bottom
+		or GameState.has_reached_bottom
 	):
 		return
 	_start_swing(_queued_swings.pop_front())

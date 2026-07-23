@@ -11,6 +11,7 @@ class_name TimingWindowTask
 @onready var streak_saved_sound: AudioStreamPlayer2D = %StreakSavedSound
 @onready var warning_sound: AudioStreamPlayer2D = %WarningSound
 @onready var save_bwah_sound: AudioStreamPlayer2D = %SaveBwahSound
+@onready var depth_label: Label = %DepthLabel
 
 signal pressed(success: bool, combo: int)
 
@@ -41,6 +42,9 @@ func _ready() -> void:
 		_recovery_window_pressed
 	):
 		recovery_window.pressed.connect(_recovery_window_pressed)
+	
+	depth_label.text = str(Utils.format_number_with_commas(GameState.config.total_run_depth))
+	GameState.depth_changed.connect(func(depth): depth_label.text = Utils.format_number_with_commas(GameState.config.total_run_depth - GameState.depth))
 
 
 ## Updates the combo or opens recovery after the main timing result.

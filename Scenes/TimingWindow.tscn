@@ -14,10 +14,13 @@
 [ext_resource type="AudioStream" uid="uid://bif7p7jcchspq" path="res://Assets/Audio/MissWithSave.wav" id="12_2plp5"]
 [ext_resource type="AudioStream" uid="uid://cbbyjg221k80c" path="res://Assets/Audio/SaveBuildup.wav" id="13_53pw3"]
 
+[sub_resource type="LabelSettings" id="LabelSettings_6ko1l"]
+font_size = 61
+
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_af75q"]
 bg_color = Color(0, 0, 0, 0.57254905)
 
-[node name="Control" type="Control" unique_id=633006767]
+[node name="MiningUI" type="Control" unique_id=633006767]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -26,6 +29,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_6wfpp")
 combo_speed_multiplier = 1.5
+recovery_speed_multiplier = 1.1
 mine_sounds = Array[AudioStream]([ExtResource("2_4e5kf"), ExtResource("3_74xn3"), ExtResource("4_2plp5"), ExtResource("5_53pw3"), ExtResource("6_af75q"), ExtResource("7_cprbh"), ExtResource("8_gxysw")])
 
 [node name="MiningWindow" parent="." unique_id=677199030 instance=ExtResource("2_73j0v")]
@@ -36,6 +40,36 @@ offset_top = -128.0
 offset_right = 349.0
 offset_bottom = -47.0
 grace = 3.0
+
+[node name="Control" type="Control" parent="MiningWindow/Backing" parent_id_path=PackedInt32Array(677199030, 953641845) index="0" unique_id=1770024605]
+anchors_preset = 0
+offset_right = 700.0
+offset_bottom = 81.0
+
+[node name="DepthLabel" type="Label" parent="MiningWindow/Backing/Control" unique_id=2110919583]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -350.0
+offset_top = -68.5
+offset_right = 350.0
+offset_bottom = 68.5
+grow_horizontal = 2
+grow_vertical = 2
+text = "100,000"
+label_settings = SubResource("LabelSettings_6ko1l")
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Panel" type="Panel" parent="MiningWindow/Backing/Control" unique_id=1498988746]
+layout_mode = 0
+offset_right = 700.0
+offset_bottom = 81.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_af75q")
 
 [node name="ComboLabel" type="Label" parent="." unique_id=1967208941]
 unique_name_in_owner = true
@@ -86,3 +120,5 @@ stream = ExtResource("12_2plp5")
 [node name="SaveBwahSound" type="AudioStreamPlayer2D" parent="." unique_id=800944095]
 unique_name_in_owner = true
 stream = ExtResource("13_53pw3")
+
+[editable path="MiningWindow"]

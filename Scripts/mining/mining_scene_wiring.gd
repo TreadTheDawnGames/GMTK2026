@@ -4,7 +4,7 @@ extends Node
 ## Connects the mining scene's cross-system signals in one searchable place.
 
 @export_category("Run")
-@export var run_state: RunState
+#@export var run_state: RunState
 
 @export_category("Mining")
 @export var mining_controller: MiningController
@@ -29,10 +29,10 @@ extends Node
 ## Establishes every signal that crosses a mining subsystem boundary.
 func _ready() -> void:
 	_connect_once(
-		run_state.depth_changed,
+		GameState.depth_changed,
 		encounter_controller._on_depth_changed
 	)
-	_connect_once(run_state.depth_changed, hud._on_depth_changed)
+	_connect_once(GameState.depth_changed, hud._on_depth_changed)
 	_connect_once(
 		miner_rig.impact_contact,
 		_on_miner_impact_contact

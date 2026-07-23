@@ -28,6 +28,8 @@ const TARGET = preload("uid://16edwc1adi0x")
 @export var animation_repeats: int = 3
 @export var animation_color : Color = Color.RED
 
+@export var desired_target_heirarchy_index : int = 1
+
 var direction: float = 1.0
 var targets: Array[TimingTarget] = []
 
@@ -85,7 +87,7 @@ func add_target() -> void:
 	new_target.use_image = targets_use_image
 	_set_control_width(new_target, max_target_size)
 	backing.add_child(new_target)
-	backing.move_child(new_target, 0)
+	backing.move_child(new_target, desired_target_heirarchy_index)
 	targets.append(new_target)
 	if is_node_ready():
 		randomize_target(new_target)
