@@ -5,6 +5,9 @@ var times_pressed : int = 0
 
 @onready var times_pressed_label: Label = %TimesPressed
 
+func _task_ready():
+	times_pressed_label.text = str(times_pressed, "/", required_pressed)
+
 func _input(event: InputEvent) -> void:
 	super._input(event)
 	if event is InputEventKey:
@@ -12,6 +15,7 @@ func _input(event: InputEvent) -> void:
 		if not keyvent.pressed:
 			return
 		if keyvent.keycode == Key.KEY_SPACE:
+			times_pressed += 1
 			times_pressed_label.text = str(times_pressed, "/", required_pressed)
 			if times_pressed == required_pressed:
 				_succeed()

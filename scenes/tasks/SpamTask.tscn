@@ -6,9 +6,9 @@
 [sub_resource type="LabelSettings" id="LabelSettings_8s06a"]
 font_size = 86
 
-[node name="Task" unique_id=1113953500 instance=ExtResource("1_lr8ck")]
+[node name="SpamTask" unique_id=1113953500 instance=ExtResource("1_lr8ck")]
 script = ExtResource("2_dpsen")
-required_pressed = 50
+required_pressed = 10
 
 [node name="Instructions" type="Label" parent="PanelContainer2/VBoxContainer/MarginContainer/VBoxContainer" parent_id_path=PackedInt32Array(884116960) index="0" unique_id=1827173090]
 layout_mode = 2
