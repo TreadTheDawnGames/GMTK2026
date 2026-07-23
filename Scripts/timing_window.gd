@@ -32,12 +32,14 @@ var combo: int = 0:
 @export_range(1, 100, 1) var combo_count_for_additional_target: int = 10
 @export var combo_speed_multiplier: float = 0.1
 @export var mine_sounds: Array[AudioStream]
+@export var combo_saved_color: Color = Color.CYAN
+@export var combo_lost_color: Color = Color.RED
 
 ## Connects both timing bars to the combo flow.
 func _ready() -> void:
 	combo_label.text = (
-		"Next bar in: "
-		+ str(combo_count_for_additional_target - combo)
+		"Combo: "
+		+ str(-combo)
 	)
 	if not mining_window.pressed.is_connected(
 		_mining_window_pressed
@@ -88,11 +90,14 @@ func _recovery_window_pressed(success: bool) -> void:
 		combo = 0
 		mining_window.reset_all_targets()
 		pressed.emit(false, combo)
-		recovery_window.stop()
+		streak_lost_sound.play()
+		#recovery_window.stop()
+
 		mining_window.speed_multiplier = 1.0
 		mining_window.remove_all_extra_targets()
-		streak_lost_sound.play()
+		recovery_window.animation_color = combo_lost_color
 	else:
 		streak_saved_sound.play()
-
+		recovery_window.animation_color = combo_saved_color
+	await recovery_window.pause(true)
 	mining_window.start()

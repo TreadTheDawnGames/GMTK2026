@@ -24,7 +24,8 @@ const TARGET = preload("uid://16edwc1adi0x")
 
 @export var one_shot: bool = false
 @export var fixed_window: float = -1.0
-@export var warning_repeats: int = 3
+@export var animation_repeats: int = 3
+@export var animation_color : Color = Color.RED
 
 var direction: float = 1.0
 var targets: Array[TimingTarget] = []
@@ -62,8 +63,8 @@ func pause(animate: bool) -> void:
 	if not animate:
 		return
 	var tween: Tween = create_tween()
-	for _repeat_index in range(warning_repeats):
-		tween.tween_property(slider, "modulate", Color.RED, 0.1)
+	for _repeat_index in range(animation_repeats):
+		tween.tween_property(slider, "modulate", animation_color, 0.1)
 		tween.tween_property(slider, "modulate", Color.WHITE, 0.1)
 	await tween.finished
 
@@ -145,6 +146,7 @@ func _process(delta: float) -> void:
 			reset_all_targets()
 
 		if one_shot:
+			await pause(true)
 			stop()
 
 	slider.position.x += speed * direction * delta * speed_multiplier

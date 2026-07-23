@@ -22,9 +22,6 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_6wfpp")
-recovery_combo_count = null
-combo_count_for_additional_target = null
-combo_speed_multiplier = null
 mine_sounds = Array[AudioStream]([ExtResource("2_4e5kf"), ExtResource("3_74xn3"), ExtResource("4_2plp5"), ExtResource("5_53pw3"), ExtResource("6_af75q"), ExtResource("7_cprbh"), ExtResource("8_gxysw")])
 
 [node name="ComboLabel" type="Label" parent="." unique_id=1967208941]
@@ -48,7 +45,6 @@ offset_top = -128.0
 offset_right = 349.0
 offset_bottom = -47.0
 grace = 3.0
-warning_repeats = 2
 
 [node name="RecoveryWindow" parent="." unique_id=1324091204 instance=ExtResource("2_73j0v")]
 unique_name_in_owner = true
@@ -57,12 +53,14 @@ offset_left = -351.0
 offset_top = -154.0
 offset_right = 349.0
 offset_bottom = -137.0
-speed = 1500.0
+speed = 1250.0
 grace = 3.0
 max_target_size = 32.0
 target_shrink_rate = 1.0
 one_shot = true
 fixed_window = 0.9
+animation_repeats = 4
+animation_color = Color(0, 1, 1, 1)
 
 [node name="StreakLostSound" type="AudioStreamPlayer2D" parent="." unique_id=1610083567]
 unique_name_in_owner = true
