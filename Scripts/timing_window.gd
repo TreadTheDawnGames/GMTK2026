@@ -46,6 +46,7 @@ func _recovery_window_pressed(success : bool):
 		combo = 0
 		pressed.emit(false, combo)
 		recovery_window.stop()
+		mining_window.speed_multiplier = 1.0
 	mining_window.start()
 	
 	pass
