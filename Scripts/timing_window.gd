@@ -19,8 +19,6 @@ var losing_combo : bool = false
 func _ready():
 	mining_window.pressed.connect(_mining_window_pressed)
 	recovery_window.pressed.connect(_recovery_window_pressed)
-	recovery_window.randomize_target()
-	recovery_window.stop()
 	#.pressed.connect(
 		#func(success : bool): 
 			#if not success:

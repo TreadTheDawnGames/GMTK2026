@@ -11,6 +11,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_6wfpp")
+recovery_combo_count = 0
 
 [node name="ComboLabel" type="Label" parent="." unique_id=1967208941]
 unique_name_in_owner = true
@@ -40,17 +41,6 @@ offset_left = -351.0
 offset_top = -154.0
 offset_right = 349.0
 offset_bottom = -137.0
-speed = 1000.0
+speed = 1500.0
 one_shot = true
 fixed_window = 0.9
-
-[node name="Target" parent="RecoveryWindow/Backing" parent_id_path=PackedInt32Array(1324091204, 953641845) index="0" unique_id=1049667420]
-offset_left = 280.0
-offset_right = 312.0
-offset_transform_position = Vector2(-16, 0)
-
-[node name="Slider" parent="RecoveryWindow/Backing" parent_id_path=PackedInt32Array(1324091204, 953641845) index="1" unique_id=1966475259]
-offset_left = -346.0
-offset_right = -335.0
-
-[editable path="RecoveryWindow"]

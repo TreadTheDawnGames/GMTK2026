@@ -19,13 +19,8 @@ var direction : float = 1.0
 
 
 func _ready():
-	slider.position.x = 0.0
-	direction = 1.0
-
 	target.offset_right = target.offset_left + target_size
 	target.offset_transform_position.x = -target.size.x * 0.5
-	if fixed_window > -1:
-		target.position.x = backing.size.x * fixed_window
 	
 	slider.offset_right = slider.offset_left + slider_size
 	slider.offset_transform_position.x = -slider.size.x * 0.5
@@ -33,7 +28,6 @@ func _ready():
 	randomize_target()
 	if one_shot:
 		stop()
-
 
 func target_half_width() -> float:
 	return target.size.x*0.5 + grace
