@@ -38,6 +38,7 @@ func _mining_window_pressed(success : bool):
 			recovery_window.start()
 			mining_window.pause()
 		else:
+			pressed.emit(false, combo)
 			combo = 0
 	pass
 
