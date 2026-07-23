@@ -24,6 +24,9 @@ var remaining_depth: int:
 ## Starts a new run when the node loads.
 func _ready() -> void:
 	reset_run()
+	Conductor.set_song(preload("uid://dcpd5v4iqgnoc"), 295, 4)
+	Conductor.play()
+	#Conductor.beat.connect(print.bind())
 
 
 ## Resets depth, combo, and hit counts.

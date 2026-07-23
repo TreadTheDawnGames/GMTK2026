@@ -119,7 +119,6 @@ func reset_all_targets() -> void:
 		target.unhit()
 		randomize_target(target)
 
-
 ## Moves the slider and resolves one press against every visible target.
 func _process(delta: float) -> void:
 	if Input.is_action_just_pressed(&"Space"):
@@ -150,22 +149,24 @@ func _process(delta: float) -> void:
 		if one_shot:
 			await pause(true)
 			stop()
-
-	slider.position.x += speed * direction * delta * speed_multiplier
-
-	var left_edge := slider_half_width()
-	var right_edge := backing.size.x - slider_half_width()
-	var hit_left_edge := slider.position.x <= left_edge and direction < 0.0
-	var hit_right_edge := (
-		slider.position.x >= right_edge
-		and direction > 0.0
-	)
-	if hit_left_edge or hit_right_edge:
-		direction *= -1
-		bounce_sound.play()
-		if one_shot:
-			pressed.emit(false)
-			stop()
+	var beat_in_measure : float = wrap(Conductor.current_beat/Conductor.beats_per_measure,0,1)
+	print(beat_in_measure)
+	slider.position.x = backing.size.x * (float(beat_in_measure)) #* delta * speed #speed_multiplier#  * delta 
+	
+	#print("slider pos: ", slider.position)
+	#var left_edge := slider_half_width()
+	#var right_edge := backing.size.x - slider_half_width()
+	#var hit_left_edge := slider.position.x <= left_edge and direction < 0.0
+	#var hit_right_edge := (
+		#slider.position.x >= right_edge
+		#and direction > 0.0
+	#)
+	#if hit_left_edge or hit_right_edge:
+		#direction *= -1
+		#bounce_sound.play()
+		#if one_shot:
+			#pressed.emit(false)
+			#stop()
 
 
 ## Moves one target to a valid position inside its backing bar.
@@ -176,40 +177,47 @@ func randomize_target(target: TimingTarget) -> void:
 		max_target_size
 	)
 	_set_control_width(target, target_size)
+	
+	var what_beat : float = 1.0/float((randi() % 4))
+	
 	var target_center_x := (
-		(randf() if fixed_window < 0 else fixed_window) * backing.size.x
+		(what_beat if fixed_window < 0 else fixed_window) * backing.size.x
 	)
+	
+	
 	target.position.x = clampf(
 		target_center_x,
 		target_size * 0.5,
 		backing.size.x - target_size * 0.5
 	)
 	
-	var rerolls : int = 5
-	var do_again:bool =true
-	while do_again and rerolls > 0:
-		for _target in targets:
-			if _target == target:
-				continue
-			if target.get_rect().intersects(_target.get_rect()):
-				
-				target.position.x = target.position.x + clampf(
-				target_center_x + target_size + 25 * (randf() - randf()),
-				target_size ,#* 0.5,
-				backing.size.x - target_size,# * 0.5
-				)
-				do_again = true
-				target.position.x = clampf(
-				target_center_x,
-				target_size ,#* 0.5,
-				backing.size.x - target_size,# * 0.5
-				)
-
-				break
-			else:
-				do_again = false
-		rerolls -= 1
-				
+	
+	
+	#var rerolls : int = 5
+	#var do_again:bool =true
+	#while do_again and rerolls > 0:
+		#for _target in targets:
+			#if _target == target:
+				#continue
+			#if target.get_rect().intersects(_target.get_rect()):
+				#
+				#target.position.x = target.position.x + clampf(
+				#target_center_x + target_size + 25 * (randf() - randf()),
+				#target_size ,#* 0.5,
+				#backing.size.x - target_size,# * 0.5
+				#)
+				#do_again = true
+				#target.position.x = clampf(
+				#target_center_x,
+				#target_size ,#* 0.5,
+				#backing.size.x - target_size,# * 0.5
+				#)
+#
+				#break
+			#else:
+				#do_again = false
+		#rerolls -= 1
+				#
 
 
 ## Changes horizontal size without overriding vertically stretched anchors.

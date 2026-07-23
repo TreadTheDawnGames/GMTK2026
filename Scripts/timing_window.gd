@@ -88,5 +88,6 @@ func _recovery_window_pressed(success: bool) -> void:
 	else:
 		streak_saved_sound.play()
 		recovery_window.animation_color = combo_saved_color
+		mining_window.speed_multiplier *=2
 	await recovery_window.pause(true)
 	mining_window.start()

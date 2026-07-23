@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://cd2mp7bpcdx5l"]
 
-[ext_resource type="Resource" path="res://resources/mining/mining_config.tres" id="1_config"]
+[ext_resource type="Resource" uid="uid://dhlm43rg16rkw" path="res://resources/mining/mining_config.tres" id="1_config"]
 [ext_resource type="Script" uid="uid://coay1iq5hk27p" path="res://Scripts/mining/run_state.gd" id="2_run_state"]
 [ext_resource type="Script" uid="uid://b38bkkdjcto5g" path="res://Scripts/mining/terrain_manager.gd" id="3_terrain"]
 [ext_resource type="Script" uid="uid://dhyir0je03ka3" path="res://Scripts/mining/timing_bridge.gd" id="4_timing_bridge"]
@@ -15,18 +15,18 @@
 [ext_resource type="Script" uid="uid://bmv66cgstojt0" path="res://Scripts/dialogue/depth_encounter_controller.gd" id="13_depth_encounter"]
 [ext_resource type="Resource" path="res://resources/encounters/depth_encounter_config.tres" id="14_encounter_config"]
 [ext_resource type="Script" uid="uid://dqb7nfeq5f2h1" path="res://Scripts/input/miner_aim_controller.gd" id="17_aim_controller"]
-[ext_resource type="Script" path="res://Scripts/pickaxes/pickaxe_progression.gd" id="19_pickaxe_progression"]
-[ext_resource type="Resource" path="res://resources/pickaxes/basic_pickaxe.tres" id="20_basic_pickaxe"]
+[ext_resource type="Script" uid="uid://cwq85ldnfasbo" path="res://Scripts/pickaxes/pickaxe_progression.gd" id="19_pickaxe_progression"]
+[ext_resource type="Resource" uid="uid://bm7au74mrcaij" path="res://resources/pickaxes/basic_pickaxe.tres" id="20_basic_pickaxe"]
 [ext_resource type="Script" uid="uid://c4nd03mddc2vw" path="res://Scripts/mining/impact_shake.gd" id="21_impact_shake"]
 [ext_resource type="Script" uid="uid://boq33gsihoh51" path="res://Scripts/ui/playtime_reveal.gd" id="22_playtime_reveal"]
-[ext_resource type="Script" path="res://Scripts/mining/mining_scene_wiring.gd" id="25_wiring"]
-[ext_resource type="Script" path="res://resources/encounters/pickaxe_gift_encounter.gd" id="26_gift_type"]
+[ext_resource type="Script" uid="uid://b54eqv80difeg" path="res://Scripts/mining/mining_scene_wiring.gd" id="25_wiring"]
+[ext_resource type="Script" uid="uid://pq66lgnwaw7m" path="res://resources/encounters/pickaxe_gift_encounter.gd" id="26_gift_type"]
 [ext_resource type="Resource" path="res://resources/encounters/excavator_pickaxe_gift.tres" id="27_excavator_gift"]
 [ext_resource type="Resource" path="res://resources/encounters/swift_pickaxe_gift.tres" id="28_swift_gift"]
 [ext_resource type="Resource" path="res://resources/encounters/heavy_pickaxe_gift.tres" id="29_heavy_gift"]
-[ext_resource type="Script" path="res://Scripts/mining/dig_number_presenter.gd" id="30_dig_number_presenter"]
-[ext_resource type="PackedScene" path="res://Scenes/mining/dig_number.tscn" id="31_dig_number"]
-[ext_resource type="Script" path="res://Scripts/mining/terrain_layer_renderer.gd" id="32_layer_renderer"]
+[ext_resource type="Script" uid="uid://7cxed37q80pf" path="res://Scripts/mining/dig_number_presenter.gd" id="30_dig_number_presenter"]
+[ext_resource type="PackedScene" uid="uid://faai1irb202y" path="res://Scenes/mining/dig_number.tscn" id="31_dig_number"]
+[ext_resource type="Script" uid="uid://d3fjog3we4ugh" path="res://Scripts/mining/terrain_layer_renderer.gd" id="32_layer_renderer"]
 [ext_resource type="Resource" path="res://resources/mining/default_terrain_layer_profile.tres" id="33_layer_profile"]
 
 [node name="GameRoot" type="Node" unique_id=1769413368]
@@ -52,7 +52,7 @@ script = ExtResource("3_terrain")
 config = ExtResource("1_config")
 encounter_config = ExtResource("14_encounter_config")
 
-[node name="TerrainLayerRenderer" type="Node2D" parent="MiningScene" node_paths=PackedStringArray("terrain_manager")]
+[node name="TerrainLayerRenderer" type="Node2D" parent="MiningScene" unique_id=938815993 node_paths=PackedStringArray("terrain_manager")]
 script = ExtResource("32_layer_renderer")
 terrain_manager = NodePath("../TerrainManager")
 profile = ExtResource("33_layer_profile")
@@ -72,7 +72,7 @@ terrain_profile = ExtResource("33_layer_profile")
 
 [node name="Systems" type="Node" parent="MiningScene" unique_id=1573949011]
 
-[node name="SceneWiring" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("run_state", "mining_controller", "timing_bridge", "view_controller", "miner_rig", "hit_particles", "dig_number_presenter", "impact_shake", "hud", "encounter_controller", "dialogue_director")]
+[node name="SceneWiring" type="Node" parent="MiningScene/Systems" unique_id=384367498 node_paths=PackedStringArray("run_state", "mining_controller", "timing_bridge", "view_controller", "miner_rig", "hit_particles", "dig_number_presenter", "impact_shake", "hud", "encounter_controller", "dialogue_director")]
 script = ExtResource("25_wiring")
 run_state = NodePath("../../../RunState")
 mining_controller = NodePath("../MiningController")
@@ -163,8 +163,8 @@ script = ExtResource("22_playtime_reveal")
 
 [node name="DialogueDirector" parent="." unique_id=1751798570 instance=ExtResource("11_dialogue_overlay")]
 
-[node name="DigNumberPresenter" type="CanvasLayer" parent="." groups=["dig_number_presenter"]]
-layer = 12
+[node name="DigNumberPresenter" type="CanvasLayer" parent="." unique_id=1502471320 groups=["dig_number_presenter"]]
 process_mode = 3
+layer = 12
 script = ExtResource("30_dig_number_presenter")
 dig_number_scene = ExtResource("31_dig_number")
