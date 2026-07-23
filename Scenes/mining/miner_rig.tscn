@@ -1,0 +1,375 @@
+[gd_scene format=3 uid="uid://021ecdl5prdm"]
+
+[ext_resource type="Script" uid="uid://doqncdiwvq0t5" path="res://Scripts/mining/miner_rig.gd" id="1_rig"]
+
+[sub_resource type="Animation" id="Animation_reset"]
+resource_name = "RESET"
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("VisualRoot:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector2(0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("VisualRoot:scale")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector2(1, 1)]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("VisualRoot/BodyPivot:rotation")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [0.0]
+}
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("VisualRoot/BodyPivot/ArmPivot:rotation")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [0.0]
+}
+tracks/4/type = "value"
+tracks/4/imported = false
+tracks/4/enabled = true
+tracks/4/path = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot:rotation")
+tracks/4/interp = 1
+tracks/4/loop_wrap = true
+tracks/4/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [-0.28]
+}
+
+[sub_resource type="Animation" id="Animation_idle"]
+resource_name = "idle"
+length = 0.9
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("VisualRoot/BodyPivot:position")
+tracks/0/interp = 2
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.45, 0.9),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(0, 0), Vector2(0, 2), Vector2(0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("VisualRoot/BodyPivot/ArmPivot:rotation")
+tracks/1/interp = 2
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.45, 0.9),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [-0.015, 0.015, -0.015]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot:rotation")
+tracks/2/interp = 2
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.45, 0.9),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [-0.28, -0.26, -0.28]
+}
+
+[sub_resource type="Animation" id="Animation_success_motion"]
+resource_name = "mine_success"
+length = 0.38
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("VisualRoot/BodyPivot:rotation")
+tracks/0/interp = 2
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.16, 0.38),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [-0.03, 0.13, 0.0]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("VisualRoot/BodyPivot/ArmPivot:rotation")
+tracks/1/interp = 2
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.16, 0.38),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [-0.1, 0.38, 0.0]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot:rotation")
+tracks/2/interp = 2
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.16, 0.38),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [-0.48, 0.38, -0.28]
+}
+
+[sub_resource type="Animation" id="Animation_miss_motion"]
+resource_name = "mine_miss"
+length = 0.28
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("VisualRoot/BodyPivot:position")
+tracks/0/interp = 2
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.07, 0.28),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(0, 3), Vector2(-3, -2), Vector2(0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("VisualRoot/BodyPivot/ArmPivot:rotation")
+tracks/1/interp = 2
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.07, 0.28),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [0.22, -0.18, 0.0]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot:rotation")
+tracks/2/interp = 2
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.07, 0.28),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [0.08, -0.5, -0.28]
+}
+
+[sub_resource type="Animation" id="Animation_wind_up"]
+resource_name = "wind_up"
+length = 0.25
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("VisualRoot/BodyPivot:position")
+tracks/0/interp = 2
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.25),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector2(0, 0), Vector2(-2, 2)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("VisualRoot/BodyPivot/ArmPivot:rotation")
+tracks/1/interp = 2
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.25),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [0.0, -0.55]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot:rotation")
+tracks/2/interp = 2
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.25),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [-0.28, -0.75]
+}
+
+[sub_resource type="Animation" id="Animation_wind_down"]
+resource_name = "wind_down"
+length = 0.2
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("VisualRoot/BodyPivot:position")
+tracks/0/interp = 2
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.2),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector2(-2, 2), Vector2(2, 4)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("VisualRoot/BodyPivot/ArmPivot:rotation")
+tracks/1/interp = 2
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.2),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [-0.55, 0.45]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot:rotation")
+tracks/2/interp = 2
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.2),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [-0.75, 0.08]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_rig"]
+_data = {
+&"RESET": SubResource("Animation_reset"),
+&"idle": SubResource("Animation_idle"),
+&"mine_miss": SubResource("Animation_miss_motion"),
+&"mine_success": SubResource("Animation_success_motion"),
+&"wind_down": SubResource("Animation_wind_down"),
+&"wind_up": SubResource("Animation_wind_up")
+}
+
+[node name="MinerRig" type="Node2D" unique_id=1134346491 node_paths=PackedStringArray("animation_player")]
+editor_description = "Presentation-only character rig. Keep this root fixed so the player stays centered. Animate VisualRoot and its pivots instead."
+position = Vector2(576, 282)
+script = ExtResource("1_rig")
+animation_player = NodePath("AnimationPlayer")
+
+[node name="VisualRoot" type="Node2D" parent="." unique_id=465234156]
+editor_description = "Animate this for whole-character bounce, squash, recoil, and small fall offsets. Do not use it to calculate mining progress."
+
+[node name="BackHairSprite" type="Sprite2D" parent="VisualRoot" unique_id=1151509294]
+editor_description = "Optional transparent PNG layer rendered behind the body. Assign the back-hair texture here."
+position = Vector2(0, -19)
+
+[node name="BodyPivot" type="Node2D" parent="VisualRoot" unique_id=1711817002]
+editor_description = "Main torso pivot. Rotate this slightly for anticipation and recoil; keep large swing motion on ArmPivot."
+
+[node name="BodySprite" type="Sprite2D" parent="VisualRoot/BodyPivot" unique_id=922361377]
+editor_description = "Final body/torso art slot. Assign a transparent PNG, align it around BodyPivot, then hide the StandInBody nodes."
+
+[node name="StandInBodyOutline" type="Polygon2D" parent="VisualRoot/BodyPivot" unique_id=612648054]
+color = Color(0.04, 0.04, 0.04, 1)
+polygon = PackedVector2Array(-22, -22, 22, -22, 22, 42, -22, 42)
+
+[node name="StandInBodyBlock" type="Polygon2D" parent="VisualRoot/BodyPivot" unique_id=226403467]
+color = Color(0.94, 0.94, 0.94, 1)
+polygon = PackedVector2Array(-17, -17, 17, -17, 17, 20, 17, 37, -17, 37)
+
+[node name="HeadPivot" type="Node2D" parent="VisualRoot/BodyPivot" unique_id=1348024584]
+editor_description = "Head and hair pivot. Animate a small counter-rotation here to keep the face readable during the swing."
+position = Vector2(0, -30)
+
+[node name="HeadSprite" type="Sprite2D" parent="VisualRoot/BodyPivot/HeadPivot" unique_id=1960137901]
+editor_description = "Final head art slot. Assign a transparent PNG and align the neck/base of the head with this pivot."
+
+[node name="StandInHeadOutline" type="Polygon2D" parent="VisualRoot/BodyPivot/HeadPivot" unique_id=522443127]
+color = Color(0.04, 0.04, 0.04, 1)
+polygon = PackedVector2Array(0, -24, 17, -17, 24, 0, 17, 17, 0, 24, -17, 17, -24, 0, -17, -17)
+
+[node name="StandInHeadCircle" type="Polygon2D" parent="VisualRoot/BodyPivot/HeadPivot" unique_id=1645988927]
+color = Color(0.94, 0.94, 0.94, 1)
+polygon = PackedVector2Array(0, -19, 13, -13, 19, 0, 13, 13, 0, 19, -13, 13, -19, 0, -13, -13)
+
+[node name="FrontHairSprite" type="Sprite2D" parent="VisualRoot/BodyPivot/HeadPivot" unique_id=1979563675]
+editor_description = "Optional front-hair or face-detail layer rendered with the head. Use this for overlap in the cutout rig."
+
+[node name="ArmPivot" type="Node2D" parent="VisualRoot/BodyPivot" unique_id=654713347]
+editor_description = "Primary swing control. Put this pivot at the shoulder and key its rotation for the large mining arc."
+position = Vector2(5, 2)
+
+[node name="ArmSprite" type="Sprite2D" parent="VisualRoot/BodyPivot/ArmPivot" unique_id=1186484576]
+editor_description = "Final swinging-arm art slot. The shoulder of the PNG should align with ArmPivot."
+
+[node name="StandInArmOutline" type="Line2D" parent="VisualRoot/BodyPivot/ArmPivot" unique_id=347213152]
+position = Vector2(1, 6)
+rotation = -1.6226559
+points = PackedVector2Array(0, 0, 15, 25)
+width = 13.0
+default_color = Color(0.04, 0.04, 0.04, 1)
+
+[node name="StandInArmLine" type="Line2D" parent="VisualRoot/BodyPivot/ArmPivot" unique_id=1433422831]
+position = Vector2(12, -1)
+rotation = 0.008236393
+points = PackedVector2Array(-10.950134, 6.0904236, 0.9835205, -2.0081482, 11.925537, -9.098541)
+width = 7.0
+default_color = Color(0.94, 0.94, 0.94, 1)
+
+[node name="PickaxePivot" type="Node2D" parent="VisualRoot/BodyPivot/ArmPivot" unique_id=970653475]
+editor_description = "Tool follow-through control. Put this pivot at the hand/grip and key rotation after ArmPivot for overlapping motion."
+rotation = -0.28
+
+[node name="PickaxeSprite" type="Sprite2D" parent="VisualRoot/BodyPivot/ArmPivot/PickaxePivot" unique_id=824686595]
+editor_description = "Final pickaxe/tool art slot. Align its grip point to PickaxePivot, then hide the StandInTool nodes."
+
+[node name="StandInToolHandle" type="Line2D" parent="VisualRoot/BodyPivot/ArmPivot/PickaxePivot" unique_id=2121169759]
+position = Vector2(23.077713, -0.6475649)
+rotation = -2.0989914
+points = PackedVector2Array(0, 0, 0, 58)
+width = 7.0
+default_color = Color(0.04, 0.04, 0.04, 1)
+
+[node name="StandInToolHead" type="Line2D" parent="VisualRoot/BodyPivot/ArmPivot/PickaxePivot" unique_id=407704483]
+position = Vector2(21.287586, 1.9592469)
+rotation = -2.0989914
+points = PackedVector2Array(-16, 58, 16, 58)
+width = 9.0
+default_color = Color(0.94, 0.94, 0.94, 1)
+
+[node name="ChipOrigin" type="Marker2D" parent="." unique_id=1250073857]
+editor_description = "LOGIC ANCHOR: pixels break directly below this marker. Do not animate it. Move it only when permanently changing where mining occurs."
+position = Vector2(0, 57)
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=716358974]
+editor_description = "Choose idle, mine_success, or mine_miss in the bottom Animation panel. RESET stores the neutral pose and should not be used as the authored action animation."
+libraries/ = SubResource("AnimationLibrary_rig")
+
+[connection signal="animation_finished" from="AnimationPlayer" to="." method="_on_animation_finished"]

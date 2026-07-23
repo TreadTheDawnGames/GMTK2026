@@ -1,0 +1,74 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Resource" path="res://resources/mining/mining_config.tres" id="1_config"]
+[ext_resource type="Script" path="res://Scripts/mining/run_state.gd" id="2_run_state"]
+[ext_resource type="Script" path="res://Scripts/mining/terrain_manager.gd" id="3_terrain"]
+[ext_resource type="Script" path="res://Scripts/mining/timing_bridge.gd" id="4_timing_bridge"]
+[ext_resource type="Script" path="res://Scripts/mining/mining_controller.gd" id="5_controller"]
+[ext_resource type="Script" path="res://Scripts/ui/mining_hud.gd" id="6_hud"]
+[ext_resource type="PackedScene" path="res://Scenes/mining/miner_rig.tscn" id="7_miner_rig"]
+[ext_resource type="PackedScene" path="res://Scenes/TimingWindow.tscn" id="8_timing_window"]
+[ext_resource type="Script" path="res://Scripts/mining/view_controller.gd" id="9_view_controller"]
+
+[node name="GameRoot" type="Node"]
+
+[node name="RunState" type="Node" parent="."]
+script = ExtResource("2_run_state")
+config = ExtResource("1_config")
+
+[node name="MiningScene" type="Node2D" parent="."]
+
+[node name="Background" type="ColorRect" parent="MiningScene"]
+offset_right = 1152.0
+offset_bottom = 648.0
+mouse_filter = 2
+color = Color(0.075, 0.095, 0.13, 1)
+
+[node name="TerrainManager" type="Node2D" parent="MiningScene"]
+script = ExtResource("3_terrain")
+config = ExtResource("1_config")
+
+[node name="MinerRig" parent="MiningScene" instance=ExtResource("7_miner_rig")]
+
+[node name="Systems" type="Node" parent="MiningScene"]
+
+[node name="TimingBridge" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("timing_window")]
+script = ExtResource("4_timing_bridge")
+timing_window = NodePath("../../HUD/TimingWindow")
+
+[node name="ViewController" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("terrain_manager")]
+script = ExtResource("9_view_controller")
+config = ExtResource("1_config")
+terrain_manager = NodePath("../../TerrainManager")
+
+[node name="MiningController" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("run_state", "terrain_manager", "view_controller", "chip_origin")]
+script = ExtResource("5_controller")
+config = ExtResource("1_config")
+run_state = NodePath("../../../RunState")
+terrain_manager = NodePath("../../TerrainManager")
+view_controller = NodePath("../ViewController")
+chip_origin = NodePath("../../MinerRig/ChipOrigin")
+
+[node name="HUD" type="CanvasLayer" parent="MiningScene" node_paths=PackedStringArray("run_state", "depth_label")]
+script = ExtResource("6_hud")
+run_state = NodePath("../../RunState")
+depth_label = NodePath("Layout/Content/DepthLabel")
+
+[node name="TimingWindow" parent="MiningScene/HUD" instance=ExtResource("8_timing_window")]
+
+[node name="Layout" type="MarginContainer" parent="MiningScene/HUD"]
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 518.0
+offset_bottom = 184.0
+
+[node name="Content" type="VBoxContainer" parent="MiningScene/HUD/Layout"]
+theme_override_constants/separation = 5
+
+[node name="DepthLabel" type="Label" parent="MiningScene/HUD/Layout/Content"]
+text = "DEPTH  0 px"
+
+[connection signal="depth_changed" from="RunState" to="MiningScene/HUD" method="_on_depth_changed"]
+[connection signal="attempt_resolved" from="MiningScene/Systems/TimingBridge" to="MiningScene/Systems/MiningController" method="resolve_attempt"]
+[connection signal="mine_missed" from="MiningScene/Systems/MiningController" to="MiningScene/MinerRig" method="play_miss"]
+[connection signal="mine_resolved" from="MiningScene/Systems/MiningController" to="MiningScene/MinerRig" method="play_success"]
