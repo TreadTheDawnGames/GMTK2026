@@ -114,7 +114,7 @@ func _process(delta: float) -> void:
 			stop()
 		
 	
-	slider.position.x += speed * direction * delta * speed_multiplier
+	slider.position.x = lerp(slider.position.x, slider.position.x+speed * direction * delta * speed_multiplier, 0.9)
 	if (slider.position.x <= 0.0+slider_half_width() and direction < 0) or (slider.position.x >= backing.size.x-slider_half_width() and direction > 0):
 		direction *= -1
 		if one_shot:

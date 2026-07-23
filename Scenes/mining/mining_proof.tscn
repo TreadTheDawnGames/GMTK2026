@@ -10,18 +10,18 @@
 [ext_resource type="PackedScene" uid="uid://bwq8rrtdf55gq" path="res://Scenes/TimingWindow.tscn" id="8_timing_window"]
 [ext_resource type="Script" uid="uid://cl8v0x0ammlnj" path="res://Scripts/mining/view_controller.gd" id="9_view_controller"]
 [ext_resource type="PackedScene" path="res://Scenes/mining/mining_hit_particles.tscn" id="10_hit_particles"]
-[ext_resource type="PackedScene" path="res://Scenes/dialogue/dialogue_overlay.tscn" id="11_dialogue_overlay"]
+[ext_resource type="PackedScene" uid="uid://bwnqpopl5iayr" path="res://Scenes/dialogue/dialogue_overlay.tscn" id="11_dialogue_overlay"]
 [ext_resource type="Resource" uid="uid://bd616ftdm0c7c" path="res://resources/dialogue/marketplace_intro.tres" id="12_marketplace_dialogue"]
 [ext_resource type="Script" uid="uid://bmv66cgstojt0" path="res://Scripts/dialogue/depth_encounter_controller.gd" id="13_depth_encounter"]
 [ext_resource type="Resource" path="res://resources/encounters/depth_encounter_config.tres" id="14_encounter_config"]
-[ext_resource type="Script" path="res://Scripts/mining/ore_inventory_state.gd" id="15_ore_inventory"]
+[ext_resource type="Script" uid="uid://bqcbj6fw6q7ef" path="res://Scripts/mining/ore_inventory_state.gd" id="15_ore_inventory"]
 [ext_resource type="PackedScene" path="res://Scenes/input/aim_mode_prompt.tscn" id="16_aim_prompt"]
-[ext_resource type="Script" path="res://Scripts/input/miner_aim_controller.gd" id="17_aim_controller"]
+[ext_resource type="Script" uid="uid://dqb7nfeq5f2h1" path="res://Scripts/input/miner_aim_controller.gd" id="17_aim_controller"]
 [ext_resource type="PackedScene" path="res://Scenes/shop/pickaxe_shop.tscn" id="18_pickaxe_shop"]
-[ext_resource type="Script" path="res://Scripts/shop/pickaxe_shop_coordinator.gd" id="19_shop_coordinator"]
+[ext_resource type="Script" uid="uid://doewt38dim4rc" path="res://Scripts/shop/pickaxe_shop_coordinator.gd" id="19_shop_coordinator"]
 [ext_resource type="Resource" path="res://resources/pickaxes/basic_pickaxe.tres" id="20_basic_pickaxe"]
-[ext_resource type="Script" path="res://Scripts/mining/impact_shake.gd" id="21_impact_shake"]
-[ext_resource type="Script" path="res://Scripts/ui/playtime_reveal.gd" id="22_playtime_reveal"]
+[ext_resource type="Script" uid="uid://c4nd03mddc2vw" path="res://Scripts/mining/impact_shake.gd" id="21_impact_shake"]
+[ext_resource type="Script" uid="uid://boq33gsihoh51" path="res://Scripts/ui/playtime_reveal.gd" id="22_playtime_reveal"]
 
 [node name="GameRoot" type="Node" unique_id=1769413368]
 
@@ -29,14 +29,13 @@
 script = ExtResource("2_run_state")
 config = ExtResource("1_config")
 
-[node name="OreInventoryState" type="Node" parent="."]
+[node name="OreInventoryState" type="Node" parent="." unique_id=486393010]
 script = ExtResource("15_ore_inventory")
 
 [node name="MiningScene" type="Node2D" parent="." unique_id=165087963]
 
-[node name="ImpactCamera" type="Camera2D" parent="MiningScene"]
+[node name="ImpactCamera" type="Camera2D" parent="MiningScene" unique_id=1747921436]
 position = Vector2(576, 324)
-enabled = true
 
 [node name="Background" type="ColorRect" parent="MiningScene" unique_id=1093987671]
 offset_right = 1152.0
@@ -69,7 +68,7 @@ script = ExtResource("9_view_controller")
 config = ExtResource("1_config")
 terrain_manager = NodePath("../../TerrainManager")
 
-[node name="ImpactShake" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("camera")]
+[node name="ImpactShake" type="Node" parent="MiningScene/Systems" unique_id=1191832147 node_paths=PackedStringArray("camera")]
 script = ExtResource("21_impact_shake")
 camera = NodePath("../../ImpactCamera")
 
@@ -82,13 +81,13 @@ terrain_manager = NodePath("../../TerrainManager")
 view_controller = NodePath("../ViewController")
 fall_origin = NodePath("../../MinerRig/ChipOrigin")
 
-[node name="MinerAimController" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("miner_rig", "mining_controller", "timing_window")]
+[node name="MinerAimController" type="Node" parent="MiningScene/Systems" unique_id=1230588894 node_paths=PackedStringArray("miner_rig", "mining_controller", "timing_window")]
 script = ExtResource("17_aim_controller")
 miner_rig = NodePath("../../MinerRig")
 mining_controller = NodePath("../MiningController")
 timing_window = NodePath("../../HUD/TimingWindow")
 
-[node name="PickaxeShopCoordinator" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("ore_inventory", "shop", "miner_rig", "mining_controller")]
+[node name="PickaxeShopCoordinator" type="Node" parent="MiningScene/Systems" unique_id=905831664 node_paths=PackedStringArray("ore_inventory", "shop", "miner_rig", "mining_controller")]
 script = ExtResource("19_shop_coordinator")
 ore_inventory = NodePath("../../../OreInventoryState")
 shop = NodePath("../../../PickaxeShopLayer/PickaxeShop")
@@ -130,41 +129,40 @@ theme_override_constants/separation = 5
 layout_mode = 2
 text = "DEPTH  100,000 px"
 
-[node name="OreLabel" type="Label" parent="MiningScene/HUD/Layout/Content"]
+[node name="OreLabel" type="Label" parent="MiningScene/HUD/Layout/Content" unique_id=1048321338]
 layout_mode = 2
 text = "ORE  0"
 
-[node name="PlaytimeReveal" type="Label" parent="MiningScene/HUD"]
+[node name="PlaytimeReveal" type="Label" parent="MiningScene/HUD" unique_id=637629585]
 visible = false
 offset_left = 892.0
 offset_top = 20.0
 offset_right = 1088.0
 offset_bottom = 48.0
-mouse_filter = 2
 text = "TIME  00:00"
 horizontal_alignment = 2
 script = ExtResource("22_playtime_reveal")
 
 [node name="DialogueDirector" parent="." unique_id=1751798570 instance=ExtResource("11_dialogue_overlay")]
 
-[node name="PickaxeShopLayer" type="CanvasLayer" parent="."]
+[node name="PickaxeShopLayer" type="CanvasLayer" parent="." unique_id=534694703]
 layer = 15
 
-[node name="PickaxeShop" parent="PickaxeShopLayer" instance=ExtResource("18_pickaxe_shop")]
+[node name="PickaxeShop" parent="PickaxeShopLayer" unique_id=1090459810 instance=ExtResource("18_pickaxe_shop")]
 
-[node name="AimModePrompt" parent="." instance=ExtResource("16_aim_prompt")]
+[node name="AimModePrompt" parent="." unique_id=1449813641 instance=ExtResource("16_aim_prompt")]
 
 [connection signal="depth_changed" from="RunState" to="MiningScene/Systems/MarketplaceEncounterController" method="_on_depth_changed"]
 [connection signal="depth_changed" from="RunState" to="MiningScene/HUD" method="_on_depth_changed"]
-[connection signal="inventory_changed" from="OreInventoryState" to="MiningScene/HUD" method="_on_ore_inventory_changed"]
 [connection signal="run_reset" from="RunState" to="OreInventoryState" method="reset_inventory"]
+[connection signal="inventory_changed" from="OreInventoryState" to="MiningScene/HUD" method="_on_ore_inventory_changed"]
 [connection signal="impact_contact" from="MiningScene/MinerRig" to="MiningScene/Systems/MiningController" method="resolve_impact"]
+[connection signal="swing_finished" from="MiningScene/MinerRig" to="MiningScene/Systems/MiningController" method="finish_swing"]
 [connection signal="attempt_resolved" from="MiningScene/Systems/TimingBridge" to="MiningScene/Systems/MiningController" method="resolve_attempt"]
+[connection signal="landing_reached" from="MiningScene/Systems/ViewController" to="MiningScene/Systems/MarketplaceEncounterController" method="_on_landing_reached"]
 [connection signal="impact_resolved" from="MiningScene/Systems/MiningController" to="MiningScene/MiningHitParticles" method="play_at_impact"]
 [connection signal="impact_resolved" from="MiningScene/Systems/MiningController" to="MiningScene/Systems/ImpactShake" method="play_at_impact"]
-[connection signal="landing_reached" from="MiningScene/Systems/ViewController" to="MiningScene/Systems/MarketplaceEncounterController" method="_on_landing_reached"]
 [connection signal="mine_missed" from="MiningScene/Systems/MiningController" to="MiningScene/MinerRig" method="play_miss"]
 [connection signal="swing_requested" from="MiningScene/Systems/MiningController" to="MiningScene/MinerRig" method="play_success"]
-[connection signal="swing_finished" from="MiningScene/MinerRig" to="MiningScene/Systems/MiningController" method="finish_swing"]
 [connection signal="conversation_finished" from="DialogueDirector" to="MiningScene/Systems/MarketplaceEncounterController" method="_on_conversation_finished"]
 [connection signal="mode_selected" from="AimModePrompt" to="MiningScene/Systems/MinerAimController" method="set_keyboard_aim_enabled"]
