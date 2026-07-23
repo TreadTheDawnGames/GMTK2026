@@ -1,8 +1,8 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://2pjknhxlb7ux"]
 
-[ext_resource type="Script" path="res://Scripts/menu/main_menu.gd" id="1_menu"]
+[ext_resource type="Script" uid="uid://dvhdu1x8j8s3b" path="res://Scripts/menu/main_menu.gd" id="1_menu"]
 
-[node name="MainMenu" type="Control" node_paths=PackedStringArray("title_group", "subtitle_group", "button_group", "start_button", "exit_button", "exit_confirmation", "status_label")]
+[node name="MainMenu" type="Control" unique_id=633825169 node_paths=PackedStringArray("title_group", "subtitle_group", "button_group", "start_button", "exit_button", "exit_confirmation", "status_label")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -18,8 +18,9 @@ start_button = NodePath("MenuLayout/ButtonCenter/Buttons/StartButton")
 exit_button = NodePath("MenuLayout/ButtonCenter/Buttons/ExitButton")
 exit_confirmation = NodePath("ExitConfirmation")
 status_label = NodePath("MenuLayout/ButtonCenter/Buttons/Status")
+section_fade_seconds = 0.0
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="ColorRect" parent="." unique_id=1064397230]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -29,7 +30,7 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(0.075, 0.095, 0.13, 1)
 
-[node name="MenuLayout" type="VBoxContainer" parent="."]
+[node name="MenuLayout" type="VBoxContainer" parent="." unique_id=642881323]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -41,7 +42,7 @@ offset_bottom = -16.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Title" type="Label" parent="MenuLayout"]
+[node name="Title" type="Label" parent="MenuLayout" unique_id=1468976124]
 custom_minimum_size = Vector2(0, 67)
 layout_mode = 2
 theme_override_font_sizes/font_size = 48
@@ -49,7 +50,7 @@ text = "GMTK2026"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="Subtitle" type="Label" parent="MenuLayout"]
+[node name="Subtitle" type="Label" parent="MenuLayout" unique_id=1785152362]
 custom_minimum_size = Vector2(0, 34)
 layout_mode = 2
 theme_override_font_sizes/font_size = 24
@@ -57,31 +58,31 @@ text = "Keep Digging."
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="ButtonCenter" type="CenterContainer" parent="MenuLayout"]
+[node name="ButtonCenter" type="CenterContainer" parent="MenuLayout" unique_id=1279497793]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="Buttons" type="VBoxContainer" parent="MenuLayout/ButtonCenter"]
+[node name="Buttons" type="VBoxContainer" parent="MenuLayout/ButtonCenter" unique_id=778454366]
 custom_minimum_size = Vector2(160, 0)
 layout_mode = 2
 theme_override_constants/separation = 16
 
-[node name="StartButton" type="Button" parent="MenuLayout/ButtonCenter/Buttons"]
+[node name="StartButton" type="Button" parent="MenuLayout/ButtonCenter/Buttons" unique_id=600240877]
 custom_minimum_size = Vector2(160, 44)
 layout_mode = 2
 text = "Start"
 
-[node name="ExitButton" type="Button" parent="MenuLayout/ButtonCenter/Buttons"]
+[node name="ExitButton" type="Button" parent="MenuLayout/ButtonCenter/Buttons" unique_id=1875770563]
 custom_minimum_size = Vector2(160, 44)
 layout_mode = 2
 text = "Exit"
 
-[node name="Status" type="Label" parent="MenuLayout/ButtonCenter/Buttons"]
+[node name="Status" type="Label" parent="MenuLayout/ButtonCenter/Buttons" unique_id=1717830105]
 custom_minimum_size = Vector2(320, 24)
 layout_mode = 2
 horizontal_alignment = 1
 
-[node name="Version" type="Label" parent="."]
+[node name="Version" type="Label" parent="." unique_id=261308708]
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0
@@ -97,7 +98,7 @@ grow_vertical = 0
 text = "JAM BUILD"
 horizontal_alignment = 2
 
-[node name="ExitConfirmation" type="ConfirmationDialog" parent="."]
+[node name="ExitConfirmation" type="ConfirmationDialog" parent="." unique_id=129160021]
 title = "Exit Game?"
-dialog_text = "Really exit the game?"
 ok_button_text = "Exit"
+dialog_text = "Really exit the game?"

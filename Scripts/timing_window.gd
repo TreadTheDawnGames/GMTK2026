@@ -17,16 +17,7 @@ signal pressed(success: bool, combo: int)
 var combo: int = 0:
 	set(value):
 		combo = value
-		combo_label.text = (
-			"Next bar in: "
-			+ str(
-				wrapi(
-					combo_count_for_additional_target - value,
-					1,
-					combo_count_for_additional_target + 1
-				)
-			)
-		)
+		combo_label.text = "Combo: " + str(-combo)
 
 @export_range(1, 100, 1) var recovery_combo_count: int = 5
 @export_range(1, 100, 1) var combo_count_for_additional_target: int = 10
