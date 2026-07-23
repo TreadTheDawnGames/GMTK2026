@@ -178,3 +178,30 @@ func randomize_target(target_panel : TimingTarget):
 		current_target_size ,#* 0.5,
 		backing.size.x - current_target_size,# * 0.5
 	)
+	
+	var rerolls : int = 5
+	var do_again:bool =true
+	while do_again and rerolls > 0:
+		for target in targets:
+			if target == target_panel:
+				continue
+			if target_panel.get_rect().intersects(target.get_rect()):
+				
+				target_panel.position.x = target_panel.position.x + clampf(
+				target_center_x + current_target_size + 25 * (randf() - randf()),
+				current_target_size ,#* 0.5,
+				backing.size.x - current_target_size,# * 0.5
+				)
+				do_again = true
+				print("rerolling")
+				target_panel.position.x = clampf(
+				target_center_x,
+				current_target_size ,#* 0.5,
+				backing.size.x - current_target_size,# * 0.5
+				)
+
+				break
+			else:
+				do_again = false
+		rerolls -= 1
+				
