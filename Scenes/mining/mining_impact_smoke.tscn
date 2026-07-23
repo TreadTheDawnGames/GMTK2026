@@ -1,0 +1,27 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://Scripts/mining/mining_impact_smoke.gd" id="1_smoke"]
+[ext_resource type="Shader" path="res://Shaders/mining_smoke.gdshader" id="2_shader"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_smoke"]
+shader = ExtResource("2_shader")
+
+[sub_resource type="QuadMesh" id="QuadMesh_smoke"]
+size = Vector2(2, 2)
+
+[sub_resource type="MultiMesh" id="MultiMesh_smoke"]
+transform_format = 0
+use_colors = true
+use_custom_data = true
+instance_count = 20
+visible_instance_count = 0
+mesh = SubResource("QuadMesh_smoke")
+
+[node name="MiningImpactSmoke" type="Node2D" node_paths=PackedStringArray("smoke_mesh")]
+process_mode = 3
+script = ExtResource("1_smoke")
+smoke_mesh = NodePath("SmokeMesh")
+
+[node name="SmokeMesh" type="MultiMeshInstance2D" parent="."]
+material = SubResource("ShaderMaterial_smoke")
+multimesh = SubResource("MultiMesh_smoke")

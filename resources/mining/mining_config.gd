@@ -4,6 +4,11 @@ extends Resource
 ## Shared, inspector-editable tuning for terrain, descent, and hit feedback.
 ## One descended terrain row equals one gameplay depth.
 
+enum MiningCameraStyle {
+	SMOOTH_FOLLOW,
+	CHUNK_SNAP,
+}
+
 @export_category("Terrain")
 @export_range(16, 512, 1) var terrain_width_cells: int = 128
 @export_range(16, 256, 1) var chunk_height_cells: int = 64
@@ -22,7 +27,27 @@ extends Resource
 @export var terrain_screen_center_x: float = 576.0
 @export var mining_face_screen_y: float = 340.0
 @export_range(0, 4, 1) var preload_chunks_below: int = 1
-@export_range(1.0, 30.0, 0.5) var view_follow_speed: float = 12.0
+## Accelerates the miner through newly opened terrain, in rows per second squared.
+@export_range(10.0, 1_000.0, 10.0) var mining_fall_gravity: float = 300.0
+## Caps long falls without changing the distance the miner traverses.
+@export_range(10.0, 1_000.0, 10.0) var mining_max_fall_speed: float = 240.0
+## Chooses continuous camera tracking or half-chunk page flips.
+@export var mining_camera_style: MiningCameraStyle = (
+	MiningCameraStyle.SMOOTH_FOLLOW
+)
+## Controls how quickly the camera eases after the airborne miner.
+@export_range(1.0, 30.0, 0.5) var mining_camera_follow_speed: float = 5.0
+## Recenters the view after landing, in terrain rows per second.
+@export_range(10.0, 2_000.0, 10.0) var landing_recenter_speed: float = 60.0
+## Terrain rows added to the review target by one mouse-wheel step.
+@export_range(10, 10_000, 10) var review_scroll_rows_per_step: int = 1_000
+## Keeps a single wheel step readable before long-distance review accelerates.
+@export_range(100.0, 6_000.0, 100.0) var review_scroll_close_speed: float = 600.0
+## Reaches full review speed only when several wheel steps are queued.
+@export_range(1_000.0, 50_000.0, 1_000.0) var review_scroll_acceleration_distance: float = 10_000.0
+@export_range(100.0, 20_000.0, 100.0) var review_scroll_speed: float = 6_000.0
+@export_range(100.0, 50_000.0, 100.0) var return_fall_gravity: float = 8_000.0
+@export_range(100.0, 50_000.0, 100.0) var return_max_fall_speed: float = 20_000.0
 
 @export_category("Effects")
 ## Treats this combo as full strength for animation and hit feedback.

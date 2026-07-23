@@ -11,7 +11,6 @@
 [ext_resource type="Script" uid="uid://cl8v0x0ammlnj" path="res://Scripts/mining/view_controller.gd" id="9_view_controller"]
 [ext_resource type="PackedScene" path="res://Scenes/mining/mining_hit_particles.tscn" id="10_hit_particles"]
 [ext_resource type="PackedScene" uid="uid://bwnqpopl5iayr" path="res://Scenes/dialogue/dialogue_overlay.tscn" id="11_dialogue_overlay"]
-[ext_resource type="Resource" path="res://resources/encounters/stone_pickaxe_gift.tres" id="12_stone_gift"]
 [ext_resource type="Script" uid="uid://bmv66cgstojt0" path="res://Scripts/dialogue/depth_encounter_controller.gd" id="13_depth_encounter"]
 [ext_resource type="Resource" path="res://resources/encounters/depth_encounter_config.tres" id="14_encounter_config"]
 [ext_resource type="Script" uid="uid://dqb7nfeq5f2h1" path="res://Scripts/input/miner_aim_controller.gd" id="17_aim_controller"]
@@ -20,14 +19,14 @@
 [ext_resource type="Script" uid="uid://c4nd03mddc2vw" path="res://Scripts/mining/impact_shake.gd" id="21_impact_shake"]
 [ext_resource type="Script" uid="uid://boq33gsihoh51" path="res://Scripts/ui/playtime_reveal.gd" id="22_playtime_reveal"]
 [ext_resource type="Script" path="res://Scripts/mining/mining_scene_wiring.gd" id="25_wiring"]
-[ext_resource type="Script" path="res://resources/encounters/pickaxe_gift_encounter.gd" id="26_gift_type"]
-[ext_resource type="Resource" path="res://resources/encounters/excavator_pickaxe_gift.tres" id="27_excavator_gift"]
-[ext_resource type="Resource" path="res://resources/encounters/swift_pickaxe_gift.tres" id="28_swift_gift"]
-[ext_resource type="Resource" path="res://resources/encounters/heavy_pickaxe_gift.tres" id="29_heavy_gift"]
 [ext_resource type="Script" path="res://Scripts/mining/dig_number_presenter.gd" id="30_dig_number_presenter"]
 [ext_resource type="PackedScene" path="res://Scenes/mining/dig_number.tscn" id="31_dig_number"]
 [ext_resource type="Script" path="res://Scripts/mining/terrain_layer_renderer.gd" id="32_layer_renderer"]
 [ext_resource type="Resource" path="res://resources/mining/default_terrain_layer_profile.tres" id="33_layer_profile"]
+[ext_resource type="PackedScene" path="res://Scenes/dialogue/merchant_presenter.tscn" id="34_merchant_presenter"]
+[ext_resource type="Script" path="res://Scripts/ui/depth_review_control.gd" id="39_depth_review"]
+[ext_resource type="PackedScene" path="res://Scenes/mining/mining_impact_smoke.tscn" id="40_impact_smoke"]
+[ext_resource type="PackedScene" path="res://Scenes/dialogue/departure_choice.tscn" id="41_departure_choice"]
 
 [node name="GameRoot" type="Node" unique_id=1769413368]
 
@@ -60,31 +59,39 @@ profile = ExtResource("33_layer_profile")
 [node name="MinerRig" parent="MiningScene" unique_id=726963260 instance=ExtResource("7_miner_rig")]
 z_index = 1
 
-[node name="EncounterNpc" parent="MiningScene" unique_id=174482703 instance=ExtResource("7_miner_rig")]
-visible = false
+[node name="MerchantLayer" type="Node2D" parent="MiningScene"]
 z_index = 1
-position = Vector2(760, 282)
 
 [node name="MiningHitParticles" parent="MiningScene" unique_id=1668060940 node_paths=PackedStringArray("terrain_manager") instance=ExtResource("10_hit_particles")]
 z_index = 3
 terrain_manager = NodePath("../TerrainManager")
 terrain_profile = ExtResource("33_layer_profile")
 
+[node name="MiningImpactSmoke" parent="MiningScene" node_paths=PackedStringArray("terrain_manager", "terrain_renderer", "view_controller") instance=ExtResource("40_impact_smoke")]
+z_index = -2
+terrain_manager = NodePath("../TerrainManager")
+terrain_renderer = NodePath("../TerrainLayerRenderer")
+view_controller = NodePath("../Systems/ViewController")
+
 [node name="Systems" type="Node" parent="MiningScene" unique_id=1573949011]
 
-[node name="SceneWiring" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("run_state", "mining_controller", "timing_bridge", "view_controller", "miner_rig", "hit_particles", "dig_number_presenter", "impact_shake", "hud", "encounter_controller", "dialogue_director")]
+[node name="SceneWiring" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("run_state", "mining_controller", "timing_bridge", "view_controller", "terrain_manager", "miner_rig", "hit_particles", "impact_smoke", "dig_number_presenter", "impact_shake", "hud", "depth_review_control", "encounter_controller", "dialogue_director", "departure_choice")]
 script = ExtResource("25_wiring")
 run_state = NodePath("../../../RunState")
 mining_controller = NodePath("../MiningController")
 timing_bridge = NodePath("../TimingBridge")
 view_controller = NodePath("../ViewController")
+terrain_manager = NodePath("../../TerrainManager")
 miner_rig = NodePath("../../MinerRig")
 hit_particles = NodePath("../../MiningHitParticles")
+impact_smoke = NodePath("../../MiningImpactSmoke")
 dig_number_presenter = NodePath("../../../DigNumberPresenter")
 impact_shake = NodePath("../ImpactShake")
 hud = NodePath("../../HUD")
+depth_review_control = NodePath("../../HUD/DepthReviewControl")
 encounter_controller = NodePath("../UpgradeEncounterController")
 dialogue_director = NodePath("../../../DialogueDirector")
+departure_choice = NodePath("../../../DepartureChoice")
 
 [node name="TimingBridge" type="Node" parent="MiningScene/Systems" unique_id=1886677998 node_paths=PackedStringArray("timing_window")]
 script = ExtResource("4_timing_bridge")
@@ -119,14 +126,14 @@ miner_rig = NodePath("../../MinerRig")
 mining_controller = NodePath("../MiningController")
 starter_pickaxe = ExtResource("20_basic_pickaxe")
 
-[node name="UpgradeEncounterController" type="Node" parent="MiningScene/Systems" unique_id=797816739 node_paths=PackedStringArray("dialogue_director", "timing_window", "encounter_npc", "pickaxe_progression", "mining_controller")]
+[node name="UpgradeEncounterController" type="Node" parent="MiningScene/Systems" unique_id=797816739 node_paths=PackedStringArray("dialogue_director", "timing_window", "merchant_parent", "pickaxe_progression", "mining_controller")]
 script = ExtResource("13_depth_encounter")
 encounter_config = ExtResource("14_encounter_config")
 mining_config = ExtResource("1_config")
-gift_encounters = Array[ExtResource("26_gift_type")]([ExtResource("12_stone_gift"), ExtResource("27_excavator_gift"), ExtResource("28_swift_gift"), ExtResource("29_heavy_gift")])
 dialogue_director = NodePath("../../../DialogueDirector")
 timing_window = NodePath("../../HUD/TimingWindow")
-encounter_npc = NodePath("../../EncounterNpc")
+merchant_scene = ExtResource("34_merchant_presenter")
+merchant_parent = NodePath("../../MerchantLayer")
 pickaxe_progression = NodePath("../PickaxeProgression")
 mining_controller = NodePath("../MiningController")
 
@@ -136,6 +143,39 @@ run_state = NodePath("../../RunState")
 depth_label = NodePath("Layout/Content/DepthLabel")
 
 [node name="TimingWindow" parent="MiningScene/HUD" unique_id=1764051259 instance=ExtResource("8_timing_window")]
+
+[node name="DepthReviewControl" type="Control" parent="MiningScene/HUD" node_paths=PackedStringArray("return_button", "timing_window", "mining_controller")]
+process_mode = 3
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("39_depth_review")
+return_button = NodePath("ReturnButton")
+timing_window = NodePath("../TimingWindow")
+mining_controller = NodePath("../../Systems/MiningController")
+
+[node name="ReturnButton" type="Button" parent="MiningScene/HUD/DepthReviewControl"]
+visible = false
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -38.0
+offset_top = -86.0
+offset_right = 38.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_default_cursor_shape = 2
+theme_override_font_sizes/font_size = 38
+text = "↓"
+tooltip_text = "Return to the miner"
 
 [node name="Layout" type="MarginContainer" parent="MiningScene/HUD" unique_id=1832449878]
 offset_left = 20.0
@@ -162,6 +202,8 @@ horizontal_alignment = 2
 script = ExtResource("22_playtime_reveal")
 
 [node name="DialogueDirector" parent="." unique_id=1751798570 instance=ExtResource("11_dialogue_overlay")]
+
+[node name="DepartureChoice" parent="." instance=ExtResource("41_departure_choice")]
 
 [node name="DigNumberPresenter" type="CanvasLayer" parent="." groups=["dig_number_presenter"]]
 layer = 12

@@ -1,6 +1,14 @@
-[gd_resource type="Resource" script_class="DepthEncounterConfig" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="DepthEncounterConfig" load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://resources/encounters/depth_encounter_config.gd" id="1_config"]
+[ext_resource type="Script" path="res://resources/encounters/depth_character_encounter.gd" id="2_encounter_type"]
+[ext_resource type="Resource" path="res://resources/encounters/stone_merchant_encounter.tres" id="3_stone"]
+[ext_resource type="Resource" path="res://resources/encounters/swift_merchant_encounter.tres" id="4_swift"]
+[ext_resource type="Resource" path="res://resources/encounters/excavator_merchant_encounter.tres" id="5_excavator"]
+[ext_resource type="Resource" path="res://resources/encounters/heavy_merchant_encounter.tres" id="6_heavy"]
+[ext_resource type="Resource" path="res://resources/encounters/thief_final_encounter.tres" id="7_thief"]
+[ext_resource type="Resource" path="res://resources/encounters/traveler_return_encounter.tres" id="8_traveler_return"]
 
 [resource]
 script = ExtResource("1_config")
+encounters = Array[ExtResource("2_encounter_type")]([ExtResource("3_stone"), ExtResource("4_swift"), ExtResource("5_excavator"), ExtResource("6_heavy"), ExtResource("8_traveler_return"), ExtResource("7_thief")])

@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/dialogue/merchant_presenter.gd" id="1_presenter"]
+
+[node name="MerchantPresenter" type="Node2D" node_paths=PackedStringArray("merchant_sprite")]
+process_mode = 3
+script = ExtResource("1_presenter")
+merchant_sprite = NodePath("MerchantSprite")
+
+[node name="MerchantSprite" type="Sprite2D" parent="."]

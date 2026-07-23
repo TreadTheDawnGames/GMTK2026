@@ -1,14 +1,12 @@
 class_name DepthEncounterConfig
 extends Resource
 
-## Shared Inspector tuning for recurring underground encounter chambers.
+## Stores the named character schedule and shared chamber settings.
 ## Vertical values use gameplay depth measured from the miner's feet.
 
-@export_category("Depth Schedule")
-@export_range(1, 1_000_000, 1) var first_floor_depth: int = 1_000
-@export_range(1, 1_000_000, 1) var repeat_interval_depth: int = 5_000
-## Stops generating chambers after the authored gift encounters run out.
-@export_range(0, 100, 1) var maximum_floor_count: int = 4
+@export_category("Named Encounters")
+## Lists every merchant and the final thief in authored depth order.
+@export var encounters: Array[DepthCharacterEncounter] = []
 
 @export_category("Chamber")
 @export_range(1, 2_000, 1) var chamber_height_rows: int = 100
@@ -19,29 +17,14 @@ extends Resource
 @export_range(0.0, 5.0, 0.1) var post_dialogue_buffer_seconds: float = 0.5
 
 
-## Returns the next authored encounter floor, or -1 when none remain.
-func get_next_floor_depth(
-	current_depth: int,
-	maximum_depth: int
-) -> int:
-	var next_floor_depth: int
-	if current_depth < first_floor_depth:
-		next_floor_depth = first_floor_depth
-	else:
-		var next_floor_index := floori(
-			float(current_depth - first_floor_depth)
-			/ float(repeat_interval_depth)
-		) + 1
-		next_floor_depth = (
-			first_floor_depth
-			+ next_floor_index * repeat_interval_depth
+## Reports whether a terrain row belongs to any encounter chamber.
+func is_chamber_row(depth: int, total_run_depth: int) -> bool:
+	for encounter in encounters:
+		if encounter == null:
+			continue
+		var rows_until_floor := (
+			encounter.resolve_depth(total_run_depth) - depth
 		)
-	if next_floor_depth > maximum_depth:
-		return -1
-	var floor_index := roundi(
-		float(next_floor_depth - first_floor_depth)
-		/ float(repeat_interval_depth)
-	)
-	if floor_index >= maximum_floor_count:
-		return -1
-	return next_floor_depth
+		if rows_until_floor > 0 and rows_until_floor <= chamber_height_rows:
+			return true
+	return false

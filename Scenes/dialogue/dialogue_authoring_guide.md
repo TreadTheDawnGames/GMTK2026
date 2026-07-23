@@ -24,30 +24,74 @@ The conversation validates itself when playback begins. Missing IDs, duplicate
 participant slots, unknown speakers, and empty lines are reported as clear
 Godot errors instead of silently failing.
 
-## Configure recurring gift encounters
+## Configure merchant appearances
+
+Create a `MerchantAppearance` resource for every sprite option. Each resource
+stores:
+
+- either a single texture or one frame from a sprite sheet;
+- scale and offset values that align the merchant's feet with the floor;
+- optional tint and horizontal flipping.
+
+Each named encounter references one appearance directly. Reuse the same
+appearance in multiple encounters when a character returns later in the run.
+
+The current appearance resources use tinted copies of the miner sheet as
+stand-ins. Replacing their textures does not change merchant scheduling.
+
+## Configure named encounters
 
 Open `res://resources/encounters/depth_encounter_config.tres` in the Inspector.
-Its schedule and chamber values control both terrain generation and encounter
-timing:
+Its `Encounters` array controls both terrain generation and encounter timing.
+Each `DepthCharacterEncounter` assigns:
 
-- `First Floor Depth` places the first chamber floor.
-- `Repeat Interval Depth` sets how far apart later chambers are. With the sample
-  first floor at 1,000, use `5,000` for floors at 1,000, 6,000, 11,000, and
-  so on; use `10,000` for floors at 1,000, 11,000, 21,000, and so on.
-- `Maximum Floor Count` must match the number of authored gift encounters.
-  It prevents unused empty chambers from appearing after the final gift.
-- `Chamber Height Rows` controls the open fall immediately above each floor.
-- `Chamber Width Cells` controls the centered opening between the side walls.
+- a unique `Encounter Id`;
+- a fixed depth measured from the starting surface;
+- one named character appearance and conversation;
+- the character's participant slot for speech animation;
+- an optional pickaxe reward equipped after dialogue.
 
-The sample first floor is at exactly 1,000 depth and has 100 rows of open fall
-space above it. `DepthEncounterController` reveals the NPC, hides
-the timing bar, and starts dialogue when the miner lands on that floor.
+Enable `Occurs At Run Bottom` only for the thief. That places the encounter at
+zero remaining depth for any configured run length. The thief uses
+`thief_encrypted_dialogue.tres`. Its empty ciphertext keeps the ending
+unwritten until the story is ready.
 
-Each entry in the controller's `Gift Encounters` array pairs one conversation
-with the pickaxe granted after its final line. Entries play in array order.
-Once every authored gift has been delivered, no additional encounter chamber
-is scheduled. Finishing a conversation equips its gift and restores the timing
-bar so mining can continue.
+To author it without saving plain text, close the editor and run this from the
+project console:
+
+`godot --headless --path . --script res://tools/encrypt_dialogue.gd -- res://resources/dialogue/thief_encrypted_dialogue.tres thief_finale "thief=Thief" "miner=Miner" --lines "thief:<line>" "miner:<line>"`
+
+Each quoted argument becomes one ordered line. Omit the `thief:` prefix when
+the thief is speaking. The command overwrites only the encrypted resource;
+plain text is never written to a project file. Reopen the editor after running
+it so Godot reloads the ciphertext.
+
+The current authored order is:
+
+- Traveler with the Stone Pickaxe at 1,000;
+- Tinkerer with the Swift Pickaxe at 6,000;
+- Tunnel Surveyor with the Excavator Pickaxe at 11,000;
+- Old Prospector with the Heavy Pickaxe at 16,000;
+- the returning Traveler at 21,000;
+- the thief at 100,000, which is zero remaining depth.
+
+There are no randomized merchants. Add another encounter resource to the
+array when a named character should return. Reusing an appearance keeps the
+character visually consistent while allowing a new conversation and reward.
+
+`Chamber Height Rows` controls the open fall immediately above each floor.
+`Chamber Width Cells` controls the centered opening between the side walls.
+
+All six characters are created when the mining scene starts. They exist below
+the viewport and scroll into view with the terrain instead of appearing when
+the miner lands. Landing only starts the current character's dialogue.
+Finishing a merchant conversation equips any assigned reward and advances to
+the next array entry. Characters remain at their original floors, so reviewing
+earlier terrain does not leave previously visited chambers empty.
+
+Each encounter identifies its `Speaker Slot`. While that participant's text is
+being revealed, `MerchantPresenter` periodically bounces the sprite. Miner
+lines do not move the merchant.
 
 During dialogue the gameplay tree pauses, while the dialogue overlay and dirt
 particles continue processing.

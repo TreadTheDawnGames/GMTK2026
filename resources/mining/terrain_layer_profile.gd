@@ -41,6 +41,7 @@ extends Resource
 @export var keep_back_layer_solid: bool = true
 ## Ensures the deepest art opening fully covers logical terrain damage.
 @export_range(0, 32, 1) var core_hole_padding: int = 4
+## Selects large masks and permits the deepest brown backdrop to appear.
 @export_range(8, 512, 1) var big_hole_minimum_size: int = 80
 @export_range(0.05, 0.95, 0.05) var transparent_alpha_threshold: float = 0.5
 

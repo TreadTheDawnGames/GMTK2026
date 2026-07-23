@@ -6,8 +6,12 @@
 script = ExtResource("1")
 id = &"stone_pickaxe"
 display_name = "Stone Pickaxe"
-description = "A lighter stone tool that swings faster than the wooden starter."
+description = "A faster stone tool whose impacts send branching lightning into the ground."
 power_multiplier = 1.05
 swing_speed_multiplier = 1.25
 debris_multiplier = 1.1
+special_effect = 3
+lightning_depth_rows = 12
+lightning_branch_count = 3
+lightning_branch_length_cells = 7
 hammer_head_color = Color(0.68, 0.7, 0.72, 1)

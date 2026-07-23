@@ -7,6 +7,7 @@ enum SpecialEffect {
 	NONE,
 	AFTERSHOCK,
 	RAPID_FOLLOW_UP,
+	BRANCHING_LIGHTNING,
 }
 
 @export_category("Identity")
@@ -36,6 +37,12 @@ enum SpecialEffect {
 @export_range(0.1, 3.0, 0.05) var follow_up_speed_scale: float = 1.25
 ## Multiplies dirt pieces for RAPID_FOLLOW_UP's bonus swing.
 @export_range(0.0, 2.0, 0.05) var follow_up_debris_scale: float = 0.5
+## Sets how far BRANCHING_LIGHTNING's central path travels downward.
+@export_range(1, 64, 1) var lightning_depth_rows: int = 12
+## Sets how many smaller paths split away from the central lightning path.
+@export_range(0, 8, 1) var lightning_branch_count: int = 3
+## Sets the maximum length of each smaller lightning path.
+@export_range(1, 32, 1) var lightning_branch_length_cells: int = 7
 
 @export_category("Appearance")
 @export var hammer_head_color: Color = Color(0.94, 0.94, 0.94, 1.0)

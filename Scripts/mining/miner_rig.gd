@@ -10,6 +10,10 @@ signal swing_finished
 @export_range(0.1, 4.0, 0.05) var animation_speed_multiplier: float = 1.0
 @export_range(0.0, 1.0, 0.05) var combo_speed_bonus: float = 0.35
 
+@export_category("Placement")
+## Seats the artwork into the layered opening without moving ChipOrigin logic.
+@export_range(0.0, 64.0, 1.0) var terrain_grounding_offset_y: float = 16.0
+
 @export_category("References")
 @export var animation_player: AnimationPlayer
 @export var visual_root: Node2D
@@ -20,10 +24,15 @@ signal swing_finished
 @export var impact_audio_player: AudioStreamPlayer2D
 
 var _playing_full_swing: bool = false
+var _rest_position: Vector2
 
 
 ## Connects animation events and starts the idle animation.
 func _ready() -> void:
+	_rest_position = position
+	# VisualRoot owns presentation placement. Keeping the offset off this
+	# script's root prevents art tuning from changing mining coordinates.
+	visual_root.position.y += terrain_grounding_offset_y
 	if not animation_player.animation_finished.is_connected(
 		_on_animation_finished
 	):
@@ -48,7 +57,7 @@ func play_success(
 	animation_player.stop()
 	animation_player.speed_scale = animation_speed_multiplier
 	animation_player.play(
-		&"mine_success",
+		&"two_frame_success",
 		-1.0,
 		combo_multiplier * maxf(swing_speed_multiplier, 0.1)
 	)
@@ -69,7 +78,7 @@ func play_miss(_combo: int) -> void:
 	animation_player.play(&"mine_miss")
 
 
-## Plays the wind-up animation.
+## Holds the miner in the raised pickaxe pose.
 func play_wind_up() -> void:
 	_playing_full_swing = false
 	animation_player.stop()
@@ -77,7 +86,7 @@ func play_wind_up() -> void:
 	animation_player.play(&"wind_up")
 
 
-## Plays the downward strike animation.
+## Holds the miner in the downward impact pose.
 func play_wind_down() -> void:
 	_playing_full_swing = false
 	animation_player.stop()
@@ -85,9 +94,9 @@ func play_wind_down() -> void:
 	animation_player.play(&"wind_down")
 
 
-## Plays the complete wind-up and strike sequence.
+## Previews the raised and impact poses in sequence.
 func play_full_swing() -> void:
-	# Authoring preview for the three-control wind-up and wind-down clips.
+	# Authoring preview for the two discrete mining poses.
 	_playing_full_swing = true
 	animation_player.stop()
 	animation_player.speed_scale = animation_speed_multiplier
@@ -125,11 +134,26 @@ func set_facing_direction(direction: int) -> void:
 	visual_root.scale.x = absf(visual_root.scale.x) * signi(direction)
 
 
+## Reports which side currently holds the raised pickaxe.
+func get_facing_direction() -> int:
+	if (
+		not is_instance_valid(visual_root)
+		or is_zero_approx(visual_root.scale.x)
+	):
+		return 1
+	return signi(roundi(visual_root.scale.x))
+
+
+## Places the miner at true screen depth during falls, flips, and review.
+func set_screen_depth_offset(screen_offset_y: float) -> void:
+	position.y = _rest_position.y + screen_offset_y
+
+
 ## Returns finished actions to idle after any queued strike plays.
 func _on_animation_finished(animation_name: StringName) -> void:
 	if animation_name == &"wind_up" and _playing_full_swing:
 		return
-	if animation_name == &"mine_success":
+	if animation_name == &"two_frame_success":
 		_playing_full_swing = false
 		_play_idle()
 		swing_finished.emit()

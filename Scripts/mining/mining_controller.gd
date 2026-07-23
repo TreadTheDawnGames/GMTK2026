@@ -51,12 +51,13 @@ signal swing_requested(
 	combo_strength: float,
 	swing_speed_multiplier: float
 )
-## Requests particles and camera shake at the hammer contact point.
+## Requests impact presentation at the hammer contact point.
 signal impact_resolved(
 	screen_position: Vector2,
 	cells_removed: int,
 	combo_strength: float,
-	debris_multiplier: float
+	debris_multiplier: float,
+	swing_side: int
 )
 ## Requests the hit's downward distance at the hammer contact point.
 signal dig_number_requested(
@@ -148,7 +149,10 @@ func _start_swing(swing: SwingRequest) -> void:
 
 
 ## Breaks terrain where the animated hammer reaches its contact keyframe.
-func resolve_impact(impact_screen_position: Vector2) -> void:
+func resolve_impact(
+	impact_screen_position: Vector2,
+	swing_side: int = 1
+) -> void:
 	if (
 		not _is_swing_pending
 		or _has_resolved_pending_impact
@@ -233,6 +237,20 @@ func resolve_impact(impact_screen_position: Vector2) -> void:
 			requested_half_width_cells
 		)
 		dig_result.absorb(aftershock_result)
+	elif (
+		_pending_swing.pickaxe != null
+		and _pending_swing.pickaxe.special_effect
+			== PickaxeDefinition.SpecialEffect.BRANCHING_LIGHTNING
+		and dig_result.cells_removed > 0
+		and not crossed_open_chamber
+	):
+		var lightning_result := terrain_manager.dig_branching_lightning(
+			Vector2i(fall_cell.x, surface_after_primary_hit_y),
+			_pending_swing.pickaxe.lightning_depth_rows,
+			_pending_swing.pickaxe.lightning_branch_count,
+			_pending_swing.pickaxe.lightning_branch_length_cells
+		)
+		dig_result.absorb(lightning_result)
 	var new_mining_y := terrain_manager.find_surface_row(
 		fall_cell.x,
 		run_state.mining_y
@@ -258,7 +276,8 @@ func resolve_impact(impact_screen_position: Vector2) -> void:
 		_pickaxe_multiplier(
 			_pending_swing.pickaxe,
 			&"debris_multiplier"
-		) * _pending_swing.debris_scale
+		) * _pending_swing.debris_scale,
+		signi(swing_side) if swing_side != 0 else 1
 	)
 	dig_number_requested.emit(
 		impact_screen_position,
@@ -297,6 +316,15 @@ func set_equipped_pickaxe(definition: PickaxeDefinition) -> void:
 ## Selects the side captured by the next successful timing result.
 func set_aim_direction(direction: int) -> void:
 	_aim_direction = clampi(direction, -1, 1)
+
+
+## Reports whether the camera may leave without interrupting a strike.
+func can_start_view_review() -> bool:
+	return (
+		not _is_swing_pending
+		and not _is_swing_queue_paused
+		and _queued_swings.is_empty()
+	)
 
 
 ## Starts the next earned hit when animation and dialogue allow it.

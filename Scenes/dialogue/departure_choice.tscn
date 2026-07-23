@@ -1,0 +1,89 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/dialogue/departure_choice.gd" id="1_choice"]
+
+[node name="DepartureChoice" type="CanvasLayer" node_paths=PackedStringArray("choice_root", "ending_root", "leave_button", "keep_digging_button", "return_to_title_button")]
+layer = 30
+process_mode = 3
+script = ExtResource("1_choice")
+choice_root = NodePath("ChoiceRoot")
+ending_root = NodePath("EndingRoot")
+leave_button = NodePath("ChoiceRoot/Center/Content/Actions/LeaveButton")
+keep_digging_button = NodePath("ChoiceRoot/Center/Content/Actions/KeepDiggingButton")
+return_to_title_button = NodePath("EndingRoot/Center/Content/ReturnToTitleButton")
+
+[node name="ChoiceRoot" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.09, 0.06, 0.05, 0.9)
+
+[node name="Center" type="CenterContainer" parent="ChoiceRoot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Content" type="VBoxContainer" parent="ChoiceRoot/Center"]
+custom_minimum_size = Vector2(640, 0)
+layout_mode = 2
+theme_override_constants/separation = 28
+
+[node name="Prompt" type="Label" parent="ChoiceRoot/Center/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "They are leaving. You can go with them, or keep digging alone."
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="Actions" type="HBoxContainer" parent="ChoiceRoot/Center/Content"]
+layout_mode = 2
+theme_override_constants/separation = 24
+alignment = 1
+
+[node name="LeaveButton" type="Button" parent="ChoiceRoot/Center/Content/Actions"]
+custom_minimum_size = Vector2(230, 64)
+layout_mode = 2
+text = "Leave with them"
+
+[node name="KeepDiggingButton" type="Button" parent="ChoiceRoot/Center/Content/Actions"]
+custom_minimum_size = Vector2(230, 64)
+layout_mode = 2
+text = "Keep digging"
+
+[node name="EndingRoot" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.09, 0.06, 0.05, 1)
+
+[node name="Center" type="CenterContainer" parent="EndingRoot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Content" type="VBoxContainer" parent="EndingRoot/Center"]
+custom_minimum_size = Vector2(620, 0)
+layout_mode = 2
+theme_override_constants/separation = 28
+
+[node name="Message" type="Label" parent="EndingRoot/Center/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 30
+text = "You leave with them.\nSome warnings are worth listening to."
+horizontal_alignment = 1
+
+[node name="ReturnToTitleButton" type="Button" parent="EndingRoot/Center/Content"]
+custom_minimum_size = Vector2(220, 64)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "Return to title"

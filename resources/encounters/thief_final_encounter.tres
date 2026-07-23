@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="DepthCharacterEncounter" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
+[ext_resource type="Resource" path="res://resources/encounters/thief_appearance.tres" id="2_appearance"]
+[ext_resource type="Resource" path="res://resources/dialogue/thief_encrypted_dialogue.tres" id="3_dialogue"]
+
+[resource]
+script = ExtResource("1_encounter")
+encounter_id = &"thief_finale"
+occurs_at_run_bottom = true
+appearance = ExtResource("2_appearance")
+encrypted_conversation = ExtResource("3_dialogue")
+speaker_slot = &"thief"

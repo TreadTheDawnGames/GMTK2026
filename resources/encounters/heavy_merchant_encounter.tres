@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="DepthCharacterEncounter" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
+[ext_resource type="Resource" path="res://resources/encounters/prospector_merchant_appearance.tres" id="2_appearance"]
+[ext_resource type="Resource" path="res://resources/dialogue/heavy_pickaxe_gift.tres" id="3_dialogue"]
+[ext_resource type="Resource" path="res://resources/pickaxes/heavy_pickaxe.tres" id="4_pickaxe"]
+
+[resource]
+script = ExtResource("1_encounter")
+encounter_id = &"prospector_heavy_pickaxe"
+depth_from_surface = 16000
+appearance = ExtResource("2_appearance")
+conversation = ExtResource("3_dialogue")
+speaker_slot = &"prospector"
+pickaxe_reward = ExtResource("4_pickaxe")

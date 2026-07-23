@@ -18,6 +18,11 @@ signal terrain_damaged(
 	destroyed_cells: Array[Vector2i],
 	horizontal_direction: int
 )
+## Reports related narrow paths as one batch so presentation uploads once.
+signal terrain_paths_damaged(
+	destroyed_paths: Array,
+	horizontal_direction: int
+)
 ## Reports view movement so terrain presentation follows the mining face.
 signal view_y_changed(view_y: float)
 
@@ -27,11 +32,13 @@ signal view_y_changed(view_y: float)
 # Masks prevent destroyed cells from being mined or collected twice.
 var _destruction_masks: Dictionary[int, PackedByteArray] = {}
 var _current_view_y: float
+var _random := RandomNumberGenerator.new()
 
 
 ## Initializes coordinate conversion at the starting surface.
 func _ready() -> void:
 	_current_view_y = float(config.initial_surface_row)
+	_random.randomize()
 
 
 ## Clears a vertical shaft with an optional extension toward the aimed side.
@@ -79,6 +86,90 @@ func dig_tunnel(
 			destroyed_cells,
 			clampi(horizontal_direction, -1, 1)
 		)
+	return result
+
+
+## Breaks a jagged downward path with smaller branches from its sides.
+func dig_branching_lightning(
+	start_cell: Vector2i,
+	depth_rows: int,
+	branch_count: int,
+	branch_length_cells: int
+) -> DigResult:
+	var result := DigResult.new()
+	if depth_rows <= 0 or not _is_mineable_cell(start_cell):
+		return result
+
+	var authored_paths: Array = []
+	var trunk_path: Array[Vector2i] = []
+	var trunk_cell := start_cell
+	for row_index in range(depth_rows):
+		if row_index > 0:
+			trunk_cell.x = clampi(
+				trunk_cell.x + _random.randi_range(-1, 1),
+				0,
+				config.terrain_width_cells - 1
+			)
+			trunk_cell.y += 1
+		if not is_ground_cell(trunk_cell):
+			break
+		trunk_path.append(trunk_cell)
+	if trunk_path.is_empty():
+		return result
+	authored_paths.append(trunk_path)
+
+	for branch_index in range(maxi(branch_count, 0)):
+		var seed_minimum := mini(
+			trunk_path.size() - 1,
+			maxi(1, trunk_path.size() / 4)
+		)
+		var seed_index := _random.randi_range(
+			seed_minimum,
+			trunk_path.size() - 1
+		)
+		var branch_cell := trunk_path[seed_index]
+		var branch_direction := (
+			-1
+			if branch_index % 2 == 0
+			else 1
+		)
+		if _random.randi_range(0, 1) == 1:
+			branch_direction *= -1
+		var branch_path: Array[Vector2i] = []
+		var branch_length := _random.randi_range(
+			maxi(2, branch_length_cells / 2),
+			maxi(branch_length_cells, 2)
+		)
+		for step_index in range(branch_length):
+			branch_cell.x = clampi(
+				branch_cell.x + branch_direction,
+				0,
+				config.terrain_width_cells - 1
+			)
+			if step_index % 2 == 0 or _random.randi_range(0, 1) == 1:
+				branch_cell.y += 1
+			if not is_ground_cell(branch_cell):
+				break
+			branch_path.append(branch_cell)
+		if not branch_path.is_empty():
+			authored_paths.append(branch_path)
+
+	var destroyed_paths: Array = []
+	var destroyed_lookup: Dictionary[Vector2i, bool] = {}
+	for authored_path: Array[Vector2i] in authored_paths:
+		var destroyed_path: Array[Vector2i] = []
+		for cell in authored_path:
+			if destroyed_lookup.has(cell) or not _is_mineable_cell(cell):
+				continue
+			_set_cell_destroyed(cell)
+			destroyed_lookup[cell] = true
+			destroyed_path.append(cell)
+			result.cells_removed += 1
+		if not destroyed_path.is_empty():
+			destroyed_paths.append(destroyed_path)
+
+	if not destroyed_paths.is_empty():
+		terrain_paths_damaged.emit(destroyed_paths, 0)
 	return result
 
 
@@ -170,6 +261,8 @@ func find_surface_row(cell_x: int, starting_row: int) -> int:
 
 ## Updates the view depth used by terrain-to-screen conversion.
 func set_view_y(view_y: float) -> void:
+	if is_equal_approx(_current_view_y, view_y):
+		return
 	_current_view_y = view_y
 	view_y_changed.emit(view_y)
 
@@ -190,18 +283,6 @@ func _is_encounter_chamber_cell(cell: Vector2i) -> bool:
 		return false
 
 	var depth_row := cell.y - config.initial_surface_row
-	var first_floor_row := encounter_config.first_floor_depth
-	var interval_rows := maxi(
-		encounter_config.repeat_interval_depth,
-		1
-	)
-	var chamber_height_rows := maxi(
-		encounter_config.chamber_height_rows,
-		1
-	)
-	if depth_row < first_floor_row - chamber_height_rows:
-		return false
-
 	var chamber_width_cells := mini(
 		encounter_config.chamber_width_cells,
 		config.terrain_width_cells
@@ -213,22 +294,9 @@ func _is_encounter_chamber_cell(cell: Vector2i) -> bool:
 	if cell.x < chamber_left or cell.x >= chamber_right:
 		return false
 
-	var floor_index := 0
-	var floor_row := first_floor_row
-	if depth_row > first_floor_row:
-		floor_index = ceili(
-			float(depth_row - first_floor_row)
-			/ float(interval_rows)
-		)
-		floor_row += floor_index * interval_rows
-	if floor_index >= encounter_config.maximum_floor_count:
-		return false
-	if floor_row > config.total_run_depth:
-		return false
-	var rows_until_floor := floor_row - depth_row
-	return (
-		rows_until_floor > 0
-		and rows_until_floor <= chamber_height_rows
+	return encounter_config.is_chamber_row(
+		depth_row,
+		config.total_run_depth
 	)
 
 

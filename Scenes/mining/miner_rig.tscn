@@ -432,12 +432,55 @@ tracks/4/keys = {
 "values": [Vector2(0, -16), Vector2(0, 9)]
 }
 
+[sub_resource type="Animation" id="Animation_two_frame_success"]
+resource_name = "two_frame_success"
+length = 0.22
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("VisualRoot/DrawnMinerSprite:frame")
+tracks/0/interp = 0
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.16),
+"transitions": PackedFloat32Array(1, 1),
+"update": 1,
+"values": [1, 2]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("VisualRoot/DrawnMinerSprite:position")
+tracks/1/interp = 0
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.16),
+"transitions": PackedFloat32Array(1, 1),
+"update": 1,
+"values": [Vector2(0, 9), Vector2(0, 13)]
+}
+tracks/2/type = "method"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath(".")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0.16),
+"transitions": PackedFloat32Array(1),
+"values": [{
+"args": [],
+"method": &"_emit_success_impact"
+}]
+}
+
 [sub_resource type="AnimationLibrary" id="AnimationLibrary_rig"]
 _data = {
 &"RESET": SubResource("Animation_reset"),
 &"idle": SubResource("Animation_idle"),
 &"mine_miss": SubResource("Animation_miss_motion"),
 &"mine_success": SubResource("Animation_success_motion"),
+&"two_frame_success": SubResource("Animation_two_frame_success"),
 &"wind_down": SubResource("Animation_wind_down"),
 &"wind_up": SubResource("Animation_wind_up")
 }
