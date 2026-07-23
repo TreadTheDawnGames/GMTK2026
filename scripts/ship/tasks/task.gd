@@ -58,3 +58,4 @@ func _process(_delta : float):
 
 
 		#global_position = clamp(get_global_mouse_position() + _grabbedOffset, Vector2.ZERO, get_viewport_rect().size)
+			get_viewport().set_input_as_handled()

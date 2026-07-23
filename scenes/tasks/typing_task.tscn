@@ -11,13 +11,13 @@ total_words_to_type = 3
 words_typed = 0
 acceptable_word_length = 6
 
-[node name="TextArea" type="Control" parent="PanelContainer/PanelContainer/MarginContainer/VBoxContainer" parent_id_path=PackedInt32Array(884116960) index="0" unique_id=535408561]
+[node name="TextArea" type="Control" parent="PanelContainer2/VBoxContainer/MarginContainer/VBoxContainer" parent_id_path=PackedInt32Array(884116960) index="0" unique_id=535408561]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 script = ExtResource("3_b6t0l")
 
-[node name="BottomLbl" type="RichTextLabel" parent="PanelContainer/PanelContainer/MarginContainer/VBoxContainer/TextArea" index="0" unique_id=36832710]
+[node name="BottomLbl" type="RichTextLabel" parent="PanelContainer2/VBoxContainer/MarginContainer/VBoxContainer/TextArea" index="0" unique_id=36832710]
 modulate = Color(0.38928655, 0.38928664, 0.38928658, 1)
 layout_mode = 1
 anchors_preset = 15
@@ -33,7 +33,7 @@ scroll_active = false
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="TopLbl" type="RichTextLabel" parent="PanelContainer/PanelContainer/MarginContainer/VBoxContainer/TextArea" index="1" unique_id=1419558670]
+[node name="TopLbl" type="RichTextLabel" parent="PanelContainer2/VBoxContainer/MarginContainer/VBoxContainer/TextArea" index="1" unique_id=1419558670]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
