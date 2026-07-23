@@ -42,11 +42,6 @@ func _ready():
 		stop()
 
 
-## Returns the target hit area including input grace.
-func target_half_width() -> float:
-	return current_target_size * 0.5 + grace
-
-
 ## Returns the slider edge area including input grace.
 func slider_half_width() -> float:
 	return slider.size.x*0.5 + grace
@@ -111,7 +106,15 @@ func remove_target():
 ## Moves the slider and resolves one press against every visible target.
 func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("Space"):
-		var hit_targets : Array[Panel] = targets.filter(func(target:Panel): return slider.position.x < target.position.x + target_half_width() and slider.position.x > target.position.x - target_half_width())
+		var hit_targets: Array[Panel] = targets.filter(
+			func(target: Panel) -> bool:
+				var hit_distance := (
+					target.size.x * 0.5
+					+ slider.size.x * 0.5
+					+ grace
+				)
+				return absf(slider.position.x - target.position.x) <= hit_distance
+		)
 		for target : Panel in hit_targets:
 			randomize_target(target)
 		if hit_targets.size() > 0:
@@ -132,8 +135,19 @@ func _process(delta: float) -> void:
 
 
 ## Moves one target to a valid position inside its backing bar.
-func randomize_target(target : Panel):
-	target.position.x = clamp((randf() if fixed_window < 0 else fixed_window)* backing.size.x, target_half_width(), backing.size.x - target_half_width())
-	current_target_size = clamp(target.size.x * target_shrink_rate, min_target_size, max_target_size)
-	target.size.x = current_target_size
-	target.offset_transform_position.x = -target.size.x * 0.5
+func randomize_target(target_panel : Panel):
+	current_target_size = clampf(
+		target_panel.size.x * target_shrink_rate,
+		min_target_size,
+		max_target_size
+	)
+	target_panel.size.x = current_target_size
+	target_panel.offset_transform_position.x = -current_target_size * 0.5
+	var target_center_x := (
+		(randf() if fixed_window < 0 else fixed_window) * backing.size.x
+	)
+	target_panel.position.x = clampf(
+		target_center_x,
+		current_target_size * 0.5,
+		backing.size.x - current_target_size * 0.5
+	)
