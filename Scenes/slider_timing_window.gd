@@ -27,6 +27,7 @@ var current_target_size : float = 128.0
 
 @export var one_shot : bool = false
 @export var fixed_window : float = -1
+@export var warning_repeats : int = 3
 
 var direction : float = 1.0
 
@@ -64,9 +65,14 @@ func start():
 
 
 ## Freezes the slider without hiding the timing bar.
-func pause():
+func pause(animate : bool):
 	set_process(false)
-
+	if animate:
+		var tween : Tween = create_tween()
+		for i in warning_repeats:
+			tween.tween_property(slider, "modulate", Color.RED, 0.1)
+			tween.tween_property(slider, "modulate", Color.WHITE, 0.1)
+		await tween.finished
 
 ## Hides the timing bar and stops its slider.
 func stop():

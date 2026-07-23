@@ -15,13 +15,10 @@ var combo : int = 0 :
 		combo = value
 		combo_label.text = "Next bar in: " + str(wrapi(combo_count_for_additional_target - value,1, combo_count_for_additional_target+1))
 
-
 @export var recovery_combo_count : int = 5
 @export var combo_count_for_additional_target : int = 10
 @export var combo_speed_multiplier : float = 0.1
 @export var mine_sounds : Array[AudioStream]
-
-
 
 ## Connects both timing bars to the combo flow.
 func _ready():
@@ -43,8 +40,8 @@ func _mining_window_pressed(success : bool):
 			mining_window.add_target.call_deferred()
 	else:
 		if combo >= recovery_combo_count:
+			await mining_window.pause(true)
 			recovery_window.start()
-			mining_window.pause()
 		else:
 			pressed.emit(false, combo)
 			combo = 0
