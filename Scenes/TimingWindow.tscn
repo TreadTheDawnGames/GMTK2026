@@ -13,6 +13,7 @@
 [ext_resource type="AudioStream" uid="uid://da4n2chd7wsvw" path="res://Assets/Audio/Save.wav" id="11_74xn3"]
 [ext_resource type="AudioStream" uid="uid://bif7p7jcchspq" path="res://Assets/Audio/MissWithSave.wav" id="12_2plp5"]
 [ext_resource type="AudioStream" uid="uid://cbbyjg221k80c" path="res://Assets/Audio/SaveBuildup.wav" id="13_53pw3"]
+[ext_resource type="Resource" uid="uid://dhlm43rg16rkw" path="res://resources/mining/mining_config.tres" id="14_mining_config"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_6ko1l"]
 font_size = 61
@@ -92,7 +93,6 @@ offset_top = -151.0
 offset_right = 349.0
 offset_bottom = -134.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_af75q")
-speed = 1250.0
 grace = 3.0
 max_target_size = 32.0
 target_shrink_rate = 1.0

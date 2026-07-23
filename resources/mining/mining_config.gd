@@ -49,6 +49,22 @@ enum MiningCameraStyle {
 @export_range(100.0, 50_000.0, 100.0) var return_fall_gravity: float = 8_000.0
 @export_range(100.0, 50_000.0, 100.0) var return_max_fall_speed: float = 20_000.0
 
+@export_category("Timing")
+## Opens the recovery challenge after a miss at or above this combo.
+@export_range(1, 100, 1) var recovery_combo_threshold: int = 5
+## Adds one mining target after each completed block of combo hits.
+@export_range(1, 100, 1) var combo_hits_for_additional_target: int = 10
+## Sets the target baseline restored after a failed streak.
+@export_range(1, 16, 1) var starting_mining_target_count: int = 1
+## Sets the main timing slider's unmodified horizontal speed.
+@export_range(1.0, 5_000.0, 1.0) var mining_bar_speed: float = 500.0
+## Sets the recovery slider's unmodified horizontal speed.
+@export_range(1.0, 5_000.0, 1.0) var recovery_bar_speed: float = 1_250.0
+## Applies a fixed speed multiplier while the mining combo is active.
+@export_range(0.1, 5.0, 0.05) var combo_speed_multiplier: float = 1.5
+## Multiplies recovery speed after each successfully saved streak.
+@export_range(0.1, 5.0, 0.05) var recovery_speed_multiplier: float = 1.2
+
 @export_category("Effects")
 ## Treats this combo as full strength for animation and hit feedback.
 @export_range(1, 100, 1) var maximum_effect_combo: int = 20
