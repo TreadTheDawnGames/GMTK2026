@@ -12,7 +12,6 @@ const TARGET = preload("uid://16edwc1adi0x")
 @onready var bounce_sound: AudioStreamPlayer2D = %BounceSound
 
 
-
 @export var speed : float = 500.0
 @export var speed_multiplier : float = 1.0
 

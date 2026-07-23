@@ -7,6 +7,8 @@ class_name TimingWindowTask
 @onready var combo_label: Label = %ComboLabel
 @onready var hit_sound: AudioStreamPlayer2D = %HitSound
 @onready var streak_saved_sound: AudioStreamPlayer2D = %StreakSavedSound
+@onready var warning_sound: AudioStreamPlayer2D = %WarningSound
+@onready var save_bwah_sound: AudioStreamPlayer2D = %SaveBwahSound
 
 signal pressed(success : bool, combo : int)          
 
@@ -40,8 +42,10 @@ func _mining_window_pressed(success : bool):
 			mining_window.add_target.call_deferred()
 	else:
 		if combo >= recovery_combo_count:
+			warning_sound.play()
 			await mining_window.pause(true)
 			recovery_window.start()
+			save_bwah_sound.play()
 		else:
 			pressed.emit(false, combo)
 			combo = 0

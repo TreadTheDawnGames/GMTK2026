@@ -11,6 +11,8 @@
 [ext_resource type="AudioStream" uid="uid://i0bh02k308nf" path="res://Assets/Audio/Mine6.wav" id="7_cprbh"]
 [ext_resource type="AudioStream" uid="uid://xd7dlv2rg765" path="res://Assets/Audio/Mine7.wav" id="8_gxysw"]
 [ext_resource type="AudioStream" uid="uid://da4n2chd7wsvw" path="res://Assets/Audio/Save.wav" id="11_74xn3"]
+[ext_resource type="AudioStream" uid="uid://bif7p7jcchspq" path="res://Assets/Audio/MissWithSave.wav" id="12_2plp5"]
+[ext_resource type="AudioStream" uid="uid://cbbyjg221k80c" path="res://Assets/Audio/SaveBuildup.wav" id="13_53pw3"]
 
 [node name="Control" type="Control" unique_id=633006767]
 layout_mode = 3
@@ -20,9 +22,6 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_6wfpp")
-recovery_combo_count = null
-combo_count_for_additional_target = null
-combo_speed_multiplier = null
 mine_sounds = Array[AudioStream]([ExtResource("2_4e5kf"), ExtResource("3_74xn3"), ExtResource("4_2plp5"), ExtResource("5_53pw3"), ExtResource("6_af75q"), ExtResource("7_cprbh"), ExtResource("8_gxysw")])
 
 [node name="ComboLabel" type="Label" parent="." unique_id=1967208941]
@@ -46,6 +45,7 @@ offset_top = -128.0
 offset_right = 349.0
 offset_bottom = -47.0
 grace = 3.0
+warning_repeats = 2
 
 [node name="RecoveryWindow" parent="." unique_id=1324091204 instance=ExtResource("2_73j0v")]
 unique_name_in_owner = true
@@ -71,3 +71,11 @@ unique_name_in_owner = true
 [node name="StreakSavedSound" type="AudioStreamPlayer2D" parent="." unique_id=1410887463]
 unique_name_in_owner = true
 stream = ExtResource("11_74xn3")
+
+[node name="WarningSound" type="AudioStreamPlayer2D" parent="." unique_id=2146219191]
+unique_name_in_owner = true
+stream = ExtResource("12_2plp5")
+
+[node name="SaveBwahSound" type="AudioStreamPlayer2D" parent="." unique_id=800944095]
+unique_name_in_owner = true
+stream = ExtResource("13_53pw3")
