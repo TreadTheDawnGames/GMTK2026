@@ -96,6 +96,9 @@ func dig_tunnel(
 		var chunk := _active_chunks[chunk_index] as TerrainChunk
 		chunk.texture.update(chunk.image)
 
+	#Create a big fancy number that shows how much you dug this hit
+	#DigNumber.create(terrain_position, depth_cells, get_tree())
+
 	return result
 
 
