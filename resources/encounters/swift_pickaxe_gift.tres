@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="PickaxeGiftEncounter" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://resources/encounters/pickaxe_gift_encounter.gd" id="1_gift"]
+[ext_resource type="Resource" path="res://resources/dialogue/swift_pickaxe_gift.tres" id="2_dialogue"]
+[ext_resource type="Resource" path="res://resources/pickaxes/swift_pickaxe.tres" id="3_pickaxe"]
+
+[resource]
+script = ExtResource("1_gift")
+conversation = ExtResource("2_dialogue")
+pickaxe = ExtResource("3_pickaxe")

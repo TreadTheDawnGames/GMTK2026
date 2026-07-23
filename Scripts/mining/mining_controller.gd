@@ -36,31 +36,34 @@ class SwingRequest:
 		counts_as_timing_success = requested_counts_as_timing_success
 
 
-class PendingMineResolution:
-	## Retains one hit summary until its progressive break reaches the floor.
-	var starting_depth_px: int
-	var cells_removed: int
-	var combo: int
-	var effect_strength: float
-
-
+## Reports the terrain and depth changed by a completed hit.
 signal mine_resolved(
-	depth_advanced_px: int,
+	depth_gained: int,
 	cells_removed: int,
 	combo: int,
-	effect_strength: float
+	combo_strength: float
 )
+## Reports a timing miss without starting a mining animation.
 signal mine_missed(combo: int)
+## Requests the miner's swing animation for an earned hit.
 signal swing_requested(
 	combo: int,
-	effect_strength: float,
+	combo_strength: float,
 	swing_speed_multiplier: float
 )
+## Requests particles and camera shake at the hammer contact point.
 signal impact_resolved(
 	screen_position: Vector2,
 	cells_removed: int,
-	effect_strength: float,
+	combo_strength: float,
 	debris_multiplier: float
+)
+## Requests the hit's downward distance at the hammer contact point.
+signal dig_number_requested(
+	screen_position: Vector2,
+	depth_gained: int,
+	combo: int,
+	combo_strength: float
 )
 
 @export var config: MiningConfig
@@ -73,13 +76,11 @@ signal impact_resolved(
 var _equipped_pickaxe: PickaxeDefinition
 var _aim_direction: int = 0
 var _pending_swing: SwingRequest
-var _pending_effect_strength: float = 0.0
+var _pending_combo_strength: float = 0.0
 var _is_swing_pending: bool = false
 var _has_resolved_pending_impact: bool = false
 var _is_swing_queue_paused: bool = false
-var _is_break_pending: bool = false
 var _queued_swings: Array[SwingRequest] = []
-var _pending_mine_resolution: PendingMineResolution
 
 
 ## Starts a swing for a successful timing result or records a miss.
@@ -104,7 +105,6 @@ func resolve_attempt(success: bool, resolved_combo: int) -> void:
 	if (
 		_is_swing_pending
 		or _is_swing_queue_paused
-		or _is_break_pending
 	):
 		_queued_swings.append(primary_swing)
 	else:
@@ -131,7 +131,7 @@ func resolve_attempt(success: bool, resolved_combo: int) -> void:
 ## Starts one retained success and waits for its animated contact frame.
 func _start_swing(swing: SwingRequest) -> void:
 	_pending_swing = swing
-	_pending_effect_strength = clampf(
+	_pending_combo_strength = clampf(
 		float(swing.combo) / float(config.maximum_effect_combo),
 		0.0,
 		1.0
@@ -140,7 +140,7 @@ func _start_swing(swing: SwingRequest) -> void:
 	_has_resolved_pending_impact = false
 	swing_requested.emit(
 		swing.combo,
-		_pending_effect_strength,
+		_pending_combo_strength,
 		_pickaxe_multiplier(
 			swing.pickaxe,
 			&"swing_speed_multiplier"
@@ -157,15 +157,18 @@ func resolve_impact(impact_screen_position: Vector2) -> void:
 		return
 	_has_resolved_pending_impact = true
 
-	var chip_combo := mini(_pending_swing.combo, config.maximum_effect_combo)
-	var combo_steps := maxi(chip_combo - 1, 0)
-	var requested_depth_cells := (
-		config.base_mine_depth_cells
-		+ config.combo_mine_depth_cells_per_step * combo_steps
+	var capped_combo := mini(
+		_pending_swing.combo,
+		config.maximum_effect_combo
 	)
-	requested_depth_cells = maxi(
+	var combo_steps := maxi(capped_combo - 1, 0)
+	var requested_depth_rows := (
+		config.base_mine_depth_rows
+		+ config.combo_mine_depth_rows_per_step * combo_steps
+	)
+	requested_depth_rows = maxi(
 		roundi(
-			float(requested_depth_cells)
+			float(requested_depth_rows)
 			* _pickaxe_multiplier(
 				_pending_swing.pickaxe,
 				&"power_multiplier"
@@ -200,31 +203,31 @@ func resolve_impact(impact_screen_position: Vector2) -> void:
 	)
 	var dig_result := terrain_manager.dig_tunnel(
 		fall_cell,
-		requested_depth_cells,
+		requested_depth_rows,
 		requested_half_width_cells,
 		impact_cell_x,
 		_pending_swing.aim_direction,
 		requested_half_width_cells
 	)
-	var primary_surface_y := terrain_manager.find_reserved_surface_row(
+	var surface_after_primary_hit_y := terrain_manager.find_surface_row(
 		fall_cell.x,
 		run_state.mining_y
 	)
 	var crossed_open_chamber := (
-		primary_surface_y
-		> fall_cell.y + requested_depth_cells
+		surface_after_primary_hit_y
+		> fall_cell.y + requested_depth_rows
 	)
 	if (
 		_pending_swing.pickaxe != null
 		and _pending_swing.pickaxe.special_effect
 			== PickaxeDefinition.SpecialEffect.AFTERSHOCK
-		and _pending_swing.pickaxe.aftershock_depth_cells > 0
+		and _pending_swing.pickaxe.aftershock_depth_rows > 0
 		and dig_result.cells_removed > 0
 		and not crossed_open_chamber
 	):
 		var aftershock_result := terrain_manager.dig_tunnel(
-			Vector2i(fall_cell.x, primary_surface_y),
-			_pending_swing.pickaxe.aftershock_depth_cells,
+			Vector2i(fall_cell.x, surface_after_primary_hit_y),
+			_pending_swing.pickaxe.aftershock_depth_rows,
 			requested_half_width_cells,
 			-1,
 			_pending_swing.aim_direction,
@@ -232,52 +235,38 @@ func resolve_impact(impact_screen_position: Vector2) -> void:
 		)
 		dig_result.absorb(aftershock_result)
 	ore_inventory.add_ore_batch(dig_result.ore_yields)
-	var new_mining_y := terrain_manager.find_reserved_surface_row(
+	var new_mining_y := terrain_manager.find_surface_row(
 		fall_cell.x,
 		run_state.mining_y
 	)
-	var rows_advanced := maxi(new_mining_y - run_state.mining_y, 0)
-	var depth_advanced_px := rows_advanced * config.logical_pixel_scale
-	_is_break_pending = (
-		terrain_manager.progressive_breaking_enabled
-		and dig_result.cells_removed > 0
+	var depth_gained := maxi(new_mining_y - run_state.mining_y, 0)
+	run_state.record_success(
+		depth_gained,
+		new_mining_y,
+		_pending_swing.combo,
+		_pending_swing.counts_as_timing_success
 	)
-	if _is_break_pending:
-		run_state.record_success(
-			0,
-			run_state.mining_y,
-			_pending_swing.combo,
-			_pending_swing.counts_as_timing_success
-		)
-		_pending_mine_resolution = PendingMineResolution.new()
-		_pending_mine_resolution.starting_depth_px = run_state.depth_px
-		_pending_mine_resolution.cells_removed = dig_result.cells_removed
-		_pending_mine_resolution.combo = _pending_swing.combo
-		_pending_mine_resolution.effect_strength = (
-			_pending_effect_strength
-		)
-	else:
-		run_state.record_success(
-			depth_advanced_px,
-			new_mining_y,
-			_pending_swing.combo,
-			_pending_swing.counts_as_timing_success
-		)
-		view_controller.follow_mining_y(run_state.mining_y)
-		mine_resolved.emit(
-			depth_advanced_px,
-			dig_result.cells_removed,
-			_pending_swing.combo,
-			_pending_effect_strength
-		)
+	view_controller.follow_mining_y(run_state.mining_y)
+	mine_resolved.emit(
+		depth_gained,
+		dig_result.cells_removed,
+		_pending_swing.combo,
+		_pending_combo_strength
+	)
 	impact_resolved.emit(
 		impact_screen_position,
 		dig_result.cells_removed,
-		_pending_effect_strength,
+		_pending_combo_strength,
 		_pickaxe_multiplier(
 			_pending_swing.pickaxe,
 			&"debris_multiplier"
 		) * _pending_swing.debris_scale
+	)
+	dig_number_requested.emit(
+		impact_screen_position,
+		depth_gained,
+		_pending_swing.combo,
+		_pending_combo_strength
 	)
 
 
@@ -291,8 +280,6 @@ func finish_swing() -> void:
 	if run_state.has_reached_bottom:
 		_queued_swings.clear()
 		return
-	if _is_break_pending:
-		return
 	_try_start_queued_swing()
 
 
@@ -302,50 +289,6 @@ func set_swing_queue_paused(is_paused: bool) -> void:
 	if is_paused:
 		return
 	_try_start_queued_swing()
-
-
-## Moves the player's feet to the next surface exposed by this frame.
-func advance_with_breakage(_cells: Array[Vector2i]) -> void:
-	if not _is_break_pending:
-		return
-	_advance_to_revealed_surface()
-
-
-## Releases the next earned swing after the break wave reaches its floor.
-func finish_break_sequence() -> void:
-	if not _is_break_pending:
-		return
-	_advance_to_revealed_surface()
-	_is_break_pending = false
-	if _pending_mine_resolution != null:
-		mine_resolved.emit(
-			run_state.depth_px
-				- _pending_mine_resolution.starting_depth_px,
-			_pending_mine_resolution.cells_removed,
-			_pending_mine_resolution.combo,
-			_pending_mine_resolution.effect_strength
-		)
-		_pending_mine_resolution = null
-	_try_start_queued_swing()
-
-
-## Updates depth and camera target from the currently revealed terrain.
-func _advance_to_revealed_surface() -> void:
-	var fall_cell_x := terrain_manager.screen_x_to_terrain_cell_x(
-		fall_origin.global_position.x
-	)
-	var new_mining_y := terrain_manager.find_surface_row(
-		fall_cell_x,
-		run_state.mining_y
-	)
-	var rows_advanced := maxi(new_mining_y - run_state.mining_y, 0)
-	if rows_advanced <= 0:
-		return
-	run_state.advance_depth(
-		rows_advanced * config.logical_pixel_scale,
-		new_mining_y
-	)
-	view_controller.follow_mining_y(run_state.mining_y)
 
 
 ## Applies the pickaxe modifiers used by future swings.
@@ -358,12 +301,11 @@ func set_aim_direction(direction: int) -> void:
 	_aim_direction = clampi(direction, -1, 1)
 
 
-## Starts the next earned hit when animation, breakage, and dialogue allow it.
+## Starts the next earned hit when animation and dialogue allow it.
 func _try_start_queued_swing() -> void:
 	if (
 		_is_swing_queue_paused
 		or _is_swing_pending
-		or _is_break_pending
 		or _queued_swings.is_empty()
 		or run_state.has_reached_bottom
 	):

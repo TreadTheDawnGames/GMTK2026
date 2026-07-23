@@ -1,0 +1,46 @@
+[gd_resource type="Resource" script_class="DialogueConversation" format=3 uid="uid://c3xwlxx3f4v66"]
+
+[ext_resource type="Script" uid="uid://c55utdbjdwaui" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
+[ext_resource type="Script" uid="uid://ivfntthetp0i" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
+[ext_resource type="Script" uid="uid://bwwpoalvqb7ni" path="res://resources/dialogue/dialogue_line.gd" id="3_line"]
+
+[sub_resource type="Resource" id="Line_warning"]
+script = ExtResource("3_line")
+speaker_slot = &"prospector"
+text = "The stone beneath us is stubborn. Speed alone will not break it."
+
+[sub_resource type="Resource" id="Line_bag"]
+script = ExtResource("3_line")
+speaker_slot = &"prospector"
+text = "(The prospector drags an enormous pickaxe from behind their bag.)"
+
+[sub_resource type="Resource" id="Line_reveal"]
+script = ExtResource("3_line")
+speaker_slot = &"prospector"
+text = "A Heavy Pickaxe. One strike, then the ground gives way beneath it."
+
+[sub_resource type="Resource" id="Line_response"]
+script = ExtResource("3_line")
+speaker_slot = &"miner"
+text = "It looks slow."
+
+[sub_resource type="Resource" id="Line_advice"]
+script = ExtResource("3_line")
+speaker_slot = &"prospector"
+text = "It is. Make the timing count, and the aftershock will do the rest."
+
+[sub_resource type="Resource" id="Participant_miner"]
+script = ExtResource("2_participant")
+slot = &"miner"
+display_name = "Miner"
+
+[sub_resource type="Resource" id="Participant_prospector"]
+script = ExtResource("2_participant")
+slot = &"prospector"
+display_name = "Old Prospector"
+
+[resource]
+script = ExtResource("1_conversation")
+conversation_id = &"heavy_pickaxe_gift"
+participants = Array[ExtResource("2_participant")]([SubResource("Participant_miner"), SubResource("Participant_prospector")])
+lines = Array[ExtResource("3_line")]([SubResource("Line_warning"), SubResource("Line_bag"), SubResource("Line_reveal"), SubResource("Line_response"), SubResource("Line_advice")])

@@ -1,11 +1,8 @@
-[gd_resource type="Resource" script_class="PickaxeDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="PickaxeDefinition" format=3 uid="uid://bm7au74mrcaij"]
 
-[ext_resource type="Script" path="res://resources/pickaxes/pickaxe_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://bvbd25ebtqkh8" path="res://resources/pickaxes/pickaxe_definition.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"basic_pickaxe"
-display_name = "Basic Pickaxe"
-description = "A balanced starting tool."
-cost = 0
-hammer_head_color = Color(0.94, 0.94, 0.94, 1)
+display_name = "Wooden Pickaxe"
+description = "A simple wooden tool carried at the start of the descent."

@@ -3,9 +3,17 @@
 [ext_resource type="Script" uid="uid://iemqq3i56276" path="res://Scripts/mining/dig_number.gd" id="1_fj50p"]
 
 [node name="DigNumber" type="RichTextLabel" unique_id=799232607]
-offset_right = 1153.0
-offset_bottom = 159.0
-theme_override_font_sizes/normal_font_size = 100
+custom_minimum_size = Vector2(260, 96)
+offset_right = 260.0
+offset_bottom = 96.0
+mouse_filter = 2
+theme_override_colors/font_outline_color = Color(0.08, 0.05, 0.04, 1)
+theme_override_constants/outline_size = 8
+theme_override_font_sizes/normal_font_size = 52
 bbcode_enabled = true
-text = "100"
+text = "+6 DEPTH"
+fit_content = true
+scroll_active = false
+horizontal_alignment = 1
+vertical_alignment = 1
 script = ExtResource("1_fj50p")

@@ -35,13 +35,13 @@ func _ready() -> void:
 ## Plays the successful strike at its combo and equipped-pickaxe speed.
 func play_success(
 	_combo: int,
-	effect_strength: float,
+	combo_strength: float,
 	swing_speed_multiplier: float
 ) -> void:
 	var combo_multiplier := lerpf(
 		1.0,
 		1.0 + combo_speed_bonus,
-		effect_strength
+		combo_strength
 	)
 	_playing_full_swing = false
 	animation_player.stop()

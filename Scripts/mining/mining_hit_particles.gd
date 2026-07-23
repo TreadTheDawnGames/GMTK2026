@@ -54,7 +54,7 @@ func _ready() -> void:
 func play_at_impact(
 	impact_screen_position: Vector2,
 	cells_removed: int,
-	effect_strength: float,
+	combo_strength: float,
 	debris_multiplier: float = 1.0
 ) -> void:
 	if cells_removed <= 0:
@@ -90,10 +90,10 @@ func play_at_impact(
 	var speed_bonus := lerpf(
 		1.0,
 		1.35,
-		clampf(effect_strength, 0.0, 1.0)
+		clampf(combo_strength, 0.0, 1.0)
 	)
 	var logical_cell_size := float(
-		terrain_manager.config.logical_pixel_scale
+		terrain_manager.config.terrain_cell_size_px
 	)
 
 	for _piece_index in range(piece_amount):

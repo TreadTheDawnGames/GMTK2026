@@ -1,0 +1,46 @@
+[gd_resource type="Resource" script_class="DialogueConversation" format=3 uid="uid://dbmifpwp3v67k"]
+
+[ext_resource type="Script" uid="uid://c55utdbjdwaui" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
+[ext_resource type="Script" uid="uid://ivfntthetp0i" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
+[ext_resource type="Script" uid="uid://bwwpoalvqb7ni" path="res://resources/dialogue/dialogue_line.gd" id="3_line"]
+
+[sub_resource type="Resource" id="Line_notice"]
+script = ExtResource("3_line")
+speaker_slot = &"tinkerer"
+text = "You're keeping a good rhythm, but that pickaxe cannot keep up with you."
+
+[sub_resource type="Resource" id="Line_bag"]
+script = ExtResource("3_line")
+speaker_slot = &"tinkerer"
+text = "(They rummage through a bag of clicking metal parts.)"
+
+[sub_resource type="Resource" id="Line_reveal"]
+script = ExtResource("3_line")
+speaker_slot = &"tinkerer"
+text = "There! The Swift Pickaxe!"
+
+[sub_resource type="Resource" id="Line_effect"]
+script = ExtResource("3_line")
+speaker_slot = &"tinkerer"
+text = "Land a clean strike and its momentum will carry into a quick second hit."
+
+[sub_resource type="Resource" id="Line_response"]
+script = ExtResource("3_line")
+speaker_slot = &"miner"
+text = "Two hits from one opening? I can use that."
+
+[sub_resource type="Resource" id="Participant_miner"]
+script = ExtResource("2_participant")
+slot = &"miner"
+display_name = "Miner"
+
+[sub_resource type="Resource" id="Participant_tinkerer"]
+script = ExtResource("2_participant")
+slot = &"tinkerer"
+display_name = "Underground Tinkerer"
+
+[resource]
+script = ExtResource("1_conversation")
+conversation_id = &"swift_pickaxe_gift"
+participants = Array[ExtResource("2_participant")]([SubResource("Participant_miner"), SubResource("Participant_tinkerer")])
+lines = Array[ExtResource("3_line")]([SubResource("Line_notice"), SubResource("Line_bag"), SubResource("Line_reveal"), SubResource("Line_effect"), SubResource("Line_response")])

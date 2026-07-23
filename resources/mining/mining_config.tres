@@ -1,8 +1,9 @@
-[gd_resource type="Resource" script_class="MiningConfig" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="MiningConfig" format=3 uid="uid://dhlm43rg16rkw"]
 
-[ext_resource type="Script" path="res://resources/mining/mining_config.gd" id="1_config"]
+[ext_resource type="Script" uid="uid://xqwjlj3si8td" path="res://resources/mining/mining_config.gd" id="1_config"]
+[ext_resource type="Script" uid="uid://c4yjcj5qe4g6f" path="res://resources/mining/ore_definition.gd" id="1_w0mva"]
 [ext_resource type="Resource" path="res://resources/mining/placeholder_ore.tres" id="2_ore"]
 
 [resource]
 script = ExtResource("1_config")
-ore_definitions = Array[ExtResource("2_ore")]([ExtResource("2_ore")])
+ore_definitions = Array[ExtResource("1_w0mva")]([ExtResource("2_ore")])

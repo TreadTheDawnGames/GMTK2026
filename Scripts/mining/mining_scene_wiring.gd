@@ -8,13 +8,12 @@ extends Node
 @export var ore_inventory: OreInventoryState
 
 @export_category("Mining")
-@export var terrain_manager: TerrainManager
-@export var terrain_break_animator: TerrainBreakAnimator
 @export var mining_controller: MiningController
 @export var timing_bridge: TimingBridge
 @export var view_controller: ViewController
 @export var miner_rig: MinerRig
 @export var hit_particles: MiningHitParticles
+@export var dig_number_presenter: DigNumberPresenter
 @export var impact_shake: ImpactShake
 
 @export_category("Interface")
@@ -38,18 +37,6 @@ func _ready() -> void:
 		hud._on_ore_inventory_changed
 	)
 	_connect_once(
-		terrain_manager.terrain_cells_destroyed,
-		terrain_break_animator.play_break_sequence
-	)
-	_connect_once(
-		terrain_break_animator.all_breaks_finished,
-		mining_controller.finish_break_sequence
-	)
-	_connect_once(
-		terrain_break_animator.cells_revealed,
-		mining_controller.advance_with_breakage
-	)
-	_connect_once(
 		miner_rig.impact_contact,
 		mining_controller.resolve_impact
 	)
@@ -68,6 +55,10 @@ func _ready() -> void:
 	_connect_once(
 		mining_controller.impact_resolved,
 		hit_particles.play_at_impact
+	)
+	_connect_once(
+		mining_controller.dig_number_requested,
+		dig_number_presenter.show_dig_number_at_impact
 	)
 	_connect_once(
 		mining_controller.impact_resolved,
