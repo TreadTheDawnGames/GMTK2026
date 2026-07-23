@@ -17,6 +17,11 @@ signal conversation_finished(conversation_id: StringName)
 @export var body_label: RichTextLabel
 @export var continue_label: Label
 
+@export var character_display_speed : float = 0.03
+
+@export var characters_for_slowest_time : Array[String] = ["."]
+@export var characters_for_slower : Array[String] = [","]
+
 var _active_conversation: DialogueConversation
 var _current_line_index: int = -1
 var _presentation_token: int = 0
@@ -26,6 +31,28 @@ var _tree_was_paused: bool = false
 ## Hides the dialogue box when the scene loads.
 func _ready() -> void:
 	dialogue_root.hide()
+	
+## An attempt at displaying characters one at a time
+func show_next_character():
+	if not visible:
+		body_label.visible_characters = 0
+		return
+	if body_label.visible_characters < body_label.text.length():
+		body_label.visible_characters += 1
+		get_tree().create_timer(character_delay(body_label.text[body_label.visible_characters-1])).timeout.connect(show_next_character, CONNECT_ONE_SHOT)
+
+func character_delay(letter : String) -> float:
+	if letter.length() > 1:
+		return character_display_speed
+	
+	var display_speed : float = character_display_speed
+	
+	if characters_for_slowest_time.has(letter):
+		display_speed *= 5
+	elif characters_for_slower.has(letter):
+		display_speed *= 3
+	
+	return display_speed
 
 
 ## Advances dialogue when the player presses Space, Enter, or left click.
@@ -44,7 +71,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	):
 		return
 	get_viewport().set_input_as_handled()
-	advance()
+	if body_label.visible_characters == body_label.text.length():
+		advance()
+	else:
+		body_label.visible_characters = body_label.text.length()
 
 
 ## Validates and starts a conversation. Returns whether it started.
@@ -110,6 +140,9 @@ func _present_current_line() -> void:
 		_active_conversation.get_participant_display_name(line.speaker_slot)
 	)
 	body_label.text = line.text
+	body_label.visible_characters = 0
+	show_next_character()
+	
 	continue_label.text = (
 		"Continuing..."
 		if line.auto_advance_delay_seconds > 0.0

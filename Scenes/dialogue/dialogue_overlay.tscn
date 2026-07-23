@@ -1,6 +1,6 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene format=3 uid="uid://bwnqpopl5iayr"]
 
-[ext_resource type="Script" path="res://Scripts/dialogue/dialogue_director.gd" id="1_director"]
+[ext_resource type="Script" uid="uid://1h124vfbvc4" path="res://Scripts/dialogue/dialogue_director.gd" id="1_director"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_dialogue"]
 bg_color = Color(0.035, 0.035, 0.045, 0.94)
@@ -14,7 +14,7 @@ corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
 
-[node name="DialogueDirector" type="CanvasLayer" node_paths=PackedStringArray("dialogue_root", "speaker_label", "body_label", "continue_label")]
+[node name="DialogueDirector" type="CanvasLayer" unique_id=1373788107 node_paths=PackedStringArray("dialogue_root", "speaker_label", "body_label", "continue_label")]
 process_mode = 3
 layer = 20
 script = ExtResource("1_director")
@@ -23,7 +23,7 @@ speaker_label = NodePath("DialogueRoot/Panel/Margin/Content/SpeakerLabel")
 body_label = NodePath("DialogueRoot/Panel/Margin/Content/BodyLabel")
 continue_label = NodePath("DialogueRoot/Panel/Margin/Content/ContinueLabel")
 
-[node name="DialogueRoot" type="Control" parent="."]
+[node name="DialogueRoot" type="Control" parent="." unique_id=265472886]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -32,7 +32,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 1
 
-[node name="Panel" type="PanelContainer" parent="DialogueRoot"]
+[node name="Panel" type="PanelContainer" parent="DialogueRoot" unique_id=1586836139]
 layout_mode = 1
 anchors_preset = 12
 anchor_top = 1.0
@@ -46,33 +46,32 @@ grow_horizontal = 2
 grow_vertical = 0
 theme_override_styles/panel = SubResource("StyleBox_dialogue")
 
-[node name="Margin" type="MarginContainer" parent="DialogueRoot/Panel"]
+[node name="Margin" type="MarginContainer" parent="DialogueRoot/Panel" unique_id=1636964935]
 layout_mode = 2
 theme_override_constants/margin_left = 22
 theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 22
 theme_override_constants/margin_bottom = 14
 
-[node name="Content" type="VBoxContainer" parent="DialogueRoot/Panel/Margin"]
+[node name="Content" type="VBoxContainer" parent="DialogueRoot/Panel/Margin" unique_id=1906505661]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="SpeakerLabel" type="Label" parent="DialogueRoot/Panel/Margin/Content"]
+[node name="SpeakerLabel" type="Label" parent="DialogueRoot/Panel/Margin/Content" unique_id=316394064]
 layout_mode = 2
 theme_override_font_sizes/font_size = 24
 text = "Speaker"
 
-[node name="BodyLabel" type="RichTextLabel" parent="DialogueRoot/Panel/Margin/Content"]
+[node name="BodyLabel" type="RichTextLabel" parent="DialogueRoot/Panel/Margin/Content" unique_id=104233342]
 custom_minimum_size = Vector2(0, 72)
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_font_sizes/normal_font_size = 20
-bbcode_enabled = false
+text = "Dialogue text"
 fit_content = true
 scroll_active = false
-text = "Dialogue text"
 
-[node name="ContinueLabel" type="Label" parent="DialogueRoot/Panel/Margin/Content"]
+[node name="ContinueLabel" type="Label" parent="DialogueRoot/Panel/Margin/Content" unique_id=2123947753]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.72, 0.72, 0.76, 1)
 text = "Space / Enter"

@@ -13,9 +13,14 @@ const TARGET = preload("uid://16edwc1adi0x")
 @export var speed : float = 500.0
 @export var speed_multiplier : float = 1.0
 
-@export var grace : float = 10.0
-@export var target_size : float = 32.0
-@export var slider_size : float = 9.0
+@export var grace : float = 7.0
+@export var max_target_size : float = 128.0
+@export var min_target_size : float = 16.0
+@export var target_shrink_rate : float = 0.9
+var current_target_size : float = 128.0
+
+
+@export var slider_size : float = 5.0
 
 @export var one_shot : bool = false
 @export var fixed_window : float = -1
@@ -36,7 +41,7 @@ func _ready():
 
 ## Returns the target hit area including input grace.
 func target_half_width() -> float:
-	return target_size * 0.5 + grace
+	return current_target_size * 0.5 + grace
 
 
 ## Returns the slider edge area including input grace.
@@ -69,7 +74,8 @@ func stop():
 ## Adds and positions one valid hit target.
 func add_target():
 	var new_target = TARGET.instantiate()
-	new_target.offset_right = new_target.offset_left + target_size
+	new_target.size.x = max_target_size
+	new_target.offset_right = new_target.offset_left + max_target_size
 	new_target.offset_transform_position.x = -new_target.size.x * 0.5
 	backing.add_child(new_target)
 	backing.move_child(new_target, 0)
@@ -82,6 +88,10 @@ func add_target():
 func remove_all_extra_targets():
 	while targets.size() > 1:
 		remove_target()
+	if targets.size() < 1:
+		printerr("Removed all targets instead of all but one.")
+		return
+	targets[0].size.x = max_target_size
 
 
 ## Removes the most recently added target.
@@ -113,5 +123,8 @@ func _process(delta: float) -> void:
 
 
 ## Moves one target to a valid position inside its backing bar.
-func randomize_target(target_panel : Panel):
-	target_panel.position.x = clamp((randf() if fixed_window < 0 else fixed_window)* backing.size.x, target_half_width(), backing.size.x - target_half_width())
+func randomize_target(target : Panel):
+	target.position.x = clamp((randf() if fixed_window < 0 else fixed_window)* backing.size.x, target_half_width(), backing.size.x - target_half_width())
+	current_target_size = clamp(target.size.x * target_shrink_rate, min_target_size, max_target_size)
+	target.size.x = current_target_size
+	target.offset_transform_position.x = -target.size.x * 0.5
