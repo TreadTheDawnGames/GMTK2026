@@ -1,20 +1,24 @@
 class_name MiningHitParticles
 extends Node2D
 
-## Plays dirt pieces that collide with the remaining terrain.
+## Plays dirt fragments that bounce against the remaining terrain.
 
 class DirtPiece:
 	var terrain_position: Vector2
 	var velocity: Vector2
 	var total_lifetime: float
 	var remaining_lifetime: float
-	var half_size: float
+	var radius: float
 	var color: Color
+	var rotation: float
+	var angular_velocity: float
+	var shape_seed: float
 	var settled: bool = false
 
 
 @export_category("References")
 @export var terrain_manager: TerrainManager
+@export var terrain_profile: TerrainLayerProfile
 
 @export_category("Burst")
 @export_range(0.1, 2.0, 0.05) var pieces_per_removed_cell: float = 0.6
@@ -22,8 +26,8 @@ class DirtPiece:
 @export_range(1, 256, 1) var maximum_piece_amount: int = 128
 @export_range(0.1, 3.0, 0.05) var piece_lifetime: float = 1.0
 @export_range(0.1, 1.0, 0.05) var fade_portion: float = 0.55
-@export_range(0.25, 1.0, 0.05) var minimum_cell_scale: float = 0.5
-@export_range(0.25, 1.5, 0.05) var maximum_cell_scale: float = 1.0
+@export_range(0.25, 1.0, 0.05) var minimum_fragment_scale: float = 0.5
+@export_range(0.25, 1.5, 0.05) var maximum_fragment_scale: float = 1.0
 
 @export_category("Motion")
 @export_range(0.0, 1_000.0, 5.0) var minimum_launch_speed: float = 180.0
@@ -35,9 +39,9 @@ class DirtPiece:
 @export_range(0.0, 200.0, 1.0) var settle_speed: float = 35.0
 
 @export_category("Performance")
-## Limits simultaneous dirt pixels so repeated hits stay inexpensive.
+## Limits simultaneous fragments so repeated hits stay inexpensive.
 @export_range(1, 512, 1) var maximum_active_pieces: int = 192
-## Applies a lower simultaneous-pixel limit in browser exports.
+## Applies a lower simultaneous-fragment limit in browser exports.
 @export_range(1, 256, 1) var web_maximum_active_pieces: int = 64
 
 var _pieces: Array[DirtPiece] = []
@@ -93,7 +97,7 @@ func play_at_impact(
 		clampf(combo_strength, 0.0, 1.0)
 	)
 	var logical_cell_size := float(
-		terrain_manager.config.terrain_cell_size_px
+		terrain_manager.config.terrain_cell_world_size
 	)
 
 	for _piece_index in range(piece_amount):
@@ -107,15 +111,20 @@ func play_at_impact(
 		) * speed_bonus
 		piece.total_lifetime = piece_lifetime
 		piece.remaining_lifetime = piece.total_lifetime
-		piece.half_size = logical_cell_size * 0.5 * _random.randf_range(
-			minimum_cell_scale,
-			maximum_cell_scale
+		piece.radius = logical_cell_size * 0.5 * _random.randf_range(
+			minimum_fragment_scale,
+			maximum_fragment_scale
 		)
 		piece.color = (
-			terrain_manager.config.terrain_accent_color
-			if _random.randf() < 0.25
-			else terrain_manager.config.terrain_color
+			terrain_profile.get_debris_color(
+				_random.randi()
+			)
+			if terrain_profile != null
+			else Color("d9a066")
 		)
+		piece.rotation = _random.randf_range(0.0, TAU)
+		piece.angular_velocity = _random.randf_range(-8.0, 8.0)
+		piece.shape_seed = _random.randf_range(0.0, TAU)
 		_pieces.append(piece)
 	set_process(true)
 	queue_redraw()
@@ -131,13 +140,14 @@ func _process(delta: float) -> void:
 			continue
 		if not piece.settled:
 			piece.velocity.y += gravity * delta
+			piece.rotation += piece.angular_velocity * delta
 			_move_piece(piece, delta)
 	queue_redraw()
 	if _pieces.is_empty():
 		set_process(false)
 
 
-## Draws each fading dirt pixel at its current terrain position.
+## Draws each fading dirt fragment at its current terrain position.
 func _draw() -> void:
 	for piece in _pieces:
 		var screen_position := terrain_manager.terrain_to_screen_position(
@@ -151,13 +161,26 @@ func _draw() -> void:
 		)
 		var draw_color := piece.color
 		draw_color.a *= fade_alpha
-		draw_rect(
-			Rect2(
-				screen_position - Vector2.ONE * piece.half_size,
-				Vector2.ONE * piece.half_size * 2.0
-			),
-			draw_color
-		)
+		var vertices := PackedVector2Array()
+		for vertex_index in range(6):
+			var angle := (
+				piece.rotation
+				+ TAU * float(vertex_index) / 6.0
+			)
+			var edge_variation := lerpf(
+				0.72,
+				1.0,
+				0.5 + 0.5 * sin(
+					piece.shape_seed + float(vertex_index) * 2.17
+				)
+			)
+			vertices.append(
+				screen_position
+				+ Vector2.RIGHT.rotated(angle)
+				* piece.radius
+				* edge_variation
+			)
+		draw_colored_polygon(vertices, draw_color)
 
 
 ## Moves one dirt piece and bounces it away from solid terrain.
@@ -208,12 +231,12 @@ func _position_collides(
 	piece: DirtPiece
 ) -> bool:
 	var horizontal_edge := terrain_position + Vector2(
-		signf(piece.velocity.x) * piece.half_size,
+		signf(piece.velocity.x) * piece.radius,
 		0.0
 	)
 	var vertical_edge := terrain_position + Vector2(
 		0.0,
-		signf(piece.velocity.y) * piece.half_size
+		signf(piece.velocity.y) * piece.radius
 	)
 	return (
 		terrain_manager.is_solid_at_terrain_position(horizontal_edge)

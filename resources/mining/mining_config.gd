@@ -2,14 +2,13 @@ class_name MiningConfig
 extends Resource
 
 ## Shared, inspector-editable tuning for terrain, descent, and hit feedback.
-## Gameplay depth is independent from terrain rendering size.
 ## One descended terrain row equals one gameplay depth.
 
 @export_category("Terrain")
 @export_range(16, 512, 1) var terrain_width_cells: int = 128
 @export_range(16, 256, 1) var chunk_height_cells: int = 64
-## Controls how large one terrain cell appears on screen.
-@export_range(1, 32, 1) var terrain_cell_size_px: int = 8
+## Sets the world-space size of one gameplay terrain cell.
+@export_range(1, 32, 1) var terrain_cell_world_size: int = 8
 @export_range(1, 512, 1) var initial_surface_row: int = 38
 @export_range(1, 1_000_000, 1) var total_run_depth: int = 100_000
 ## Terrain rows cleared by a normal starting hit.
@@ -19,9 +18,6 @@ extends Resource
 @export_range(0, 32, 1) var base_tunnel_half_width_cells: int = 3
 @export_range(0, 8, 1) var combo_tunnel_half_width_cells_per_step: int = 1
 @export var global_seed: int = 2026
-@export_range(16, 1_024, 1) var depth_band_height_rows: int = 128
-@export var terrain_color: Color = Color("633c31")
-@export var terrain_accent_color: Color = Color("75483a")
 @export var ore_definitions: Array[OreDefinition] = []
 
 @export_category("View")

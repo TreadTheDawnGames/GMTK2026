@@ -2,6 +2,12 @@
 
 [ext_resource type="Script" uid="uid://doqncdiwvq0t5" path="res://Scripts/mining/miner_rig.gd" id="1_rig"]
 [ext_resource type="AudioStream" uid="uid://bptrknuwih5g2" path="res://Assets/Audio/513694__kasparsj__impact-stone-heavy.wav" id="2_avhsd"]
+[ext_resource type="Texture2D" uid="uid://ci36ejocc2jce" path="res://Assets/Characters/MrNotOffensiveName-Sheet.png" id="3_drawn_miner"]
+[ext_resource type="Shader" path="res://Shaders/drawn_miner.gdshader" id="4_drawn_shader"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_drawn_miner"]
+resource_local_to_scene = true
+shader = ExtResource("4_drawn_shader")
 
 [sub_resource type="Animation" id="Animation_reset"]
 resource_name = "RESET"
@@ -66,6 +72,30 @@ tracks/4/keys = {
 "update": 0,
 "values": [-0.28]
 }
+tracks/5/type = "value"
+tracks/5/imported = false
+tracks/5/enabled = true
+tracks/5/path = NodePath("VisualRoot/DrawnMinerSprite:frame")
+tracks/5/interp = 1
+tracks/5/loop_wrap = true
+tracks/5/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [0]
+}
+tracks/6/type = "value"
+tracks/6/imported = false
+tracks/6/enabled = true
+tracks/6/path = NodePath("VisualRoot/DrawnMinerSprite:position")
+tracks/6/interp = 1
+tracks/6/loop_wrap = true
+tracks/6/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector2(0, -16)]
+}
 
 [sub_resource type="Animation" id="Animation_idle"]
 resource_name = "idle"
@@ -107,6 +137,30 @@ tracks/2/keys = {
 "update": 0,
 "values": [-0.28, -0.26, -0.28]
 }
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("VisualRoot/DrawnMinerSprite:frame")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [0]
+}
+tracks/4/type = "value"
+tracks/4/imported = false
+tracks/4/enabled = true
+tracks/4/path = NodePath("VisualRoot/DrawnMinerSprite:position")
+tracks/4/interp = 1
+tracks/4/loop_wrap = true
+tracks/4/keys = {
+"times": PackedFloat32Array(0, 0.45, 0.9),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(0, -16), Vector2(0, -14), Vector2(0, -16)]
+}
 
 [sub_resource type="Animation" id="Animation_miss_motion"]
 resource_name = "mine_miss"
@@ -146,6 +200,30 @@ tracks/2/keys = {
 "transitions": PackedFloat32Array(1, 1, 1),
 "update": 0,
 "values": [0.08, -0.5, -0.28]
+}
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("VisualRoot/DrawnMinerSprite:frame")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0, 0.07, 0.28),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 1,
+"values": [3, 6, 0]
+}
+tracks/4/type = "value"
+tracks/4/imported = false
+tracks/4/enabled = true
+tracks/4/path = NodePath("VisualRoot/DrawnMinerSprite:position")
+tracks/4/interp = 1
+tracks/4/loop_wrap = true
+tracks/4/keys = {
+"times": PackedFloat32Array(0, 0.07, 0.28),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(0, -5), Vector2(0, 7), Vector2(0, -16)]
 }
 
 [sub_resource type="Animation" id="Animation_success_motion"]
@@ -201,6 +279,30 @@ tracks/3/keys = {
 "method": &"_emit_success_impact"
 }]
 }
+tracks/4/type = "value"
+tracks/4/imported = false
+tracks/4/enabled = true
+tracks/4/path = NodePath("VisualRoot/DrawnMinerSprite:frame")
+tracks/4/interp = 1
+tracks/4/loop_wrap = true
+tracks/4/keys = {
+"times": PackedFloat32Array(0, 0.09, 0.16, 0.38),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"update": 1,
+"values": [1, 5, 2, 0]
+}
+tracks/5/type = "value"
+tracks/5/imported = false
+tracks/5/enabled = true
+tracks/5/path = NodePath("VisualRoot/DrawnMinerSprite:position")
+tracks/5/interp = 1
+tracks/5/loop_wrap = true
+tracks/5/keys = {
+"times": PackedFloat32Array(0, 0.09, 0.16, 0.38),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"update": 0,
+"values": [Vector2(0, 9), Vector2(0, 23), Vector2(0, 13), Vector2(0, -16)]
+}
 
 [sub_resource type="Animation" id="Animation_wind_down"]
 resource_name = "wind_down"
@@ -240,6 +342,30 @@ tracks/2/keys = {
 "transitions": PackedFloat32Array(1, 1),
 "update": 0,
 "values": [-0.75, 0.08]
+}
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("VisualRoot/DrawnMinerSprite:frame")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0, 0.1, 0.2),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 1,
+"values": [1, 5, 2]
+}
+tracks/4/type = "value"
+tracks/4/imported = false
+tracks/4/enabled = true
+tracks/4/path = NodePath("VisualRoot/DrawnMinerSprite:position")
+tracks/4/interp = 1
+tracks/4/loop_wrap = true
+tracks/4/keys = {
+"times": PackedFloat32Array(0, 0.1, 0.2),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(0, 9), Vector2(0, 23), Vector2(0, 13)]
 }
 
 [sub_resource type="Animation" id="Animation_wind_up"]
@@ -281,6 +407,30 @@ tracks/2/keys = {
 "update": 0,
 "values": [-0.28, -0.75]
 }
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("VisualRoot/DrawnMinerSprite:frame")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0, 0.25),
+"transitions": PackedFloat32Array(1, 1),
+"update": 1,
+"values": [0, 1]
+}
+tracks/4/type = "value"
+tracks/4/imported = false
+tracks/4/enabled = true
+tracks/4/path = NodePath("VisualRoot/DrawnMinerSprite:position")
+tracks/4/interp = 1
+tracks/4/loop_wrap = true
+tracks/4/keys = {
+"times": PackedFloat32Array(0, 0.25),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector2(0, -16), Vector2(0, 9)]
+}
 
 [sub_resource type="AnimationLibrary" id="AnimationLibrary_rig"]
 _data = {
@@ -292,13 +442,14 @@ _data = {
 &"wind_up": SubResource("Animation_wind_up")
 }
 
-[node name="MinerRig" type="Node2D" unique_id=1134346491 node_paths=PackedStringArray("animation_player", "visual_root", "impact_point", "stand_in_hammer_head", "final_hammer_head_sprite", "impact_audio_player")]
+[node name="MinerRig" type="Node2D" unique_id=1134346491 node_paths=PackedStringArray("animation_player", "visual_root", "drawn_miner_sprite", "impact_point", "stand_in_hammer_head", "final_hammer_head_sprite", "impact_audio_player")]
 editor_description = "Presentation-only character rig. Keep this root fixed so the player stays centered. Animate VisualRoot and its pivots instead."
 position = Vector2(576, 282)
 script = ExtResource("1_rig")
 animation_player = NodePath("AnimationPlayer")
 visual_root = NodePath("VisualRoot")
-impact_point = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/ImpactPoint")
+drawn_miner_sprite = NodePath("VisualRoot/DrawnMinerSprite")
+impact_point = NodePath("VisualRoot/DrawnImpactPoint")
 stand_in_hammer_head = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/StandInToolHead")
 final_hammer_head_sprite = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/PickaxeHeadSprite")
 impact_audio_player = NodePath("ImpactAudio")
@@ -306,11 +457,24 @@ impact_audio_player = NodePath("ImpactAudio")
 [node name="VisualRoot" type="Node2D" parent="." unique_id=465234156]
 editor_description = "Animate this for whole-character bounce, squash, recoil, and small fall offsets. Do not use it to calculate mining progress."
 
+[node name="DrawnMinerSprite" type="Sprite2D" parent="VisualRoot"]
+material = SubResource("ShaderMaterial_drawn_miner")
+position = Vector2(0, -16)
+scale = Vector2(0.62, 0.62)
+texture = ExtResource("3_drawn_miner")
+hframes = 7
+
+[node name="DrawnImpactPoint" type="Marker2D" parent="VisualRoot"]
+editor_description = "Contact point for the drawn miner's ground-strike frame."
+position = Vector2(24, 57)
+
 [node name="BackHairSprite" type="Sprite2D" parent="VisualRoot" unique_id=1151509294]
+visible = false
 editor_description = "Optional transparent PNG layer rendered behind the body. Assign the back-hair texture here."
 position = Vector2(0, -19)
 
 [node name="BodyPivot" type="Node2D" parent="VisualRoot" unique_id=1711817002]
+visible = false
 editor_description = "Main torso pivot. Rotate this slightly for anticipation and recoil; keep large swing motion on ArmPivot."
 position = Vector2(2, 4)
 

@@ -195,7 +195,6 @@ func randomize_target(target: TimingTarget) -> void:
 				backing.size.x - target_size,# * 0.5
 				)
 				do_again = true
-				print("rerolling")
 				target.position.x = clampf(
 				target_center_x,
 				target_size ,#* 0.5,

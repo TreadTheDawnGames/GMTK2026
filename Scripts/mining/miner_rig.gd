@@ -1,7 +1,7 @@
 class_name MinerRig
 extends Node2D
 
-## Plays animations for the miner cutout rig.
+## Plays the miner's drawn frames and reports the authored contact moment.
 
 signal impact_contact(screen_position: Vector2)
 signal swing_finished
@@ -13,6 +13,7 @@ signal swing_finished
 @export_category("References")
 @export var animation_player: AnimationPlayer
 @export var visual_root: Node2D
+@export var drawn_miner_sprite: Sprite2D
 @export var impact_point: Marker2D
 @export var stand_in_hammer_head: Line2D
 @export var final_hammer_head_sprite: Sprite2D
@@ -101,12 +102,20 @@ func set_animation_speed_multiplier(value: float) -> void:
 		animation_player.speed_scale = animation_speed_multiplier
 
 
-## Applies the equipped pickaxe color to both placeholder and final tool art.
+## Applies the equipped pickaxe color to every available miner art slot.
 func set_hammer_head_color(color: Color) -> void:
 	if is_instance_valid(stand_in_hammer_head):
 		stand_in_hammer_head.default_color = color
 	if is_instance_valid(final_hammer_head_sprite):
 		final_hammer_head_sprite.self_modulate = color
+	if (
+		is_instance_valid(drawn_miner_sprite)
+		and drawn_miner_sprite.material is ShaderMaterial
+	):
+		var drawn_material := (
+			drawn_miner_sprite.material as ShaderMaterial
+		)
+		drawn_material.set_shader_parameter(&"tool_tint", color)
 
 
 ## Faces the visible miner toward the selected mining side.

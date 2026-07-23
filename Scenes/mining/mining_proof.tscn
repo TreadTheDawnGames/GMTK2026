@@ -28,6 +28,8 @@
 [ext_resource type="Resource" path="res://resources/encounters/heavy_pickaxe_gift.tres" id="29_heavy_gift"]
 [ext_resource type="Script" path="res://Scripts/mining/dig_number_presenter.gd" id="30_dig_number_presenter"]
 [ext_resource type="PackedScene" path="res://Scenes/mining/dig_number.tscn" id="31_dig_number"]
+[ext_resource type="Script" path="res://Scripts/mining/terrain_layer_renderer.gd" id="32_layer_renderer"]
+[ext_resource type="Resource" path="res://resources/mining/default_terrain_layer_profile.tres" id="33_layer_profile"]
 
 [node name="GameRoot" type="Node" unique_id=1769413368]
 
@@ -44,24 +46,34 @@ script = ExtResource("15_ore_inventory")
 position = Vector2(576, 324)
 
 [node name="Background" type="ColorRect" parent="MiningScene" unique_id=1093987671]
+z_index = -10
 offset_right = 1152.0
 offset_bottom = 648.0
 mouse_filter = 2
 color = Color(0.075, 0.095, 0.13, 1)
 
-[node name="TerrainManager" type="Node2D" parent="MiningScene" unique_id=381932075]
+[node name="TerrainManager" type="Node" parent="MiningScene" unique_id=381932075]
 script = ExtResource("3_terrain")
 config = ExtResource("1_config")
 encounter_config = ExtResource("14_encounter_config")
 
+[node name="TerrainLayerRenderer" type="Node2D" parent="MiningScene" node_paths=PackedStringArray("terrain_manager")]
+script = ExtResource("32_layer_renderer")
+terrain_manager = NodePath("../TerrainManager")
+profile = ExtResource("33_layer_profile")
+
 [node name="MinerRig" parent="MiningScene" unique_id=726963260 instance=ExtResource("7_miner_rig")]
+z_index = 1
 
 [node name="EncounterNpc" parent="MiningScene" unique_id=174482703 instance=ExtResource("7_miner_rig")]
 visible = false
+z_index = 1
 position = Vector2(760, 282)
 
 [node name="MiningHitParticles" parent="MiningScene" unique_id=1668060940 node_paths=PackedStringArray("terrain_manager") instance=ExtResource("10_hit_particles")]
+z_index = 3
 terrain_manager = NodePath("../TerrainManager")
+terrain_profile = ExtResource("33_layer_profile")
 
 [node name="Systems" type="Node" parent="MiningScene" unique_id=1573949011]
 

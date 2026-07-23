@@ -1,115 +1,79 @@
-# Miner Cutout Rigging Guide
+# Miner Animation Guide
 
-The miner uses a simple cutout rig made from `Node2D` pivots. It does not
-require a `Skeleton2D`, bones, skin weights, or frame-by-frame sprite sheets.
+The playable miner uses the seven-frame drawing in
+`Assets/Characters/MrNotOffensiveName-Sheet.png`. `MinerRig` keeps animation,
+impact timing, facing, audio, and playback speed in one scene.
 
-## Controls
+## Scene controls
 
 ```text
-MinerRig                 Keep fixed at the player screen position
-├── VisualRoot           Whole-character bounce, squash, and recoil
-│   ├── BackHairSprite   Optional art behind the body
-│   └── BodyPivot        Torso rotation
-│       ├── BodySprite   Body art
-│       ├── HeadPivot    Head counter-rotation
-│       │   ├── HeadSprite
-│       │   └── FrontHairSprite
-│       └── ArmPivot     Main swing rotation
-│           ├── ArmSprite
-│           └── PickaxePivot  Tool follow-through
-│               └── PickaxeSprite
-├── ChipOrigin           Fixed gameplay impact point; never animate
-└── AnimationPlayer
+MinerRig                 Fixed player screen position
+├── VisualRoot           Flips the complete miner for left/right aim
+│   ├── DrawnMinerSprite Seven-frame visible animation
+│   └── DrawnImpactPoint Hammer contact location on the strike frame
+├── ChipOrigin           Fixed center used to calculate the player's fall
+└── AnimationPlayer      Owns idle, success, miss, and preview clips
 ```
 
-The basic rig has only three animation controls:
+`BodyPivot` and its cutout children remain hidden in the scene as the earlier
+stand-in asset. They are not the visible gameplay character.
 
-1. `BodyPivot` moves the whole body. The head, arm, and tool follow it.
-2. `ArmPivot` creates the main swing.
-3. `PickaxePivot` adds tool follow-through.
-
-`HeadPivot` is an optional fourth polish control for head counter-rotation.
-Do not animate `MinerRig` or `ChipOrigin`.
-
-## Preview an existing animation
+## Preview an animation
 
 1. Open `miner_rig.tscn`.
-2. Select `AnimationPlayer` in the Scene tree.
-3. In the bottom Animation panel, open the dropdown that currently says
-   `RESET`.
-4. Choose `idle`, `wind_up`, `wind_down`, `mine_success`, or `mine_miss`.
-5. Press the play triangle in the Animation panel.
+2. Select `AnimationPlayer`.
+3. Choose `idle`, `wind_up`, `wind_down`, `mine_success`, or `mine_miss` in
+   the Animation panel.
+4. Press the play triangle.
 
-`RESET` is the neutral property state used by Godot. Do not author the swing
-inside `RESET`.
+`RESET` stores the neutral frame and should not be used as an action clip.
 
-## Edit the successful swing
+## Edit the mining swing
 
-1. Select `mine_success`.
-2. Move the timeline cursor to the desired time.
-3. Select a pivot such as `ArmPivot`.
-4. Rotate or move it in the 2D viewport.
-5. In the Inspector, expand `Transform` and press the key icon beside
-   `Rotation`, `Position`, or `Scale`.
-6. Repeat for the other poses and pivots.
-7. Press play to preview.
+The visible animation changes only two `DrawnMinerSprite` properties:
 
-Suggested poses:
+- `frame` chooses one drawing from the sheet.
+- `position` keeps the character's feet aligned while poses change height.
 
-- `0.00`: impact/contact pose. A correct timing press breaks terrain now.
-- `0.07`: strongest recoil and tool follow-through.
-- `0.28`: return to the neutral pose.
+`mine_success` currently uses:
 
-The successful animation begins at impact because Caspian's timing result is
-the authoritative hit moment. The animation shows recoil and recovery after
-that result; it does not decide when terrain breaks.
+- `0.00`: frame 1, wound up at the upper-right.
+- `0.09`: frame 5, fast transition into the strike.
+- `0.16`: frame 2, ground contact.
+- `0.38`: frame 0, return to idle.
 
-`wind_up` and `wind_down` are starter clips for authoring the complete visual
-swing. Each has only three tracks: body position, arm rotation, and pickaxe
-rotation. `mine_success` remains the gameplay contact/recoil clip so adding
-the practice clips does not silently delay terrain damage.
+The method track calls `_emit_success_impact()` at `0.16`. Move that method
+key with the contact drawing if the strike timing changes. Terrain, particles,
+audio, and the dig number all begin from that callback.
 
-## Change animation speed
+`wind_up` and `wind_down` contain the same poses as separate clips for
+previewing a larger anticipation. `play_full_swing()` plays them in order.
 
-Select the `MinerRig` root and change `Animation Speed Multiplier` under the
-Playback section. `1.0` is authored speed, `0.5` is half speed, and `2.0` is
-double speed.
+## Change speed
 
-Another gameplay system can change the same number without changing keys:
+`Animation Speed Multiplier` on `MinerRig` changes every clip. The mining
+controller also supplies the equipped pickaxe speed and combo bonus when it
+calls `play_success()`.
 
 ```gdscript
 miner_rig.set_animation_speed_multiplier(1.5)
 ```
 
-`Combo Speed Bonus` is a separate optional increase applied to successful
-gameplay hits. Use `play_full_swing()` to preview `wind_up` followed by
-`wind_down` from code.
+Playback speed changes timing without moving the impact key relative to the
+visible strike.
 
-For a miss, use a slower overshoot that never visually contacts `ChipOrigin`.
-For idle, keep movement small so it does not compete with the timing bar.
+## Replace the sheet
 
-## Replace the stand-ins with art
+Keep seven 256-by-256 frames in one horizontal row to replace the drawing
+without changing the scene. If the frame count or layout changes, update
+`DrawnMinerSprite.hframes` and the frame keys together.
 
-The easiest art delivery is a set of transparent PNG layers:
-
-- back hair
-- body
-- head
-- front hair or face details
-- swinging arm
-- pickaxe/tool
-
-Assign each PNG to its matching `Sprite2D`. Position each sprite so its joint
-lines up with its parent pivot. Then hide the matching `StandIn...` nodes with
-their eye icons.
-
-For a mostly single-piece character, assign the complete character to
-`BodySprite`, hide the unused head/hair/arm stand-ins, and keep the arm and
-pickaxe separate only if they need an independent swing.
+Keep the contact drawing aligned with `DrawnImpactPoint`. `ChipOrigin` stays
+fixed because it defines where the player falls, not where the artwork moves.
 
 ## Test in gameplay
 
-Open `mining_proof.tscn` and run the scene. Press Space or left click while the timing slider
-overlaps its target. A correct result should play `mine_success`, break terrain
-under `ChipOrigin`, and advance the player depth. A miss should play
-`mine_miss` without changing terrain or depth.
+Run `mining_proof.tscn` and press Space or left click while the timing slider
+overlaps a target. A correct result should play `mine_success`, break terrain
+on the contact frame, and advance depth. A miss should play `mine_miss`
+without changing terrain or depth.
