@@ -146,6 +146,20 @@ tracks/2/keys = {
 "update": 0,
 "values": [-0.48, 0.38, -0.28]
 }
+tracks/3/type = "method"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath(".")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0.16),
+"transitions": PackedFloat32Array(1),
+"values": [{
+"args": [],
+"method": &"_emit_success_impact"
+}]
+}
 
 [sub_resource type="Animation" id="Animation_miss_motion"]
 resource_name = "mine_miss"
@@ -277,11 +291,12 @@ _data = {
 &"wind_up": SubResource("Animation_wind_up")
 }
 
-[node name="MinerRig" type="Node2D" unique_id=1134346491 node_paths=PackedStringArray("animation_player")]
+[node name="MinerRig" type="Node2D" unique_id=1134346491 node_paths=PackedStringArray("animation_player", "impact_point")]
 editor_description = "Presentation-only character rig. Keep this root fixed so the player stays centered. Animate VisualRoot and its pivots instead."
 position = Vector2(576, 282)
 script = ExtResource("1_rig")
 animation_player = NodePath("AnimationPlayer")
+impact_point = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/ImpactPoint")
 
 [node name="VisualRoot" type="Node2D" parent="." unique_id=465234156]
 editor_description = "Animate this for whole-character bounce, squash, recoil, and small fall offsets. Do not use it to calculate mining progress."
@@ -363,6 +378,10 @@ rotation = -2.0989914
 points = PackedVector2Array(-16, 58, 16, 58)
 width = 9.0
 default_color = Color(0.94, 0.94, 0.94, 1)
+
+[node name="ImpactPoint" type="Marker2D" parent="VisualRoot/BodyPivot/ArmPivot/PickaxePivot"]
+editor_description = "Particle spawn point at the striking end of the hammer head."
+position = Vector2(79.44684, -13.451826)
 
 [node name="ChipOrigin" type="Marker2D" parent="." unique_id=1250073857]
 editor_description = "LOGIC ANCHOR: pixels break directly below this marker. Do not animate it. Move it only when permanently changing where mining occurs."

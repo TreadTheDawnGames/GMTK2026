@@ -1,8 +1,7 @@
 class_name MiningController
 extends Node
 
-## Resolves one timing result into terrain damage and run progression. Direct
-## calls preserve ordering; signals announce the completed result to visuals.
+## Turns timing results into terrain damage and player depth.
 
 signal mine_resolved(
 	depth_advanced_px: int,
@@ -21,6 +20,8 @@ signal mine_missed(combo: int)
 var _impact_seed: int = 0
 
 
+## Resolves one timing result. Successful hits break ground and move the player;
+## misses only update the failed-hit count.
 func resolve_attempt(success: bool, resolved_combo: int) -> void:
 	var safe_combo := maxi(resolved_combo, 0)
 	if not success:
@@ -33,6 +34,10 @@ func resolve_attempt(success: bool, resolved_combo: int) -> void:
 		config.base_chip_cells
 		+ config.combo_chip_cells_per_step * chip_combo
 	)
+	var requested_depth_rows := (
+		config.base_chip_depth_rows
+		+ config.combo_chip_depth_rows_per_step * chip_combo
+	)
 	var impact_cell := Vector2i(
 		terrain_manager.screen_x_to_terrain_cell_x(
 			chip_origin.global_position.x
@@ -43,7 +48,8 @@ func resolve_attempt(success: bool, resolved_combo: int) -> void:
 	var cells_removed := terrain_manager.chip_at(
 		impact_cell,
 		requested_cells,
-		_impact_seed
+		_impact_seed,
+		requested_depth_rows
 	)
 	var new_mining_y := terrain_manager.find_surface_row(
 		impact_cell.x,

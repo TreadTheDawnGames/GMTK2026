@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="DialogueConversation" format=3 uid="uid://bd616ftdm0c7c"]
+
+[ext_resource type="Script" uid="uid://c55utdbjdwaui" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
+[ext_resource type="Script" uid="uid://ivfntthetp0i" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
+[ext_resource type="Script" uid="uid://bwwpoalvqb7ni" path="res://resources/dialogue/dialogue_line.gd" id="3_line"]
+
+[sub_resource type="Resource" id="Line_welcome"]
+script = ExtResource("3_line")
+speaker_slot = &"keeper"
+text = "One thousand pixels down. That is no small climb."
+
+[sub_resource type="Resource" id="Line_question"]
+script = ExtResource("3_line")
+speaker_slot = &"miner"
+text = "It feels like I have barely started."
+
+[sub_resource type="Resource" id="Line_answer"]
+script = ExtResource("3_line")
+speaker_slot = &"keeper"
+text = "Then keep going. You've got this. There are more friendly faces waiting below."
+
+[sub_resource type="Resource" id="Line_departure"]
+script = ExtResource("3_line")
+speaker_slot = &"miner"
+text = "All right. Down I go."
+
+[sub_resource type="Resource" id="Participant_miner"]
+script = ExtResource("2_participant")
+slot = &"miner"
+display_name = "Miner"
+
+[sub_resource type="Resource" id="Participant_keeper"]
+script = ExtResource("2_participant")
+slot = &"keeper"
+display_name = "Marketplace Keeper"
+
+[resource]
+script = ExtResource("1_conversation")
+conversation_id = &"marketplace_intro"
+participants = Array[ExtResource("2_participant")]([SubResource("Participant_miner"), SubResource("Participant_keeper")])
+lines = Array[ExtResource("3_line")]([SubResource("Line_welcome"), SubResource("Line_question"), SubResource("Line_answer"), SubResource("Line_departure")])

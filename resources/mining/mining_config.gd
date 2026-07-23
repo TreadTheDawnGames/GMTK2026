@@ -11,6 +11,8 @@ extends Resource
 @export_range(1, 512, 1) var initial_surface_row: int = 38
 @export_range(1, 1_000, 1) var base_chip_cells: int = 24
 @export_range(0, 100, 1) var combo_chip_cells_per_step: int = 4
+@export_range(1, 64, 1) var base_chip_depth_rows: int = 3
+@export_range(0, 16, 1) var combo_chip_depth_rows_per_step: int = 1
 @export var global_seed: int = 2026
 @export_range(16, 1_024, 1) var depth_band_height_rows: int = 128
 @export var terrain_color: Color = Color("633c31")

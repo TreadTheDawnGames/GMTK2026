@@ -1,47 +1,60 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene format=3 uid="uid://cd2mp7bpcdx5l"]
 
 [ext_resource type="Resource" path="res://resources/mining/mining_config.tres" id="1_config"]
-[ext_resource type="Script" path="res://Scripts/mining/run_state.gd" id="2_run_state"]
-[ext_resource type="Script" path="res://Scripts/mining/terrain_manager.gd" id="3_terrain"]
-[ext_resource type="Script" path="res://Scripts/mining/timing_bridge.gd" id="4_timing_bridge"]
-[ext_resource type="Script" path="res://Scripts/mining/mining_controller.gd" id="5_controller"]
-[ext_resource type="Script" path="res://Scripts/ui/mining_hud.gd" id="6_hud"]
-[ext_resource type="PackedScene" path="res://Scenes/mining/miner_rig.tscn" id="7_miner_rig"]
-[ext_resource type="PackedScene" path="res://Scenes/TimingWindow.tscn" id="8_timing_window"]
-[ext_resource type="Script" path="res://Scripts/mining/view_controller.gd" id="9_view_controller"]
+[ext_resource type="Script" uid="uid://coay1iq5hk27p" path="res://Scripts/mining/run_state.gd" id="2_run_state"]
+[ext_resource type="Script" uid="uid://b38bkkdjcto5g" path="res://Scripts/mining/terrain_manager.gd" id="3_terrain"]
+[ext_resource type="Script" uid="uid://dhyir0je03ka3" path="res://Scripts/mining/timing_bridge.gd" id="4_timing_bridge"]
+[ext_resource type="Script" uid="uid://bwr8gfyga4tkf" path="res://Scripts/mining/mining_controller.gd" id="5_controller"]
+[ext_resource type="Script" uid="uid://t03gc6i8a4yb" path="res://Scripts/ui/mining_hud.gd" id="6_hud"]
+[ext_resource type="PackedScene" uid="uid://021ecdl5prdm" path="res://Scenes/mining/miner_rig.tscn" id="7_miner_rig"]
+[ext_resource type="PackedScene" uid="uid://bwq8rrtdf55gq" path="res://Scenes/TimingWindow.tscn" id="8_timing_window"]
+[ext_resource type="Script" uid="uid://cl8v0x0ammlnj" path="res://Scripts/mining/view_controller.gd" id="9_view_controller"]
+[ext_resource type="PackedScene" path="res://Scenes/mining/mining_hit_particles.tscn" id="10_hit_particles"]
+[ext_resource type="PackedScene" path="res://Scenes/dialogue/dialogue_overlay.tscn" id="11_dialogue_overlay"]
+[ext_resource type="Resource" path="res://resources/dialogue/marketplace_intro.tres" id="12_marketplace_dialogue"]
+[ext_resource type="Script" uid="uid://bmv66cgstojt0" path="res://Scripts/dialogue/depth_encounter_controller.gd" id="13_depth_encounter"]
+[ext_resource type="Resource" path="res://resources/encounters/depth_encounter_config.tres" id="14_encounter_config"]
 
-[node name="GameRoot" type="Node"]
+[node name="GameRoot" type="Node" unique_id=1769413368]
 
-[node name="RunState" type="Node" parent="."]
+[node name="RunState" type="Node" parent="." unique_id=308069637]
 script = ExtResource("2_run_state")
 config = ExtResource("1_config")
 
-[node name="MiningScene" type="Node2D" parent="."]
+[node name="MiningScene" type="Node2D" parent="." unique_id=165087963]
 
-[node name="Background" type="ColorRect" parent="MiningScene"]
+[node name="Background" type="ColorRect" parent="MiningScene" unique_id=1093987671]
 offset_right = 1152.0
 offset_bottom = 648.0
 mouse_filter = 2
 color = Color(0.075, 0.095, 0.13, 1)
 
-[node name="TerrainManager" type="Node2D" parent="MiningScene"]
+[node name="TerrainManager" type="Node2D" parent="MiningScene" unique_id=381932075]
 script = ExtResource("3_terrain")
 config = ExtResource("1_config")
+encounter_config = ExtResource("14_encounter_config")
 
-[node name="MinerRig" parent="MiningScene" instance=ExtResource("7_miner_rig")]
+[node name="MinerRig" parent="MiningScene" unique_id=726963260 instance=ExtResource("7_miner_rig")]
 
-[node name="Systems" type="Node" parent="MiningScene"]
+[node name="MarketplaceNpc" parent="MiningScene" unique_id=174482703 instance=ExtResource("7_miner_rig")]
+visible = false
+position = Vector2(760, 282)
 
-[node name="TimingBridge" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("timing_window")]
+[node name="MiningHitParticles" parent="MiningScene" unique_id=1668060940 node_paths=PackedStringArray("terrain_manager") instance=ExtResource("10_hit_particles")]
+terrain_manager = NodePath("../TerrainManager")
+
+[node name="Systems" type="Node" parent="MiningScene" unique_id=1573949011]
+
+[node name="TimingBridge" type="Node" parent="MiningScene/Systems" unique_id=1886677998 node_paths=PackedStringArray("timing_window")]
 script = ExtResource("4_timing_bridge")
 timing_window = NodePath("../../HUD/TimingWindow")
 
-[node name="ViewController" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("terrain_manager")]
+[node name="ViewController" type="Node" parent="MiningScene/Systems" unique_id=844951694 node_paths=PackedStringArray("terrain_manager")]
 script = ExtResource("9_view_controller")
 config = ExtResource("1_config")
 terrain_manager = NodePath("../../TerrainManager")
 
-[node name="MiningController" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("run_state", "terrain_manager", "view_controller", "chip_origin")]
+[node name="MiningController" type="Node" parent="MiningScene/Systems" unique_id=1389910536 node_paths=PackedStringArray("run_state", "terrain_manager", "view_controller", "chip_origin")]
 script = ExtResource("5_controller")
 config = ExtResource("1_config")
 run_state = NodePath("../../../RunState")
@@ -49,26 +62,41 @@ terrain_manager = NodePath("../../TerrainManager")
 view_controller = NodePath("../ViewController")
 chip_origin = NodePath("../../MinerRig/ChipOrigin")
 
-[node name="HUD" type="CanvasLayer" parent="MiningScene" node_paths=PackedStringArray("run_state", "depth_label")]
+[node name="MarketplaceEncounterController" type="Node" parent="MiningScene/Systems" unique_id=797816739 node_paths=PackedStringArray("dialogue_director", "timing_window", "encounter_npc")]
+script = ExtResource("13_depth_encounter")
+encounter_config = ExtResource("14_encounter_config")
+conversation = ExtResource("12_marketplace_dialogue")
+dialogue_director = NodePath("../../../DialogueDirector")
+timing_window = NodePath("../../HUD/TimingWindow")
+encounter_npc = NodePath("../../MarketplaceNpc")
+
+[node name="HUD" type="CanvasLayer" parent="MiningScene" unique_id=557922213 node_paths=PackedStringArray("run_state", "depth_label")]
 script = ExtResource("6_hud")
 run_state = NodePath("../../RunState")
 depth_label = NodePath("Layout/Content/DepthLabel")
 
-[node name="TimingWindow" parent="MiningScene/HUD" instance=ExtResource("8_timing_window")]
+[node name="TimingWindow" parent="MiningScene/HUD" unique_id=1764051259 instance=ExtResource("8_timing_window")]
 
-[node name="Layout" type="MarginContainer" parent="MiningScene/HUD"]
+[node name="Layout" type="MarginContainer" parent="MiningScene/HUD" unique_id=1832449878]
 offset_left = 20.0
 offset_top = 20.0
 offset_right = 518.0
 offset_bottom = 184.0
 
-[node name="Content" type="VBoxContainer" parent="MiningScene/HUD/Layout"]
+[node name="Content" type="VBoxContainer" parent="MiningScene/HUD/Layout" unique_id=1070302529]
+layout_mode = 2
 theme_override_constants/separation = 5
 
-[node name="DepthLabel" type="Label" parent="MiningScene/HUD/Layout/Content"]
+[node name="DepthLabel" type="Label" parent="MiningScene/HUD/Layout/Content" unique_id=677929986]
+layout_mode = 2
 text = "DEPTH  0 px"
 
+[node name="DialogueDirector" parent="." unique_id=1751798570 instance=ExtResource("11_dialogue_overlay")]
+
+[connection signal="depth_changed" from="RunState" to="MiningScene/Systems/MarketplaceEncounterController" method="_on_depth_changed"]
 [connection signal="depth_changed" from="RunState" to="MiningScene/HUD" method="_on_depth_changed"]
+[connection signal="success_impact" from="MiningScene/MinerRig" to="MiningScene/MiningHitParticles" method="play_at_impact"]
 [connection signal="attempt_resolved" from="MiningScene/Systems/TimingBridge" to="MiningScene/Systems/MiningController" method="resolve_attempt"]
 [connection signal="mine_missed" from="MiningScene/Systems/MiningController" to="MiningScene/MinerRig" method="play_miss"]
 [connection signal="mine_resolved" from="MiningScene/Systems/MiningController" to="MiningScene/MinerRig" method="play_success"]
+[connection signal="conversation_finished" from="DialogueDirector" to="MiningScene/Systems/MarketplaceEncounterController" method="_on_conversation_finished"]
