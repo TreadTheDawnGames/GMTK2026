@@ -22,7 +22,8 @@ offset_bottom = 446.5
 [node name="VBoxContainer" type="VBoxContainer" parent="PanelContainer2" unique_id=1741910787]
 layout_mode = 2
 
-[node name="Panel" type="Panel" parent="PanelContainer2/VBoxContainer" unique_id=678789819]
+[node name="TaskHeader" type="Panel" parent="PanelContainer2/VBoxContainer" unique_id=678789819]
+unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 18.615)
 layout_mode = 2
 
@@ -43,5 +44,6 @@ layout_mode = 2
 alignment = 1
 
 [node name="ExitButton" type="Button" parent="PanelContainer2/VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer" unique_id=707331258]
+unique_name_in_owner = true
 layout_mode = 2
 text = "Exit"
