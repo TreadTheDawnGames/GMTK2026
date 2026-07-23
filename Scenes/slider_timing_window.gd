@@ -24,7 +24,7 @@ func _ready():
 	
 	slider.offset_right = slider.offset_left + slider_size
 	slider.offset_transform_position.x = -slider.size.x * 0.5
-	
+	await get_tree().process_frame
 	randomize_target()
 	if one_shot:
 		stop()
