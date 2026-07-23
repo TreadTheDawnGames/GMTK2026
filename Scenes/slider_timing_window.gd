@@ -5,7 +5,6 @@ signal pressed(success:bool)
 
 @onready var target: Panel = %Target
 @onready var slider: Panel = %Slider
-@onready var slider_area: Control = %SliderArea
 @onready var backing: Control = %Backing
 
 @export var speed : float = 500.0
@@ -23,12 +22,12 @@ func _ready():
 	slider.position.x = 0.0
 	direction = 1.0
 
-	target.size.x = target_size
+	target.offset_right = target.offset_left + target_size
 	target.offset_transform_position.x = -target.size.x * 0.5
 	if fixed_window > -1:
 		target.position.x = backing.size.x * fixed_window
 	
-	slider.size.x = slider_size
+	slider.offset_right = slider.offset_left + slider_size
 	slider.offset_transform_position.x = -slider.size.x * 0.5
 	
 	randomize_target()
