@@ -1,0 +1,107 @@
+[gd_scene format=3 uid="uid://dudpxx04vy3wp"]
+
+[ext_resource type="Script" uid="uid://c074tui02p5if" path="res://scripts/ship/ship_builder.gd" id="1_builder"]
+[ext_resource type="PackedScene" path="res://scenes/ship/sections/main_hull_section.tscn" id="1_hull"]
+[ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_horizontal_section.tscn" id="2_horizontal"]
+[ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_t_right_down_left_section.tscn" id="3_t_junction"]
+[ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_vertical_section.tscn" id="4_vertical"]
+[ext_resource type="PackedScene" path="res://scenes/ship/sections/cargo_section.tscn" id="5_cargo"]
+[ext_resource type="PackedScene" uid="uid://rotvs88lgq2" path="res://scenes/ship/objectives/task_placeholder.tscn" id="6_task"]
+[ext_resource type="PackedScene" path="res://scenes/ship/sections/crew_section.tscn" id="7_crew"]
+[ext_resource type="PackedScene" path="res://scenes/ship/sections/airlock_section.tscn" id="8_airlock"]
+[ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_horizontal_80_section.tscn" id="9_horizontal_80"]
+[ext_resource type="PackedScene" path="res://scenes/ship/sections/hallway_vertical_102_section.tscn" id="10_vertical_102"]
+[ext_resource type="Script" uid="uid://nwmpqyjkw1fb" path="res://scripts/ship/ship_task_coordinator.gd" id="11_task_coordinator"]
+[ext_resource type="Script" path="res://scripts/ship/task_escalation_clock.gd" id="12_escalation_clock"]
+
+[node name="ShipBuilder" type="Node2D" unique_id=1637252056]
+script = ExtResource("1_builder")
+
+[node name="NavigationLinks" type="Node2D" parent="." unique_id=847097301]
+unique_name_in_owner = true
+
+[node name="MainHull" parent="." unique_id=123633979 instance=ExtResource("1_hull")]
+position = Vector2(-16, 48)
+
+[node name="TaskPlaceholder" parent="MainHull" unique_id=109450670 instance=ExtResource("6_task")]
+position = Vector2(64, -80)
+
+[node name="LeftHallway" parent="." unique_id=1726546278 instance=ExtResource("2_horizontal")]
+position = Vector2(-152, -32)
+
+[node name="LeftTJunction" parent="." unique_id=272993486 instance=ExtResource("3_t_junction")]
+position = Vector2(-280, -32)
+
+[node name="PortCrewQuarters" parent="." unique_id=1132758648 instance=ExtResource("7_crew")]
+position = Vector2(-480, -32)
+
+[node name="TaskPlaceholder" parent="PortCrewQuarters" unique_id=510924491 instance=ExtResource("6_task")]
+position = Vector2(0, -20)
+
+[node name="CargoRoom" parent="." unique_id=21569011 instance=ExtResource("5_cargo")]
+position = Vector2(-280, 200)
+
+[node name="TaskPlaceholder" parent="CargoRoom" unique_id=402543811 instance=ExtResource("6_task")]
+
+[node name="DownHallway" parent="." unique_id=370243936 instance=ExtResource("4_vertical")]
+position = Vector2(-280, 96)
+
+[node name="LowerTJunction" parent="." unique_id=1369595513 instance=ExtResource("3_t_junction")]
+position = Vector2(-280, 368)
+rotation = 3.1415927
+
+[node name="LowerEngineeringHallway" parent="." unique_id=961218568 instance=ExtResource("9_horizontal_80")]
+position = Vector2(-144, 368)
+
+[node name="RightHallway" parent="." unique_id=603534944 instance=ExtResource("2_horizontal")]
+position = Vector2(120, -32)
+
+[node name="CrewQuarters" parent="." unique_id=1749278390 instance=ExtResource("7_crew")]
+position = Vector2(256, -32)
+
+[node name="TaskPlaceholder" parent="CrewQuarters" unique_id=1503029520 instance=ExtResource("6_task")]
+position = Vector2(0, -20)
+
+[node name="OuterRightHallway" parent="." unique_id=678457168 instance=ExtResource("2_horizontal")]
+position = Vector2(392, -32)
+
+[node name="Airlock" parent="." unique_id=1134824858 instance=ExtResource("8_airlock")]
+position = Vector2(528, -32)
+
+[node name="TaskPlaceholder" parent="Airlock" unique_id=596447389 instance=ExtResource("6_task")]
+
+[node name="BottomEngineeringHallway" parent="." unique_id=1503846120 instance=ExtResource("10_vertical_102")]
+position = Vector2(-16, 265)
+editor_snap_size = 1
+
+[node name="EngineeringRoom" parent="." unique_id=1941311586 instance=ExtResource("5_cargo")]
+position = Vector2(-16, 388)
+editor_snap_size = 2
+
+[node name="TaskPlaceholder" parent="EngineeringRoom" unique_id=856420059 instance=ExtResource("6_task")]
+
+[node name="TaskCoordinator" type="Node" parent="." unique_id=1950812434 node_paths=PackedStringArray("objectives_root")]
+script = ExtResource("11_task_coordinator")
+objectives_root = NodePath("..")
+
+[node name="TaskClock" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="TaskClockPanel" type="PanelContainer" parent="TaskClock" node_paths=PackedStringArray("coordinator")]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -224.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 72.0
+grow_horizontal = 0
+script = ExtResource("12_escalation_clock")
+coordinator = NodePath("../../TaskCoordinator")
+
+[node name="CountdownLabel" type="Label" parent="TaskClock/TaskClockPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "TASK SPEEDUP IN 00:30\nDECAY SPEED 1.00x"
+horizontal_alignment = 1
+vertical_alignment = 1
