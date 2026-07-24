@@ -6,9 +6,20 @@
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_eprdb"]
 bg_color = Color(0, 0, 0, 0.57254905)
+border_color = Color(0, 0, 0, 0.77254903)
+border_blend = true
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7muo2"]
 bg_color = Color(1, 1, 1, 1)
+corner_radius_top_left = 7
+corner_radius_top_right = 7
+corner_radius_bottom_right = 7
+corner_radius_bottom_left = 7
+corner_detail = 7
 
 [node name="MiningWindow" type="PanelContainer" unique_id=888560620]
 anchors_preset = 7

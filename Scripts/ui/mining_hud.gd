@@ -5,6 +5,7 @@ extends CanvasLayer
 
 @export var depth_label: Label
 @export var bottom_eta_label: Label
+@export var fps_label: Label
 @export_range(0.1, 2.0, 0.1) var eta_refresh_seconds: float = 0.25
 
 @onready var _game_state: RunState = RunState.get_global(self)
@@ -27,6 +28,7 @@ func _process(delta: float) -> void:
 		return
 	_eta_refresh_remaining = eta_refresh_seconds
 	_update_bottom_eta()
+	fps_label.text = str("FPS: ", Engine.get_frames_per_second())
 
 
 ## Refreshes both labels immediately when the player gains depth.

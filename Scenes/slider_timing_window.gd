@@ -36,7 +36,10 @@ var targets: Array[TimingTarget] = []
 var consecutive_hits : int = 0
 var _starting_target_count: int = 1
 
-var slider_position : float = 0.0
+var slider_position : float = 0.0:
+	set(value):
+		slider_position = value
+		slider.position.x = slider_position
 
 
 ## Creates the configured target baseline and prepares one-shot recovery bars.
@@ -52,7 +55,6 @@ func _ready() -> void:
 	reset_one_shot()
 	if one_shot:
 		stop()
-	slider.position.x = slider_position
 
 
 ## Returns the slider edge area including input grace.
@@ -207,7 +209,7 @@ func _process(delta: float) -> void:
 				await pause(true)
 				stop()
 
-	slider_position += speed * direction * delta * speed_multiplier
+	slider_position += speed * direction * speed_multiplier  * delta
 
 	var left_edge := slider_half_width()
 	var right_edge := backing.size.x - slider_half_width()
@@ -223,8 +225,12 @@ func _process(delta: float) -> void:
 			pressed.emit(false, 0, consecutive_hits)
 			stop()
 	
-	slider.position.x = slider_position
+	#slider.position.x = slider_position
+	#queue_redraw()
 
+#func _draw():
+	#draw_line(backing.position + Vector2(slider_position, 0), (backing.position + Vector2(slider_position, 0)) + Vector2.UP * 50, Color.RED, 1.0)
+	#pass
 ## Maps a successful slider position to left, center-neutral, or right.
 func _get_slider_hit_direction() -> int:
 	var hit_offset_from_center: float = (

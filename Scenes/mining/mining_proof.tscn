@@ -25,8 +25,8 @@
 [ext_resource type="Script" uid="uid://cxysje4e2miht" path="res://Scripts/ui/depth_review_control.gd" id="39_depth_review"]
 [ext_resource type="PackedScene" path="res://Scenes/mining/mining_impact_smoke.tscn" id="40_impact_smoke"]
 [ext_resource type="PackedScene" path="res://Scenes/dialogue/departure_choice.tscn" id="41_departure_choice"]
-[ext_resource type="Script" path="res://Scripts/dialogue/run_intro_controller.gd" id="42_intro_controller"]
-[ext_resource type="Resource" path="res://resources/dialogue/run_intro.tres" id="43_intro_conversation"]
+[ext_resource type="Script" uid="uid://vrpny10f1lau" path="res://Scripts/dialogue/run_intro_controller.gd" id="42_intro_controller"]
+[ext_resource type="Resource" uid="uid://dt1ue7jav8nj4" path="res://resources/dialogue/run_intro.tres" id="43_intro_conversation"]
 [ext_resource type="Resource" path="res://resources/encounters/traveler_character_appearance.tres" id="44_intro_appearance"]
 
 [node name="GameRoot" type="Node" unique_id=1769413368]
@@ -56,7 +56,7 @@ profile = ExtResource("33_layer_profile")
 [node name="MinerRig" parent="MiningScene" unique_id=726963260 instance=ExtResource("7_miner_rig")]
 z_index = 1
 
-[node name="IntroGuide" parent="MiningScene" instance=ExtResource("34_character_presenter")]
+[node name="IntroGuide" parent="MiningScene" unique_id=124219569 instance=ExtResource("34_character_presenter")]
 z_index = 2
 position = Vector2(760, 260)
 
@@ -133,7 +133,7 @@ character_parent = NodePath("../../CharacterLayer")
 pickaxe_progression = NodePath("../PickaxeProgression")
 mining_controller = NodePath("../MiningController")
 
-[node name="RunIntroController" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("dialogue_director", "guide_presenter", "timing_window", "mining_controller")]
+[node name="RunIntroController" type="Node" parent="MiningScene/Systems" unique_id=1079054404 node_paths=PackedStringArray("dialogue_director", "guide_presenter", "timing_window", "mining_controller")]
 process_mode = 3
 script = ExtResource("42_intro_controller")
 conversation = ExtResource("43_intro_conversation")
@@ -143,10 +143,11 @@ guide_presenter = NodePath("../../IntroGuide")
 timing_window = NodePath("../../HUD/TimingWindow")
 mining_controller = NodePath("../MiningController")
 
-[node name="HUD" type="CanvasLayer" parent="MiningScene" unique_id=557922213 node_paths=PackedStringArray("depth_label", "bottom_eta_label")]
+[node name="HUD" type="CanvasLayer" parent="MiningScene" unique_id=557922213 node_paths=PackedStringArray("depth_label", "bottom_eta_label", "fps_label")]
 script = ExtResource("6_hud")
 depth_label = NodePath("Layout/Content/DepthLabel")
 bottom_eta_label = NodePath("Layout/Content/BottomEtaLabel")
+fps_label = NodePath("Layout/Content/FPS")
 
 [node name="TimingWindow" parent="MiningScene/HUD" unique_id=1764051259 instance=ExtResource("8_timing_window")]
 
@@ -197,11 +198,15 @@ theme_override_constants/separation = 5
 layout_mode = 2
 text = "DEPTH  100,000"
 
-[node name="BottomEtaLabel" type="Label" parent="MiningScene/HUD/Layout/Content"]
+[node name="BottomEtaLabel" type="Label" parent="MiningScene/HUD/Layout/Content" unique_id=728776188]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.72, 0.72, 0.76, 1)
 theme_override_font_sizes/font_size = 14
 text = "BOTTOM ETA  --:--"
+
+[node name="FPS" type="Label" parent="MiningScene/HUD/Layout/Content" unique_id=1876008124]
+layout_mode = 2
+text = "FPS: --"
 
 [node name="PlaytimeReveal" type="Label" parent="MiningScene/HUD" unique_id=637629585]
 visible = false

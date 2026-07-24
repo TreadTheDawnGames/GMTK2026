@@ -20,9 +20,6 @@
 [sub_resource type="LabelSettings" id="LabelSettings_6ko1l"]
 font_size = 61
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_af75q"]
-bg_color = Color(0, 0, 0, 0.57254905)
-
 [node name="MiningUI" type="Control" unique_id=633006767]
 layout_mode = 3
 anchors_preset = 15
@@ -92,7 +89,6 @@ offset_left = -351.0
 offset_top = -151.0
 offset_right = 349.0
 offset_bottom = -134.0
-theme_override_styles/panel = SubResource("StyleBoxFlat_af75q")
 target_packed_scenes = Array[PackedScene]([ExtResource("13_sgvbc")])
 grace = 3.0
 targets_use_image = false
