@@ -33,6 +33,10 @@ func _ready() -> void:
 	)
 	_connect_once(_game_state.depth_changed, hud._on_depth_changed)
 	_connect_once(
+		_game_state.run_reset,
+		mining_controller._on_run_reset
+	)
+	_connect_once(
 		miner_rig.impact_contact,
 		_on_miner_impact_contact
 	)
@@ -66,8 +70,12 @@ func _ready() -> void:
 		view_controller.release_encounter_focus
 	)
 	_connect_once(
-		terrain_manager.view_y_changed,
-		encounter_controller._on_view_y_changed
+		terrain_manager.view_position_changed,
+		terrain_renderer._on_view_position_changed
+	)
+	_connect_once(
+		terrain_manager.view_position_changed,
+		encounter_controller._on_view_position_changed
 	)
 	_connect_once(
 		mining_controller.impact_resolved,
@@ -92,6 +100,10 @@ func _ready() -> void:
 	_connect_once(
 		mining_controller.swing_requested,
 		miner_rig.play_success
+	)
+	_connect_once(
+		mining_controller.path_direction_changed,
+		miner_rig.set_facing_direction
 	)
 	_connect_once(
 		dialogue_director.conversation_finished,
@@ -127,7 +139,7 @@ func _ready() -> void:
 	)
 	_connect_once(
 		view_controller.miner_screen_offset_changed,
-		miner_rig.set_screen_depth_offset
+		miner_rig.set_screen_offset
 	)
 
 

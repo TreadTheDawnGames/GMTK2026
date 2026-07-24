@@ -70,16 +70,17 @@ func _on_landing_reached(_mining_y: int) -> void:
 	_begin_active_encounter.call_deferred()
 
 
-## Keeps all authored characters attached to their terrain floors.
-func _on_view_y_changed(view_y: float) -> void:
+## Keeps all authored characters attached to their terrain positions.
+func _on_view_position_changed(view_cell_position: Vector2) -> void:
 	var cell_size := float(mining_config.terrain_cell_world_size)
 	var terrain_left := (
 		mining_config.terrain_screen_center_x
-		- float(mining_config.terrain_width_cells) * cell_size * 0.5
+		- view_cell_position.x * cell_size
 	)
 	merchant_parent.position = Vector2(
 		terrain_left,
-		mining_config.mining_face_screen_y - view_y * cell_size
+		mining_config.mining_face_screen_y
+			- view_cell_position.y * cell_size
 	)
 
 
@@ -321,7 +322,10 @@ func _prepare_authored_characters() -> bool:
 			) * cell_size
 		)
 		_presenters.append(presenter)
-	_on_view_y_changed(float(mining_config.initial_surface_row))
+	_on_view_position_changed(Vector2(
+		float(mining_config.terrain_width_cells) * 0.5,
+		float(mining_config.initial_surface_row)
+	))
 	return true
 
 

@@ -156,9 +156,9 @@ func get_facing_direction() -> int:
 	return signi(roundi(visual_root.scale.x))
 
 
-## Places the miner at true screen depth during falls, flips, and review.
-func set_screen_depth_offset(screen_offset_y: float) -> void:
-	position.y = _rest_position.y + screen_offset_y
+## Places the miner at its true screen offset during falls and view movement.
+func set_screen_offset(screen_offset: Vector2) -> void:
+	position = _rest_position + screen_offset
 
 
 ## Places the artwork above the first layer on an authored intact floor.
@@ -188,7 +188,7 @@ func get_landing_foot_screen_x() -> float:
 	return landing_foot_anchor.global_position.x
 
 
-## Changes presentation placement without moving ChipOrigin mining logic.
+## Changes visual grounding without moving the rig's gameplay position.
 func _set_grounding_offset(offset_y: float) -> void:
 	visual_root.position.y = _visual_root_rest_y + offset_y
 

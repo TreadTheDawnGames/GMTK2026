@@ -10,7 +10,8 @@ enum MiningCameraStyle {
 }
 
 @export_category("Terrain")
-@export_range(16, 512, 1) var terrain_width_cells: int = 128
+## Covers the 1152px canvas while the autonomous path pans 24 cells sideways.
+@export_range(16, 512, 1) var terrain_width_cells: int = 192
 @export_range(16, 256, 1) var chunk_height_cells: int = 64
 ## Sets the world-space size of one gameplay terrain cell.
 @export_range(1, 32, 1) var terrain_cell_world_size: int = 8
@@ -22,6 +23,12 @@ enum MiningCameraStyle {
 ## Three cells on each side make a seven-cell-wide starting tunnel.
 @export_range(0, 32, 1) var base_tunnel_half_width_cells: int = 3
 @export_range(0, 8, 1) var combo_tunnel_half_width_cells_per_step: int = 1
+
+@export_category("Autonomous Path")
+## Moves the landing column after each earned strike.
+@export_range(1, 16, 1) var snake_horizontal_step_cells: int = 3
+## Reverses direction at this distance from the terrain center.
+@export_range(1, 64, 1) var snake_half_span_cells: int = 24
 
 @export_category("View")
 @export var terrain_screen_center_x: float = 576.0
