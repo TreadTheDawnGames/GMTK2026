@@ -20,6 +20,7 @@ class SwingRequest:
 	func _init(
 		requested_combo: int,
 		requested_pickaxes: Array[PickaxeDefinition],
+		requested_path_direction: int = 0,
 		requested_power_scale: float = 1.0,
 		requested_width_scale: float = 1.0,
 		requested_speed_scale: float = 1.0,
@@ -35,6 +36,7 @@ class SwingRequest:
 		speed_scale = requested_speed_scale
 		debris_scale = requested_debris_scale
 		counts_as_timing_success = requested_counts_as_timing_success
+		path_direction = clampi(requested_path_direction, -1, 1)
 
 
 ## Reports the terrain and depth changed by a completed hit.
@@ -69,7 +71,7 @@ signal dig_number_requested(
 	combo: int,
 	combo_strength: float
 )
-## Faces the miner toward the automatically selected tunnel direction.
+## Faces the miner toward the successful timing hit's side of the bar.
 signal path_direction_changed(direction: int)
 
 @export var config: MiningConfig
@@ -91,7 +93,11 @@ var _queued_swings: Array[SwingRequest] = []
 
 
 ## Starts a swing for a successful timing result or records a miss.
-func resolve_attempt(success: bool, resolved_combo: int) -> void:
+func resolve_attempt(
+	success: bool,
+	resolved_combo: int,
+	hit_direction: int = 0
+) -> void:
 	var safe_combo := maxi(resolved_combo, 0)
 	if _game_state.has_reached_bottom:
 		return
@@ -106,7 +112,8 @@ func resolve_attempt(success: bool, resolved_combo: int) -> void:
 		return
 	var primary_swing := SwingRequest.new(
 		safe_combo,
-		_active_pickaxes
+		_active_pickaxes,
+		hit_direction
 	)
 	if (
 		_is_swing_pending
@@ -128,6 +135,7 @@ func resolve_attempt(success: bool, resolved_combo: int) -> void:
 		_queued_swings.append(SwingRequest.new(
 			safe_combo,
 			_active_pickaxes,
+			hit_direction,
 			definition.follow_up_power_scale,
 			definition.follow_up_width_scale,
 			definition.follow_up_speed_scale,
@@ -162,6 +170,8 @@ func _start_swing(swing: SwingRequest) -> void:
 		_path_direction = -1
 	elif _game_state.mining_x <= left_turn_cell_x:
 		_path_direction = 1
+	elif swing.path_direction != 0:
+		_path_direction = swing.path_direction
 	swing.path_direction = _path_direction
 	var horizontal_step_cells := mini(
 		config.snake_horizontal_step_cells,
