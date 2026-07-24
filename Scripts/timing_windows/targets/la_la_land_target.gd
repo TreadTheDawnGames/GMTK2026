@@ -20,7 +20,10 @@ func hit(_timing_window : SliderTimingWindow = null):
 	timing_window.start()
 	pass
 
-func timing_hit(success : bool):
+func timing_hit(
+	success: bool,
+	_hit_direction: int = 0
+) -> void:
 	if success:
 		timing_window.pause(false)
 		timing_window2.start()
@@ -28,7 +31,10 @@ func timing_hit(success : bool):
 		exit()
 	pass
 
-func timing_hit2(success : bool):
+func timing_hit2(
+	success: bool,
+	_hit_direction: int = 0
+) -> void:
 	if success:
 		timing_window2.pause(false)
 		timing_window3.start()
@@ -36,7 +42,10 @@ func timing_hit2(success : bool):
 		exit()
 	pass
 	
-func timing_hit3(success : bool):
+func timing_hit3(
+	success: bool,
+	_hit_direction: int = 0
+) -> void:
 	if success:
 		timing_window3.pause(true)
 		freeze.emit(false)

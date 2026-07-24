@@ -3,7 +3,8 @@ class_name SliderTimingWindow
 
 ## Moves the timing slider and tracks targets until every target is hit.
 
-signal pressed(success: bool)
+## Reports whether the press hit and which half of the bar received the hit.
+signal pressed(success: bool, hit_direction: int)
 
 @export var target_packed_scenes : Array[PackedScene] = [preload("uid://16edwc1adi0x")]
 
@@ -170,7 +171,11 @@ func _process(delta: float) -> void:
 		for target: TimingTarget in hit_targets:
 			target.hit(self)
 
-		pressed.emit(not hit_targets.is_empty())
+		var success: bool = not hit_targets.is_empty()
+		var hit_direction: int = 0
+		if success:
+			hit_direction = _get_slider_hit_direction()
+		pressed.emit(success, hit_direction)
 		var all_targets_hit := targets.all(
 			func(target: TimingTarget) -> bool:
 				return target.is_hit
@@ -195,8 +200,18 @@ func _process(delta: float) -> void:
 		direction *= -1
 		bounce_sound.play()
 		if one_shot:
-			pressed.emit(false)
+			pressed.emit(false, 0)
 			stop()
+
+
+## Maps a successful slider position to left, center-neutral, or right.
+func _get_slider_hit_direction() -> int:
+	var hit_offset_from_center: float = (
+		slider.position.x - backing.size.x * 0.5
+	)
+	if is_zero_approx(hit_offset_from_center):
+		return 0
+	return -1 if hit_offset_from_center < 0.0 else 1
 
 
 ## Moves one target to a valid position inside its backing bar.

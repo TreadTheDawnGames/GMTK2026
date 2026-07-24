@@ -13,7 +13,7 @@ class_name TimingWindowTask
 @onready var save_bwah_sound: AudioStreamPlayer2D = %SaveBwahSound
 @onready var depth_label: Label = %DepthLabel
 
-signal pressed(success: bool, combo: int)
+signal pressed(success: bool, combo: int, hit_direction: int)
 ## Reports the combo that actually ended after recovery is exhausted.
 signal streak_ended(previous_combo: int)
 
@@ -89,10 +89,13 @@ func _apply_pickaxe_target_unlocks() -> void:
 
 
 ## Updates the combo or opens recovery after the main timing result.
-func _mining_window_pressed(success: bool) -> void:
+func _mining_window_pressed(
+	success: bool,
+	hit_direction: int = 0
+) -> void:
 	if success:
 		combo += 1
-		pressed.emit(true, combo)
+		pressed.emit(true, combo, clampi(hit_direction, -1, 1))
 		mining_window.speed_multiplier = (
 			(mining_config.combo_speed_multiplier)
 		)
@@ -129,7 +132,7 @@ func _mining_window_pressed(success: bool) -> void:
 			save_bwah_sound.play()
 		else:
 			var lost_combo := combo
-			pressed.emit(false, combo)
+			pressed.emit(false, combo, 0)
 			combo = 0
 			streak_ended.emit(lost_combo)
 			mining_window.remove_all_extra_targets()
@@ -139,12 +142,15 @@ func _mining_window_pressed(success: bool) -> void:
 
 
 ## Resolves recovery and restarts the main timing bar.
-func _recovery_window_pressed(success: bool) -> void:
+func _recovery_window_pressed(
+	success: bool,
+	_hit_direction: int = 0
+) -> void:
 	if not success:
 		var lost_combo := combo
 		combo = 0
 		mining_window.reset_all_targets()
-		pressed.emit(false, combo)
+		pressed.emit(false, combo, 0)
 		streak_ended.emit(lost_combo)
 		streak_lost_sound.play()
 		#recovery_window.stop()
