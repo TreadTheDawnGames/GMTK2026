@@ -1,0 +1,31 @@
+[gd_scene format=3 uid="uid://ct5832k6hpwck"]
+
+[ext_resource type="PackedScene" uid="uid://16edwc1adi0x" path="res://Scenes/targets/target_base.tscn" id="1_bxaoc"]
+[ext_resource type="Script" uid="uid://b8xx1pvraj3pw" path="res://Scripts/timing_windows/targets/multi_target.gd" id="2_68w5j"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_6ko1l"]
+font_size = 32
+
+[node name="MultiTarget" unique_id=980051362 instance=ExtResource("1_bxaoc")]
+script = ExtResource("2_68w5j")
+required_hits = 3
+my_width = 16.0
+
+[node name="TimesHitLabel" type="Label" parent="." index="1" unique_id=1889533722]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -11.5
+offset_right = 20.0
+offset_bottom = 11.5
+grow_horizontal = 2
+grow_vertical = 2
+text = "5"
+label_settings = SubResource("LabelSettings_6ko1l")
+horizontal_alignment = 1
+vertical_alignment = 1
