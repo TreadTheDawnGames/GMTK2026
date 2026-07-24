@@ -23,5 +23,6 @@ script = ExtResource("1_smoke")
 smoke_mesh = NodePath("SmokeMesh")
 
 [node name="SmokeMesh" type="MultiMeshInstance2D" parent="."]
+z_index = 1
 material = SubResource("ShaderMaterial_smoke")
 multimesh = SubResource("MultiMesh_smoke")

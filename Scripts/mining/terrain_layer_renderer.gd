@@ -94,6 +94,18 @@ func _ready() -> void:
 			"TerrainLayerRenderer requires terrain_manager and profile."
 		)
 		return
+	var layer_count: int = profile.get_layer_count()
+	if (
+		profile.layer_dirt_detail_scales_px.size() != layer_count
+		or profile.layer_dirt_detail_colors.size() != layer_count
+		or profile.layer_dirt_variance_strengths.size() != layer_count
+		or profile.layer_rock_densities.size() != layer_count
+		or profile.layer_rock_detail_strengths.size() != layer_count
+	):
+		push_error(
+			"TerrainLayerRenderer texture arrays must match Layer Tints."
+		)
+		return
 	_connect_once(
 		terrain_manager.terrain_damaged,
 		_on_terrain_damaged
@@ -1306,6 +1318,35 @@ func _create_layer_material(
 	material.set_shader_parameter(
 		&"fill_texture_world_size",
 		profile.fill_texture_world_size
+	)
+	material.set_shader_parameter(
+		&"use_strata_texture",
+		profile.layer_dirt_texture_enabled
+	)
+	material.set_shader_parameter(
+		&"dirt_detail_scale",
+		profile.layer_dirt_detail_scales_px[layer_index]
+	)
+	material.set_shader_parameter(
+		&"dirt_detail_color",
+		profile.layer_dirt_detail_colors[layer_index]
+	)
+	material.set_shader_parameter(
+		&"dirt_variance_strength",
+		profile.layer_dirt_variance_strengths[layer_index]
+	)
+	material.set_shader_parameter(
+		&"rock_density",
+		profile.layer_rock_densities[layer_index]
+	)
+	material.set_shader_parameter(
+		&"rock_detail_strength",
+		profile.layer_rock_detail_strengths[layer_index]
+	)
+	material.set_shader_parameter(
+		&"stratum_depth",
+		float(layer_index)
+			/ float(maxi(profile.get_layer_count() - 1, 1))
 	)
 	return material
 

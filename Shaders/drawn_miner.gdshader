@@ -1,7 +1,8 @@
 shader_type canvas_item;
 
-uniform vec4 outline_color : source_color = vec4(0.96, 0.94, 0.86, 1.0);
-uniform float outline_width = 3.0;
+// Retained only for recoloring neutral tool metal when this optional material
+// is assigned. The former white silhouette outline is intentionally removed;
+// the authored miner textures provide their own black linework.
 uniform vec4 tool_tint : source_color = vec4(1.0);
 
 void fragment() {
@@ -18,21 +19,6 @@ void fragment() {
 		if (is_tool_metal) {
 			source.rgb *= tool_tint.rgb;
 		}
-		COLOR = source;
-	} else {
-		vec2 offset = TEXTURE_PIXEL_SIZE * outline_width;
-		float nearby_alpha = 0.0;
-		nearby_alpha = max(nearby_alpha, texture(TEXTURE, UV + vec2(offset.x, 0.0)).a);
-		nearby_alpha = max(nearby_alpha, texture(TEXTURE, UV - vec2(offset.x, 0.0)).a);
-		nearby_alpha = max(nearby_alpha, texture(TEXTURE, UV + vec2(0.0, offset.y)).a);
-		nearby_alpha = max(nearby_alpha, texture(TEXTURE, UV - vec2(0.0, offset.y)).a);
-		nearby_alpha = max(nearby_alpha, texture(TEXTURE, UV + offset).a);
-		nearby_alpha = max(nearby_alpha, texture(TEXTURE, UV - offset).a);
-		nearby_alpha = max(nearby_alpha, texture(TEXTURE, UV + vec2(offset.x, -offset.y)).a);
-		nearby_alpha = max(nearby_alpha, texture(TEXTURE, UV + vec2(-offset.x, offset.y)).a);
-		COLOR = vec4(
-			outline_color.rgb,
-			outline_color.a * nearby_alpha
-		);
 	}
+	COLOR = source;
 }

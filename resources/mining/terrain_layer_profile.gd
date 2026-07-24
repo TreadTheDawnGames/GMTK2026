@@ -24,6 +24,41 @@ extends Resource
 @export_range(1, 8, 1) var mask_pixels_per_cell: int = 4
 @export var fill_texture_world_size: Vector2 = Vector2(256.0, 256.0)
 
+@export_category("Strata Dirt Texture")
+## Adds flat dirt variance and sparse rocks without changing terrain logic.
+@export var layer_dirt_texture_enabled: bool = true
+## Moves from broad surface variation through tighter compacted strata.
+@export var layer_dirt_detail_scales_px: PackedFloat32Array = PackedFloat32Array([
+	64.0,
+	48.0,
+	32.0,
+	72.0,
+])
+@export var layer_dirt_detail_colors: PackedColorArray = PackedColorArray([
+	Color(0.25, 0.19, 0.15, 0.69),
+	Color(0.20, 0.15, 0.11, 0.66),
+	Color(0.15, 0.11, 0.09, 0.66),
+	Color(0.09, 0.07, 0.07, 0.82),
+])
+@export var layer_dirt_variance_strengths: PackedFloat32Array = PackedFloat32Array([
+	0.16,
+	0.15,
+	0.14,
+	0.10,
+])
+@export var layer_rock_densities: PackedFloat32Array = PackedFloat32Array([
+	0.12,
+	0.22,
+	0.45,
+	0.14,
+])
+@export var layer_rock_detail_strengths: PackedFloat32Array = PackedFloat32Array([
+	0.45,
+	0.50,
+	0.55,
+	0.40,
+])
+
 @export_category("Impact Shape")
 ## Lists organic cutout masks from the foreground layer to the deepest layer.
 @export var small_hole_masks: Array[Texture2D] = []
@@ -49,7 +84,9 @@ extends Resource
 ## Lowers layer one so layer two forms the visible chamber standing surface.
 @export_range(0.0, 64.0, 1.0) var chamber_layer_two_floor_reveal_px: float = 20.0
 
-@export_category("Debris")
+@export_category("Debris and Dust")
+## Uses a lighter earth value so dust separates from the dark tunnel back wall.
+@export var impact_smoke_color: Color = Color(0.52, 0.40, 0.30)
 @export var debris_colors: PackedColorArray = PackedColorArray([
 	Color("eec39a"),
 	Color("d9a066"),

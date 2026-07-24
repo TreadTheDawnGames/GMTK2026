@@ -48,7 +48,7 @@ class SmokeCloud:
 @export_range(1, 32, 1) var maximum_lobes: int = 20
 ## Lower browser cap bounds per-frame collision samples and MultiMesh writes.
 @export_range(1, 24, 1) var web_maximum_lobes: int = 12
-@export var smoke_color: Color = Color("a65f3f")
+@export var smoke_color: Color = Color(0.52, 0.40, 0.30)
 
 @export_category("Bonding")
 @export_range(1.0, 300.0, 1.0) var minimum_bond_spacing: float = 96.0
@@ -78,6 +78,11 @@ var _random := RandomNumberGenerator.new()
 ## Prepares random values and sleeps processing until smoke exists.
 func _ready() -> void:
 	_random.randomize()
+	if (
+		terrain_renderer != null
+		and terrain_renderer.profile != null
+	):
+		smoke_color = terrain_renderer.profile.impact_smoke_color
 	if smoke_mesh != null and smoke_mesh.multimesh != null:
 		smoke_mesh.multimesh.visible_instance_count = 0
 	set_process(false)
