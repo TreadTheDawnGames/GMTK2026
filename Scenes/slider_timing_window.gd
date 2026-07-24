@@ -240,77 +240,42 @@ func _get_slider_hit_direction() -> int:
 	return -1 if hit_offset_from_center < 0.0 else 1
 
 
-## Moves one target to a valid position inside its backing bar.
-func randomize_target(target: TimingTarget) -> void:
-	# Target sets reset on successful hits, so use the authored width directly
-	# instead of allocating a temporary position/width array on the hot path.
-	var target_width: float = maxf(target.my_width, 1.0)
-	var minimum_center_x: float = target_width * 0.5
-	var maximum_center_x: float = maxf(
-		backing.size.x - minimum_center_x,
-		minimum_center_x
-	)
-	var requested_center_x: float = target.place(backing.size.x)
-	if fixed_window >= 0.0:
-		requested_center_x = fixed_window * backing.size.x
-	target.position.x = clampf(
-		requested_center_x,
-		minimum_center_x,
-		maximum_center_x
-	)
-
-	##The direction to shift if there are overlaps. Always towards the center of the board
-	#var shift_direction : float = 0
-	#if requested_center_x > backing.size.x / 2.0:
-		#shift_direction = -1.0
-	#elif requested_center_x < backing.size.x / 2.0:
-		#shift_direction = 1.0
-
-	##For edge cases when overlap is guaranteed (due to too many targets on the board)
-	#var remaining_rerolls : int = 5
-	##init to true to ensure the loop runs at least once
-	#var overlaps_existing_target: bool = true
-	#while overlaps_existing_target and remaining_rerolls > 0:
-		#overlaps_existing_target = false
+### Moves one target to a valid position inside its backing bar.
+#func randomize_target(target: TimingTarget) -> void:
+	## Target sets reset on successful hits, so use the authored width directly
+	## instead of allocating a temporary position/width array on the hot path.
+	#var target_width: float = maxf(target.my_width, 1.0)
+	#var minimum_center_x: float = target_width * 0.5
+	#var maximum_center_x: float = maxf(
+		#backing.size.x - minimum_center_x,
+		#minimum_center_x
+	#)
+	#var requested_center_x: float = target.place(backing.size.x)
+	#if fixed_window >= 0.0:
+		#requested_center_x = fixed_window * backing.size.x
+	#target.position.x = clampf(
+		#requested_center_x,
+		#minimum_center_x,
+		#maximum_center_x
+	#)
+#
+	### Placement work stays bounded: at most five rerolls per target reset.
+	#var rerolls_remaining: int = 5
+	#while rerolls_remaining > 0:
+		#var overlaps_existing_target1: bool = false
 		#for existing_target: TimingTarget in targets:
 			#if existing_target == target:
 				#continue
-			#if requested_center_x + (target_width*0.5) > existing_target.get_rect().position.x and requested_center_x < existing_target.get_rect().position.x + existing_target.get_rect().size.x \
-				#or requested_center_x - (target_width*0.5) > existing_target.get_rect().position.x and requested_center_x < existing_target.get_rect().position.x + existing_target.get_rect().size.x:
-				#overlaps_existing_target = true
-				#print("gonna reroll")
-				#print("Targ width: ", target_width)
-			#
-			#print("requested center: ", requested_center_x)
-			#
-			#if shift_direction == 0:
-				#target.position.x = randf_range(
-				#minimum_center_x,
-				#maximum_center_x
-				#)
-			#else:
-				#requested_center_x += (target_width*2) * shift_direction
-				#pass
-		#remaining_rerolls -= 1
-
-	## Placement work stays bounded: at most five rerolls per target reset.
-	var rerolls_remaining: int = 5
-	while rerolls_remaining > 0:
-		var overlaps_existing_target1: bool = false
-		for existing_target: TimingTarget in targets:
-			if existing_target == target:
-				continue
-			if target.get_rect().intersects(existing_target.get_rect()):
-				overlaps_existing_target1 = true
-				break
-		if not overlaps_existing_target1:
-			break
-		target.position.x = randf_range(
-			minimum_center_x,
-			maximum_center_x
-		)
-		rerolls_remaining -= 1
-
+			#if target.get_rect().intersects(existing_target.get_rect()):
+				#overlaps_existing_target1 = true
+				#break
+		#if not overlaps_existing_target1:
+			#break
+		#target.position.x = randf_range(
+			#minimum_center_x,
+			#maximum_center_x
+		#)
+		#rerolls_remaining -= 1
 func randomize_all_targets():
 	var need_reroll : bool = true
 	var total_rerolls : int = 0

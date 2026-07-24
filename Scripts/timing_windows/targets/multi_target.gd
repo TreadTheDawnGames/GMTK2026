@@ -24,7 +24,7 @@ func hit(_timing_window : SliderTimingWindow = null) -> void:
 	times_hit += 1
 	slider_position = _timing_window.slider.position.x
 	slider_direction = _timing_window.direction
-	_timing_window.randomize_target(self)
+	position.x = place(_timing_window.backing.size.x)
 	if times_hit == required_hits:
 		super.hit(_timing_window)
 		times_hit = 0
