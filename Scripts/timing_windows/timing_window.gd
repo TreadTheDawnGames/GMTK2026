@@ -14,6 +14,8 @@ class_name TimingWindowTask
 @onready var depth_label: Label = %DepthLabel
 
 signal pressed(success: bool, combo: int)
+## Reports the combo that actually ended after recovery is exhausted.
+signal streak_ended(previous_combo: int)
 
 @export var mining_config: MiningConfig
 
@@ -27,6 +29,7 @@ var combo: int = 0:
 @export var combo_lost_color: Color = Color.RED
 
 @onready var _game_state: RunState = RunState.get_global(self)
+var _target_unlocks: Array[PickaxeDefinition] = []
 
 ## Connects both timing bars to the combo flow.
 func _ready() -> void:
@@ -54,6 +57,8 @@ func _ready() -> void:
 	_update_depth_label(_game_state.depth)
 	if not _game_state.depth_changed.is_connected(_update_depth_label):
 		_game_state.depth_changed.connect(_update_depth_label)
+	if not _target_unlocks.is_empty():
+		_apply_pickaxe_target_unlocks()
 
 
 ## Shows remaining run depth from the shared state.
@@ -61,6 +66,26 @@ func _update_depth_label(_depth: int) -> void:
 	depth_label.text = Utils.format_number_with_commas(
 		_game_state.remaining_depth
 	)
+
+
+## Stores cumulative pickaxes and restores their zero-combo baseline scenes.
+func set_pickaxe_target_unlocks(
+	definitions: Array[PickaxeDefinition]
+) -> void:
+	_target_unlocks = definitions.duplicate()
+	if is_node_ready():
+		_apply_pickaxe_target_unlocks()
+
+
+## Rebuilds only the zero-combo target baseline after the bar is ready.
+func _apply_pickaxe_target_unlocks() -> void:
+	var baseline_scenes: Array[PackedScene] = []
+	for definition in _target_unlocks:
+		if definition == null or definition.target_unlock_combo > 0:
+			continue
+		baseline_scenes.append_array(definition.target_scenes)
+	if not baseline_scenes.is_empty():
+		mining_window.set_target_pool(baseline_scenes)
 
 
 ## Updates the combo or opens recovery after the main timing result.
@@ -77,8 +102,23 @@ func _mining_window_pressed(success: bool) -> void:
 			]
 			hit_sound.play()
 
+		var unlocked_pickaxe_target := false
+		for definition in _target_unlocks:
+			if (
+				definition == null
+				or definition.target_unlock_combo != combo
+				or definition.target_scenes.is_empty()
+			):
+				continue
+			mining_window.add_target_from_pool.call_deferred(
+				definition.target_scenes
+			)
+			unlocked_pickaxe_target = true
 		if (
-			combo % mining_config.combo_hits_for_additional_target == 0
+			not unlocked_pickaxe_target
+			and _target_unlocks.is_empty()
+			and combo
+				% mining_config.combo_hits_for_additional_target == 0
 		):
 			mining_window.add_target.call_deferred()
 	else:
@@ -88,8 +128,10 @@ func _mining_window_pressed(success: bool) -> void:
 			recovery_window.start()
 			save_bwah_sound.play()
 		else:
+			var lost_combo := combo
 			pressed.emit(false, combo)
 			combo = 0
+			streak_ended.emit(lost_combo)
 			mining_window.remove_all_extra_targets()
 			mining_window.speed_multiplier = 1.0
 			streak_lost_sound.play()
@@ -99,9 +141,11 @@ func _mining_window_pressed(success: bool) -> void:
 ## Resolves recovery and restarts the main timing bar.
 func _recovery_window_pressed(success: bool) -> void:
 	if not success:
+		var lost_combo := combo
 		combo = 0
 		mining_window.reset_all_targets()
 		pressed.emit(false, combo)
+		streak_ended.emit(lost_combo)
 		streak_lost_sound.play()
 		#recovery_window.stop()
 

@@ -6,7 +6,7 @@ extends Node
 class SwingRequest:
 	## Retains one earned strike until its animation reaches the ground.
 	var combo: int
-	var pickaxe: PickaxeDefinition
+	var pickaxes: Array[PickaxeDefinition]
 	var power_scale: float
 	var width_scale: float
 	var speed_scale: float
@@ -19,7 +19,7 @@ class SwingRequest:
 	## Captures the tool and modifiers earned by one timing result.
 	func _init(
 		requested_combo: int,
-		requested_pickaxe: PickaxeDefinition,
+		requested_pickaxes: Array[PickaxeDefinition],
 		requested_power_scale: float = 1.0,
 		requested_width_scale: float = 1.0,
 		requested_speed_scale: float = 1.0,
@@ -27,7 +27,9 @@ class SwingRequest:
 		requested_counts_as_timing_success: bool = true
 	) -> void:
 		combo = requested_combo
-		pickaxe = requested_pickaxe
+		# Progression replaces rather than mutates this array, so queued hits
+		# retain a stable <=10-item snapshot without another per-hit allocation.
+		pickaxes = requested_pickaxes
 		power_scale = requested_power_scale
 		width_scale = requested_width_scale
 		speed_scale = requested_speed_scale
@@ -76,7 +78,9 @@ signal path_direction_changed(direction: int)
 
 @onready var _game_state: RunState = RunState.get_global(self)
 
-var _equipped_pickaxe: PickaxeDefinition
+# Authored progression contains exactly ten definitions; merchant grants only
+# replace this bounded snapshot and never grow it per hit.
+var _active_pickaxes: Array[PickaxeDefinition] = []
 var _path_direction: int = 1
 var _pending_swing: SwingRequest
 var _pending_combo_strength: float = 0.0
@@ -102,7 +106,7 @@ func resolve_attempt(success: bool, resolved_combo: int) -> void:
 		return
 	var primary_swing := SwingRequest.new(
 		safe_combo,
-		_equipped_pickaxe
+		_active_pickaxes
 	)
 	if (
 		_is_swing_pending
@@ -112,19 +116,22 @@ func resolve_attempt(success: bool, resolved_combo: int) -> void:
 	else:
 		_start_swing(primary_swing)
 
-	# Swift's bonus is tied to the earned timing result and cannot chain itself.
-	if (
-		_equipped_pickaxe != null
-		and _equipped_pickaxe.special_effect
-			== PickaxeDefinition.SpecialEffect.RAPID_FOLLOW_UP
-	):
+	# Every owned rapid-follow-up pickaxe adds one bonus swing. Bonus swings
+	# retain the complete stack but cannot recursively create more swings.
+	for definition in _active_pickaxes:
+		if (
+			definition == null
+			or definition.special_effect
+				!= PickaxeDefinition.SpecialEffect.RAPID_FOLLOW_UP
+		):
+			continue
 		_queued_swings.append(SwingRequest.new(
 			safe_combo,
-			_equipped_pickaxe,
-			_equipped_pickaxe.follow_up_power_scale,
-			_equipped_pickaxe.follow_up_width_scale,
-			_equipped_pickaxe.follow_up_speed_scale,
-			_equipped_pickaxe.follow_up_debris_scale,
+			_active_pickaxes,
+			definition.follow_up_power_scale,
+			definition.follow_up_width_scale,
+			definition.follow_up_speed_scale,
+			definition.follow_up_debris_scale,
 			false
 		))
 
@@ -178,9 +185,10 @@ func _start_swing(swing: SwingRequest) -> void:
 	swing_requested.emit(
 		swing.combo,
 		_pending_combo_strength,
-		_pickaxe_multiplier(
-			swing.pickaxe,
-			&"swing_speed_multiplier"
+		_stack_multiplier(
+			swing.pickaxes,
+			&"swing_speed_multiplier",
+			config.maximum_stack_swing_speed_multiplier
 		) * swing.speed_scale
 	)
 
@@ -209,9 +217,10 @@ func resolve_impact(
 	requested_depth_rows = maxi(
 		roundi(
 			float(requested_depth_rows)
-			* _pickaxe_multiplier(
-				_pending_swing.pickaxe,
-				&"power_multiplier"
+			* _stack_multiplier(
+				_pending_swing.pickaxes,
+				&"power_multiplier",
+				config.maximum_stack_power_multiplier
 			)
 			* _pending_swing.power_scale
 		),
@@ -237,58 +246,71 @@ func resolve_impact(
 		impact_cell_x,
 		_pending_swing.target_cell_x
 	)
-	var surface_after_primary_hit_y := terrain_manager.find_surface_row(
-		_pending_swing.target_cell_x,
-		_game_state.mining_y
+	var surface_after_primary_hit: Vector2i = (
+		terrain_manager.find_tunnel_surface_cell(
+			fall_cell,
+			_pending_swing.target_cell_x,
+			requested_depth_rows
+		)
 	)
+	var surface_after_primary_hit_y: int = surface_after_primary_hit.y
 	var crossed_open_chamber := (
 		surface_after_primary_hit_y
 		> fall_cell.y + requested_depth_rows
 	)
-	if (
-		_pending_swing.pickaxe != null
-		and _pending_swing.pickaxe.special_effect
-			== PickaxeDefinition.SpecialEffect.AFTERSHOCK
-		and _pending_swing.pickaxe.aftershock_depth_rows > 0
-		and dig_result.cells_removed > 0
-		and not crossed_open_chamber
-	):
-		var aftershock_result := terrain_manager.dig_tunnel(
-			Vector2i(
+	if dig_result.cells_removed > 0 and not crossed_open_chamber:
+		for definition in _pending_swing.pickaxes:
+			if (
+				definition == null
+				or definition.special_effect
+					!= PickaxeDefinition.SpecialEffect.AFTERSHOCK
+				or definition.aftershock_depth_rows <= 0
+			):
+				continue
+			var aftershock_result := terrain_manager.dig_tunnel(
+				Vector2i(
+					_pending_swing.target_cell_x,
+					surface_after_primary_hit_y
+				),
+				definition.aftershock_depth_rows,
+				requested_half_width_cells,
+				-1,
+				_pending_swing.target_cell_x
+			)
+			dig_result.absorb(aftershock_result)
+			surface_after_primary_hit_y = terrain_manager.find_surface_row(
 				_pending_swing.target_cell_x,
-				surface_after_primary_hit_y
-			),
-			_pending_swing.pickaxe.aftershock_depth_rows,
-			requested_half_width_cells,
-			-1,
-			_pending_swing.target_cell_x
+				_game_state.mining_y
+			)
+		for definition in _pending_swing.pickaxes:
+			if (
+				definition == null
+				or definition.special_effect
+					!= PickaxeDefinition.SpecialEffect.BRANCHING_LIGHTNING
+			):
+				continue
+			var lightning_result := terrain_manager.dig_branching_lightning(
+				Vector2i(
+					_pending_swing.target_cell_x,
+					surface_after_primary_hit_y
+				),
+				definition.lightning_depth_rows,
+				definition.lightning_branch_count,
+				definition.lightning_branch_length_cells
+			)
+			dig_result.absorb(lightning_result)
+	var new_mining_position: Vector2i = (
+		terrain_manager.find_tunnel_surface_cell(
+			fall_cell,
+			_pending_swing.target_cell_x,
+			requested_depth_rows
 		)
-		dig_result.absorb(aftershock_result)
-	elif (
-		_pending_swing.pickaxe != null
-		and _pending_swing.pickaxe.special_effect
-			== PickaxeDefinition.SpecialEffect.BRANCHING_LIGHTNING
-		and dig_result.cells_removed > 0
-		and not crossed_open_chamber
-	):
-		var lightning_result := terrain_manager.dig_branching_lightning(
-			Vector2i(
-				_pending_swing.target_cell_x,
-				surface_after_primary_hit_y
-			),
-			_pending_swing.pickaxe.lightning_depth_rows,
-			_pending_swing.pickaxe.lightning_branch_count,
-			_pending_swing.pickaxe.lightning_branch_length_cells
-		)
-		dig_result.absorb(lightning_result)
-	var new_mining_y := terrain_manager.find_surface_row(
-		_pending_swing.target_cell_x,
-		_game_state.mining_y
 	)
+	var new_mining_y: int = new_mining_position.y
 	var depth_gained := maxi(new_mining_y - _game_state.mining_y, 0)
 	_game_state.record_success(
 		depth_gained,
-		Vector2i(_pending_swing.target_cell_x, new_mining_y),
+		new_mining_position,
 		_pending_swing.combo,
 		_pending_swing.counts_as_timing_success
 	)
@@ -305,9 +327,10 @@ func resolve_impact(
 		impact_screen_position,
 		dig_result.cells_removed,
 		_pending_combo_strength,
-		_pickaxe_multiplier(
-			_pending_swing.pickaxe,
-			&"debris_multiplier"
+		_stack_multiplier(
+			_pending_swing.pickaxes,
+			&"debris_multiplier",
+			config.maximum_stack_debris_multiplier
 		) * _pending_swing.debris_scale,
 		signi(swing_side) if swing_side != 0 else 1
 	)
@@ -340,9 +363,9 @@ func set_swing_queue_paused(is_paused: bool) -> void:
 	_try_start_queued_swing()
 
 
-## Applies the pickaxe modifiers used by future swings.
-func set_equipped_pickaxe(definition: PickaxeDefinition) -> void:
-	_equipped_pickaxe = definition
+## Replaces the cumulative snapshot captured by future earned swings.
+func set_active_pickaxes(definitions: Array[PickaxeDefinition]) -> void:
+	_active_pickaxes = definitions.duplicate()
 
 
 ## Reports whether the camera may leave without interrupting a strike.
@@ -386,9 +409,10 @@ func _get_requested_half_width_cells(swing: SwingRequest) -> int:
 	return maxi(
 		roundi(
 			float(requested_half_width_cells)
-			* _pickaxe_multiplier(
-				swing.pickaxe,
-				&"width_multiplier"
+			* _stack_multiplier(
+				swing.pickaxes,
+				&"width_multiplier",
+				config.maximum_stack_width_multiplier
 			)
 			* swing.width_scale
 		),
@@ -396,11 +420,21 @@ func _get_requested_half_width_cells(swing: SwingRequest) -> int:
 	)
 
 
-## Returns one strike-pickaxe modifier or the neutral value.
-func _pickaxe_multiplier(
-	pickaxe: PickaxeDefinition,
-	property_name: StringName
+## Adds each definition's delta from neutral and caps cumulative run power.
+func _stack_multiplier(
+	pickaxes: Array[PickaxeDefinition],
+	property_name: StringName,
+	maximum_multiplier: float
 ) -> float:
-	if pickaxe == null:
-		return 1.0
-	return maxf(float(pickaxe.get(property_name)), 0.0)
+	var combined_multiplier := 1.0
+	for definition in pickaxes:
+		if definition == null:
+			continue
+		combined_multiplier += (
+			float(definition.get(property_name)) - 1.0
+		)
+	return clampf(
+		combined_multiplier,
+		0.1,
+		maxf(maximum_multiplier, 0.1)
+	)

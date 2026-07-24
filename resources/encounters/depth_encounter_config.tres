@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="DepthEncounterConfig" load_steps=9 format=3]
+[gd_resource type="Resource" script_class="DepthEncounterConfig" load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://resources/encounters/depth_encounter_config.gd" id="1_config"]
 [ext_resource type="Script" path="res://resources/encounters/depth_character_encounter.gd" id="2_encounter_type"]
@@ -8,7 +8,14 @@
 [ext_resource type="Resource" path="res://resources/encounters/heavy_merchant_encounter.tres" id="6_heavy"]
 [ext_resource type="Resource" path="res://resources/encounters/thief_final_encounter.tres" id="7_thief"]
 [ext_resource type="Resource" path="res://resources/encounters/traveler_return_encounter.tres" id="8_traveler_return"]
+[ext_resource type="Resource" path="res://resources/encounters/magnetic_merchant_encounter.tres" id="9_magnetic"]
+[ext_resource type="Resource" path="res://resources/encounters/seismic_merchant_encounter.tres" id="10_seismic"]
+[ext_resource type="Resource" path="res://resources/encounters/echo_merchant_encounter.tres" id="11_echo"]
+[ext_resource type="Resource" path="res://resources/encounters/thiefbreaker_merchant_encounter.tres" id="12_thiefbreaker"]
+[ext_resource type="Resource" path="res://resources/encounters/cast_farewell_encounter.tres" id="13_farewell"]
 
 [resource]
 script = ExtResource("1_config")
-encounters = Array[ExtResource("2_encounter_type")]([ExtResource("3_stone"), ExtResource("4_swift"), ExtResource("5_excavator"), ExtResource("6_heavy"), ExtResource("8_traveler_return"), ExtResource("7_thief")])
+chamber_height_rows = 24
+chamber_ceiling_inset_cells = 12
+encounters = Array[ExtResource("2_encounter_type")]([ExtResource("3_stone"), ExtResource("4_swift"), ExtResource("5_excavator"), ExtResource("6_heavy"), ExtResource("8_traveler_return"), ExtResource("9_magnetic"), ExtResource("10_seismic"), ExtResource("11_echo"), ExtResource("12_thiefbreaker"), ExtResource("13_farewell"), ExtResource("7_thief")])

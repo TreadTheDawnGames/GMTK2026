@@ -5,6 +5,7 @@
 [ext_resource type="Texture2D" uid="uid://bquhjnjhy8how" path="res://Assets/Characters/miner_idle.png" id="3_drawn_miner"]
 [ext_resource type="Shader" uid="uid://lbslat3xisea" path="res://Shaders/drawn_miner.gdshader" id="4_drawn_shader"]
 [ext_resource type="Texture2D" uid="uid://cpy531sdh8q1o" path="res://Assets/Characters/miner_impact.png" id="5_impact_miner"]
+[ext_resource type="Texture2D" uid="uid://b7itm01ip56lo" path="res://Assets/Characters/miner_wound_up.png" id="6_wind_up_miner"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_drawn_miner"]
 resource_local_to_scene = true
@@ -308,9 +309,9 @@ tracks/5/keys = {
 "values": [Vector2(0, 9), Vector2(0, 23), Vector2(0, 13), Vector2(0, -16)]
 }
 
-[sub_resource type="Animation" id="Animation_two_frame_success"]
-resource_name = "two_frame_success"
-length = 0.5
+[sub_resource type="Animation" id="Animation_three_frame_success"]
+resource_name = "three_frame_success"
+length = 0.62
 tracks/0/type = "value"
 tracks/0/imported = false
 tracks/0/enabled = true
@@ -318,10 +319,10 @@ tracks/0/path = NodePath("VisualRoot/DrawnMinerSprite:frame")
 tracks/0/interp = 0
 tracks/0/loop_wrap = true
 tracks/0/keys = {
-"times": PackedFloat32Array(0, 0.16),
-"transitions": PackedFloat32Array(1, 1),
+"times": PackedFloat32Array(0, 0.08, 0.24),
+"transitions": PackedFloat32Array(1, 1, 1),
 "update": 1,
-"values": [0, 0]
+"values": [0, 0, 0]
 }
 tracks/1/type = "value"
 tracks/1/imported = false
@@ -330,10 +331,10 @@ tracks/1/path = NodePath("VisualRoot/DrawnMinerSprite:position")
 tracks/1/interp = 0
 tracks/1/loop_wrap = true
 tracks/1/keys = {
-"times": PackedFloat32Array(0, 0.16),
-"transitions": PackedFloat32Array(1, 1),
+"times": PackedFloat32Array(0, 0.08, 0.24),
+"transitions": PackedFloat32Array(1, 1, 1),
 "update": 1,
-"values": [Vector2(0, 9), Vector2(0, 13)]
+"values": [Vector2(0, 9), Vector2(0, 9), Vector2(0, 13)]
 }
 tracks/2/type = "method"
 tracks/2/imported = false
@@ -342,9 +343,12 @@ tracks/2/path = NodePath(".")
 tracks/2/interp = 1
 tracks/2/loop_wrap = true
 tracks/2/keys = {
-"times": PackedFloat32Array(0.16),
-"transitions": PackedFloat32Array(1),
+"times": PackedFloat32Array(0.08, 0.24),
+"transitions": PackedFloat32Array(1, 1),
 "values": [{
+"args": [],
+"method": &"_show_success_wind_up"
+}, {
 "args": [],
 "method": &"_emit_success_impact"
 }]
@@ -484,7 +488,7 @@ _data = {
 &"idle": SubResource("Animation_idle"),
 &"mine_miss": SubResource("Animation_miss_motion"),
 &"mine_success": SubResource("Animation_success_motion"),
-&"two_frame_success": SubResource("Animation_two_frame_success"),
+&"three_frame_success": SubResource("Animation_three_frame_success"),
 &"wind_down": SubResource("Animation_wind_down"),
 &"wind_up": SubResource("Animation_wind_up")
 }
@@ -498,6 +502,7 @@ visual_root = NodePath("VisualRoot")
 drawn_miner_sprite = NodePath("VisualRoot/DrawnMinerSprite")
 landing_foot_anchor = NodePath("VisualRoot/LandingFootAnchor")
 idle_miner_texture = ExtResource("3_drawn_miner")
+wind_up_miner_texture = ExtResource("6_wind_up_miner")
 impact_miner_texture = ExtResource("5_impact_miner")
 impact_point = NodePath("VisualRoot/DrawnImpactPoint")
 stand_in_hammer_head = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/StandInToolHead")

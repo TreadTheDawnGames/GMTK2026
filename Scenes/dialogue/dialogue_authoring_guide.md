@@ -49,7 +49,13 @@ Each `DepthCharacterEncounter` assigns:
 - a fixed depth measured from the starting surface;
 - one named character appearance and conversation;
 - the character's participant slot for speech animation;
-- an optional pickaxe reward equipped after dialogue.
+- an optional pickaxe reward appended to the cumulative run stack.
+
+Pickaxe gifts never replace earlier tools. Every owned definition continues
+to contribute mining modifiers and special effects. The newest gift controls
+only the visible tool tint. Each definition also authors a combo threshold
+and target-scene collection; reaching that combo adds one extra target from
+that pickaxe until the streak ends.
 
 Enable `Occurs At Run Bottom` only for the thief. That places the encounter at
 zero remaining depth for any configured run length. The thief uses
@@ -66,13 +72,18 @@ the thief is speaking. The command overwrites only the encrypted resource;
 plain text is never written to a project file. Reopen the editor after running
 it so Godot reloads the ciphertext.
 
-The current authored order is:
+The current authored order keeps every reward before the late solo descent:
 
 - Traveler with the Stone Pickaxe at 1,000;
 - Tinkerer with the Swift Pickaxe at 6,000;
 - Tunnel Surveyor with the Excavator Pickaxe at 11,000;
 - Old Prospector with the Heavy Pickaxe at 16,000;
-- the returning Traveler at 21,000;
+- returning Traveler with the Lantern Pickaxe at 25,000;
+- returning Tinkerer with the Magnetic Pickaxe at 35,000;
+- returning Surveyor with the Seismic Pickaxe at 47,000;
+- returning Prospector with the Echo Pickaxe at 61,000;
+- returning Traveler with the Thiefbreaker Pickaxe at 76,000;
+- the full cast farewell at 84,000;
 - the thief at 100,000, which is zero remaining depth.
 
 There are no randomized merchants. Add another encounter resource to the
@@ -85,9 +96,14 @@ character visually consistent while allowing a new conversation and reward.
 All six characters are created when the mining scene starts. They exist below
 the viewport and scroll into view with the terrain instead of appearing when
 the miner lands. Landing only starts the current character's dialogue.
-Finishing a merchant conversation equips any assigned reward and advances to
-the next array entry. Characters remain at their original floors, so reviewing
-earlier terrain does not leave previously visited chambers empty.
+Finishing a merchant conversation stacks any assigned reward and advances to
+the next array entry. A combo of ten or more defers an overdue merchant until
+that streak actually ends. Characters otherwise remain at their original
+floors, so reviewing earlier terrain does not leave visited chambers empty.
+
+Merchant chambers are intentionally only 24 terrain rows tall. The farewell
+encounter opens through the right wall so the four named merchants can walk
+offscreen before the miner continues alone.
 
 Each encounter identifies its `Speaker Slot`. While that participant's text is
 being revealed, `MerchantPresenter` periodically bounces the sprite. Miner

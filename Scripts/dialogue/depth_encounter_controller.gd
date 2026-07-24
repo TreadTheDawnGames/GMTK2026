@@ -13,9 +13,13 @@ signal encounter_camera_released
 @export_category("Schedule")
 @export var encounter_config: DepthEncounterConfig
 @export var mining_config: MiningConfig
+## Defers a merchant until this protected streak actually ends.
+@export_range(1, 100, 1) var protected_combo_threshold: int = 10
 
 @export_category("Character Placement")
 @export_range(-64, 64, 1) var horizontal_offset_cells: int = 22
+@export_range(1.0, 5.0, 0.1) var departure_walk_seconds: float = 1.2
+@export_range(1, 256, 1) var departure_walk_cells: int = 48
 
 @export_category("References")
 @export var dialogue_director: DialogueDirector
@@ -28,10 +32,12 @@ signal encounter_camera_released
 var _presenters: Array[MerchantPresenter] = []
 var _next_encounter_index: int = 0
 var _pending_encounter_index: int = -1
+var _deferred_encounter_index: int = -1
 var _active_encounter_index: int = -1
 var _is_initialized: bool = false
 var _is_waiting_for_departure_choice: bool = false
 var _active_conversation: DialogueConversation
+@onready var _game_state: RunState = RunState.get_global(self)
 
 
 ## Creates every authored character before the player reaches their room.
@@ -48,6 +54,7 @@ func _on_depth_changed(depth: int) -> void:
 		or _is_waiting_for_departure_choice
 		or _active_encounter_index >= 0
 		or _pending_encounter_index >= 0
+		or _deferred_encounter_index >= 0
 		or _next_encounter_index >= encounter_config.encounters.size()
 	):
 		return
@@ -55,6 +62,13 @@ func _on_depth_changed(depth: int) -> void:
 	if depth < encounter.resolve_depth(mining_config.total_run_depth):
 		return
 
+	if (
+		encounter.pickaxe_reward != null
+		and timing_window.combo >= protected_combo_threshold
+	):
+		_deferred_encounter_index = _next_encounter_index
+		_presenters[_deferred_encounter_index].hide()
+		return
 	_pending_encounter_index = _next_encounter_index
 	timing_window.process_mode = Node.PROCESS_MODE_DISABLED
 	mining_controller.set_swing_queue_paused(true)
@@ -64,6 +78,36 @@ func _on_depth_changed(depth: int) -> void:
 func _on_landing_reached(_mining_y: int) -> void:
 	if _pending_encounter_index < 0 or _active_encounter_index >= 0:
 		return
+	_activate_pending_encounter()
+
+
+## Brings an overdue merchant to the miner when a protected streak ends.
+func _on_streak_ended(previous_combo: int) -> void:
+	if (
+		_deferred_encounter_index < 0
+		or previous_combo < protected_combo_threshold
+		or _active_encounter_index >= 0
+	):
+		return
+	_pending_encounter_index = _deferred_encounter_index
+	_deferred_encounter_index = -1
+	var presenter := _presenters[_pending_encounter_index]
+	presenter.position.x = (
+		float(_game_state.mining_x + horizontal_offset_cells)
+		* float(mining_config.terrain_cell_world_size)
+	)
+	presenter.position.y = (
+		float(_game_state.mining_y)
+		* float(mining_config.terrain_cell_world_size)
+	)
+	presenter.show()
+	timing_window.process_mode = Node.PROCESS_MODE_DISABLED
+	mining_controller.set_swing_queue_paused(true)
+	_activate_pending_encounter()
+
+
+## Promotes one pending floor into the active dialogue sequence.
+func _activate_pending_encounter() -> void:
 	_active_encounter_index = _pending_encounter_index
 	_pending_encounter_index = -1
 	encounter_camera_focus_requested.emit()
@@ -164,7 +208,13 @@ func _is_departure_encounter(encounter_index: int) -> bool:
 ## Places the four named characters together for their departure warning.
 func _gather_departing_characters() -> void:
 	var departure_y := _presenters[_active_encounter_index].position.y
-	var group_x_cells: Array[int] = [32, 48, 80, 96]
+	var center_cell_x := mining_config.terrain_width_cells / 2
+	var group_x_cells: Array[int] = [
+		center_cell_x - 32,
+		center_cell_x - 16,
+		center_cell_x + 16,
+		center_cell_x + 32,
+	]
 	for presenter_index in range(
 		mini(_active_encounter_index, group_x_cells.size())
 	):
@@ -219,13 +269,22 @@ func _on_conversation_finished(conversation_id: StringName) -> void:
 	_restore_mining_after_buffer()
 
 
-## Removes the departing cast and begins the solitary descent.
+## Walks the departing cast through the open right wall, then resumes mining.
 func continue_after_departure() -> void:
 	if not _is_waiting_for_departure_choice:
 		return
 	_is_waiting_for_departure_choice = false
-	for presenter_index in range(_next_encounter_index):
-		_presenters[presenter_index].hide()
+	var departure_distance := (
+		float(departure_walk_cells)
+		* float(mining_config.terrain_cell_world_size)
+	)
+	for presenter_index in range(
+		mini(_next_encounter_index, 4)
+	):
+		_presenters[presenter_index].depart_right(
+			departure_distance,
+			departure_walk_seconds
+		)
 	_restore_mining_after_buffer()
 
 

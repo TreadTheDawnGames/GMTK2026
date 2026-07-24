@@ -1,18 +1,19 @@
-[gd_resource type="Resource" script_class="PickaxeDefinition" format=3 uid="uid://bbndt540njrcm"]
+[gd_resource type="Resource" script_class="PickaxeDefinition" load_steps=4 format=3 uid="uid://bbndt540njrcm"]
 
 [ext_resource type="Script" uid="uid://bvbd25ebtqkh8" path="res://resources/pickaxes/pickaxe_definition.gd" id="1"]
+[ext_resource type="PackedScene" path="res://Scenes/targets/target_base.tscn" id="2_base"]
+[ext_resource type="PackedScene" path="res://Scenes/targets/moving_target.tscn" id="3_target"]
 
 [resource]
 script = ExtResource("1")
 id = &"swift_pickaxe"
 display_name = "Swift Pickaxe"
 description = "Every successful timing hit earns a quick follow-up strike."
-power_multiplier = 0.7
-width_multiplier = 0.9
-swing_speed_multiplier = 1.6
-debris_multiplier = 0.7
+swing_speed_multiplier = 1.15
 special_effect = 2
 follow_up_power_scale = 0.55
 follow_up_speed_scale = 1.35
 follow_up_debris_scale = 0.6
 hammer_head_color = Color(0.45, 1, 0.65, 1)
+target_unlock_combo = 20
+target_scenes = Array[PackedScene]([ExtResource("2_base"), ExtResource("3_target")])

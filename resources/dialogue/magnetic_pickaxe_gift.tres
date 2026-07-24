@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="DialogueConversation" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
+[ext_resource type="Script" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
+[ext_resource type="Script" path="res://resources/dialogue/dialogue_line.gd" id="3_line"]
+
+[sub_resource type="Resource" id="Participant_miner"]
+script = ExtResource("2_participant")
+slot = &"miner"
+display_name = "Miner"
+
+[sub_resource type="Resource" id="Participant_tinkerer"]
+script = ExtResource("2_participant")
+slot = &"tinkerer"
+display_name = "Underground Tinkerer"
+
+[sub_resource type="Resource" id="Line_warning"]
+script = ExtResource("3_line")
+speaker_slot = &"tinkerer"
+text = "The targets are starting to move faster than ordinary steel can follow."
+
+[sub_resource type="Resource" id="Line_gift"]
+script = ExtResource("3_line")
+speaker_slot = &"tinkerer"
+text = "My Magnetic Pickaxe will add roaming gold marks to your rhythm."
+
+[sub_resource type="Resource" id="Line_miner"]
+script = ExtResource("3_line")
+speaker_slot = &"miner"
+text = "Nothing gets left behind."
+
+[resource]
+script = ExtResource("1_conversation")
+conversation_id = &"magnetic_pickaxe_gift"
+participants = Array[ExtResource("2_participant")]([SubResource("Participant_miner"), SubResource("Participant_tinkerer")])
+lines = Array[ExtResource("3_line")]([SubResource("Line_warning"), SubResource("Line_gift"), SubResource("Line_miner")])

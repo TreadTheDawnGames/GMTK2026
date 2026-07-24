@@ -1,14 +1,17 @@
-[gd_resource type="Resource" script_class="PickaxeDefinition" format=3 uid="uid://bxr253ocfnjf8"]
+[gd_resource type="Resource" script_class="PickaxeDefinition" load_steps=4 format=3 uid="uid://bxr253ocfnjf8"]
 
 [ext_resource type="Script" uid="uid://bvbd25ebtqkh8" path="res://resources/pickaxes/pickaxe_definition.gd" id="1"]
+[ext_resource type="PackedScene" path="res://Scenes/targets/target_base.tscn" id="2_base"]
+[ext_resource type="PackedScene" path="res://Scenes/targets/target_base.tscn" id="3_target"]
 
 [resource]
 script = ExtResource("1")
 id = &"wide_pickaxe"
 display_name = "Excavator Pickaxe"
 description = "Clears a wider path, but swings with less force."
-power_multiplier = 0.9
-width_multiplier = 1.5
-swing_speed_multiplier = 0.9
-debris_multiplier = 1.2
+width_multiplier = 1.15
+swing_speed_multiplier = 1.0
+debris_multiplier = 1.05
 hammer_head_color = Color(0.36, 0.76, 1, 1)
+target_unlock_combo = 30
+target_scenes = Array[PackedScene]([ExtResource("2_base"), ExtResource("3_target")])

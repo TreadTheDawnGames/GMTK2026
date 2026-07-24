@@ -75,6 +75,11 @@ enum MiningCameraStyle {
 @export_category("Effects")
 ## Treats this combo as full strength for animation and hit feedback.
 @export_range(1, 100, 1) var maximum_effect_combo: int = 20
+## Caps cumulative pickaxe deltas so ten collected tools remain tunable.
+@export_range(1.0, 10.0, 0.1) var maximum_stack_power_multiplier: float = 2.0
+@export_range(1.0, 10.0, 0.1) var maximum_stack_width_multiplier: float = 2.0
+@export_range(1.0, 10.0, 0.1) var maximum_stack_swing_speed_multiplier: float = 2.5
+@export_range(1.0, 10.0, 0.1) var maximum_stack_debris_multiplier: float = 3.0
 
 
 ## Returns the final terrain row beneath the player's feet.

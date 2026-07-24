@@ -69,7 +69,7 @@ view_controller = NodePath("../Systems/ViewController")
 
 [node name="Systems" type="Node" parent="MiningScene" unique_id=1573949011]
 
-[node name="SceneWiring" type="Node" parent="MiningScene/Systems" unique_id=1434760342 node_paths=PackedStringArray("mining_controller", "timing_bridge", "view_controller", "terrain_manager", "terrain_renderer", "miner_rig", "hit_particles", "impact_smoke", "dig_number_presenter", "impact_shake", "hud", "depth_review_control", "encounter_controller", "dialogue_director", "departure_choice")]
+[node name="SceneWiring" type="Node" parent="MiningScene/Systems" unique_id=1434760342 node_paths=PackedStringArray("mining_controller", "timing_bridge", "view_controller", "terrain_manager", "terrain_renderer", "miner_rig", "hit_particles", "impact_smoke", "dig_number_presenter", "impact_shake", "pickaxe_progression", "hud", "timing_window", "depth_review_control", "encounter_controller", "dialogue_director", "departure_choice")]
 script = ExtResource("25_wiring")
 mining_controller = NodePath("../MiningController")
 timing_bridge = NodePath("../TimingBridge")
@@ -81,7 +81,9 @@ hit_particles = NodePath("../../MiningHitParticles")
 impact_smoke = NodePath("../../MiningImpactSmoke")
 dig_number_presenter = NodePath("../../../DigNumberPresenter")
 impact_shake = NodePath("../ImpactShake")
+pickaxe_progression = NodePath("../PickaxeProgression")
 hud = NodePath("../../HUD")
+timing_window = NodePath("../../HUD/TimingWindow")
 depth_review_control = NodePath("../../HUD/DepthReviewControl")
 encounter_controller = NodePath("../UpgradeEncounterController")
 dialogue_director = NodePath("../../../DialogueDirector")

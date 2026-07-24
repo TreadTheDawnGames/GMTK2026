@@ -14,9 +14,11 @@ extends Node
 @export var impact_smoke: MiningImpactSmoke
 @export var dig_number_presenter: DigNumberPresenter
 @export var impact_shake: ImpactShake
+@export var pickaxe_progression: PickaxeProgression
 
 @export_category("Interface")
 @export var hud: MiningHud
+@export var timing_window: TimingWindowTask
 @export var depth_review_control: DepthReviewControl
 @export var encounter_controller: DepthEncounterController
 @export var dialogue_director: DialogueDirector
@@ -47,6 +49,14 @@ func _ready() -> void:
 	_connect_once(
 		timing_bridge.attempt_resolved,
 		mining_controller.resolve_attempt
+	)
+	_connect_once(
+		pickaxe_progression.target_unlocks_changed,
+		timing_window.set_pickaxe_target_unlocks
+	)
+	_connect_once(
+		timing_window.streak_ended,
+		encounter_controller._on_streak_ended
 	)
 	_connect_once(
 		mining_controller.dig_presentation_started,
