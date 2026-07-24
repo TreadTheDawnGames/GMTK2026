@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://cp1o8kksfkcxm"]
+
+[ext_resource type="PackedScene" uid="uid://16edwc1adi0x" path="res://Scenes/targets/target_base.tscn" id="1_jlnua"]
+[ext_resource type="Script" uid="uid://bfjgognbagwh1" path="res://Scripts/timing_windows/targets/la_la_land_target.gd" id="2_7selm"]
+[ext_resource type="PackedScene" uid="uid://cf8q7ylnplo6c" path="res://Scenes/slider_timing_window.tscn" id="3_1ajj0"]
+
+[node name="LaLaLandTarget" unique_id=980051362 instance=ExtResource("1_jlnua")]
+script = ExtResource("2_7selm")
+my_width = 128.0
+
+[node name="CanvasLayer" type="CanvasLayer" parent="." index="1" unique_id=1649126501]
+
+[node name="TimingWindow" parent="CanvasLayer" index="0" unique_id=888560620 instance=ExtResource("3_1ajj0")]
+unique_name_in_owner = true
+offset_left = -371.0
+offset_top = -326.0
+offset_right = 329.0
+offset_bottom = -245.0
+target_packed_scenes = Array[PackedScene]([ExtResource("1_jlnua")])
+one_shot = true
+fixed_window = 0.5

@@ -79,11 +79,16 @@ func stop() -> void:
 
 ## Adds and positions one valid hit target.
 func add_target() -> void:
+	if target_packed_scenes.size() == 0:
+		push_error(name, " does not have any target scenes.")
+		return
+	#print(name, " ", target_packed_scenes)
 	var new_target := target_packed_scenes.pick_random().instantiate() as TimingTarget
 	if new_target == null:
 		push_error("The timing target scene must create a TimingTarget.")
 		return
 	new_target.initialize()
+	new_target.freeze.connect(on_freeze)
 	backing.add_child(new_target)
 	backing.move_child(new_target, desired_target_heirarchy_index)
 	targets.append(new_target)
@@ -204,3 +209,9 @@ func randomize_target(target: TimingTarget) -> void:
 				do_again = false
 		rerolls -= 1
 				
+func on_freeze(stopped:bool):
+	if stopped:
+		pause(false)
+	else:
+		start()
+	pass

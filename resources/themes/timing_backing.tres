@@ -1,0 +1,10 @@
+[gd_resource type="StyleBoxTexture" format=3 uid="uid://cxvty1lal1xjs"]
+
+[ext_resource type="Texture2D" uid="uid://cp14u8vab2pqs" path="res://Assets/TimeBar/Bar.png" id="1_iavbc"]
+
+[resource]
+texture = ExtResource("1_iavbc")
+expand_margin_left = 50.0
+expand_margin_top = 75.0
+expand_margin_right = 50.0
+expand_margin_bottom = 75.0

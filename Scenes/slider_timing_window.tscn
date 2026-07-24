@@ -1,16 +1,11 @@
 [gd_scene format=3 uid="uid://cf8q7ylnplo6c"]
 
-[ext_resource type="Texture2D" uid="uid://cp14u8vab2pqs" path="res://Assets/TimeBar/Bar.png" id="1_eprdb"]
 [ext_resource type="Script" uid="uid://yknrp1dp4whn" path="res://Scenes/slider_timing_window.gd" id="1_iyxre"]
 [ext_resource type="PackedScene" uid="uid://bcoaf8y2mxx7" path="res://Scenes/targets/shrinking_target.tscn" id="3_7ume1"]
 [ext_resource type="AudioStream" uid="uid://cbv4v668aoluj" path="res://Assets/Audio/LineHitEdge.wav" id="9_6q4rb"]
 
-[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_0336k"]
-texture = ExtResource("1_eprdb")
-expand_margin_left = 50.0
-expand_margin_top = 75.0
-expand_margin_right = 50.0
-expand_margin_bottom = 75.0
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_eprdb"]
+bg_color = Color(0, 0, 0, 0.57254905)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7muo2"]
 bg_color = Color(1, 1, 1, 1)
@@ -27,9 +22,10 @@ offset_right = 124.0
 offset_bottom = -567.0
 grow_horizontal = 2
 grow_vertical = 0
-theme_override_styles/panel = SubResource("StyleBoxTexture_0336k")
+theme_override_styles/panel = SubResource("StyleBoxFlat_eprdb")
 script = ExtResource("1_iyxre")
 target_packed_scenes = Array[PackedScene]([ExtResource("3_7ume1")])
+desired_target_heirarchy_index = 0
 
 [node name="Backing" type="Control" parent="." unique_id=953641845]
 unique_name_in_owner = true

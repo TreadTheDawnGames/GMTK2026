@@ -1,6 +1,7 @@
 class_name TimingTarget
 extends Panel
 
+signal freeze(stopped : bool)
 ## Tracks whether one timing target has already been collected this set.
 
 @export var my_width : float = 16

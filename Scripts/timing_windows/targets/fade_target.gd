@@ -1,4 +1,5 @@
 extends TimingTarget
+class_name FadeTarget
 
 @export var fade_time : float = 2.0
 # Called when the node enters the scene tree for the first time.

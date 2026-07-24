@@ -78,8 +78,7 @@ func _mining_window_pressed(success: bool) -> void:
 			hit_sound.play()
 
 		if (
-			combo
-			% mining_config.combo_hits_for_additional_target == 0
+			combo % mining_config.combo_hits_for_additional_target == 0
 		):
 			mining_window.add_target.call_deferred()
 	else:

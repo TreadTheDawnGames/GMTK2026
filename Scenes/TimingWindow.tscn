@@ -12,6 +12,7 @@
 [ext_resource type="AudioStream" uid="uid://xd7dlv2rg765" path="res://Assets/Audio/Mine7.wav" id="8_gxysw"]
 [ext_resource type="AudioStream" uid="uid://da4n2chd7wsvw" path="res://Assets/Audio/Save.wav" id="11_74xn3"]
 [ext_resource type="AudioStream" uid="uid://bif7p7jcchspq" path="res://Assets/Audio/MissWithSave.wav" id="12_2plp5"]
+[ext_resource type="StyleBox" uid="uid://cxvty1lal1xjs" path="res://resources/themes/timing_backing.tres" id="12_sgvbc"]
 [ext_resource type="AudioStream" uid="uid://cbbyjg221k80c" path="res://Assets/Audio/SaveBuildup.wav" id="13_53pw3"]
 [ext_resource type="PackedScene" uid="uid://16edwc1adi0x" path="res://Scenes/targets/target_base.tscn" id="13_sgvbc"]
 [ext_resource type="Resource" uid="uid://dhlm43rg16rkw" path="res://resources/mining/mining_config.tres" id="14_mining_config"]
@@ -42,12 +43,17 @@ offset_right = 349.0
 offset_bottom = -47.0
 grace = 3.0
 
-[node name="Control" type="Control" parent="MiningWindow/Backing" parent_id_path=PackedInt32Array(677199030, 953641845) index="0" unique_id=1770024605]
-anchors_preset = 0
+[node name="Control" type="Control" parent="MiningWindow" unique_id=1770024605]
+show_behind_parent = true
+layout_mode = 2
+
+[node name="Panel" type="Panel" parent="MiningWindow/Control" unique_id=1498988746]
+layout_mode = 0
 offset_right = 700.0
 offset_bottom = 81.0
+theme_override_styles/panel = ExtResource("12_sgvbc")
 
-[node name="DepthLabel" type="Label" parent="MiningWindow/Backing/Control" unique_id=2110919583]
+[node name="DepthLabel" type="Label" parent="MiningWindow/Control" unique_id=2110919583]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 8
@@ -65,12 +71,6 @@ text = "100,000"
 label_settings = SubResource("LabelSettings_6ko1l")
 horizontal_alignment = 1
 vertical_alignment = 1
-
-[node name="Panel" type="Panel" parent="MiningWindow/Backing/Control" unique_id=1498988746]
-layout_mode = 0
-offset_right = 700.0
-offset_bottom = 81.0
-theme_override_styles/panel = SubResource("StyleBoxFlat_af75q")
 
 [node name="ComboLabel" type="Label" parent="." unique_id=1967208941]
 unique_name_in_owner = true

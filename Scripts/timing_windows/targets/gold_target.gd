@@ -1,5 +1,6 @@
 extends TimingTarget
-class_name GoldTarget
+class_name MovingTarget
+
 @onready var bounce_sound: AudioStreamPlayer2D = %BounceSound
 
 var track : float = 700
