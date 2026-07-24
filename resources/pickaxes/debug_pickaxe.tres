@@ -1,7 +1,6 @@
 [gd_resource type="Resource" script_class="PickaxeDefinition" format=3 uid="uid://bktf56q4v503t"]
 
 [ext_resource type="Script" uid="uid://bvbd25ebtqkh8" path="res://resources/pickaxes/pickaxe_definition.gd" id="1_vg1jj"]
-[ext_resource type="PackedScene" uid="uid://cp1o8kksfkcxm" path="res://Scenes/targets/la_la_land_target.tscn" id="2_lqo8p"]
 [ext_resource type="PackedScene" uid="uid://bcoaf8y2mxx7" path="res://Scenes/targets/shrinking_target.tscn" id="3_yfitg"]
 
 [resource]
@@ -10,5 +9,5 @@ id = &"debug_pickaxe"
 display_name = "Debug Pickaxe"
 description = "The Dev Tool"
 target_unlock_combo = 1
-target_scenes = Array[PackedScene]([ExtResource("3_yfitg"), ExtResource("2_lqo8p")])
+target_scenes = Array[PackedScene]([ExtResource("3_yfitg")])
 metadata/_custom_type_script = "uid://bvbd25ebtqkh8"

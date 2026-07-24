@@ -245,24 +245,57 @@ func randomize_target(target: TimingTarget) -> void:
 		minimum_center_x,
 		maximum_center_x
 	)
+	#The direction to shift if there are overlaps. Always towards the center of the board
+	var shift_direction : float = 0
+	if requested_center_x > backing.size.x / 2.0:
+		shift_direction = -1.0
+	elif requested_center_x < backing.size.x / 2.0:
+		shift_direction = 1.0
 
-	# Placement work stays bounded: at most five rerolls per target reset.
-	var rerolls_remaining: int = 5
-	while rerolls_remaining > 0:
-		var overlaps_existing_target: bool = false
+	#For edge cases when overlap is guaranteed (due to too many targets on the board)
+	var remaining_rerolls : int = 5
+	#init to true to ensure the loop runs at least once
+	var overlaps_existing_target: bool = true
+	while overlaps_existing_target and remaining_rerolls > 0:
+		overlaps_existing_target = false
 		for existing_target: TimingTarget in targets:
 			if existing_target == target:
 				continue
-			if target.get_rect().intersects(existing_target.get_rect()):
+			if requested_center_x + (target_width*0.5) > existing_target.get_rect().position.x and requested_center_x < existing_target.get_rect().position.x + existing_target.get_rect().size.x \
+				or requested_center_x - (target_width*0.5) > existing_target.get_rect().position.x and requested_center_x < existing_target.get_rect().position.x + existing_target.get_rect().size.x:
 				overlaps_existing_target = true
-				break
-		if not overlaps_existing_target:
-			break
-		target.position.x = randf_range(
-			minimum_center_x,
-			maximum_center_x
-		)
-		rerolls_remaining -= 1
+				print("gonna reroll")
+				print("Targ width: ", target_width)
+			
+			print("requested center: ", requested_center_x)
+			
+			if shift_direction == 0:
+				target.position.x = randf_range(
+				minimum_center_x,
+				maximum_center_x
+				)
+			else:
+				requested_center_x += (target_width*2) * shift_direction
+				pass
+		remaining_rerolls -= 1
+
+	## Placement work stays bounded: at most five rerolls per target reset.
+	#var rerolls_remaining: int = 5
+	#while rerolls_remaining > 0:
+		#var overlaps_existing_target1: bool = false
+		#for existing_target: TimingTarget in targets:
+			#if existing_target == target:
+				#continue
+			#if target.get_rect().intersects(existing_target.get_rect()):
+				#overlaps_existing_target1 = true
+				#break
+		#if not overlaps_existing_target1:
+			#break
+		#target.position.x = randf_range(
+			#minimum_center_x,
+			#maximum_center_x
+		#)
+		#rerolls_remaining -= 1
 
 
 func on_freeze(stopped:bool):
