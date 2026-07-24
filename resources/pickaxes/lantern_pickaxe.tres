@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="PickaxeDefinition" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="PickaxeDefinition" format=3 uid="uid://6pidmqhhxata"]
 
-[ext_resource type="Script" path="res://resources/pickaxes/pickaxe_definition.gd" id="1_definition"]
-[ext_resource type="PackedScene" path="res://Scenes/targets/target_base.tscn" id="2_base"]
-[ext_resource type="PackedScene" path="res://Scenes/targets/fade_target.tscn" id="3_fade"]
+[ext_resource type="Script" uid="uid://bvbd25ebtqkh8" path="res://resources/pickaxes/pickaxe_definition.gd" id="1_definition"]
+[ext_resource type="PackedScene" uid="uid://cilpog06kwu7u" path="res://Scenes/targets/fade_target.tscn" id="3_fade"]
+[ext_resource type="PackedScene" uid="uid://bcoaf8y2mxx7" path="res://Scenes/targets/shrinking_target.tscn" id="3_qv6sw"]
 
 [resource]
 script = ExtResource("1_definition")
@@ -11,7 +11,6 @@ display_name = "Lantern Pickaxe"
 description = "A lit tool that introduces targets which fade into the dark."
 power_multiplier = 1.03
 swing_speed_multiplier = 1.05
-debris_multiplier = 1.0
 hammer_head_color = Color(1, 0.82, 0.34, 1)
 target_unlock_combo = 50
-target_scenes = Array[PackedScene]([ExtResource("2_base"), ExtResource("2_base"), ExtResource("3_fade")])
+target_scenes = Array[PackedScene]([ExtResource("3_fade"), ExtResource("3_qv6sw")])

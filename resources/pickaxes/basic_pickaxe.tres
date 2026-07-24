@@ -1,11 +1,10 @@
-[gd_resource type="Resource" script_class="PickaxeDefinition" load_steps=3 format=3 uid="uid://bm7au74mrcaij"]
+[gd_resource type="Resource" script_class="PickaxeDefinition" format=3 uid="uid://bm7au74mrcaij"]
 
 [ext_resource type="Script" uid="uid://bvbd25ebtqkh8" path="res://resources/pickaxes/pickaxe_definition.gd" id="1"]
-[ext_resource type="PackedScene" path="res://Scenes/targets/target_base.tscn" id="2_target"]
+[ext_resource type="PackedScene" uid="uid://bcoaf8y2mxx7" path="res://Scenes/targets/shrinking_target.tscn" id="2_ke3cp"]
 
 [resource]
 script = ExtResource("1")
 display_name = "Wooden Pickaxe"
 description = "A simple wooden tool carried at the start of the descent."
-swing_speed_multiplier = 1.0
-target_scenes = Array[PackedScene]([ExtResource("2_target")])
+target_scenes = Array[PackedScene]([ExtResource("2_ke3cp")])

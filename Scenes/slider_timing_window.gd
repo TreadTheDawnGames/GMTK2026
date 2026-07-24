@@ -208,7 +208,6 @@ func randomize_target(target: TimingTarget) -> void:
 		target.size.x * 0.5,
 		backing.size.x - target.size.x * 0.5
 	)
-	
 	var rerolls : int = 5
 	var do_again:bool =true
 	while do_again and rerolls > 0:

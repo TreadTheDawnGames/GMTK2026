@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="PickaxeDefinition" load_steps=4 format=3 uid="uid://bbndt540njrcm"]
+[gd_resource type="Resource" script_class="PickaxeDefinition" format=3 uid="uid://bbndt540njrcm"]
 
 [ext_resource type="Script" uid="uid://bvbd25ebtqkh8" path="res://resources/pickaxes/pickaxe_definition.gd" id="1"]
-[ext_resource type="PackedScene" path="res://Scenes/targets/target_base.tscn" id="2_base"]
-[ext_resource type="PackedScene" path="res://Scenes/targets/moving_target.tscn" id="3_target"]
+[ext_resource type="PackedScene" uid="uid://bcoaf8y2mxx7" path="res://Scenes/targets/shrinking_target.tscn" id="2_b8qbh"]
+[ext_resource type="PackedScene" uid="uid://gx2i6oqtq8fi" path="res://Scenes/targets/moving_target.tscn" id="3_target"]
 
 [resource]
 script = ExtResource("1")
@@ -16,4 +16,4 @@ follow_up_speed_scale = 1.35
 follow_up_debris_scale = 0.6
 hammer_head_color = Color(0.45, 1, 0.65, 1)
 target_unlock_combo = 20
-target_scenes = Array[PackedScene]([ExtResource("2_base"), ExtResource("3_target")])
+target_scenes = Array[PackedScene]([ExtResource("2_b8qbh"), ExtResource("3_target")])
