@@ -60,8 +60,7 @@ func _ready() -> void:
 		_game_state.depth_changed.connect(_update_depth_label)
 	if not _target_unlocks.is_empty():
 		_apply_pickaxe_target_unlocks()
-
-
+	
 ## Shows remaining run depth from the shared state.
 func _update_depth_label(_depth: int) -> void:
 	depth_label.text = Utils.format_number_with_commas(
