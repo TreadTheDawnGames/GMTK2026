@@ -1,15 +1,16 @@
 [gd_scene format=3 uid="uid://ct5832k6hpwck"]
 
-[ext_resource type="PackedScene" uid="uid://16edwc1adi0x" path="res://Scenes/targets/target_base.tscn" id="1_bxaoc"]
-[ext_resource type="Script" uid="uid://b8xx1pvraj3pw" path="res://Scripts/timing_windows/targets/multi_target.gd" id="2_68w5j"]
+[ext_resource type="PackedScene" uid="uid://16edwc1adi0x" path="res://Scenes/targets/target_base.tscn" id="1_mauvn"]
+[ext_resource type="Script" uid="uid://b8xx1pvraj3pw" path="res://Scripts/timing_windows/targets/multi_target.gd" id="2_q51j3"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_6ko1l"]
 font_size = 32
 
-[node name="MultiTarget" unique_id=980051362 instance=ExtResource("1_bxaoc")]
-script = ExtResource("2_68w5j")
+[node name="ChaseTarget" unique_id=980051362 instance=ExtResource("1_mauvn")]
+self_modulate = Color(0, 0.56078434, 1, 1)
+script = ExtResource("2_q51j3")
 required_hits = 3
-my_width = 16.0
+my_width = 48.0
 
 [node name="TimesHitLabel" type="Label" parent="." index="1" unique_id=1889533722]
 unique_name_in_owner = true
