@@ -3,16 +3,8 @@
 [ext_resource type="Script" uid="uid://doqncdiwvq0t5" path="res://Scripts/mining/miner_rig.gd" id="1_rig"]
 [ext_resource type="AudioStream" uid="uid://bptrknuwih5g2" path="res://Assets/Audio/513694__kasparsj__impact-stone-heavy.wav" id="2_avhsd"]
 [ext_resource type="Texture2D" uid="uid://bquhjnjhy8how" path="res://Assets/Characters/miner_idle.png" id="3_drawn_miner"]
-[ext_resource type="Shader" uid="uid://lbslat3xisea" path="res://Shaders/drawn_miner.gdshader" id="4_drawn_shader"]
 [ext_resource type="Texture2D" uid="uid://cpy531sdh8q1o" path="res://Assets/Characters/miner_impact.png" id="5_impact_miner"]
 [ext_resource type="Texture2D" uid="uid://b7itm01ip56lo" path="res://Assets/Characters/miner_wound_up.png" id="6_wind_up_miner"]
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_drawn_miner"]
-resource_local_to_scene = true
-shader = ExtResource("4_drawn_shader")
-shader_parameter/outline_color = Color(0.96, 0.94, 0.86, 1)
-shader_parameter/outline_width = 8.0
-shader_parameter/tool_tint = Color(1, 1, 1, 1)
 
 [sub_resource type="Animation" id="Animation_reset"]
 resource_name = "RESET"
@@ -513,12 +505,11 @@ impact_audio_player = NodePath("ImpactAudio")
 editor_description = "Animate this for whole-character bounce, squash, recoil, and small fall offsets. Do not use it to calculate mining progress."
 
 [node name="DrawnMinerSprite" type="Sprite2D" parent="VisualRoot" unique_id=611169088]
-material = SubResource("ShaderMaterial_drawn_miner")
 position = Vector2(0, -16)
 scale = Vector2(0.22, 0.22)
 texture = ExtResource("3_drawn_miner")
 
-[node name="LandingFootAnchor" type="Marker2D" parent="VisualRoot"]
+[node name="LandingFootAnchor" type="Marker2D" parent="VisualRoot" unique_id=410620658]
 editor_description = "Authored underside of the idle miner's soles. Landings align this point to visible terrain support."
 position = Vector2(0, 52)
 
