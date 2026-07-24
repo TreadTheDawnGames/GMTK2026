@@ -12,6 +12,7 @@ extends Node2D
 
 var _base_sprite_position: Vector2
 var _bounce_tween: Tween
+var _departure_tween: Tween
 
 
 ## Stores the authored sprite position before an appearance is assigned.
@@ -63,3 +64,19 @@ func react_to_presented_line() -> void:
 		_base_sprite_position,
 		half_duration
 	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+
+
+## Walks this merchant out through the chamber's authored right opening.
+func depart_right(distance: float, duration: float) -> void:
+	reset_speech_motion()
+	if _departure_tween != null and _departure_tween.is_valid():
+		_departure_tween.kill()
+	_departure_tween = create_tween()
+	_departure_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_departure_tween.tween_property(
+		self,
+		"position:x",
+		position.x + maxf(distance, 0.0),
+		maxf(duration, 0.01)
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	_departure_tween.tween_callback(hide)

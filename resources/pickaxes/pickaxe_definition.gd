@@ -1,7 +1,9 @@
 class_name PickaxeDefinition
 extends Resource
 
-## Describes one equippable pickaxe and the mining modifiers it provides.
+## Describes one collectible pickaxe and the modifiers it adds to the run.
+## Pickaxes never replace earlier rewards: progression combines every owned
+## definition while the newest definition controls the visible tool color.
 
 enum SpecialEffect {
 	NONE,
@@ -46,3 +48,9 @@ enum SpecialEffect {
 
 @export_category("Appearance")
 @export var hammer_head_color: Color = Color(0.94, 0.94, 0.94, 1.0)
+
+@export_category("Timing Targets")
+## Adds one extra target from this collection at the authored combo.
+## Zero reserves these scenes for the starting baseline.
+@export_range(0, 100, 1) var target_unlock_combo: int = 0
+@export var target_scenes: Array[PackedScene] = []

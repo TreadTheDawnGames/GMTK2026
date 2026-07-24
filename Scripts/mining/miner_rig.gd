@@ -22,6 +22,7 @@ signal swing_finished
 @export var drawn_miner_sprite: Sprite2D
 @export var landing_foot_anchor: Marker2D
 @export var idle_miner_texture: Texture2D
+@export var wind_up_miner_texture: Texture2D
 @export var impact_miner_texture: Texture2D
 @export var impact_point: Marker2D
 @export var stand_in_hammer_head: Line2D
@@ -64,10 +65,15 @@ func play_success(
 	animation_player.stop()
 	animation_player.speed_scale = animation_speed_multiplier
 	animation_player.play(
-		&"two_frame_success",
+		&"three_frame_success",
 		-1.0,
 		combo_multiplier * maxf(swing_speed_multiplier, 0.1)
 	)
+
+
+## Swaps to the readable anticipation pose before hammer contact.
+func _show_success_wind_up() -> void:
+	_set_miner_texture(wind_up_miner_texture)
 
 
 ## Reports the hammer-tip position when the animation reaches the ground.
@@ -89,7 +95,7 @@ func play_miss(_combo: int) -> void:
 
 ## Holds the miner in the raised pickaxe pose.
 func play_wind_up() -> void:
-	_set_miner_texture(idle_miner_texture)
+	_set_miner_texture(wind_up_miner_texture)
 	_playing_full_swing = false
 	animation_player.stop()
 	animation_player.speed_scale = animation_speed_multiplier
@@ -107,8 +113,8 @@ func play_wind_down() -> void:
 
 ## Previews the raised and impact poses in sequence.
 func play_full_swing() -> void:
-	# Authoring preview for the two discrete mining poses.
-	_set_miner_texture(idle_miner_texture)
+	# Authoring preview for the anticipation and contact poses.
+	_set_miner_texture(wind_up_miner_texture)
 	_playing_full_swing = true
 	animation_player.stop()
 	animation_player.speed_scale = animation_speed_multiplier
@@ -156,9 +162,9 @@ func get_facing_direction() -> int:
 	return signi(roundi(visual_root.scale.x))
 
 
-## Places the miner at true screen depth during falls, flips, and review.
-func set_screen_depth_offset(screen_offset_y: float) -> void:
-	position.y = _rest_position.y + screen_offset_y
+## Places the miner at its true screen offset during falls and view movement.
+func set_screen_offset(screen_offset: Vector2) -> void:
+	position = _rest_position + screen_offset
 
 
 ## Places the artwork above the first layer on an authored intact floor.
@@ -188,7 +194,7 @@ func get_landing_foot_screen_x() -> float:
 	return landing_foot_anchor.global_position.x
 
 
-## Changes presentation placement without moving ChipOrigin mining logic.
+## Changes visual grounding without moving the rig's gameplay position.
 func _set_grounding_offset(offset_y: float) -> void:
 	visual_root.position.y = _visual_root_rest_y + offset_y
 
@@ -204,7 +210,7 @@ func _on_animation_finished(animation_name: StringName) -> void:
 	if animation_name == &"wind_up" and _playing_full_swing:
 		_set_miner_texture(impact_miner_texture)
 		return
-	if animation_name == &"two_frame_success":
+	if animation_name == &"three_frame_success":
 		_playing_full_swing = false
 		_play_idle()
 		swing_finished.emit()

@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="PickaxeDefinition" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://resources/pickaxes/pickaxe_definition.gd" id="1_definition"]
+[ext_resource type="PackedScene" path="res://Scenes/targets/target_base.tscn" id="2_base"]
+[ext_resource type="PackedScene" path="res://Scenes/targets/fade_target.tscn" id="3_fade"]
+[ext_resource type="PackedScene" path="res://Scenes/targets/moving_target.tscn" id="4_gold"]
+
+[resource]
+script = ExtResource("1_definition")
+id = &"echo_pickaxe"
+display_name = "Echo Pickaxe"
+description = "Successful strikes answer with a lighter echoing blow."
+power_multiplier = 1.04
+swing_speed_multiplier = 1.05
+special_effect = 2
+follow_up_power_scale = 0.3
+follow_up_width_scale = 0.8
+follow_up_speed_scale = 1.4
+follow_up_debris_scale = 0.35
+hammer_head_color = Color(0.4, 0.9, 1, 1)
+target_unlock_combo = 80
+target_scenes = Array[PackedScene]([ExtResource("2_base"), ExtResource("2_base"), ExtResource("3_fade"), ExtResource("4_gold")])

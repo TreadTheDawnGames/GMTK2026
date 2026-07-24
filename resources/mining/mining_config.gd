@@ -10,7 +10,8 @@ enum MiningCameraStyle {
 }
 
 @export_category("Terrain")
-@export_range(16, 512, 1) var terrain_width_cells: int = 128
+## Covers the 1152px canvas while the autonomous path pans 24 cells sideways.
+@export_range(16, 512, 1) var terrain_width_cells: int = 192
 @export_range(16, 256, 1) var chunk_height_cells: int = 64
 ## Sets the world-space size of one gameplay terrain cell.
 @export_range(1, 32, 1) var terrain_cell_world_size: int = 8
@@ -22,6 +23,12 @@ enum MiningCameraStyle {
 ## Three cells on each side make a seven-cell-wide starting tunnel.
 @export_range(0, 32, 1) var base_tunnel_half_width_cells: int = 3
 @export_range(0, 8, 1) var combo_tunnel_half_width_cells_per_step: int = 1
+
+@export_category("Autonomous Path")
+## Moves the landing column after each earned strike.
+@export_range(1, 16, 1) var snake_horizontal_step_cells: int = 3
+## Reverses direction at this distance from the terrain center.
+@export_range(1, 64, 1) var snake_half_span_cells: int = 24
 
 @export_category("View")
 @export var terrain_screen_center_x: float = 576.0
@@ -68,6 +75,11 @@ enum MiningCameraStyle {
 @export_category("Effects")
 ## Treats this combo as full strength for animation and hit feedback.
 @export_range(1, 100, 1) var maximum_effect_combo: int = 20
+## Caps cumulative pickaxe deltas so ten collected tools remain tunable.
+@export_range(1.0, 10.0, 0.1) var maximum_stack_power_multiplier: float = 2.0
+@export_range(1.0, 10.0, 0.1) var maximum_stack_width_multiplier: float = 2.0
+@export_range(1.0, 10.0, 0.1) var maximum_stack_swing_speed_multiplier: float = 2.5
+@export_range(1.0, 10.0, 0.1) var maximum_stack_debris_multiplier: float = 3.0
 
 
 ## Returns the final terrain row beneath the player's feet.

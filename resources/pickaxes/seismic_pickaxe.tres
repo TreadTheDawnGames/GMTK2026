@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="PickaxeDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://resources/pickaxes/pickaxe_definition.gd" id="1_definition"]
+[ext_resource type="PackedScene" path="res://Scenes/targets/target_base.tscn" id="2_base"]
+[ext_resource type="PackedScene" path="res://Scenes/targets/shrinking_target.tscn" id="3_shrinking"]
+
+[resource]
+script = ExtResource("1_definition")
+id = &"seismic_pickaxe"
+display_name = "Seismic Pickaxe"
+description = "Each strike stores a smaller underground aftershock."
+power_multiplier = 1.08
+swing_speed_multiplier = 1.0
+debris_multiplier = 1.1
+special_effect = 1
+aftershock_depth_rows = 2
+hammer_head_color = Color(1, 0.7, 0.2, 1)
+target_unlock_combo = 70
+target_scenes = Array[PackedScene]([ExtResource("2_base"), ExtResource("2_base"), ExtResource("3_shrinking")])

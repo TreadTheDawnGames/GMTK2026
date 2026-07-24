@@ -12,8 +12,10 @@ extends Resource
 ## Used only when story text should remain encrypted in source control.
 @export var encrypted_conversation: EncryptedDialogueConversation
 @export var speaker_slot: StringName
-## Grants and equips this pickaxe after dialogue when one is assigned.
+## Adds this pickaxe to the cumulative stack after dialogue.
 @export var pickaxe_reward: PickaxeDefinition
+## Opens the chamber through its right wall for an authored departure.
+@export var opens_right_exit: bool = false
 
 
 ## Returns the gameplay depth where this character waits.

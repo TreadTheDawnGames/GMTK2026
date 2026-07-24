@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="DialogueConversation" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
+[ext_resource type="Script" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
+[ext_resource type="Script" path="res://resources/dialogue/dialogue_line.gd" id="3_line"]
+
+[sub_resource type="Resource" id="Participant_miner"]
+script = ExtResource("2_participant")
+slot = &"miner"
+display_name = "Miner"
+
+[sub_resource type="Resource" id="Participant_prospector"]
+script = ExtResource("2_participant")
+slot = &"prospector"
+display_name = "Old Prospector"
+
+[sub_resource type="Resource" id="Line_listen"]
+script = ExtResource("3_line")
+speaker_slot = &"prospector"
+text = "Hear that? The ground is repeating your blows now."
+
+[sub_resource type="Resource" id="Line_gift"]
+script = ExtResource("3_line")
+speaker_slot = &"prospector"
+text = "The Echo Pickaxe repeats them louder. Do not let it outrun you."
+
+[sub_resource type="Resource" id="Line_miner"]
+script = ExtResource("3_line")
+speaker_slot = &"miner"
+text = "I will make every echo count."
+
+[resource]
+script = ExtResource("1_conversation")
+conversation_id = &"echo_pickaxe_gift"
+participants = Array[ExtResource("2_participant")]([SubResource("Participant_miner"), SubResource("Participant_prospector")])
+lines = Array[ExtResource("3_line")]([SubResource("Line_listen"), SubResource("Line_gift"), SubResource("Line_miner")])

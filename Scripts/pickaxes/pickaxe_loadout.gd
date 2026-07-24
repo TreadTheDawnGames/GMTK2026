@@ -1,7 +1,7 @@
 class_name PickaxeLoadout
 extends RefCounted
 
-## Tracks the pickaxes owned by the player and which one is equipped.
+## Tracks the cumulative pickaxe stack and its newest visible definition.
 
 signal inventory_changed(owned_pickaxes: Array[PickaxeDefinition])
 signal equipped_changed(definition: PickaxeDefinition)
@@ -43,7 +43,7 @@ func unlock(definition: PickaxeDefinition) -> bool:
 	return true
 
 
-## Equips an owned pickaxe for subsequent mining hits.
+## Selects the newest visible pickaxe without disabling earlier upgrades.
 func equip(definition: PickaxeDefinition) -> bool:
 	if not owns(definition):
 		return false

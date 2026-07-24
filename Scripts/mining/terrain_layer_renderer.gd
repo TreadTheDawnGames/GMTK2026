@@ -4,8 +4,8 @@ extends Node2D
 ## Streams layered terrain art and reveals organic openings at mining impacts.
 ## Visual cutouts intentionally retain one colored backdrop over logical holes.
 ## Normal hits stop at orange; big hits may expose the solid brown back layer.
-## This color-only mismatch never affects collision or earned depth. Press F3
-## to overlay every logically open cell and compare presentation with gameplay.
+## Chamber antialiasing may differ by less than one logical cell at a side edge;
+## neither mismatch affects support. Press F3 to compare the logical opening.
 
 class TerrainChunkVisual:
 	var root: Node2D
@@ -75,6 +75,7 @@ var _small_mask_data: Array[HoleMaskData] = []
 var _big_mask_data: Array[HoleMaskData] = []
 var _resized_stamp_cache: Dictionary[Vector4i, ResizedStampImages] = {}
 var _resized_stamp_cache_order: Array[Vector4i] = []
+var _current_view_x: float
 var _current_view_y: float
 var _loaded_first_chunk: int = -1
 var _loaded_last_chunk: int = -1
@@ -100,16 +101,12 @@ func _ready() -> void:
 		_on_terrain_paths_damaged
 	)
 	_connect_once(
-		terrain_manager.view_y_changed,
-		_on_view_y_changed
-	)
-	_connect_once(
 		get_viewport().size_changed,
 		_on_viewport_size_changed
 	)
 	_prepare_hole_masks()
 	_prepare_chamber_transition_stamps()
-	_on_view_y_changed(terrain_manager.get_view_y())
+	_on_view_position_changed(terrain_manager.get_view_position())
 
 
 ## Captures the combo used by synchronous damage stamps for one resolved hit.
@@ -175,9 +172,10 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 		_upload_chunk_masks(chunk, changed_layers)
 
 
-## Repositions streamed terrain around the current mining face.
-func _on_view_y_changed(view_y: float) -> void:
-	_current_view_y = view_y
+## Repositions streamed terrain around the current 2D mining face.
+func _on_view_position_changed(view_cell_position: Vector2) -> void:
+	_current_view_x = view_cell_position.x
+	_current_view_y = view_cell_position.y
 	_refresh_active_chunks()
 	_position_active_chunks()
 	if _show_logical_overlay:
@@ -336,19 +334,17 @@ func _build_chunk_base_mask(
 	image.fill(EMPTY_MASK_COLOR)
 	var chunk_start_row := chunk_index * config.chunk_height_cells
 	var encounter_config := terrain_manager.encounter_config
-	var chamber_left_cell := 0
-	var chamber_right_cell := 0
+	var backdrop_right_cell := config.terrain_width_cells
 	if encounter_config != null:
-		var chamber_width_cells := mini(
+		var backdrop_width := mini(
 			encounter_config.chamber_width_cells,
 			config.terrain_width_cells
 		)
-		chamber_left_cell = floori(
-			float(config.terrain_width_cells - chamber_width_cells)
-			* 0.5
-		)
-		chamber_right_cell = (
-			chamber_left_cell + chamber_width_cells
+		backdrop_right_cell = (
+			floori(
+				float(config.terrain_width_cells - backdrop_width) * 0.5
+			)
+			+ backdrop_width
 		)
 	for local_row in range(config.chunk_height_cells):
 		var world_row := chunk_start_row + local_row
@@ -365,7 +361,7 @@ func _build_chunk_base_mask(
 			)
 		)
 		var row_mask_y := local_row * mask_cell_size
-		if preserve_chamber_backdrop or not is_chamber_row:
+		if not is_chamber_row:
 			image.fill_rect(
 				Rect2i(
 					0,
@@ -376,28 +372,124 @@ func _build_chunk_base_mask(
 				SOLID_MASK_COLOR
 			)
 			continue
-		if chamber_left_cell > 0:
+		var chamber_bounds := (
+			encounter_config.get_chamber_horizontal_bounds(
+				world_row - config.initial_surface_row,
+				config.total_run_depth,
+				config.terrain_width_cells
+			)
+		)
+		var chamber_left_cell := chamber_bounds.x
+		var chamber_right_cell := chamber_bounds.y
+		if preserve_chamber_backdrop:
+			# Visual terrain may retain a solid deepest-layer backdrop behind
+			# the logical chamber. A departure room clears exactly the normal
+			# right side-wall width so the authored logical exit reads by eye;
+			# F3 still overlays logical cells for parity inspection.
+			var retained_backdrop_right := (
+				backdrop_right_cell
+				if chamber_right_cell == config.terrain_width_cells
+				else config.terrain_width_cells
+			)
 			image.fill_rect(
 				Rect2i(
 					0,
 					row_mask_y,
-					chamber_left_cell * mask_cell_size,
+					retained_backdrop_right * mask_cell_size,
 					mask_cell_size
 				),
 				SOLID_MASK_COLOR
 			)
-		if chamber_right_cell < config.terrain_width_cells:
+			continue
+		_fill_chamber_side_mask(
+			image,
+			row_mask_y,
+			world_row,
+			mask_cell_size
+		)
+	return image
+
+
+## Draws the shared chamber taper at mask-pixel resolution. This runs only
+## while a chunk is built, never on the per-hit mining hot path.
+func _fill_chamber_side_mask(
+	image: Image,
+	row_mask_y: int,
+	world_row: int,
+	mask_cell_size: int
+) -> void:
+	var config: MiningConfig = terrain_manager.config
+	var encounter_config: DepthEncounterConfig = (
+		terrain_manager.encounter_config
+	)
+	if encounter_config == null or mask_cell_size <= 0:
+		return
+	var mask_width: int = image.get_width()
+	for sub_row: int in range(mask_cell_size):
+		var depth: float = (
+			float(world_row - config.initial_surface_row)
+			+ (float(sub_row) + 0.5) / float(mask_cell_size)
+		)
+		var chamber_bounds: Vector2 = (
+			encounter_config.get_chamber_horizontal_bounds_at_depth(
+				depth,
+				config.total_run_depth,
+				config.terrain_width_cells
+			)
+		)
+		var left_mask_x: float = clampf(
+			chamber_bounds.x * float(mask_cell_size),
+			0.0,
+			float(mask_width)
+		)
+		var right_mask_x: float = clampf(
+			chamber_bounds.y * float(mask_cell_size),
+			left_mask_x,
+			float(mask_width)
+		)
+		var mask_y: int = row_mask_y + sub_row
+		var left_full_pixels: int = floori(left_mask_x)
+		if left_full_pixels > 0:
+			image.fill_rect(
+				Rect2i(0, mask_y, left_full_pixels, 1),
+				SOLID_MASK_COLOR
+			)
+		if left_full_pixels < mask_width:
+			var left_coverage: float = (
+				left_mask_x - float(left_full_pixels)
+			)
+			if left_coverage > 0.0:
+				image.set_pixel(
+					left_full_pixels,
+					mask_y,
+					Color(1.0, 1.0, 1.0, left_coverage)
+				)
+
+		var right_full_start: int = ceili(right_mask_x)
+		if right_full_start < mask_width:
 			image.fill_rect(
 				Rect2i(
-					chamber_right_cell * mask_cell_size,
-					row_mask_y,
-					(config.terrain_width_cells - chamber_right_cell)
-						* mask_cell_size,
-					mask_cell_size
+					right_full_start,
+					mask_y,
+					mask_width - right_full_start,
+					1
 				),
 				SOLID_MASK_COLOR
 			)
-	return image
+		var right_boundary_pixel: int = floori(right_mask_x)
+		if (
+			right_boundary_pixel >= 0
+			and right_boundary_pixel < mask_width
+		):
+			var right_coverage: float = (
+				float(right_full_start) - right_mask_x
+			)
+			if right_coverage > 0.0:
+				image.set_pixel(
+					right_boundary_pixel,
+					mask_y,
+					Color(1.0, 1.0, 1.0, right_coverage)
+				)
 
 
 ## Keeps every loaded chunk aligned as the view follows the player.
@@ -406,7 +498,7 @@ func _position_active_chunks() -> void:
 	var cell_size := float(config.terrain_cell_world_size)
 	var terrain_left := (
 		config.terrain_screen_center_x
-		- float(config.terrain_width_cells) * cell_size * 0.5
+		- _current_view_x * cell_size
 	)
 	for chunk_index: int in _active_chunks:
 		var chunk := _active_chunks[chunk_index]
@@ -629,7 +721,7 @@ func get_layer_opening_floor_support_screen_y(
 	)
 	var terrain_left: float = (
 		config.terrain_screen_center_x
-		- float(config.terrain_width_cells) * cell_size * 0.5
+		- _current_view_x * cell_size
 	)
 	var mask_x: int = floori(
 		(screen_x - terrain_left) * mask_pixels_per_world_unit
@@ -733,7 +825,7 @@ func _draw() -> void:
 	)
 	var terrain_left := (
 		config.terrain_screen_center_x
-		- float(config.terrain_width_cells) * cell_size * 0.5
+		- _current_view_x * cell_size
 	)
 	for cell_y in range(first_row, last_row + 1):
 		for cell_x in range(config.terrain_width_cells):
@@ -959,16 +1051,6 @@ func _prepare_chamber_transition_stamps() -> void:
 
 	var config := terrain_manager.config
 	var cell_size := float(config.terrain_cell_world_size)
-	var chamber_width_cells := mini(
-		encounter_config.chamber_width_cells,
-		config.terrain_width_cells
-	)
-	var chamber_left_cells := (
-		float(config.terrain_width_cells - chamber_width_cells) * 0.5
-	)
-	var chamber_right_cells := (
-		chamber_left_cells + float(chamber_width_cells)
-	)
 	var minimum_radius_cells := mini(
 		chamber_circle_min_radius_cells,
 		chamber_circle_max_radius_cells
@@ -983,6 +1065,15 @@ func _prepare_chamber_transition_stamps() -> void:
 		var encounter_depth := encounter.resolve_depth(
 			config.total_run_depth
 		)
+		var chamber_bounds := (
+			encounter_config.get_chamber_horizontal_bounds(
+				encounter_depth - 1,
+				config.total_run_depth,
+				config.terrain_width_cells
+			)
+		)
+		var chamber_left_cells := float(chamber_bounds.x)
+		var chamber_right_cells := float(chamber_bounds.y)
 		var chamber_ceiling_row := (
 			config.initial_surface_row
 			+ encounter_depth

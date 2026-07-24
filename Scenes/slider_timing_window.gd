@@ -28,6 +28,8 @@ signal pressed(success: bool)
 @export var desired_target_heirarchy_index : int = 1
 
 var direction: float = 1.0
+# Growth is bounded by the configured baseline plus nine authored pickaxe
+# unlocks; a lost streak prunes the collection back to its baseline.
 var targets: Array[TimingTarget] = []
 var _starting_target_count: int = 1
 
@@ -101,6 +103,29 @@ func set_starting_target_count(target_count: int) -> void:
 	_starting_target_count = maxi(target_count, 1)
 	if is_node_ready():
 		remove_all_extra_targets()
+
+
+## Rebuilds the active targets from a cumulative pickaxe scene pool.
+func set_target_pool(new_target_scenes: Array[PackedScene]) -> void:
+	if new_target_scenes.is_empty():
+		push_warning("The timing target pool cannot be empty.")
+		return
+	target_packed_scenes = new_target_scenes.duplicate()
+	if not is_node_ready():
+		return
+	for target in targets:
+		target.queue_free()
+	targets.clear()
+	while targets.size() < _starting_target_count:
+		add_target()
+
+
+## Adds one earned target from a specific pickaxe's authored collection.
+func add_target_from_pool(new_target_scenes: Array[PackedScene]) -> void:
+	if new_target_scenes.is_empty():
+		return
+	target_packed_scenes = new_target_scenes.duplicate()
+	add_target()
 
 
 ## Restores the timing bar to its configured starting target count.
