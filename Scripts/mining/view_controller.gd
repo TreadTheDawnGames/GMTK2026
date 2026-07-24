@@ -235,10 +235,18 @@ func _follow_miner(delta: float) -> void:
 		else:
 			# Follow the physical miner rather than the resolved floor. This
 			# frame-rate-independent lag preserves downward screen travel.
-			current_view_y = lerpf(
+			var eased_view_y: float = lerpf(
 				current_view_y,
 				_current_miner_position.y,
 				follow_weight
+			)
+			# Large blasts can accelerate the miner farther than ordinary
+			# easing can comfortably frame. The cap remains smooth because it
+			# follows the miner's physical position, not the resolved floor.
+			current_view_y = maxf(
+				eased_view_y,
+				_current_miner_position.y
+					- config.mining_camera_max_lag_rows
 			)
 		return
 	if _current_miner_position.y > target_view_position.y:

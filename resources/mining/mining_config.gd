@@ -44,6 +44,8 @@ enum MiningCameraStyle {
 )
 ## Controls how quickly the camera eases after the airborne miner.
 @export_range(1.0, 30.0, 0.5) var mining_camera_follow_speed: float = 5.0
+## Prevents a large blast from carrying the miner below the visible follow area.
+@export_range(1.0, 64.0, 1.0) var mining_camera_max_lag_rows: float = 12.0
 ## Recenters the view after landing, in terrain rows per second.
 @export_range(10.0, 2_000.0, 10.0) var landing_recenter_speed: float = 60.0
 ## Terrain rows added to the review target by one mouse-wheel step.

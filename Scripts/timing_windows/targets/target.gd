@@ -30,7 +30,7 @@ func unhit() -> void:
 func is_overlapping(_input_rect : Rect2) -> bool:
 	return false
 
-## Returns a touple of [position, width]
-func place(placement_width : float) -> Array[float]:
+## Chooses the target's desired horizontal center inside the timing bar.
+func place(placement_width : float) -> float:
 	var target_center_x := (randf() * placement_width)
-	return [target_center_x, my_width]
+	return target_center_x
