@@ -95,8 +95,10 @@ func add_target() -> void:
 	backing.add_child(new_target)
 	backing.move_child(new_target, desired_target_heirarchy_index)
 	targets.append(new_target)
+	
 	if is_node_ready():
 		randomize_target(new_target)
+		clamp_target(new_target)
 
 
 ## Sets the target baseline restored whenever a streak ends.
@@ -137,6 +139,7 @@ func remove_all_extra_targets() -> void:
 		add_target()
 	for baseline_target in targets:
 		baseline_target.initialize()
+		clamp_target(baseline_target)
 
 
 ## Removes the most recently added target.
@@ -224,7 +227,6 @@ func randomize_target(target: TimingTarget) -> void:
 		target_touple[1] * 0.5,
 		backing.size.x - target_touple[1] * 0.5
 	)
-	target.position.x = target_center_x
 	var rerolls : int = 5
 	var do_again:bool =true
 	while do_again and rerolls > 0:
@@ -233,13 +235,13 @@ func randomize_target(target: TimingTarget) -> void:
 				continue
 			if target.get_rect().intersects(_target.get_rect()):
 				
-				target.position.x = target.position.x + clampf(
+				target_center_x = target_center_x + clampf(
 				target_center_x + target_touple[1] + 25 * (randf() - randf()),
 				target_touple[1],#* 0.5,
 				backing.size.x - target_touple[1],# * 0.5
 				)
 				do_again = true
-				target.position.x = clampf(
+				target_center_x = clampf(
 				target_center_x,
 				target_touple[1] ,#* 0.5,
 				backing.size.x - target_touple[1],# * 0.5
@@ -249,10 +251,19 @@ func randomize_target(target: TimingTarget) -> void:
 			else:
 				do_again = false
 		rerolls -= 1
-				
+	
+	target.position.x = target_center_x
+		
 func on_freeze(stopped:bool):
 	if stopped:
 		pause(false)
 	else:
 		start()
 	pass
+
+func clamp_target(target : TimingTarget):
+	target.position.x = clampf(
+		target.position.x,
+		target.size.x * 0.5,
+		backing.size.x - target.size.x * 0.5
+	)

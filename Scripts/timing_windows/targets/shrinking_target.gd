@@ -21,3 +21,7 @@ func hit(_timing_window : SliderTimingWindow = null) -> void:
 	my_width = target_size
 	Utils.set_control_width(self, target_size)
 	
+### Returns a touple of [position, width]
+#func place(placement_width : float) -> Array[float]:
+	#var target_center_x := (randf() * placement_width)
+	#return [target_center_x, max_width]
