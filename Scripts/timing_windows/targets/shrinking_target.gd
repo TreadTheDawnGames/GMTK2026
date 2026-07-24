@@ -21,6 +21,3 @@ func hit() -> void:
 	my_width = target_size
 	Utils.set_control_width(self, target_size)
 	
-func place(placement_width : float) -> float:
-	var target_center_x := (randf() * placement_width)
-	return target_center_x

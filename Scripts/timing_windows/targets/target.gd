@@ -29,5 +29,6 @@ func unhit() -> void:
 func is_overlapping(_input_rect : Rect2) -> bool:
 	return false
 
-func place(_placement_width : float) -> float:
-	return 0.0
+func place(placement_width : float) -> float:
+	var target_center_x := (randf() * placement_width)
+	return target_center_x
