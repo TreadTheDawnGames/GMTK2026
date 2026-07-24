@@ -69,7 +69,8 @@ signal dig_number_requested(
 	screen_position: Vector2,
 	depth_gained: int,
 	combo: int,
-	combo_strength: float
+	combo_strength: float,
+	swing_side: int
 )
 ## Faces the miner toward the successful timing hit's side of the bar.
 signal path_direction_changed(direction: int)
@@ -365,7 +366,8 @@ func resolve_impact(
 		impact_screen_position,
 		depth_gained,
 		_pending_swing.combo,
-		_pending_combo_strength
+		_pending_combo_strength,
+		signi(swing_side) if swing_side != 0 else 1
 	)
 
 

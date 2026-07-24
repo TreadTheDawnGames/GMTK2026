@@ -33,7 +33,7 @@ var _random := RandomNumberGenerator.new()
 var _active_numbers: Array[DigNumber] = []
 
 
-## Seeds launch direction and distance variation for this run.
+## Seeds travel-distance variation and direction fallback for standalone calls.
 func _ready() -> void:
 	_random.randomize()
 
@@ -43,14 +43,16 @@ func show_dig_number_at_impact(
 	impact_screen_position: Vector2,
 	depth_gained: int,
 	combo: int,
-	combo_strength: float
+	combo_strength: float,
+	mining_direction: int
 ) -> void:
 	create(
 		impact_screen_position,
 		depth_gained,
 		combo,
 		combo_strength,
-		get_tree()
+		get_tree(),
+		mining_direction
 	)
 
 
@@ -60,7 +62,8 @@ static func create(
 	depth_gained: int,
 	combo: int,
 	combo_strength: float,
-	scene_tree: SceneTree
+	scene_tree: SceneTree,
+	mining_direction: int = 0
 ) -> DigNumber:
 	if scene_tree == null:
 		push_error("A SceneTree is required to create a dig number.")
@@ -75,7 +78,8 @@ static func create(
 		impact_screen_position,
 		depth_gained,
 		combo,
-		combo_strength
+		combo_strength,
+		mining_direction
 	)
 
 
@@ -84,7 +88,8 @@ func _spawn_dig_number(
 	impact_screen_position: Vector2,
 	depth_gained: int,
 	combo: int,
-	combo_strength: float
+	combo_strength: float,
+	mining_direction: int
 ) -> DigNumber:
 	if depth_gained <= 0 or dig_number_scene == null:
 		return null
@@ -117,13 +122,15 @@ func _spawn_dig_number(
 		return null
 	add_child(dig_number)
 	_active_numbers.append(dig_number)
-	# Each label independently chooses a side so repeated impacts do not
-	# produce a visually biased stream in one direction.
-	var horizontal_direction := (
-		-1.0
-		if _random.randi_range(0, 1) == 0
-		else 1.0
-	)
+	# Gameplay launches away from the mining side so the marker clears both the
+	# hammer and the new opening. Standalone previews retain a random fallback.
+	var horizontal_direction := -float(signi(mining_direction))
+	if mining_direction == 0:
+		horizontal_direction = (
+			-1.0
+			if _random.randi_range(0, 1) == 0
+			else 1.0
+		)
 	var bottom_screen_limit_y := (
 		get_viewport().get_visible_rect().end.y
 	)
