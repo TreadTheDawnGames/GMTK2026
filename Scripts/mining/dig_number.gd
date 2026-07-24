@@ -11,7 +11,7 @@ extends RichTextLabel
 }
 @export var minimum_combo_color: Color = Color("f5ead7")
 @export var maximum_combo_color: Color = Color("ff6b35")
-@export_range(0.0, 1.0, 0.05) var starting_scale: float = 0.15
+@export_range(0.0, 1.0, 0.05) var starting_scale: float = 0.4
 @export_range(1.0, 2.5, 0.05) var pop_overshoot: float = 1.15
 
 @export_category("Depth Scale")
@@ -80,7 +80,16 @@ func present(
 
 	# Combo changes styling and color; actual downward progress changes size.
 	text = formatted_text
-	pivot_offset = size * 0.5
+	var launches_left := horizontal_direction < 0.0
+	horizontal_alignment = (
+		HORIZONTAL_ALIGNMENT_RIGHT
+		if launches_left
+		else HORIZONTAL_ALIGNMENT_LEFT
+	)
+	pivot_offset = Vector2(
+		size.x if launches_left else 0.0,
+		size.y * 0.5
+	)
 	scale = Vector2.ONE * starting_scale
 	rotation = deg_to_rad(
 		-launch_rotation_degrees * horizontal_direction
@@ -104,25 +113,30 @@ func present(
 		+ maximum_depth_scale_bonus * depth_scale_strength
 	)
 	var maximum_visual_scale := final_display_scale * pop_overshoot
-	var maximum_scaled_half_size := (
-		pivot_offset * maximum_visual_scale
-	)
+	var maximum_scaled_size := size * maximum_visual_scale
 	var rotation_cosine := absf(cos(rotation))
 	var rotation_sine := absf(sin(rotation))
-	var maximum_rotated_half_size := Vector2(
-		maximum_scaled_half_size.x * rotation_cosine
-			+ maximum_scaled_half_size.y * rotation_sine,
-		maximum_scaled_half_size.x * rotation_sine
-			+ maximum_scaled_half_size.y * rotation_cosine
+	var maximum_rotation_intrusion_x := (
+		maximum_scaled_size.y * 0.5 * rotation_sine
+	)
+	var maximum_outward_extent_x := (
+		maximum_scaled_size.x * rotation_cosine
+		+ maximum_rotation_intrusion_x
+	)
+	var maximum_vertical_extent := (
+		maximum_scaled_size.x * rotation_sine
+		+ maximum_scaled_size.y * 0.5 * rotation_cosine
 	)
 	_player_exclusion_rect = player_exclusion_rect
-	var start_center_x := (
+	# The player-facing label edge is the scale pivot. Small numbers now
+	# emerge beside the miner while every larger pop grows away from them.
+	var start_pivot_x := (
 		player_exclusion_rect.position.x
-			- maximum_rotated_half_size.x
+			- maximum_rotation_intrusion_x
 			- 1.0
-		if horizontal_direction < 0.0
+		if launches_left
 		else player_exclusion_rect.end.x
-			+ maximum_rotated_half_size.x
+			+ maximum_rotation_intrusion_x
 			+ 1.0
 	)
 	var start_center_y := maxf(
@@ -130,19 +144,30 @@ func present(
 			impact_screen_position.y - launch_lift_px,
 			player_exclusion_rect.get_center().y - ui_clearance_px
 		),
-		maximum_rotated_half_size.y + ui_clearance_px
+		maximum_vertical_extent + ui_clearance_px
 	)
-	var start_center := Vector2(start_center_x, start_center_y)
-	position = start_center - pivot_offset
+	var start_pivot := Vector2(start_pivot_x, start_center_y)
+	position = start_pivot - pivot_offset
 	_arc_start_position = position
+	var launch_rect_left := (
+		start_pivot_x - maximum_outward_extent_x
+		if launches_left
+		else start_pivot_x - maximum_rotation_intrusion_x
+	)
 	_maximum_launch_rect = Rect2(
-		start_center - maximum_rotated_half_size,
-		maximum_rotated_half_size * 2.0
+		Vector2(
+			launch_rect_left,
+			start_center_y - maximum_vertical_extent
+		),
+		Vector2(
+			maximum_outward_extent_x + maximum_rotation_intrusion_x,
+			maximum_vertical_extent * 2.0
+		)
 	)
 	var pop_seconds := minf(lifetime_seconds * 0.14, 0.2)
 	var settle_seconds := minf(lifetime_seconds * 0.12, 0.16)
 	var pop_tween := create_tween()
-	pop_tween.set_trans(Tween.TRANS_BACK)
+	pop_tween.set_trans(Tween.TRANS_QUAD)
 	pop_tween.set_ease(Tween.EASE_OUT)
 	pop_tween.tween_property(
 		self,
@@ -159,21 +184,22 @@ func present(
 	)
 
 	var randomized_launch_scale := maxf(random_travel_scale, 0.1)
-	var destination_center_x := (
-		start_center_x
+	var destination_pivot_x := (
+		start_pivot_x
 		+ horizontal_direction
 			* horizontal_travel_px
 			* randomized_launch_scale
 			* lerpf(1.0, 1.25, safe_combo_strength)
 	)
 	var horizontal_tween := create_tween()
+	horizontal_tween.tween_interval(pop_seconds)
 	horizontal_tween.set_trans(Tween.TRANS_QUAD)
 	horizontal_tween.set_ease(Tween.EASE_OUT)
 	horizontal_tween.tween_property(
 		self,
 		"position:x",
-		destination_center_x - pivot_offset.x,
-		lifetime_seconds
+		destination_pivot_x - pivot_offset.x,
+		maxf(lifetime_seconds - pop_seconds, 0.01)
 	)
 
 	var impact_label_y := position.y
@@ -189,12 +215,12 @@ func present(
 		- maximum_half_height
 	)
 	var natural_end_center_y := (
-		start_center.y - jump_height * 0.45
+		start_center_y - jump_height * 0.45
 	)
 	var end_center_y := minf(natural_end_center_y, safe_end_center_y)
 	var end_label_y := end_center_y - pivot_offset.y
 	_arc_end_position = Vector2(
-		destination_center_x - pivot_offset.x,
+		destination_pivot_x - pivot_offset.x,
 		end_label_y
 	)
 	_arc_maximum_bottom_y = (

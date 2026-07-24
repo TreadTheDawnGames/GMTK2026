@@ -184,10 +184,10 @@ theme_override_font_sizes/font_size = 38
 text = "↓"
 
 [node name="Layout" type="MarginContainer" parent="MiningScene/HUD" unique_id=1832449878]
-offset_left = 308.0
-offset_top = 72.0
-offset_right = 548.0
-offset_bottom = 144.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 518.0
+offset_bottom = 184.0
 
 [node name="Content" type="VBoxContainer" parent="MiningScene/HUD/Layout" unique_id=1070302529]
 layout_mode = 2
@@ -196,14 +196,12 @@ theme_override_constants/separation = 5
 [node name="DepthLabel" type="Label" parent="MiningScene/HUD/Layout/Content" unique_id=677929986]
 layout_mode = 2
 text = "DEPTH  100,000"
-horizontal_alignment = 2
 
 [node name="BottomEtaLabel" type="Label" parent="MiningScene/HUD/Layout/Content"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.72, 0.72, 0.76, 1)
 theme_override_font_sizes/font_size = 14
 text = "BOTTOM ETA  --:--"
-horizontal_alignment = 2
 
 [node name="PlaytimeReveal" type="Label" parent="MiningScene/HUD" unique_id=637629585]
 visible = false

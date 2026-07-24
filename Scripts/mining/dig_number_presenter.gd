@@ -15,8 +15,11 @@ const PRESENTER_GROUP: StringName = &"dig_number_presenter"
 @export var player_visual: Sprite2D
 ## Includes the timing bar texture that expands above its Control rectangle.
 @export_range(0.0, 160.0, 1.0) var timing_bar_visual_overhang_px: float = 80.0
+## Authored visible bounds avoid treating transparent texture padding as body.
+@export var player_visual_size_px: Vector2 = Vector2(80.0, 144.0)
+@export var player_visual_center_offset_px: Vector2 = Vector2(0.0, 16.0)
 ## Keeps the complete maximum-size label outside the current miner artwork.
-@export_range(0.0, 96.0, 1.0) var player_clearance_px: float = 24.0
+@export_range(0.0, 96.0, 1.0) var player_clearance_px: float = 6.0
 
 @export_category("Performance")
 ## RichText effects and tweens make each active label relatively expensive.
@@ -125,38 +128,21 @@ func _spawn_dig_number(
 		get_viewport().get_visible_rect().end.y
 	)
 	var viewport_center_x := get_viewport().get_visible_rect().get_center().x
+	var player_visual_center := Vector2(
+		viewport_center_x,
+		impact_screen_position.y - player_visual_size_px.y * 0.5
+	)
 	var player_exclusion_rect := Rect2(
-		Vector2(
-			viewport_center_x - 128.0,
-			impact_screen_position.y - 184.0
-		),
-		Vector2(256.0, 184.0)
+		player_visual_center - player_visual_size_px * 0.5,
+		player_visual_size_px
 	)
 	if player_visual != null:
-		var local_player_rect := player_visual.get_rect()
-		var player_screen_transform := (
-			player_visual.get_global_transform_with_canvas()
+		player_visual_center = (
+			player_visual.get_global_transform_with_canvas().origin
+			+ player_visual_center_offset_px
 		)
-		var player_top_left := (
-			player_screen_transform * local_player_rect.position
-		)
-		player_exclusion_rect = Rect2(player_top_left, Vector2.ZERO)
-		player_exclusion_rect = player_exclusion_rect.expand(
-			player_screen_transform
-				* Vector2(
-					local_player_rect.end.x,
-					local_player_rect.position.y
-				)
-		)
-		player_exclusion_rect = player_exclusion_rect.expand(
-			player_screen_transform * local_player_rect.end
-		)
-		player_exclusion_rect = player_exclusion_rect.expand(
-			player_screen_transform
-				* Vector2(
-					local_player_rect.position.x,
-					local_player_rect.end.y
-				)
+		player_exclusion_rect.position = (
+			player_visual_center - player_visual_size_px * 0.5
 		)
 	player_exclusion_rect = player_exclusion_rect.grow(
 		player_clearance_px
