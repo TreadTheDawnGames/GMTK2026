@@ -173,7 +173,6 @@ func _process(delta: float) -> void:
 func randomize_target(target: TimingTarget) -> void:
 	
 	var target_center_x = target.place(backing.size.x) if fixed_window < 0.0 else fixed_window*backing.size.x
-	print("fixedWindow: ", fixed_window)
 	target.position.x = clampf(
 		target_center_x,
 		target.size.x * 0.5,

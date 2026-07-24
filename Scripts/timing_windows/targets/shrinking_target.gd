@@ -7,7 +7,6 @@ class_name ShrinkingTarget
 
 
 func initialize():
-	print("initing shrink target")
 	my_width = max_width
 	Utils.set_control_width(self, my_width)
 	
