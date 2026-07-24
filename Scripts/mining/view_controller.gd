@@ -27,7 +27,7 @@ enum ViewMode {
 var current_view_y: float
 ## Latest supporting terrain row resolved by MiningController.
 var target_view_y: float
-## Presentation-only miner row; gameplay depth remains owned by RunState.
+## Presentation-only miner row; gameplay depth remains owned by GameState.
 var _current_miner_y: float
 ## Downward row velocity retained across frames and consecutive openings.
 var _mining_fall_velocity: float = 0.0

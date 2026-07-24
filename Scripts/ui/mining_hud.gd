@@ -3,18 +3,19 @@ extends CanvasLayer
 
 ## Displays the remaining depth for the current run.
 
-#@export var run_state: RunState
 @export var depth_label: Label
+
+@onready var _game_state: RunState = RunState.get_global(self)
 
 
 ## Displays the starting depth.
 func _ready() -> void:
-	_update_remaining_depth(GameState.remaining_depth)
+	_update_remaining_depth(_game_state.remaining_depth)
 
 
 ## Refreshes the label when depth changes.
 func _on_depth_changed(_depth: int) -> void:
-	_update_remaining_depth(GameState.remaining_depth)
+	_update_remaining_depth(_game_state.remaining_depth)
 
 
 ## Shows how much gameplay depth remains before the run bottom.

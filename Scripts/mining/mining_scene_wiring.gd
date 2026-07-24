@@ -3,9 +3,6 @@ extends Node
 
 ## Connects the mining scene's cross-system signals in one searchable place.
 
-@export_category("Run")
-#@export var run_state: RunState
-
 @export_category("Mining")
 @export var mining_controller: MiningController
 @export var timing_bridge: TimingBridge
@@ -25,14 +22,16 @@ extends Node
 @export var dialogue_director: DialogueDirector
 @export var departure_choice: DepartureChoice
 
+@onready var _game_state: RunState = RunState.get_global(self)
+
 
 ## Establishes every signal that crosses a mining subsystem boundary.
 func _ready() -> void:
 	_connect_once(
-		GameState.depth_changed,
+		_game_state.depth_changed,
 		encounter_controller._on_depth_changed
 	)
-	_connect_once(GameState.depth_changed, hud._on_depth_changed)
+	_connect_once(_game_state.depth_changed, hud._on_depth_changed)
 	_connect_once(
 		miner_rig.impact_contact,
 		_on_miner_impact_contact
@@ -55,7 +54,8 @@ func _ready() -> void:
 	)
 	_connect_once(
 		view_controller.landing_reached,
-		_on_miner_landing_grounding
+		_on_miner_landing_grounding,
+		Object.CONNECT_DEFERRED
 	)
 	_connect_once(
 		encounter_controller.encounter_camera_focus_requested,
@@ -68,10 +68,6 @@ func _ready() -> void:
 	_connect_once(
 		terrain_manager.view_y_changed,
 		encounter_controller._on_view_y_changed
-	)
-	_connect_once(
-		mining_controller.impact_resolved,
-		_on_impact_resolved_grounding
 	)
 	_connect_once(
 		mining_controller.impact_resolved,
@@ -143,25 +139,26 @@ func _on_miner_impact_contact(screen_position: Vector2) -> void:
 	)
 
 
-## Moves the artwork into the layered opening only when terrain was removed.
-func _on_impact_resolved_grounding(
-	_screen_position: Vector2,
-	cells_removed: int,
-	_combo_strength: float,
-	_debris_multiplier: float,
-	_swing_side: int
-) -> void:
-	if cells_removed > 0:
-		miner_rig.show_mined_opening_grounding()
-
-
-## Restores first-layer footing at the surface and every authored room.
+## Seats authored floors on layer one and mined landings on visible layer two.
 func _on_miner_landing_grounding(mining_y: int) -> void:
 	if terrain_manager.is_authored_landing_floor(mining_y):
 		miner_rig.show_intact_floor_grounding()
+		return
+	var support_screen_y: float = (
+		terrain_renderer.get_layer_opening_floor_support_screen_y(
+			miner_rig.get_landing_foot_screen_x(),
+			mining_y,
+			1
+		)
+	)
+	miner_rig.seat_landing_foot_at_screen_y(support_screen_y)
 
 
 ## Connects one cross-system signal without duplicating an existing route.
-func _connect_once(source_signal: Signal, target: Callable) -> void:
+func _connect_once(
+	source_signal: Signal,
+	target: Callable,
+	flags: int = 0
+) -> void:
 	if not source_signal.is_connected(target):
-		source_signal.connect(target)
+		source_signal.connect(target, flags)

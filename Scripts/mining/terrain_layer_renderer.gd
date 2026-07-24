@@ -40,6 +40,9 @@ const LAYER_SHADER: Shader = preload(
 )
 const SOLID_MASK_COLOR := Color.WHITE
 const EMPTY_MASK_COLOR := Color.TRANSPARENT
+# A landing samples at most 64 rows (256 mask pixels at the default profile).
+# The query runs once per landing and never grows with run depth or hit count.
+const MAX_SUPPORT_SCAN_ROWS: int = 64
 
 @export_category("References")
 @export var terrain_manager: TerrainManager
@@ -76,6 +79,7 @@ var _current_view_y: float
 var _loaded_first_chunk: int = -1
 var _loaded_last_chunk: int = -1
 var _latest_foreground_opening_rect := Rect2()
+var _latest_support_world_position := Vector2(NAN, NAN)
 var _show_logical_overlay: bool = false
 var _active_impact_combo: int = 0
 
@@ -176,6 +180,8 @@ func _on_view_y_changed(view_y: float) -> void:
 	_current_view_y = view_y
 	_refresh_active_chunks()
 	_position_active_chunks()
+	if _show_logical_overlay:
+		queue_redraw()
 
 
 ## Recalculates streamed coverage when the browser canvas changes size.
@@ -604,6 +610,90 @@ func get_latest_foreground_opening_rect() -> Rect2:
 	return _latest_foreground_opening_rect
 
 
+## Finds the bottom lip where one layer's organic opening becomes solid again.
+func get_layer_opening_floor_support_screen_y(
+	screen_x: float,
+	landing_world_row: int,
+	layer_index: int
+) -> float:
+	if (
+		layer_index < 0
+		or layer_index >= profile.get_layer_count()
+		or profile.mask_pixels_per_cell <= 0
+	):
+		return NAN
+	var config: MiningConfig = terrain_manager.config
+	var cell_size: float = float(config.terrain_cell_world_size)
+	var mask_pixels_per_world_unit: float = (
+		float(profile.mask_pixels_per_cell) / cell_size
+	)
+	var terrain_left: float = (
+		config.terrain_screen_center_x
+		- float(config.terrain_width_cells) * cell_size * 0.5
+	)
+	var mask_x: int = floori(
+		(screen_x - terrain_left) * mask_pixels_per_world_unit
+	)
+	var mask_width: int = (
+		config.terrain_width_cells * profile.mask_pixels_per_cell
+	)
+	if mask_x < 0 or mask_x >= mask_width:
+		return NAN
+
+	var chunk_mask_height: int = (
+		config.chunk_height_cells * profile.mask_pixels_per_cell
+	)
+	var first_mask_y: int = maxi(
+		landing_world_row * profile.mask_pixels_per_cell,
+		0
+	)
+	var sample_count: int = (
+		MAX_SUPPORT_SCAN_ROWS * profile.mask_pixels_per_cell
+	)
+	var saw_opening: bool = false
+	for sample_offset: int in range(sample_count):
+		var world_mask_y: int = first_mask_y + sample_offset
+		var chunk_index: int = floori(
+			float(world_mask_y) / float(chunk_mask_height)
+		)
+		if not _active_chunks.has(chunk_index):
+			continue
+		var chunk: TerrainChunkVisual = _active_chunks[chunk_index]
+		if layer_index >= chunk.mask_images.size():
+			continue
+		var local_mask_y: int = posmod(
+			world_mask_y,
+			chunk_mask_height
+		)
+		var layer_alpha: float = (
+			chunk.mask_images[layer_index]
+			.get_pixel(mask_x, local_mask_y)
+			.a
+		)
+		if layer_alpha < profile.transparent_alpha_threshold:
+			saw_opening = true
+			continue
+		if not saw_opening:
+			continue
+
+		var support_world_y: float = (
+			(float(world_mask_y) + 0.5)
+			/ mask_pixels_per_world_unit
+		)
+		_latest_support_world_position = Vector2(
+			screen_x - terrain_left,
+			support_world_y
+		)
+		if _show_logical_overlay:
+			queue_redraw()
+		return (
+			config.mining_face_screen_y
+			+ support_world_y
+			- _current_view_y * cell_size
+		)
+	return NAN
+
+
 ## Toggles a visual audit of logical openings with one debug keypress.
 func _unhandled_key_input(event: InputEvent) -> void:
 	if (
@@ -660,6 +750,18 @@ func _draw() -> void:
 				),
 				logical_overlay_color
 			)
+	if not is_nan(_latest_support_world_position.y):
+		var support_screen_position := Vector2(
+			terrain_left + _latest_support_world_position.x,
+			config.mining_face_screen_y
+				+ _latest_support_world_position.y
+				- _current_view_y * cell_size
+		)
+		draw_circle(
+			support_screen_position,
+			4.0,
+			Color(1.0, 0.15, 0.85, 0.95)
+		)
 
 
 ## Traces a thin organic opening along one branching damage path.

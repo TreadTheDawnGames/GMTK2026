@@ -13,13 +13,14 @@ signal swing_finished
 @export_category("Placement")
 ## Seats the miner on the pale top stratum at the surface and merchant floors.
 @export_range(0.0, 64.0, 1.0) var intact_floor_grounding_offset_y: float = 16.0
-## Seats the miner into the orange-edged opening after terrain is struck.
-@export_range(0.0, 64.0, 1.0) var mined_opening_grounding_offset_y: float = 32.0
+## Slightly overlaps the sampled dirt edge so texture filtering cannot show a gap.
+@export_range(0.0, 4.0, 0.25) var grounding_overlap_y: float = 1.0
 
 @export_category("References")
 @export var animation_player: AnimationPlayer
 @export var visual_root: Node2D
 @export var drawn_miner_sprite: Sprite2D
+@export var landing_foot_anchor: Marker2D
 @export var idle_miner_texture: Texture2D
 @export var impact_miner_texture: Texture2D
 @export var impact_point: Marker2D
@@ -165,9 +166,26 @@ func show_intact_floor_grounding() -> void:
 	_set_grounding_offset(intact_floor_grounding_offset_y)
 
 
-## Places the artwork above the second visible layer after a successful hit.
-func show_mined_opening_grounding() -> void:
-	_set_grounding_offset(mined_opening_grounding_offset_y)
+## Seats the authored sole baseline on the renderer's sampled dirt support.
+func seat_landing_foot_at_screen_y(support_screen_y: float) -> void:
+	if is_nan(support_screen_y) or not is_instance_valid(landing_foot_anchor):
+		return
+	var grounding_delta: float = (
+		support_screen_y
+		+ grounding_overlap_y
+		- landing_foot_anchor.global_position.y
+	)
+	var current_grounding_offset: float = (
+		visual_root.position.y - _visual_root_rest_y
+	)
+	_set_grounding_offset(current_grounding_offset + grounding_delta)
+
+
+## Returns the horizontal sole position used to sample organic terrain.
+func get_landing_foot_screen_x() -> float:
+	if not is_instance_valid(landing_foot_anchor):
+		return global_position.x
+	return landing_foot_anchor.global_position.x
 
 
 ## Changes presentation placement without moving ChipOrigin mining logic.

@@ -21,6 +21,16 @@ var remaining_depth: int:
 		return maxi(config.total_run_depth - depth, 0)
 
 
+## Returns the project autoload without coupling consumers to a bare global.
+static func get_global(context: Node) -> RunState:
+	var game_state: RunState = (
+		context.get_node_or_null("/root/GameState") as RunState
+	)
+	if game_state == null:
+		push_error("GameState autoload is unavailable.")
+	return game_state
+
+
 ## Starts a new run when the node loads.
 func _ready() -> void:
 	reset_run()

@@ -6,3 +6,4 @@
 script = ExtResource("1")
 display_name = "Wooden Pickaxe"
 description = "A simple wooden tool carried at the start of the descent."
+swing_speed_multiplier = 1.0

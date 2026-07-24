@@ -26,6 +26,8 @@ var combo: int = 0:
 @export var combo_saved_color: Color = Color.CYAN
 @export var combo_lost_color: Color = Color.RED
 
+@onready var _game_state: RunState = RunState.get_global(self)
+
 ## Connects both timing bars to the combo flow.
 func _ready() -> void:
 	if mining_config == null:
@@ -49,8 +51,16 @@ func _ready() -> void:
 	):
 		recovery_window.pressed.connect(_recovery_window_pressed)
 	
-	depth_label.text = str(Utils.format_number_with_commas(GameState.config.total_run_depth))
-	GameState.depth_changed.connect(func(depth): depth_label.text = Utils.format_number_with_commas(GameState.config.total_run_depth - GameState.depth))
+	_update_depth_label(_game_state.depth)
+	if not _game_state.depth_changed.is_connected(_update_depth_label):
+		_game_state.depth_changed.connect(_update_depth_label)
+
+
+## Shows remaining run depth from the shared state.
+func _update_depth_label(_depth: int) -> void:
+	depth_label.text = Utils.format_number_with_commas(
+		_game_state.remaining_depth
+	)
 
 
 ## Updates the combo or opens recovery after the main timing result.
