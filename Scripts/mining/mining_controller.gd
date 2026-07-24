@@ -299,14 +299,31 @@ func resolve_impact(
 					!= PickaxeDefinition.SpecialEffect.BRANCHING_LIGHTNING
 			):
 				continue
+			var maximum_crack_count := (
+				definition.lightning_max_crack_count
+			)
+			var maximum_crack_length := (
+				definition.lightning_max_crack_length_cells
+			)
+			var maximum_crack_depth := (
+				definition.lightning_max_crack_depth_cells
+			)
+			# Browser builds keep the same growth curve and layer taper with a
+			# smaller bounded mask workload on the impact hot path.
+			if OS.has_feature("web"):
+				maximum_crack_count = mini(maximum_crack_count, 3)
+				maximum_crack_length = mini(maximum_crack_length, 12)
+				maximum_crack_depth = mini(maximum_crack_depth, 3)
 			var lightning_result := terrain_manager.dig_branching_lightning(
 				Vector2i(
 					_pending_swing.target_cell_x,
 					surface_after_primary_hit_y
 				),
-				definition.lightning_depth_rows,
-				definition.lightning_branch_count,
-				definition.lightning_branch_length_cells
+				requested_half_width_cells,
+				_pending_combo_strength,
+				maximum_crack_count,
+				maximum_crack_length,
+				maximum_crack_depth
 			)
 			dig_result.absorb(lightning_result)
 	var new_mining_position: Vector2i = (

@@ -88,14 +88,23 @@ streaming and camera boundaries cannot drift apart.
 
 ## Branching lightning
 
-The Stone Pickaxe adds a jagged central path and shorter randomized side
-branches beneath its normal impact. Logical paths are sent to the renderer as
-one batch. Each branch receives a narrow layered opening, while every affected
-chunk uploads its changed masks only once.
+The Stone Pickaxe cracks the dirt outward from the actual left and right edges
+of its normal impact. Because the origin uses the resolved tunnel half-width,
+larger combo blasts never leave disconnected lightning marks beneath the miner.
+Low combos make one short crack on a random side. Higher combos add alternating
+left/right paths, increase their lateral reach and shallow vertical wander, and
+widen their layered openings. The inner crack cuts the first two strata; its
+outer quarter loses power and cuts only the foreground stratum, so the end reads
+as a fading fracture instead of another full tunnel.
 
-Lightning depth, branch count, and branch length are Inspector settings on the
-Stone Pickaxe resource. The terrain manager owns which cells break; the layer
-renderer owns only their organic presentation.
+Maximum crack count, length, and depth are Inspector settings on the pickaxe
+definition. Logical paths are sent to the renderer as one batch, and every
+affected chunk uploads its masks only once. The terrain manager owns which cells
+break; each persistent renderer stamp stores the combo-scaled visual width so
+streaming a chunk out and back cannot resize an old crack.
+Browser exports cap the maximum at three twelve-cell cracks. The normal
+`impact_resolved` signal still produces the bounded dirt-particle burst, smoke,
+shake, and dig number once for the complete hit rather than once per crack.
 
 ## Impact smoke
 

@@ -13,6 +13,13 @@ class DigResult:
 		cells_removed += other.cells_removed
 
 
+# One lightning event allocates at most 8 paths × 32 cells. Pickaxe exports use
+# the same caps so direct callers cannot grow per-hit work beyond the web budget.
+const MAX_LIGHTNING_CRACKS: int = 8
+const MAX_LIGHTNING_CRACK_LENGTH: int = 32
+const MAX_LIGHTNING_CRACK_DEPTH: int = 8
+
+
 ## Reports newly opened terrain so presentation can reveal the damage.
 signal terrain_damaged(
 	destroyed_cells: Array[Vector2i],
@@ -103,70 +110,117 @@ func dig_tunnel(
 	return result
 
 
-## Breaks a jagged downward path with smaller branches from its sides.
+## Breaks shallow left/right cracks from a combo-sized blast's outer edge.
 func dig_branching_lightning(
-	start_cell: Vector2i,
-	depth_rows: int,
-	branch_count: int,
-	branch_length_cells: int
+	impact_center_cell: Vector2i,
+	impact_half_width_cells: int,
+	combo_strength: float,
+	max_crack_count: int,
+	max_crack_length_cells: int,
+	max_crack_depth_cells: int
 ) -> DigResult:
 	var result := DigResult.new()
-	if depth_rows <= 0 or not _is_mineable_cell(start_cell):
+	if max_crack_count <= 0 or max_crack_length_cells <= 0:
 		return result
 
+	var effect_strength := clampf(combo_strength, 0.0, 1.0)
+	var safe_max_crack_count := mini(
+		max_crack_count,
+		MAX_LIGHTNING_CRACKS
+	)
+	var safe_max_crack_length := mini(
+		max_crack_length_cells,
+		MAX_LIGHTNING_CRACK_LENGTH
+	)
+	var safe_max_crack_depth := clampi(
+		max_crack_depth_cells,
+		0,
+		MAX_LIGHTNING_CRACK_DEPTH
+	)
+	var crack_count := clampi(
+		roundi(
+			lerpf(
+				1.0,
+				float(safe_max_crack_count),
+				effect_strength
+			)
+		),
+		1,
+		maxi(safe_max_crack_count, 1)
+	)
+	var minimum_crack_length := mini(3, safe_max_crack_length)
+	var crack_length_limit := clampi(
+		roundi(
+			lerpf(
+				float(minimum_crack_length),
+				float(safe_max_crack_length),
+				effect_strength
+			)
+		),
+		1,
+		maxi(safe_max_crack_length, 1)
+	)
+	var crack_depth_limit := clampi(
+		roundi(
+			lerpf(
+				0.0,
+				float(safe_max_crack_depth),
+				effect_strength
+			)
+		),
+		0,
+		safe_max_crack_depth
+	)
 	var authored_paths: Array = []
-	var trunk_path: Array[Vector2i] = []
-	var trunk_cell := start_cell
-	for row_index in range(depth_rows):
-		if row_index > 0:
-			trunk_cell.x = clampi(
-				trunk_cell.x + _random.randi_range(-1, 1),
+	var first_direction := (
+		-1
+		if _random.randi_range(0, 1) == 0
+		else 1
+	)
+	for crack_index in range(crack_count):
+		var crack_direction := (
+			first_direction
+			if crack_index % 2 == 0
+			else -first_direction
+		)
+		var crack_cell := Vector2i(
+			clampi(
+				impact_center_cell.x
+					+ crack_direction
+						* (maxi(impact_half_width_cells, 0) + 1),
 				0,
 				config.terrain_width_cells - 1
-			)
-			trunk_cell.y += 1
-		if not is_ground_cell(trunk_cell):
-			break
-		trunk_path.append(trunk_cell)
-	if trunk_path.is_empty():
-		return result
-	authored_paths.append(trunk_path)
-
-	for branch_index in range(maxi(branch_count, 0)):
-		var seed_minimum := mini(
-			trunk_path.size() - 1,
-			maxi(1, trunk_path.size() / 4)
+			),
+			impact_center_cell.y
 		)
-		var seed_index := _random.randi_range(
-			seed_minimum,
-			trunk_path.size() - 1
+		var crack_path: Array[Vector2i] = []
+		var crack_depth := 0
+		var random_length_minimum := maxi(
+			1,
+			ceili(float(crack_length_limit) * 0.65)
 		)
-		var branch_cell := trunk_path[seed_index]
-		var branch_direction := (
-			-1
-			if branch_index % 2 == 0
-			else 1
+		var crack_length := _random.randi_range(
+			random_length_minimum,
+			crack_length_limit
 		)
-		if _random.randi_range(0, 1) == 1:
-			branch_direction *= -1
-		var branch_path: Array[Vector2i] = []
-		var branch_length := _random.randi_range(
-			maxi(2, branch_length_cells / 2),
-			maxi(branch_length_cells, 2)
-		)
-		for step_index in range(branch_length):
-			branch_cell.x = clampi(
-				branch_cell.x + branch_direction,
-				0,
-				config.terrain_width_cells - 1
-			)
-			if step_index % 2 == 0 or _random.randi_range(0, 1) == 1:
-				branch_cell.y += 1
-			if not is_ground_cell(branch_cell):
+		for step_index in range(crack_length):
+			if step_index > 0:
+				crack_cell.x = clampi(
+					crack_cell.x + crack_direction,
+					0,
+					config.terrain_width_cells - 1
+				)
+				var depth_roll := _random.randi_range(0, 99)
+				if depth_roll < 34 and crack_depth < crack_depth_limit:
+					crack_depth += 1
+				elif depth_roll < 52 and crack_depth > 0:
+					crack_depth -= 1
+				crack_cell.y = impact_center_cell.y + crack_depth
+			if not is_ground_cell(crack_cell):
 				break
-			branch_path.append(branch_cell)
-		if not branch_path.is_empty():
-			authored_paths.append(branch_path)
+			crack_path.append(crack_cell)
+		if not crack_path.is_empty():
+			authored_paths.append(crack_path)
 
 	var destroyed_paths: Array = []
 	var destroyed_lookup: Dictionary[Vector2i, bool] = {}

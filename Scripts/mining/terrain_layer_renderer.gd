@@ -26,6 +26,8 @@ class ImpactStamp:
 	var core_radius: float
 	var damage_bounds: Rect2
 	var narrow_path_points: PackedVector2Array
+	var narrow_path_radius_scale: float = 1.0
+	var narrow_path_two_layer_fraction: float = 0.5
 	var use_big_hole: bool
 	var flip_x: bool
 	var flip_y: bool
@@ -615,6 +617,29 @@ func _create_impact_stamp(
 	stamp.center = damage_rect.get_center()
 	stamp.damage_bounds = damage_rect
 	if is_narrow_path:
+		var combo_strength := clampf(
+			float(_active_impact_combo)
+				/ float(
+					maxi(
+						terrain_manager.config.maximum_effect_combo,
+						1
+					)
+				),
+			0.0,
+			1.0
+		)
+		stamp.narrow_path_radius_scale = lerpf(
+			0.9,
+			1.5,
+			combo_strength
+		)
+		# Inner crack segments retain enough force to cut two upper strata.
+		# The final segment always fades to the foreground layer only.
+		stamp.narrow_path_two_layer_fraction = lerpf(
+			0.45,
+			0.75,
+			combo_strength
+		)
 		for cell_index in range(0, destroyed_cells.size(), 2):
 			stamp.narrow_path_points.append(
 				(
@@ -941,12 +966,18 @@ func _punch_narrow_path(
 	layer_index: int,
 	mask_data: HoleMaskData
 ) -> bool:
+	# Lightning never cuts the deeper backdrop. Layer two receives only the
+	# inner fraction, while the weakening outer edge remains on layer one.
+	if layer_index > 1:
+		return false
 	var layer_count := profile.get_layer_count()
 	var layers_below := layer_count - layer_index - 1
 	var opening_radius := (
-		float(terrain_manager.config.terrain_cell_world_size) * 0.75
-		+ float(profile.core_hole_padding)
-		+ float(mini(profile.rim_width, 4) * layers_below)
+		(
+			float(terrain_manager.config.terrain_cell_world_size) * 0.32
+			+ float(profile.core_hole_padding) * 0.5
+			+ float(mini(profile.rim_width, 4) * layers_below) * 0.5
+		) * stamp.narrow_path_radius_scale
 	)
 	var layer_offset := (
 		profile.get_layer_impact_offset(layer_index)
@@ -958,8 +989,19 @@ func _punch_narrow_path(
 	if stamp.flip_y:
 		layer_offset.y *= -1.0
 
+	var path_point_count := stamp.narrow_path_points.size()
+	if layer_index == 1:
+		path_point_count = clampi(
+			ceili(
+				float(path_point_count)
+					* stamp.narrow_path_two_layer_fraction
+			),
+			1,
+			path_point_count
+		)
 	var changed := false
-	for path_point in stamp.narrow_path_points:
+	for point_index in range(path_point_count):
+		var path_point := stamp.narrow_path_points[point_index]
 		var opening_center := path_point + layer_offset
 		if _punch_hole(
 			destination,
