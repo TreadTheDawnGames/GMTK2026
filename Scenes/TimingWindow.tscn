@@ -11,7 +11,6 @@
 [ext_resource type="AudioStream" uid="uid://i0bh02k308nf" path="res://Assets/Audio/Mine6.wav" id="7_cprbh"]
 [ext_resource type="AudioStream" uid="uid://xd7dlv2rg765" path="res://Assets/Audio/Mine7.wav" id="8_gxysw"]
 [ext_resource type="AudioStream" uid="uid://da4n2chd7wsvw" path="res://Assets/Audio/Save.wav" id="11_74xn3"]
-[ext_resource type="PackedScene" uid="uid://cp1o8kksfkcxm" path="res://Scenes/targets/la_la_land_target.tscn" id="11_gxysw"]
 [ext_resource type="AudioStream" uid="uid://bif7p7jcchspq" path="res://Assets/Audio/MissWithSave.wav" id="12_2plp5"]
 [ext_resource type="StyleBox" uid="uid://cxvty1lal1xjs" path="res://resources/themes/timing_backing.tres" id="12_sgvbc"]
 [ext_resource type="AudioStream" uid="uid://cbbyjg221k80c" path="res://Assets/Audio/SaveBuildup.wav" id="13_53pw3"]
@@ -42,7 +41,6 @@ offset_left = -351.0
 offset_top = -128.0
 offset_right = 349.0
 offset_bottom = -47.0
-target_packed_scenes = Array[PackedScene]([ExtResource("11_gxysw")])
 grace = 3.0
 
 [node name="Control" type="Control" parent="MiningWindow" unique_id=1770024605]
