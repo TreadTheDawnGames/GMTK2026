@@ -33,6 +33,9 @@ func initialize():
 	Utils.set_control_width(self, my_width)
 	pass
 
+func is_point_within_bounds(point : float, grace : float = 0) -> bool:
+	return  get_left_extent() - grace < point and point < get_right_extent() + grace
+
 ## Marks this target collected and hides it until the set resets.
 func hit(_timing_window : SliderTimingWindow = null) -> void:
 	is_hit = true

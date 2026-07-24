@@ -36,6 +36,8 @@ var targets: Array[TimingTarget] = []
 var consecutive_hits : int = 0
 var _starting_target_count: int = 1
 
+var slider_position : float = 0.0
+
 
 ## Creates the configured target baseline and prepares one-shot recovery bars.
 func _ready() -> void:
@@ -50,11 +52,12 @@ func _ready() -> void:
 	reset_one_shot()
 	if one_shot:
 		stop()
+	slider.position.x = slider_position
 
 
 ## Returns the slider edge area including input grace.
 func slider_half_width() -> float:
-	return slider.size.x * 0.5 + grace
+	return slider.size.x * 0.5
 
 
 ## Shows the bar and prepares a fresh target for one-shot recovery.
@@ -66,7 +69,7 @@ func start() -> void:
 
 func reset_one_shot():
 	if one_shot:
-		slider.position.x = 0.0
+		slider_position = 0.0
 		direction = 1.0
 		reset_all_targets()
 	pass
@@ -108,7 +111,7 @@ func add_target() -> void:
 	if is_node_ready():
 		#randomize_all_targets
 		#randomize_target(new_target)
-		clamp_target(new_target)
+		new_target.position.x = clamp_within_bounds(new_target.position.x, new_target.size.x)
 
 
 ## Sets the target baseline restored whenever a streak ends.
@@ -151,7 +154,7 @@ func remove_all_extra_targets() -> void:
 		add_target()
 	for baseline_target in targets:
 		baseline_target.initialize()
-		clamp_target(baseline_target)
+		baseline_target.position.x = clamp_within_bounds(baseline_target.position.x, baseline_target.size.x)
 	randomize_all_targets()
 
 ## Removes the specified target or the most recently added target.
@@ -184,17 +187,8 @@ func _process(delta: float) -> void:
 	if Input.is_action_just_pressed(&"Space"):
 		var hit_targets: Array = targets.filter(
 			func(target: TimingTarget) -> bool:
-				var hit_distance := (
-					target.size.x * 0.5
-					+ slider.size.x * 0.5
-					+ grace
-				)
-				return (
-					not target.is_hit
-					and absf(slider.position.x - target.position.x)
-						<= hit_distance
-				)
-		)
+				return target.is_point_within_bounds(slider_position, grace))
+
 		for target: TimingTarget in hit_targets:
 			target.hit(self)
 
@@ -213,13 +207,13 @@ func _process(delta: float) -> void:
 				await pause(true)
 				stop()
 
-	slider.position.x += speed * direction * delta * speed_multiplier
+	slider_position += speed * direction * delta * speed_multiplier
 
 	var left_edge := slider_half_width()
 	var right_edge := backing.size.x - slider_half_width()
-	var hit_left_edge := slider.position.x <= left_edge and direction < 0.0
+	var hit_left_edge := slider_position <= left_edge and direction < 0.0
 	var hit_right_edge := (
-		slider.position.x >= right_edge
+		slider_position >= right_edge
 		and direction > 0.0
 	)
 	if hit_left_edge or hit_right_edge:
@@ -228,12 +222,13 @@ func _process(delta: float) -> void:
 		if one_shot:
 			pressed.emit(false, 0, consecutive_hits)
 			stop()
-
+	
+	slider.position.x = slider_position
 
 ## Maps a successful slider position to left, center-neutral, or right.
 func _get_slider_hit_direction() -> int:
 	var hit_offset_from_center: float = (
-		slider.position.x - backing.size.x * 0.5
+		slider_position - backing.size.x * 0.5
 	)
 	if is_zero_approx(hit_offset_from_center):
 		return 0
@@ -329,11 +324,11 @@ func on_freeze(stopped:bool):
 		if is_all_targets_hit() and not one_shot:
 			reset_all_targets()
 
-func clamp_target(target : TimingTarget):
-	target.position.x = clampf(
-		target.position.x,
-		target.size.x * 0.5,
-		backing.size.x - target.size.x * 0.5
+func clamp_within_bounds(to_clamp : float, width : float) -> float:
+	return clampf(
+		to_clamp,
+		width * 0.5,
+		backing.size.x - width * 0.5
 	)
 
 func is_all_targets_hit() -> bool:

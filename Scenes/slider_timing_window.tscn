@@ -25,6 +25,7 @@ grow_vertical = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_eprdb")
 script = ExtResource("1_iyxre")
 target_packed_scenes = Array[PackedScene]([ExtResource("2_eprdb")])
+speed = 20.0
 desired_target_heirarchy_index = 0
 
 [node name="Backing" type="Control" parent="." unique_id=953641845]
