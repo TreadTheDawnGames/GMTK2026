@@ -17,12 +17,12 @@ display_name = "Lookout"
 [sub_resource type="Resource" id="Line_warning"]
 script = ExtResource("3_line")
 speaker_slot = &"lookout"
-text = "The thief is at depth zero. You need to stop him before he steals everything."
+text = "Bro why are you here? Whatever, you going after the Thief before he steals?"
 
 [sub_resource type="Resource" id="Line_accept"]
 script = ExtResource("3_line")
 speaker_slot = &"miner"
-text = "On it."
+text = "Yup!!"
 
 [resource]
 script = ExtResource("1_conversation")
