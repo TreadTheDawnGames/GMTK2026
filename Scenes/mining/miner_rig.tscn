@@ -487,7 +487,7 @@ _data = {
 
 [node name="MinerRig" type="Node2D" unique_id=1134346491 node_paths=PackedStringArray("animation_player", "visual_root", "drawn_miner_sprite", "landing_foot_anchor", "impact_point", "stand_in_hammer_head", "final_hammer_head_sprite", "impact_audio_player")]
 editor_description = "Presentation-only character rig. Keep this root fixed so the player stays centered. Animate VisualRoot and its pivots instead."
-position = Vector2(576, 282)
+position = Vector2(576, 202)
 script = ExtResource("1_rig")
 animation_player = NodePath("AnimationPlayer")
 visual_root = NodePath("VisualRoot")

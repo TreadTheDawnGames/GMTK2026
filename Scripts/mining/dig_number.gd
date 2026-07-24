@@ -12,26 +12,30 @@ extends RichTextLabel
 @export var minimum_combo_color: Color = Color("f5ead7")
 @export var maximum_combo_color: Color = Color("ff6b35")
 @export_range(0.0, 1.0, 0.05) var starting_scale: float = 0.15
-@export_range(1.0, 2.5, 0.05) var pop_overshoot: float = 1.3
+@export_range(1.0, 2.5, 0.05) var pop_overshoot: float = 1.15
 
 @export_category("Depth Scale")
 ## Keeps a normal starting hit at the base display size.
 @export_range(1, 1_000, 1) var base_depth: int = 6
 ## Reaches the largest display size at this downward distance.
 @export_range(1, 2_000, 1) var full_scale_depth: int = 32
-@export_range(0.0, 2.0, 0.05) var maximum_depth_scale_bonus: float = 0.8
+@export_range(0.0, 2.0, 0.05) var maximum_depth_scale_bonus: float = 0.55
 
 @export_category("Motion")
 @export_range(0.1, 5.0, 0.1) var lifetime_seconds: float = 1.5
-@export_range(0.0, 300.0, 1.0) var jump_height_px: float = 92.0
-@export_range(0.0, 300.0, 1.0) var horizontal_travel_px: float = 110.0
+@export_range(0.0, 400.0, 1.0) var launch_lift_px: float = 170.0
+@export_range(0.0, 300.0, 1.0) var jump_height_px: float = 64.0
+@export_range(0.0, 400.0, 1.0) var horizontal_travel_px: float = 180.0
 @export_range(0.0, 30.0, 1.0) var launch_rotation_degrees: float = 8.0
 @export_range(0.0, 1.0, 0.05) var fade_portion: float = 0.4
 @export_range(0.0, 64.0, 1.0) var ui_clearance_px: float = 16.0
 
 ## Retained for deterministic motion-bound checks without sampling tweens.
+var _arc_start_position: Vector2
 var _arc_end_position: Vector2
 var _arc_maximum_bottom_y: float
+var _maximum_launch_rect: Rect2
+var _player_exclusion_rect: Rect2
 
 
 ## Animates the value from the hammer contact using its captured combo.
@@ -42,6 +46,7 @@ func present(
 	combo_strength: float,
 	horizontal_direction: float,
 	random_travel_scale: float,
+	player_exclusion_rect: Rect2,
 	bottom_screen_limit_y: float
 ) -> void:
 	var safe_combo_strength := clampf(combo_strength, 0.0, 1.0)
@@ -76,7 +81,6 @@ func present(
 	# Combo changes styling and color; actual downward progress changes size.
 	text = formatted_text
 	pivot_offset = size * 0.5
-	position = impact_screen_position - pivot_offset
 	scale = Vector2.ONE * starting_scale
 	rotation = deg_to_rad(
 		-launch_rotation_degrees * horizontal_direction
@@ -99,6 +103,42 @@ func present(
 		1.0
 		+ maximum_depth_scale_bonus * depth_scale_strength
 	)
+	var maximum_visual_scale := final_display_scale * pop_overshoot
+	var maximum_scaled_half_size := (
+		pivot_offset * maximum_visual_scale
+	)
+	var rotation_cosine := absf(cos(rotation))
+	var rotation_sine := absf(sin(rotation))
+	var maximum_rotated_half_size := Vector2(
+		maximum_scaled_half_size.x * rotation_cosine
+			+ maximum_scaled_half_size.y * rotation_sine,
+		maximum_scaled_half_size.x * rotation_sine
+			+ maximum_scaled_half_size.y * rotation_cosine
+	)
+	_player_exclusion_rect = player_exclusion_rect
+	var start_center_x := (
+		player_exclusion_rect.position.x
+			- maximum_rotated_half_size.x
+			- 1.0
+		if horizontal_direction < 0.0
+		else player_exclusion_rect.end.x
+			+ maximum_rotated_half_size.x
+			+ 1.0
+	)
+	var start_center_y := maxf(
+		minf(
+			impact_screen_position.y - launch_lift_px,
+			player_exclusion_rect.get_center().y - ui_clearance_px
+		),
+		maximum_rotated_half_size.y + ui_clearance_px
+	)
+	var start_center := Vector2(start_center_x, start_center_y)
+	position = start_center - pivot_offset
+	_arc_start_position = position
+	_maximum_launch_rect = Rect2(
+		start_center - maximum_rotated_half_size,
+		maximum_rotated_half_size * 2.0
+	)
 	var pop_seconds := minf(lifetime_seconds * 0.14, 0.2)
 	var settle_seconds := minf(lifetime_seconds * 0.12, 0.16)
 	var pop_tween := create_tween()
@@ -119,9 +159,8 @@ func present(
 	)
 
 	var randomized_launch_scale := maxf(random_travel_scale, 0.1)
-	var viewport_center_x := get_viewport_rect().size.x * 0.5
 	var destination_center_x := (
-		viewport_center_x
+		start_center_x
 		+ horizontal_direction
 			* horizontal_travel_px
 			* randomized_launch_scale
@@ -143,7 +182,6 @@ func present(
 		* randomized_launch_scale
 		* lerpf(1.0, 1.2, safe_combo_strength)
 	)
-	var maximum_visual_scale := final_display_scale * pop_overshoot
 	var maximum_half_height := pivot_offset.y * maximum_visual_scale
 	var safe_end_center_y := (
 		bottom_screen_limit_y
@@ -151,7 +189,7 @@ func present(
 		- maximum_half_height
 	)
 	var natural_end_center_y := (
-		impact_screen_position.y - jump_height * 0.45
+		start_center.y - jump_height * 0.45
 	)
 	var end_center_y := minf(natural_end_center_y, safe_end_center_y)
 	var end_label_y := end_center_y - pivot_offset.y

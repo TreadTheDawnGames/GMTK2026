@@ -32,7 +32,7 @@ enum MiningCameraStyle {
 
 @export_category("View")
 @export var terrain_screen_center_x: float = 576.0
-@export var mining_face_screen_y: float = 340.0
+@export var mining_face_screen_y: float = 260.0
 @export_range(0, 4, 1) var preload_chunks_below: int = 1
 ## Accelerates the miner through newly opened terrain, in rows per second squared.
 @export_range(10.0, 1_000.0, 10.0) var mining_fall_gravity: float = 300.0

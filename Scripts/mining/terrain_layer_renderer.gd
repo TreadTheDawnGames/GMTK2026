@@ -5,7 +5,9 @@ extends Node2D
 ## Visual cutouts intentionally retain one colored backdrop over logical holes.
 ## Normal hits stop at orange; big hits may expose the solid brown back layer.
 ## Chamber antialiasing may differ by less than one logical cell at a side edge;
-## neither mismatch affects support. Press F3 to compare the logical opening.
+## layer one may sit up to the profile's authored reveal distance below a room's
+## logical floor while layer two stays aligned to support. Neither mismatch
+## affects collision. Press F3 to compare the logical opening.
 
 class TerrainChunkVisual:
 	var root: Node2D
@@ -269,7 +271,13 @@ func _load_chunk(chunk_index: int) -> void:
 			if is_solid_back_layer
 			else base_mask
 		)
-		chunk.mask_images.append(source_mask.duplicate())
+		var layer_mask := source_mask.duplicate()
+		if layer_index == 0:
+			_clear_chamber_foreground_floor_bands(
+				layer_mask,
+				chunk_index
+			)
+		chunk.mask_images.append(layer_mask)
 
 	var chamber_stamps: Array = _chamber_stamps_by_chunk.get(
 		chunk_index,
@@ -408,6 +416,63 @@ func _build_chunk_base_mask(
 			mask_cell_size
 		)
 	return image
+
+
+## Lowers only layer one beneath each room's unchanged layer-two support.
+func _clear_chamber_foreground_floor_bands(
+	image: Image,
+	chunk_index: int
+) -> void:
+	var config := terrain_manager.config
+	var encounter_config := terrain_manager.encounter_config
+	if (
+		encounter_config == null
+		or profile.chamber_layer_two_floor_reveal_px <= 0.0
+		or profile.mask_pixels_per_cell <= 0
+	):
+		return
+	var reveal_mask_height := maxi(
+		ceili(
+			profile.chamber_layer_two_floor_reveal_px
+				* float(profile.mask_pixels_per_cell)
+				/ float(config.terrain_cell_world_size)
+		),
+		1
+	)
+	var chunk_mask_height := (
+		config.chunk_height_cells * profile.mask_pixels_per_cell
+	)
+	var chunk_mask_top := chunk_index * chunk_mask_height
+	var image_bounds := Rect2i(Vector2i.ZERO, image.get_size())
+	for encounter in encounter_config.encounters:
+		if encounter == null:
+			continue
+		var encounter_depth := encounter.resolve_depth(
+			config.total_run_depth
+		)
+		var floor_world_row := (
+			config.initial_surface_row + encounter_depth
+		)
+		var floor_mask_y := (
+			floor_world_row * profile.mask_pixels_per_cell
+			- chunk_mask_top
+		)
+		var chamber_bounds := (
+			encounter_config.get_chamber_horizontal_bounds(
+				encounter_depth - 1,
+				config.total_run_depth,
+				config.terrain_width_cells
+			)
+		)
+		var reveal_rect := Rect2i(
+			chamber_bounds.x * profile.mask_pixels_per_cell,
+			floor_mask_y,
+			(chamber_bounds.y - chamber_bounds.x)
+				* profile.mask_pixels_per_cell,
+			reveal_mask_height
+		).intersection(image_bounds)
+		if reveal_rect.has_area():
+			image.fill_rect(reveal_rect, EMPTY_MASK_COLOR)
 
 
 ## Draws the shared chamber taper at mask-pixel resolution. This runs only

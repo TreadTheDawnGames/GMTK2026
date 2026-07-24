@@ -17,4 +17,5 @@ big_hole_masks = Array[Texture2D]([ExtResource("7_big_4"), ExtResource("6_big_3"
 rim_width = 16
 layer_impact_offsets = PackedVector2Array(-14, -6, 11, 5, -7, 10, 4, -3)
 keep_back_layer_solid = true
+chamber_layer_two_floor_reveal_px = 20.0
 debris_colors = PackedColorArray(0.933333, 0.764706, 0.603922, 1, 0.85098, 0.627451, 0.4, 1, 0.87451, 0.443137, 0.14902, 1, 0.560784, 0.337255, 0.231373, 1)

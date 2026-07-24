@@ -45,6 +45,10 @@ extends Resource
 @export_range(8, 512, 1) var big_hole_minimum_size: int = 80
 @export_range(0.05, 0.95, 0.05) var transparent_alpha_threshold: float = 0.5
 
+@export_category("Encounter Chambers")
+## Lowers layer one so layer two forms the visible chamber standing surface.
+@export_range(0.0, 64.0, 1.0) var chamber_layer_two_floor_reveal_px: float = 20.0
+
 @export_category("Debris")
 @export var debris_colors: PackedColorArray = PackedColorArray([
 	Color("eec39a"),

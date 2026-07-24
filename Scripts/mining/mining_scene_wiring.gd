@@ -21,6 +21,7 @@ extends Node
 @export var timing_window: TimingWindowTask
 @export var depth_review_control: DepthReviewControl
 @export var encounter_controller: DepthEncounterController
+@export var intro_controller: RunIntroController
 @export var dialogue_director: DialogueDirector
 @export var departure_choice: DepartureChoice
 
@@ -37,6 +38,10 @@ func _ready() -> void:
 	_connect_once(
 		_game_state.run_reset,
 		mining_controller._on_run_reset
+	)
+	_connect_once(
+		_game_state.run_reset,
+		hud._on_run_reset
 	)
 	_connect_once(
 		miner_rig.impact_contact,
@@ -120,8 +125,16 @@ func _ready() -> void:
 		encounter_controller._on_conversation_finished
 	)
 	_connect_once(
+		dialogue_director.conversation_finished,
+		intro_controller._on_conversation_finished
+	)
+	_connect_once(
 		dialogue_director.line_presented,
 		encounter_controller._on_dialogue_line_presented
+	)
+	_connect_once(
+		dialogue_director.line_presented,
+		intro_controller._on_dialogue_line_presented
 	)
 	_connect_once(
 		encounter_controller.departure_choice_requested,
