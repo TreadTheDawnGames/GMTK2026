@@ -30,6 +30,7 @@ func unhit() -> void:
 func is_overlapping(_input_rect : Rect2) -> bool:
 	return false
 
-func place(placement_width : float) -> float:
+## Returns a touple of [position, width]
+func place(placement_width : float) -> Array[float]:
 	var target_center_x := (randf() * placement_width)
-	return target_center_x
+	return [target_center_x, my_width]

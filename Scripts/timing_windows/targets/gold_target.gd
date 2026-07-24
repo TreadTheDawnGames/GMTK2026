@@ -10,11 +10,11 @@ var direction : float = 1.0
 
 @export var speed : float = 250
 
-func place(_placement_width : float) -> float:
+func place(_placement_width : float) -> Array[float]:
 	initial_position = randf()*_placement_width
 	curr_pos = initial_position
 	
-	return initial_position
+	return [initial_position, my_width]
 
 func _process(delta: float) -> void:
 	position.x += speed * direction * delta

@@ -20,7 +20,7 @@ func unhit() -> void:
 	
 	super.unhit()
 
-func place(_placement_width : float) -> float:
+func place(_placement_width : float) -> Array[float]:
 	return super.place(_placement_width)
 
 func _fade():

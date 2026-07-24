@@ -201,13 +201,15 @@ func _process(delta: float) -> void:
 
 ## Moves one target to a valid position inside its backing bar.
 func randomize_target(target: TimingTarget) -> void:
+	var target_touple : Array[float] = target.place(backing.size.x)
+	var target_center_x = target_touple[0] if fixed_window < 0.0 else fixed_window*backing.size.x
 	
-	var target_center_x = target.place(backing.size.x) if fixed_window < 0.0 else fixed_window*backing.size.x
-	target.position.x = clampf(
+	target_center_x = clampf(
 		target_center_x,
-		target.size.x * 0.5,
-		backing.size.x - target.size.x * 0.5
+		target_touple[1] * 0.5,
+		backing.size.x - target_touple[1] * 0.5
 	)
+	target.position.x = target_center_x
 	var rerolls : int = 5
 	var do_again:bool =true
 	while do_again and rerolls > 0:
@@ -217,15 +219,15 @@ func randomize_target(target: TimingTarget) -> void:
 			if target.get_rect().intersects(_target.get_rect()):
 				
 				target.position.x = target.position.x + clampf(
-				target_center_x + target.size.x + 25 * (randf() - randf()),
-				target.size.x,#* 0.5,
-				backing.size.x - target.size.x,# * 0.5
+				target_center_x + target_touple[1] + 25 * (randf() - randf()),
+				target_touple[1],#* 0.5,
+				backing.size.x - target_touple[1],# * 0.5
 				)
 				do_again = true
 				target.position.x = clampf(
 				target_center_x,
-				target.size.x ,#* 0.5,
-				backing.size.x - target.size.x,# * 0.5
+				target_touple[1] ,#* 0.5,
+				backing.size.x - target_touple[1],# * 0.5
 				)
 
 				break
