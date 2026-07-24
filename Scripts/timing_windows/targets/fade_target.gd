@@ -1,6 +1,6 @@
 extends TimingTarget
 
-
+@export var fade_time : float = 2.0
 # Called when the node enters the scene tree for the first time.
 var t : Tween
 func initialize() -> void:
@@ -28,6 +28,6 @@ func _fade():
 	else:
 		t = create_tween()
 	super.initialize()
-	t.tween_property(self, "modulate:a", 0.0, 4.0)
+	t.tween_property(self, "modulate:a", 0.0, fade_time)
 	await t.finished
 	hit()
