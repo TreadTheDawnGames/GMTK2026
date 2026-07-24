@@ -13,8 +13,6 @@ signal encounter_camera_released
 @export_category("Schedule")
 @export var encounter_config: DepthEncounterConfig
 @export var mining_config: MiningConfig
-## Defers a merchant until this protected streak actually ends.
-@export_range(1, 100, 1) var protected_combo_threshold: int = 10
 
 @export_category("Character Placement")
 @export_range(-64, 64, 1) var horizontal_offset_cells: int = 22
@@ -32,7 +30,6 @@ signal encounter_camera_released
 var _presenters: Array[MerchantPresenter] = []
 var _next_encounter_index: int = 0
 var _pending_encounter_index: int = -1
-var _deferred_encounter_index: int = -1
 var _active_encounter_index: int = -1
 var _is_initialized: bool = false
 var _is_waiting_for_departure_choice: bool = false
@@ -54,7 +51,6 @@ func _on_depth_changed(depth: int) -> void:
 		or _is_waiting_for_departure_choice
 		or _active_encounter_index >= 0
 		or _pending_encounter_index >= 0
-		or _deferred_encounter_index >= 0
 		or _next_encounter_index >= encounter_config.encounters.size()
 	):
 		return
@@ -62,13 +58,6 @@ func _on_depth_changed(depth: int) -> void:
 	if depth < encounter.resolve_depth(mining_config.total_run_depth):
 		return
 
-	if (
-		encounter.pickaxe_reward != null
-		and timing_window.combo >= protected_combo_threshold
-	):
-		_deferred_encounter_index = _next_encounter_index
-		_presenters[_deferred_encounter_index].hide()
-		return
 	_pending_encounter_index = _next_encounter_index
 	timing_window.process_mode = Node.PROCESS_MODE_DISABLED
 	mining_controller.set_swing_queue_paused(true)
@@ -78,31 +67,6 @@ func _on_depth_changed(depth: int) -> void:
 func _on_landing_reached(_mining_y: int) -> void:
 	if _pending_encounter_index < 0 or _active_encounter_index >= 0:
 		return
-	_activate_pending_encounter()
-
-
-## Brings an overdue merchant to the miner when a protected streak ends.
-func _on_streak_ended(previous_combo: int) -> void:
-	if (
-		_deferred_encounter_index < 0
-		or previous_combo < protected_combo_threshold
-		or _active_encounter_index >= 0
-	):
-		return
-	_pending_encounter_index = _deferred_encounter_index
-	_deferred_encounter_index = -1
-	var presenter := _presenters[_pending_encounter_index]
-	presenter.position.x = (
-		float(_game_state.mining_x + horizontal_offset_cells)
-		* float(mining_config.terrain_cell_world_size)
-	)
-	presenter.position.y = (
-		float(_game_state.mining_y)
-		* float(mining_config.terrain_cell_world_size)
-	)
-	presenter.show()
-	timing_window.process_mode = Node.PROCESS_MODE_DISABLED
-	mining_controller.set_swing_queue_paused(true)
 	_activate_pending_encounter()
 
 

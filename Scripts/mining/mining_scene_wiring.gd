@@ -60,10 +60,6 @@ func _ready() -> void:
 		timing_window.set_pickaxe_target_unlocks
 	)
 	_connect_once(
-		timing_window.streak_ended,
-		encounter_controller._on_streak_ended
-	)
-	_connect_once(
 		mining_controller.dig_presentation_started,
 		terrain_renderer._on_dig_presentation_started
 	)
