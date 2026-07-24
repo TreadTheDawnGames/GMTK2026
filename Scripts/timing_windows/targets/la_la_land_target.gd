@@ -1,12 +1,16 @@
 extends TimingTarget
 class_name LaLaLandTarget
 @onready var timing_window: SliderTimingWindow = %TimingWindow
+@onready var timing_window2: SliderTimingWindow = %TimingWindow2
+@onready var timing_window3: SliderTimingWindow = %TimingWindow3
 
 func initialize():
-	if not timing_window:
-		timing_window = %TimingWindow
-	timing_window.stop()
+	timing_window = %TimingWindow
+	timing_window2 = %TimingWindow2
+	timing_window3 = %TimingWindow3
 	timing_window.pressed.connect(timing_hit)
+	timing_window2.pressed.connect(timing_hit2)
+	timing_window3.pressed.connect(timing_hit3)
 
 func hit():
 	super.hit()
@@ -17,6 +21,30 @@ func hit():
 	pass
 
 func timing_hit(success : bool):
+	if success:
+		timing_window.pause(false)
+		timing_window2.start()
+	else:
+		exit()
+	pass
+
+func timing_hit2(success : bool):
+	if success:
+		timing_window2.pause(false)
+		timing_window3.start()
+	else:
+		exit()
+	pass
+	
+func timing_hit3(success : bool):
+	if success:
+		timing_window3.pause(true)
+		freeze.emit(false)
+	else:
+		exit()
+	
+	pass
+
+func exit():
 	timing_window.stop()
 	freeze.emit(false)
-	pass

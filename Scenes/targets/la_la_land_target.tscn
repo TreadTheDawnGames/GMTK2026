@@ -12,10 +12,30 @@ my_width = 128.0
 
 [node name="TimingWindow" parent="CanvasLayer" index="0" unique_id=888560620 instance=ExtResource("3_1ajj0")]
 unique_name_in_owner = true
-offset_left = -371.0
-offset_top = -326.0
-offset_right = 329.0
-offset_bottom = -245.0
+offset_left = -351.0
+offset_top = -447.0
+offset_right = 349.0
+offset_bottom = -366.0
+target_packed_scenes = Array[PackedScene]([ExtResource("1_jlnua")])
+one_shot = true
+fixed_window = 0.5
+
+[node name="TimingWindow2" parent="CanvasLayer" index="1" unique_id=728482663 instance=ExtResource("3_1ajj0")]
+unique_name_in_owner = true
+offset_left = -351.0
+offset_top = -351.0
+offset_right = 349.0
+offset_bottom = -270.0
+target_packed_scenes = Array[PackedScene]([ExtResource("1_jlnua")])
+one_shot = true
+fixed_window = 0.5
+
+[node name="TimingWindow3" parent="CanvasLayer" index="2" unique_id=827220972 instance=ExtResource("3_1ajj0")]
+unique_name_in_owner = true
+offset_left = -351.0
+offset_top = -256.0
+offset_right = 349.0
+offset_bottom = -175.0
 target_packed_scenes = Array[PackedScene]([ExtResource("1_jlnua")])
 one_shot = true
 fixed_window = 0.5
