@@ -3,12 +3,17 @@ extends Panel
 
 ## Tracks whether one timing target has already been collected this set.
 
+@export var my_width : float = 16
 var is_hit: bool = false
 
 var use_image:bool=true:
 	set(value):
 		use_image = value
 		$TextureRect.visible = value
+
+func initialize():
+	Utils.set_control_width(self, my_width)
+	pass
 
 ## Marks this target collected and hides it until the set resets.
 func hit() -> void:
@@ -20,3 +25,9 @@ func hit() -> void:
 func unhit() -> void:
 	is_hit = false
 	show()
+
+func is_overlapping(_input_rect : Rect2) -> bool:
+	return false
+
+func place(_placement_width : float) -> float:
+	return 0.0

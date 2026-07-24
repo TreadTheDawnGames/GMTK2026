@@ -1,0 +1,13 @@
+[gd_scene format=3 uid="uid://bcoaf8y2mxx7"]
+
+[ext_resource type="PackedScene" uid="uid://16edwc1adi0x" path="res://Scenes/targets/target_base.tscn" id="1_u3k5l"]
+[ext_resource type="Script" uid="uid://0ttt7fn5dtrb" path="res://Scripts/timing_windows/targets/shrinking_target.gd" id="2_haf3m"]
+
+[node name="ShrinkingTarget" unique_id=980051362 instance=ExtResource("1_u3k5l")]
+script = ExtResource("2_haf3m")
+max_width = 128.0
+min_width = 16.0
+shrink_rate = 0.9
+
+[node name="TextureRect" parent="." index="0" unique_id=1601954937]
+visible = true

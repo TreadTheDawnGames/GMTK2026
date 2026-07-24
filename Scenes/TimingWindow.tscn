@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://bwq8rrtdf55gq"]
 
-[ext_resource type="Script" uid="uid://bcafu266b27ml" path="res://Scripts/timing_window.gd" id="1_6wfpp"]
+[ext_resource type="Script" uid="uid://bcafu266b27ml" path="res://Scripts/timing_windows/timing_window.gd" id="1_6wfpp"]
 [ext_resource type="AudioStream" uid="uid://dv0xbfqt1h8x2" path="res://Assets/Audio/Mine1.wav" id="2_4e5kf"]
 [ext_resource type="PackedScene" uid="uid://cf8q7ylnplo6c" path="res://Scenes/slider_timing_window.tscn" id="2_73j0v"]
 [ext_resource type="AudioStream" uid="uid://css4yiv58xd3q" path="res://Assets/Audio/Mine2.wav" id="3_74xn3"]
@@ -13,6 +13,7 @@
 [ext_resource type="AudioStream" uid="uid://da4n2chd7wsvw" path="res://Assets/Audio/Save.wav" id="11_74xn3"]
 [ext_resource type="AudioStream" uid="uid://bif7p7jcchspq" path="res://Assets/Audio/MissWithSave.wav" id="12_2plp5"]
 [ext_resource type="AudioStream" uid="uid://cbbyjg221k80c" path="res://Assets/Audio/SaveBuildup.wav" id="13_53pw3"]
+[ext_resource type="PackedScene" uid="uid://16edwc1adi0x" path="res://Scenes/targets/target_base.tscn" id="13_sgvbc"]
 [ext_resource type="Resource" uid="uid://dhlm43rg16rkw" path="res://resources/mining/mining_config.tres" id="14_mining_config"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_6ko1l"]
@@ -92,9 +93,8 @@ offset_top = -151.0
 offset_right = 349.0
 offset_bottom = -134.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_af75q")
+target_packed_scenes = Array[PackedScene]([ExtResource("13_sgvbc")])
 grace = 3.0
-max_target_size = 32.0
-target_shrink_rate = 1.0
 targets_use_image = false
 one_shot = true
 fixed_window = 0.9

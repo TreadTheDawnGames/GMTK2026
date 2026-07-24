@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://gx2i6oqtq8fi"]
+
+[ext_resource type="PackedScene" uid="uid://16edwc1adi0x" path="res://Scenes/targets/target_base.tscn" id="1_bl36e"]
+[ext_resource type="Script" uid="uid://c507yeq702vqx" path="res://Scripts/timing_windows/targets/gold_target.gd" id="2_o2bqu"]
+[ext_resource type="AudioStream" uid="uid://cbv4v668aoluj" path="res://Assets/Audio/LineHitEdge.wav" id="3_o2bqu"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bl36e"]
+bg_color = Color(1, 0.60784316, 0, 1)
+
+[node name="GoldTarget" unique_id=980051362 instance=ExtResource("1_bl36e")]
+theme_override_styles/panel = SubResource("StyleBoxFlat_bl36e")
+script = ExtResource("2_o2bqu")
+speed = 250.0
+my_width = 32.0
+
+[node name="TextureRect" parent="." index="0" unique_id=1601954937]
+visible = true
+
+[node name="BounceSound" type="AudioStreamPlayer2D" parent="." index="1" unique_id=1750839069]
+unique_name_in_owner = true
+stream = ExtResource("3_o2bqu")

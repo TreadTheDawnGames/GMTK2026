@@ -5,7 +5,7 @@ class_name SliderTimingWindow
 
 signal pressed(success: bool)
 
-const TARGET = preload("uid://16edwc1adi0x")
+@export var target_packed_scenes : Array[PackedScene] = [preload("uid://16edwc1adi0x")]
 
 @onready var slider: Panel = %Slider
 @onready var backing: Control = %Backing
@@ -16,9 +16,6 @@ const TARGET = preload("uid://16edwc1adi0x")
 @export var speed_multiplier: float = 1.0
 
 @export var grace: float = 7.0
-@export var max_target_size: float = 128.0
-@export var min_target_size: float = 16.0
-@export var target_shrink_rate: float = 0.9
 @export var targets_use_image: bool = true
 
 @export var slider_size: float = 5.0
@@ -39,7 +36,7 @@ var _starting_target_count: int = 1
 func _ready() -> void:
 	while targets.size() < _starting_target_count:
 		add_target()
-	_set_control_width(slider, slider_size)
+	Utils.set_control_width(slider, slider_size)
 	await get_tree().process_frame
 	for target in targets:
 		randomize_target(target)
@@ -82,12 +79,11 @@ func stop() -> void:
 
 ## Adds and positions one valid hit target.
 func add_target() -> void:
-	var new_target := TARGET.instantiate() as TimingTarget
+	var new_target := target_packed_scenes.pick_random().instantiate() as TimingTarget
 	if new_target == null:
 		push_error("The timing target scene must create a TimingTarget.")
 		return
-	new_target.use_image = targets_use_image
-	_set_control_width(new_target, max_target_size)
+	new_target.initialize()
 	backing.add_child(new_target)
 	backing.move_child(new_target, desired_target_heirarchy_index)
 	targets.append(new_target)
@@ -109,12 +105,7 @@ func remove_all_extra_targets() -> void:
 	while targets.size() < _starting_target_count:
 		add_target()
 	for baseline_target in targets:
-		_set_control_width(baseline_target, max_target_size)
-		baseline_target.position.x = clampf(
-			baseline_target.position.x,
-			max_target_size * 0.5,
-			backing.size.x - max_target_size * 0.5
-		)
+		baseline_target.initialize()
 
 
 ## Removes the most recently added target.
@@ -180,19 +171,13 @@ func _process(delta: float) -> void:
 
 ## Moves one target to a valid position inside its backing bar.
 func randomize_target(target: TimingTarget) -> void:
-	var target_size := clampf(
-		target.size.x * target_shrink_rate,
-		min_target_size,
-		max_target_size
-	)
-	_set_control_width(target, target_size)
-	var target_center_x := (
-		(randf() if fixed_window < 0 else fixed_window) * backing.size.x
-	)
+	
+	var target_center_x = target.place(backing.size.x) if fixed_window < 0.0 else fixed_window*backing.size.x
+	print("fixedWindow: ", fixed_window)
 	target.position.x = clampf(
 		target_center_x,
-		target_size * 0.5,
-		backing.size.x - target_size * 0.5
+		target.size.x * 0.5,
+		backing.size.x - target.size.x * 0.5
 	)
 	
 	var rerolls : int = 5
@@ -204,15 +189,15 @@ func randomize_target(target: TimingTarget) -> void:
 			if target.get_rect().intersects(_target.get_rect()):
 				
 				target.position.x = target.position.x + clampf(
-				target_center_x + target_size + 25 * (randf() - randf()),
-				target_size ,#* 0.5,
-				backing.size.x - target_size,# * 0.5
+				target_center_x + target.size.x + 25 * (randf() - randf()),
+				target.size.x,#* 0.5,
+				backing.size.x - target.size.x,# * 0.5
 				)
 				do_again = true
 				target.position.x = clampf(
 				target_center_x,
-				target_size ,#* 0.5,
-				backing.size.x - target_size,# * 0.5
+				target.size.x ,#* 0.5,
+				backing.size.x - target.size.x,# * 0.5
 				)
 
 				break
@@ -220,8 +205,3 @@ func randomize_target(target: TimingTarget) -> void:
 				do_again = false
 		rerolls -= 1
 				
-
-
-## Changes horizontal size without overriding vertically stretched anchors.
-func _set_control_width(control: Control, width: float) -> void:
-	control.offset_right = control.offset_left + width

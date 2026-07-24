@@ -16,3 +16,7 @@ static func format_number_with_commas(number: int) -> String:
 		result = "-" + result
 
 	return result
+
+## Changes horizontal size without overriding vertically stretched anchors.
+static func set_control_width(control : Control, width: float) -> void:
+	control.offset_right = control.offset_left + width
