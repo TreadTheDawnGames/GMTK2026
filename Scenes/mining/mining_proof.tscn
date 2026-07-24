@@ -12,7 +12,6 @@
 [ext_resource type="PackedScene" uid="uid://bwnqpopl5iayr" path="res://Scenes/dialogue/dialogue_overlay.tscn" id="11_dialogue_overlay"]
 [ext_resource type="Script" uid="uid://bmv66cgstojt0" path="res://Scripts/dialogue/depth_encounter_controller.gd" id="13_depth_encounter"]
 [ext_resource type="Resource" path="res://resources/encounters/depth_encounter_config.tres" id="14_encounter_config"]
-[ext_resource type="Script" uid="uid://dqb7nfeq5f2h1" path="res://Scripts/input/miner_aim_controller.gd" id="17_aim_controller"]
 [ext_resource type="Script" uid="uid://cwq85ldnfasbo" path="res://Scripts/pickaxes/pickaxe_progression.gd" id="19_pickaxe_progression"]
 [ext_resource type="Resource" uid="uid://bm7au74mrcaij" path="res://resources/pickaxes/basic_pickaxe.tres" id="20_basic_pickaxe"]
 [ext_resource type="Script" uid="uid://c4nd03mddc2vw" path="res://Scripts/mining/impact_shake.gd" id="21_impact_shake"]
@@ -101,18 +100,11 @@ terrain_manager = NodePath("../../TerrainManager")
 script = ExtResource("21_impact_shake")
 camera = NodePath("../../ImpactCamera")
 
-[node name="MiningController" type="Node" parent="MiningScene/Systems" unique_id=1389910536 node_paths=PackedStringArray("terrain_manager", "view_controller", "fall_origin")]
+[node name="MiningController" type="Node" parent="MiningScene/Systems" unique_id=1389910536 node_paths=PackedStringArray("terrain_manager", "view_controller")]
 script = ExtResource("5_controller")
 config = ExtResource("1_config")
 terrain_manager = NodePath("../../TerrainManager")
 view_controller = NodePath("../ViewController")
-fall_origin = NodePath("../../MinerRig/ChipOrigin")
-
-[node name="MinerAimController" type="Node" parent="MiningScene/Systems" unique_id=1230588894 node_paths=PackedStringArray("miner_rig", "mining_controller", "timing_window")]
-script = ExtResource("17_aim_controller")
-miner_rig = NodePath("../../MinerRig")
-mining_controller = NodePath("../MiningController")
-timing_window = NodePath("../../HUD/TimingWindow")
 
 [node name="PickaxeProgression" type="Node" parent="MiningScene/Systems" unique_id=905831664 node_paths=PackedStringArray("miner_rig", "mining_controller")]
 script = ExtResource("19_pickaxe_progression")

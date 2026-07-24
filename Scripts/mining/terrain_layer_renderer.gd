@@ -75,6 +75,7 @@ var _small_mask_data: Array[HoleMaskData] = []
 var _big_mask_data: Array[HoleMaskData] = []
 var _resized_stamp_cache: Dictionary[Vector4i, ResizedStampImages] = {}
 var _resized_stamp_cache_order: Array[Vector4i] = []
+var _current_view_x: float
 var _current_view_y: float
 var _loaded_first_chunk: int = -1
 var _loaded_last_chunk: int = -1
@@ -100,16 +101,12 @@ func _ready() -> void:
 		_on_terrain_paths_damaged
 	)
 	_connect_once(
-		terrain_manager.view_y_changed,
-		_on_view_y_changed
-	)
-	_connect_once(
 		get_viewport().size_changed,
 		_on_viewport_size_changed
 	)
 	_prepare_hole_masks()
 	_prepare_chamber_transition_stamps()
-	_on_view_y_changed(terrain_manager.get_view_y())
+	_on_view_position_changed(terrain_manager.get_view_position())
 
 
 ## Captures the combo used by synchronous damage stamps for one resolved hit.
@@ -175,9 +172,10 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 		_upload_chunk_masks(chunk, changed_layers)
 
 
-## Repositions streamed terrain around the current mining face.
-func _on_view_y_changed(view_y: float) -> void:
-	_current_view_y = view_y
+## Repositions streamed terrain around the current 2D mining face.
+func _on_view_position_changed(view_cell_position: Vector2) -> void:
+	_current_view_x = view_cell_position.x
+	_current_view_y = view_cell_position.y
 	_refresh_active_chunks()
 	_position_active_chunks()
 	if _show_logical_overlay:
@@ -406,7 +404,7 @@ func _position_active_chunks() -> void:
 	var cell_size := float(config.terrain_cell_world_size)
 	var terrain_left := (
 		config.terrain_screen_center_x
-		- float(config.terrain_width_cells) * cell_size * 0.5
+		- _current_view_x * cell_size
 	)
 	for chunk_index: int in _active_chunks:
 		var chunk := _active_chunks[chunk_index]
@@ -629,7 +627,7 @@ func get_layer_opening_floor_support_screen_y(
 	)
 	var terrain_left: float = (
 		config.terrain_screen_center_x
-		- float(config.terrain_width_cells) * cell_size * 0.5
+		- _current_view_x * cell_size
 	)
 	var mask_x: int = floori(
 		(screen_x - terrain_left) * mask_pixels_per_world_unit
@@ -733,7 +731,7 @@ func _draw() -> void:
 	)
 	var terrain_left := (
 		config.terrain_screen_center_x
-		- float(config.terrain_width_cells) * cell_size * 0.5
+		- _current_view_x * cell_size
 	)
 	for cell_y in range(first_row, last_row + 1):
 		for cell_x in range(config.terrain_width_cells):

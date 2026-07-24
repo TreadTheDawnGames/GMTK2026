@@ -610,10 +610,6 @@ default_color = Color(0.94, 0.94, 0.94, 1)
 editor_description = "Particle spawn point at the striking end of the hammer head."
 position = Vector2(79.44684, -13.451826)
 
-[node name="ChipOrigin" type="Marker2D" parent="." unique_id=1250073857]
-editor_description = "LOGIC ANCHOR: terrain breaks directly below this marker. Do not animate it. Move it only when permanently changing where mining occurs."
-position = Vector2(0, 57)
-
 [node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=716358974]
 editor_description = "Choose idle, mine_success, or mine_miss in the bottom Animation panel. RESET stores the neutral pose and should not be used as the authored action animation."
 libraries/ = SubResource("AnimationLibrary_rig")

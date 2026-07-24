@@ -7,19 +7,19 @@ class SwingRequest:
 	## Retains one earned strike until its animation reaches the ground.
 	var combo: int
 	var pickaxe: PickaxeDefinition
-	var aim_direction: int
 	var power_scale: float
 	var width_scale: float
 	var speed_scale: float
 	var debris_scale: float
 	var counts_as_timing_success: bool
+	var path_direction: int = 1
+	var target_cell_x: int
 
 
 	## Captures the tool and modifiers earned by one timing result.
 	func _init(
 		requested_combo: int,
 		requested_pickaxe: PickaxeDefinition,
-		requested_aim_direction: int = 0,
 		requested_power_scale: float = 1.0,
 		requested_width_scale: float = 1.0,
 		requested_speed_scale: float = 1.0,
@@ -28,7 +28,6 @@ class SwingRequest:
 	) -> void:
 		combo = requested_combo
 		pickaxe = requested_pickaxe
-		aim_direction = clampi(requested_aim_direction, -1, 1)
 		power_scale = requested_power_scale
 		width_scale = requested_width_scale
 		speed_scale = requested_speed_scale
@@ -68,16 +67,17 @@ signal dig_number_requested(
 	combo: int,
 	combo_strength: float
 )
+## Faces the miner toward the automatically selected tunnel direction.
+signal path_direction_changed(direction: int)
 
 @export var config: MiningConfig
 @export var terrain_manager: TerrainManager
 @export var view_controller: ViewController
-@export var fall_origin: Marker2D
 
 @onready var _game_state: RunState = RunState.get_global(self)
 
 var _equipped_pickaxe: PickaxeDefinition
-var _aim_direction: int = 0
+var _path_direction: int = 1
 var _pending_swing: SwingRequest
 var _pending_combo_strength: float = 0.0
 var _is_swing_pending: bool = false
@@ -102,8 +102,7 @@ func resolve_attempt(success: bool, resolved_combo: int) -> void:
 		return
 	var primary_swing := SwingRequest.new(
 		safe_combo,
-		_equipped_pickaxe,
-		_aim_direction
+		_equipped_pickaxe
 	)
 	if (
 		_is_swing_pending
@@ -122,7 +121,6 @@ func resolve_attempt(success: bool, resolved_combo: int) -> void:
 		_queued_swings.append(SwingRequest.new(
 			safe_combo,
 			_equipped_pickaxe,
-			_aim_direction,
 			_equipped_pickaxe.follow_up_power_scale,
 			_equipped_pickaxe.follow_up_width_scale,
 			_equipped_pickaxe.follow_up_speed_scale,
@@ -133,6 +131,42 @@ func resolve_attempt(success: bool, resolved_combo: int) -> void:
 
 ## Starts one retained success and waits for its animated contact frame.
 func _start_swing(swing: SwingRequest) -> void:
+	var center_cell_x := config.terrain_width_cells / 2
+	var requested_half_width_cells := (
+		_get_requested_half_width_cells(swing)
+	)
+	var available_half_span := (
+		center_cell_x - requested_half_width_cells - 1
+	)
+	if terrain_manager.encounter_config != null:
+		available_half_span = mini(
+			available_half_span,
+			terrain_manager.encounter_config.chamber_width_cells / 2
+				- requested_half_width_cells
+				- 1
+		)
+	var safe_half_span := maxi(
+		mini(config.snake_half_span_cells, available_half_span),
+		0
+	)
+	var left_turn_cell_x := center_cell_x - safe_half_span
+	var right_turn_cell_x := center_cell_x + safe_half_span
+	if _game_state.mining_x >= right_turn_cell_x:
+		_path_direction = -1
+	elif _game_state.mining_x <= left_turn_cell_x:
+		_path_direction = 1
+	swing.path_direction = _path_direction
+	var horizontal_step_cells := mini(
+		config.snake_horizontal_step_cells,
+		maxi(requested_half_width_cells, 1)
+	)
+	swing.target_cell_x = clampi(
+		_game_state.mining_x
+			+ swing.path_direction * horizontal_step_cells,
+		left_turn_cell_x,
+		right_turn_cell_x
+	)
+	path_direction_changed.emit(swing.path_direction)
 	_pending_swing = swing
 	_pending_combo_strength = clampf(
 		float(swing.combo) / float(config.maximum_effect_combo),
@@ -184,27 +218,13 @@ func resolve_impact(
 		1
 	)
 	var requested_half_width_cells := (
-		config.base_tunnel_half_width_cells
-		+ config.combo_tunnel_half_width_cells_per_step * combo_steps
-	)
-	requested_half_width_cells = maxi(
-		roundi(
-			float(requested_half_width_cells)
-			* _pickaxe_multiplier(
-				_pending_swing.pickaxe,
-				&"width_multiplier"
-			)
-			* _pending_swing.width_scale
-		),
-		0
+		_get_requested_half_width_cells(_pending_swing)
 	)
 	var impact_cell_x := terrain_manager.screen_x_to_terrain_cell_x(
 		impact_screen_position.x
 	)
 	var fall_cell := Vector2i(
-		terrain_manager.screen_x_to_terrain_cell_x(
-			fall_origin.global_position.x
-		),
+		_game_state.mining_x,
 		_game_state.mining_y
 	)
 	# Presentation receives this before TerrainManager emits damage, so every
@@ -215,11 +235,10 @@ func resolve_impact(
 		requested_depth_rows,
 		requested_half_width_cells,
 		impact_cell_x,
-		_pending_swing.aim_direction,
-		requested_half_width_cells
+		_pending_swing.target_cell_x
 	)
 	var surface_after_primary_hit_y := terrain_manager.find_surface_row(
-		fall_cell.x,
+		_pending_swing.target_cell_x,
 		_game_state.mining_y
 	)
 	var crossed_open_chamber := (
@@ -235,12 +254,14 @@ func resolve_impact(
 		and not crossed_open_chamber
 	):
 		var aftershock_result := terrain_manager.dig_tunnel(
-			Vector2i(fall_cell.x, surface_after_primary_hit_y),
+			Vector2i(
+				_pending_swing.target_cell_x,
+				surface_after_primary_hit_y
+			),
 			_pending_swing.pickaxe.aftershock_depth_rows,
 			requested_half_width_cells,
 			-1,
-			_pending_swing.aim_direction,
-			requested_half_width_cells
+			_pending_swing.target_cell_x
 		)
 		dig_result.absorb(aftershock_result)
 	elif (
@@ -251,24 +272,29 @@ func resolve_impact(
 		and not crossed_open_chamber
 	):
 		var lightning_result := terrain_manager.dig_branching_lightning(
-			Vector2i(fall_cell.x, surface_after_primary_hit_y),
+			Vector2i(
+				_pending_swing.target_cell_x,
+				surface_after_primary_hit_y
+			),
 			_pending_swing.pickaxe.lightning_depth_rows,
 			_pending_swing.pickaxe.lightning_branch_count,
 			_pending_swing.pickaxe.lightning_branch_length_cells
 		)
 		dig_result.absorb(lightning_result)
 	var new_mining_y := terrain_manager.find_surface_row(
-		fall_cell.x,
+		_pending_swing.target_cell_x,
 		_game_state.mining_y
 	)
 	var depth_gained := maxi(new_mining_y - _game_state.mining_y, 0)
 	_game_state.record_success(
 		depth_gained,
-		new_mining_y,
+		Vector2i(_pending_swing.target_cell_x, new_mining_y),
 		_pending_swing.combo,
 		_pending_swing.counts_as_timing_success
 	)
-	view_controller.follow_mining_y(_game_state.mining_y)
+	view_controller.follow_mining_position(
+		Vector2i(_game_state.mining_x, _game_state.mining_y)
+	)
 	mine_resolved.emit(
 		depth_gained,
 		dig_result.cells_removed,
@@ -319,11 +345,6 @@ func set_equipped_pickaxe(definition: PickaxeDefinition) -> void:
 	_equipped_pickaxe = definition
 
 
-## Selects the side captured by the next successful timing result.
-func set_aim_direction(direction: int) -> void:
-	_aim_direction = clampi(direction, -1, 1)
-
-
 ## Reports whether the camera may leave without interrupting a strike.
 func can_start_view_review() -> bool:
 	return (
@@ -343,6 +364,36 @@ func _try_start_queued_swing() -> void:
 	):
 		return
 	_start_swing(_queued_swings.pop_front())
+
+
+## Restores the initial rightward leg and drops stale retained swings.
+func _on_run_reset() -> void:
+	_path_direction = 1
+	_pending_swing = null
+	_is_swing_pending = false
+	_has_resolved_pending_impact = false
+	_queued_swings.clear()
+
+
+## Resolves the connected tunnel radius for planning and impact damage.
+func _get_requested_half_width_cells(swing: SwingRequest) -> int:
+	var capped_combo := mini(swing.combo, config.maximum_effect_combo)
+	var combo_steps := maxi(capped_combo - 1, 0)
+	var requested_half_width_cells := (
+		config.base_tunnel_half_width_cells
+		+ config.combo_tunnel_half_width_cells_per_step * combo_steps
+	)
+	return maxi(
+		roundi(
+			float(requested_half_width_cells)
+			* _pickaxe_multiplier(
+				swing.pickaxe,
+				&"width_multiplier"
+			)
+			* swing.width_scale
+		),
+		0
+	)
 
 
 ## Returns one strike-pickaxe modifier or the neutral value.

@@ -2,17 +2,17 @@ class_name ViewController
 extends Node
 
 ## How it works:
-## - target_view_y is the authoritative terrain row beneath the miner.
-## - _current_miner_y accelerates toward it when a hit opens a gap.
+## - target_view_position is the authoritative terrain cell beneath the miner.
+## - _current_miner_position falls diagonally through each newly opened path.
 ## - Smooth mode eases after the miner and closes its lag after contact.
 ## - Chunk mode holds one page until the miner crosses its halfway point.
 ## - Review mode moves the view only; returning uses its own fast free fall.
-## The invariant is that screen offset always equals miner row minus view row.
+## The invariant is that screen offset always equals miner position minus view.
 
 signal landing_reached(mining_y: int)
 signal review_started
 signal miner_view_reached
-signal miner_screen_offset_changed(screen_offset_y: float)
+signal miner_screen_offset_changed(screen_offset: Vector2)
 
 enum ViewMode {
 	FOLLOWING_MINER,
@@ -24,29 +24,35 @@ enum ViewMode {
 @export var terrain_manager: TerrainManager
 
 ## Terrain row currently presented at the fixed mining-face screen position.
+var current_view_x: float
 var current_view_y: float
-## Latest supporting terrain row resolved by MiningController.
-var target_view_y: float
-## Presentation-only miner row; gameplay depth remains owned by GameState.
-var _current_miner_y: float
+## Latest supporting terrain cell resolved by MiningController.
+var target_view_position: Vector2
+## Presentation-only miner position; gameplay remains owned by GameState.
+var _current_miner_position: Vector2
+var _fall_start_position: Vector2
 ## Downward row velocity retained across frames and consecutive openings.
 var _mining_fall_velocity: float = 0.0
 var _review_target_y: float
 var _return_velocity: float = 0.0
 var _last_landing_y: int
 var _view_mode: ViewMode = ViewMode.FOLLOWING_MINER
-var _last_miner_screen_offset: float = NAN
+var _last_miner_screen_offset := Vector2(NAN, NAN)
 var _is_encounter_focus_active: bool = false
 
 
 ## Starts the view at the ground surface.
 func _ready() -> void:
+	current_view_x = float(config.terrain_width_cells) * 0.5
 	current_view_y = float(config.initial_surface_row)
-	target_view_y = current_view_y
-	_current_miner_y = current_view_y
+	target_view_position = Vector2(current_view_x, current_view_y)
+	_current_miner_position = target_view_position
+	_fall_start_position = target_view_position
 	_review_target_y = current_view_y
 	_last_landing_y = config.initial_surface_row
-	terrain_manager.set_view_y(current_view_y)
+	terrain_manager.set_view_position(
+		Vector2(current_view_x, current_view_y)
+	)
 
 
 ## Advances the active follow, review, or free-fall movement.
@@ -59,20 +65,26 @@ func _process(delta: float) -> void:
 				_move_review_view(delta)
 			ViewMode.RETURNING:
 				_fall_to_miner(delta)
-	terrain_manager.set_view_y(current_view_y)
+	terrain_manager.set_view_position(
+		Vector2(current_view_x, current_view_y)
+	)
 	_publish_miner_screen_offset()
 
 
 ## Finishes camera catch-up before an encounter dialogue covers the screen.
 func focus_miner_for_encounter() -> void:
 	_is_encounter_focus_active = true
-	current_view_y = target_view_y
-	_current_miner_y = target_view_y
-	_review_target_y = target_view_y
+	current_view_x = target_view_position.x
+	current_view_y = target_view_position.y
+	_current_miner_position = target_view_position
+	_fall_start_position = target_view_position
+	_review_target_y = target_view_position.y
 	_mining_fall_velocity = 0.0
 	_return_velocity = 0.0
 	_view_mode = ViewMode.FOLLOWING_MINER
-	terrain_manager.set_view_y(current_view_y)
+	terrain_manager.set_view_position(
+		Vector2(current_view_x, current_view_y)
+	)
 	_publish_miner_screen_offset()
 
 
@@ -80,8 +92,10 @@ func focus_miner_for_encounter() -> void:
 func release_encounter_focus() -> void:
 	_is_encounter_focus_active = false
 	if config.mining_camera_style == MiningConfig.MiningCameraStyle.CHUNK_SNAP:
-		current_view_y = _get_chunk_camera_y(target_view_y)
-		terrain_manager.set_view_y(current_view_y)
+		current_view_y = _get_chunk_camera_y(target_view_position.y)
+		terrain_manager.set_view_position(
+			Vector2(current_view_x, current_view_y)
+		)
 		_publish_miner_screen_offset()
 
 
@@ -89,25 +103,23 @@ func release_encounter_focus() -> void:
 func _publish_miner_screen_offset() -> void:
 	# One conversion path serves both physical mining falls and detached
 	# review, preventing the rig and terrain from using different depth scales.
-	var miner_world_y := (
-		_current_miner_y
+	var miner_world_position := (
+		_current_miner_position
 		if _view_mode == ViewMode.FOLLOWING_MINER
-		else target_view_y
+		else target_view_position
 	)
 	var miner_screen_offset := (
-		miner_world_y - current_view_y
+		miner_world_position - Vector2(current_view_x, current_view_y)
 	) * float(config.terrain_cell_world_size)
-	if not is_equal_approx(
-		miner_screen_offset,
-		_last_miner_screen_offset
-	):
+	if not miner_screen_offset.is_equal_approx(_last_miner_screen_offset):
 		_last_miner_screen_offset = miner_screen_offset
 		miner_screen_offset_changed.emit(miner_screen_offset)
 
 
-## Sets the terrain row the normal view should follow.
-func follow_mining_y(mining_y: int) -> void:
-	target_view_y = float(mining_y)
+## Sets the terrain cell the normal view should follow.
+func follow_mining_position(mining_position: Vector2i) -> void:
+	_fall_start_position = _current_miner_position
+	target_view_position = Vector2(mining_position)
 
 
 ## Moves the detached view toward earlier or later visited terrain.
@@ -121,9 +133,8 @@ func scroll_review(direction: int) -> void:
 	):
 		return
 	if _view_mode == ViewMode.FOLLOWING_MINER:
-		var miner_has_landed := is_equal_approx(
-			_current_miner_y,
-			target_view_y
+		var miner_has_landed := _current_miner_position.is_equal_approx(
+			target_view_position
 		)
 		if (
 			config.mining_camera_style
@@ -131,9 +142,12 @@ func scroll_review(direction: int) -> void:
 		):
 			if not miner_has_landed:
 				return
-		elif not is_equal_approx(current_view_y, target_view_y):
+		elif not Vector2(
+			current_view_x,
+			current_view_y
+		).is_equal_approx(target_view_position):
 			return
-		_current_miner_y = target_view_y
+		_current_miner_position = target_view_position
 		_view_mode = ViewMode.REVIEWING
 		_review_target_y = current_view_y
 		review_started.emit()
@@ -143,9 +157,9 @@ func scroll_review(direction: int) -> void:
 			+ float(
 				safe_direction
 				* config.review_scroll_rows_per_step
-			),
+		),
 		float(config.initial_surface_row),
-		target_view_y
+		target_view_position.y
 	)
 
 
@@ -164,66 +178,116 @@ func is_reviewing() -> bool:
 
 ## Falls through the complete mined gap, then recenters after landing.
 func _follow_miner(delta: float) -> void:
-	if _current_miner_y < target_view_y:
+	if _current_miner_position.y < target_view_position.y:
 		_mining_fall_velocity = minf(
 			_mining_fall_velocity
 				+ config.mining_fall_gravity * delta,
 			config.mining_max_fall_speed
 		)
-		_current_miner_y = minf(
-			_current_miner_y
+		_current_miner_position.y = minf(
+			_current_miner_position.y
 				+ _mining_fall_velocity * delta,
-			target_view_y
+			target_view_position.y
 		)
-		if is_equal_approx(_current_miner_y, target_view_y):
-			_current_miner_y = target_view_y
+		var fall_distance := (
+			target_view_position.y - _fall_start_position.y
+		)
+		var fall_progress := (
+			1.0
+			if fall_distance <= 0.0
+			else clampf(
+				(
+					_current_miner_position.y
+					- _fall_start_position.y
+				) / fall_distance,
+				0.0,
+				1.0
+			)
+		)
+		_current_miner_position.x = lerpf(
+			_fall_start_position.x,
+			target_view_position.x,
+			fall_progress
+		)
+		if is_equal_approx(
+			_current_miner_position.y,
+			target_view_position.y
+		):
+			_current_miner_position = target_view_position
 			_mining_fall_velocity = 0.0
 			_report_mining_landing()
 
+		var follow_weight := (
+			1.0 - exp(-config.mining_camera_follow_speed * delta)
+		)
+		current_view_x = lerpf(
+			current_view_x,
+			_current_miner_position.x,
+			follow_weight
+		)
 		if (
 			config.mining_camera_style
 				== MiningConfig.MiningCameraStyle.CHUNK_SNAP
 		):
-			current_view_y = _get_chunk_camera_y(_current_miner_y)
+			current_view_y = _get_chunk_camera_y(
+				_current_miner_position.y
+			)
 		else:
 			# Follow the physical miner rather than the resolved floor. This
 			# frame-rate-independent lag preserves downward screen travel.
-			var follow_weight := (
-				1.0
-				- exp(-config.mining_camera_follow_speed * delta)
-			)
 			current_view_y = lerpf(
 				current_view_y,
-				_current_miner_y,
+				_current_miner_position.y,
 				follow_weight
 			)
 		return
-	if _current_miner_y > target_view_y:
-		_current_miner_y = target_view_y
+	if _current_miner_position.y > target_view_position.y:
+		_current_miner_position = target_view_position
 		_mining_fall_velocity = 0.0
 		_report_mining_landing()
 
+	_current_miner_position.x = move_toward(
+		_current_miner_position.x,
+		target_view_position.x,
+		config.landing_recenter_speed * delta
+	)
 	if (
 		config.mining_camera_style
 			== MiningConfig.MiningCameraStyle.CHUNK_SNAP
 	):
-		current_view_y = _get_chunk_camera_y(_current_miner_y)
+		current_view_x = move_toward(
+			current_view_x,
+			target_view_position.x,
+			config.landing_recenter_speed * delta
+		)
+		current_view_y = _get_chunk_camera_y(
+			_current_miner_position.y
+		)
 		return
 
 	# Once supported, finish the smooth camera motion without snapping.
-	current_view_y = move_toward(
-		current_view_y,
-		target_view_y,
+	current_view_x = move_toward(
+		current_view_x,
+		target_view_position.x,
 		config.landing_recenter_speed * delta
 	)
-	if not is_equal_approx(current_view_y, target_view_y):
+	current_view_y = move_toward(
+		current_view_y,
+		target_view_position.y,
+		config.landing_recenter_speed * delta
+	)
+	if not Vector2(
+		current_view_x,
+		current_view_y
+	).is_equal_approx(target_view_position):
 		return
-	current_view_y = target_view_y
+	current_view_x = target_view_position.x
+	current_view_y = target_view_position.y
 
 
 ## Emits one landing after the presentation miner reaches its supporting row.
 func _report_mining_landing() -> void:
-	var landing_y := roundi(target_view_y)
+	var landing_y := roundi(target_view_position.y)
 	if landing_y == _last_landing_y:
 		return
 	_last_landing_y = landing_y
@@ -250,21 +314,29 @@ func _move_review_view(delta: float) -> void:
 		_review_target_y,
 		scroll_speed * delta
 	)
+	current_view_x = move_toward(
+		current_view_x,
+		target_view_position.x,
+		scroll_speed * delta
+	)
 	if (
-		is_equal_approx(current_view_y, target_view_y)
-		and is_equal_approx(_review_target_y, target_view_y)
+		is_equal_approx(current_view_y, target_view_position.y)
+		and is_equal_approx(
+			_review_target_y,
+			target_view_position.y
+		)
 	):
 		_finish_return_to_miner()
 
 
 ## Accelerates the detached camera until it reaches the miner.
 func _fall_to_miner(delta: float) -> void:
-	var return_view_y := target_view_y
+	var return_view_y := target_view_position.y
 	if (
 		config.mining_camera_style
 			== MiningConfig.MiningCameraStyle.CHUNK_SNAP
 	):
-		return_view_y = _get_chunk_camera_y(target_view_y)
+		return_view_y = _get_chunk_camera_y(target_view_position.y)
 	_return_velocity = minf(
 		_return_velocity + config.return_fall_gravity * delta,
 		config.return_max_fall_speed
@@ -273,20 +345,30 @@ func _fall_to_miner(delta: float) -> void:
 		current_view_y + _return_velocity * delta,
 		return_view_y
 	)
-	if current_view_y >= return_view_y:
+	current_view_x = move_toward(
+		current_view_x,
+		target_view_position.x,
+		_return_velocity * delta
+	)
+	if (
+		current_view_y >= return_view_y
+		and is_equal_approx(current_view_x, target_view_position.x)
+	):
 		_finish_return_to_miner()
 
 
 ## Reattaches the camera and reports that mining can resume.
 func _finish_return_to_miner() -> void:
+	current_view_x = target_view_position.x
 	current_view_y = (
-		_get_chunk_camera_y(target_view_y)
+		_get_chunk_camera_y(target_view_position.y)
 		if config.mining_camera_style
 			== MiningConfig.MiningCameraStyle.CHUNK_SNAP
-		else target_view_y
+		else target_view_position.y
 	)
-	_current_miner_y = target_view_y
-	_review_target_y = target_view_y
+	_current_miner_position = target_view_position
+	_fall_start_position = target_view_position
+	_review_target_y = target_view_position.y
 	_mining_fall_velocity = 0.0
 	_return_velocity = 0.0
 	_view_mode = ViewMode.FOLLOWING_MINER
