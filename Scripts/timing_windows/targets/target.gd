@@ -10,10 +10,24 @@ var is_hit: bool = false
 ##Whether this target is removed from the pool of active targets after use
 @export var single_use : bool = false
 
+var target_position : float = 0
+
 var use_image:bool=true:
 	set(value):
 		use_image = value
 		$TextureRect.visible = value
+
+func set_target_position(pos : float, set_physical_pos : bool = false):
+	target_position = pos
+	if set_physical_pos:
+		position.x = pos
+	pass
+
+func get_left_extent() -> float:
+	return (target_position - (my_width*0.5))
+	
+func get_right_extent():
+	return target_position + (my_width*0.5)
 
 func initialize():
 	Utils.set_control_width(self, my_width)

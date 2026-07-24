@@ -23,6 +23,7 @@ signal pressed(success: bool, hit_direction: int, combo : int)
 @export var one_shot: bool = false
 @export var stop_one_shot_when_done: bool = true
 @export var fixed_window: float = -1.0
+@export var space_between_targets : float = 5.0
 @export var animation_repeats: int = 3
 @export var animation_color : Color = Color.RED
 
@@ -42,8 +43,9 @@ func _ready() -> void:
 		add_target()
 	Utils.set_control_width(slider, slider_size)
 	await get_tree().process_frame
-	for target in targets:
-		randomize_target(target)
+	randomize_all_targets()
+	#for target in targets:
+		#randomize_target(target)
 	
 	reset_one_shot()
 	if one_shot:
@@ -104,7 +106,8 @@ func add_target() -> void:
 	targets.append(new_target)
 	
 	if is_node_ready():
-		randomize_target(new_target)
+		#randomize_all_targets
+		#randomize_target(new_target)
 		clamp_target(new_target)
 
 
@@ -128,6 +131,7 @@ func set_target_pool(new_target_scenes: Array[PackedScene]) -> void:
 	targets.clear()
 	while targets.size() < _starting_target_count:
 		add_target()
+	randomize_all_targets()
 
 
 ## Adds one earned target from a specific pickaxe's authored collection.
@@ -136,6 +140,7 @@ func add_target_from_pool(new_target_scenes: Array[PackedScene]) -> void:
 		return
 	target_packed_scenes = new_target_scenes.duplicate()
 	add_target()
+	randomize_all_targets()
 
 
 ## Restores the timing bar to its configured starting target count.
@@ -147,6 +152,7 @@ func remove_all_extra_targets() -> void:
 	for baseline_target in targets:
 		baseline_target.initialize()
 		clamp_target(baseline_target)
+	randomize_all_targets()
 
 ## Removes the specified target or the most recently added target.
 func remove_target(specific_target : TimingTarget = null) -> void:
@@ -163,13 +169,14 @@ func reset_all_targets() -> void:
 	var targets_to_remove : Array[TimingTarget] = []
 	for target : TimingTarget in targets:
 		target.unhit()
-		randomize_target(target)
+		#randomize_target(target)
 		if target.single_use:
 			targets_to_remove.append(target)
-	
+	randomize_all_targets()
 	for target in targets_to_remove:
 		remove_target(target)
 		add_target.call_deferred()
+		randomize_all_targets.call_deferred()
 	#remove_all_extra_targets()
 
 ## Moves the slider and resolves one press against every visible target.
@@ -304,6 +311,50 @@ func randomize_target(target: TimingTarget) -> void:
 		)
 		rerolls_remaining -= 1
 
+func randomize_all_targets():
+	var need_reroll : bool = true
+	var total_rerolls : int = 0
+	while need_reroll:
+		#assume safe until told otherwise
+		need_reroll = false
+		var placed_targs : Array = []
+		for target in targets:
+			var requested_position = target.place(backing.size.x) if fixed_window < 0.0 else fixed_window * backing.size.x
+			target.set_target_position(requested_position, false  )
+			var extents = [target.get_left_extent() , target.get_right_extent() , requested_position, target]
+		#if extents overlap
+			for pt in placed_targs:
+				if pt[3] == target:
+					continue
+				print("extents: ", extents)
+				var left_overlap : bool = (extents[0] - space_between_targets > pt[0] and extents[0] - space_between_targets < pt[1])
+				var right_overlap : bool = (extents[1] + space_between_targets> pt[0] and extents[1] + space_between_targets< pt[1])
+				var center_overlap : bool = (requested_position > pt[0] and requested_position < pt[1])
+
+				if (left_overlap or right_overlap or center_overlap):
+					need_reroll = true
+					print("yes overlap. Left of: ", left_overlap, " Right of: ", right_overlap)
+					break
+			print("placed targs: ", placed_targs.size())
+		#else
+			placed_targs.append(extents)
+			var minimum_center_x: float = target.my_width * 0.5
+			var maximum_center_x: float = maxf(
+				backing.size.x - minimum_center_x,
+				minimum_center_x
+			)
+		
+
+			target.set_target_position(clampf(
+				extents[2],
+				minimum_center_x,
+				maximum_center_x), true)
+		if total_rerolls > 24:
+			printerr("Not an error: Rerolls = ", total_rerolls)
+			break
+		total_rerolls += 1
+	
+	pass
 
 func on_freeze(stopped:bool):
 	if stopped:
