@@ -87,7 +87,6 @@ func _apply_pickaxe_target_unlocks() -> void:
 	if not baseline_scenes.is_empty():
 		mining_window.set_target_pool(baseline_scenes)
 
-
 ## Updates the combo or opens recovery after the main timing result.
 func _mining_window_pressed(
 	success: bool,
@@ -147,6 +146,7 @@ func _mining_window_pressed(
 			streak_ended.emit(lost_combo)
 			mining_window.remove_all_extra_targets()
 			mining_window.speed_multiplier = 1.0
+			mining_window.play_animation(Color.RED)
 			streak_lost_sound.play()
 			mining_window.reset_all_targets()
 
@@ -179,5 +179,11 @@ func _recovery_window_pressed(
 
 		streak_saved_sound.play()
 		recovery_window.animation_color = combo_saved_color
+		
 	await recovery_window.pause(true)
+	
+	if success:
+		mining_window.recovery_action()
+		mining_window.clamp_all_targets()
+		
 	mining_window.start()

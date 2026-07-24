@@ -44,11 +44,11 @@ var slider_position : float = 0.0:
 
 ## Creates the configured target baseline and prepares one-shot recovery bars.
 func _ready() -> void:
-	while targets.size() < _starting_target_count:
-		add_target()
+	#while targets.size() < _starting_target_count:
+		#add_target()
 	Utils.set_control_width(slider, slider_size)
 	await get_tree().process_frame
-	randomize_all_targets()
+	#randomize_all_targets()
 	#for target in targets:
 		#randomize_target(target)
 	
@@ -81,12 +81,16 @@ func pause(animate: bool) -> void:
 	set_process(false)
 	if not animate:
 		return
+	await play_animation(animation_color, animation_repeats, 0.1)
+
+func play_animation(color : Color, repetitions : int = 1,  duration : float = 0.1):
 	var tween: Tween = create_tween()
-	for _repeat_index in range(animation_repeats):
-		tween.tween_property(slider, "modulate", animation_color, 0.1)
-		tween.tween_property(slider, "modulate", Color.WHITE, 0.1)
+	for _repeat_index in range(repetitions):
+		tween.tween_property(slider, "modulate", color, duration)
+		tween.tween_property(slider, "modulate", Color.WHITE, duration)
 	await tween.finished
 
+	pass
 
 ## Hides the timing bar and stops its slider.
 func stop() -> void:
@@ -180,6 +184,7 @@ func reset_all_targets() -> void:
 	randomize_all_targets()
 	for target in targets_to_remove:
 		remove_target(target)
+		## Replace teh target we just removed since it was a single_use
 		add_target.call_deferred()
 		randomize_all_targets.call_deferred()
 	#remove_all_extra_targets()
@@ -292,16 +297,13 @@ func randomize_all_targets():
 			for pt in placed_targs:
 				if pt[3] == target:
 					continue
-				print("extents: ", extents)
 				var left_overlap : bool = (extents[0] - space_between_targets > pt[0] and extents[0] - space_between_targets < pt[1])
 				var right_overlap : bool = (extents[1] + space_between_targets> pt[0] and extents[1] + space_between_targets< pt[1])
 				var center_overlap : bool = (requested_position > pt[0] and requested_position < pt[1])
 
 				if (left_overlap or right_overlap or center_overlap):
 					need_reroll = true
-					print("yes overlap. Left of: ", left_overlap, " Right of: ", right_overlap)
 					break
-			print("placed targs: ", placed_targs.size())
 		#else
 			placed_targs.append(extents)
 			var minimum_center_x: float = target.my_width * 0.5
@@ -336,9 +338,25 @@ func clamp_within_bounds(to_clamp : float, width : float) -> float:
 		width * 0.5,
 		backing.size.x - width * 0.5
 	)
+func clamp_target_within_bounds(target : TimingTarget) -> float:
+	var return_me = clampf(
+		target.target_position,
+		target.my_width * 0.5,
+		backing.size.x - target.my_width * 0.5
+	)
+	target.set_target_position(return_me, true)
+	return return_me
 
 func is_all_targets_hit() -> bool:
 	var all_targets_hit := targets.all(
 	func(target: TimingTarget) -> bool:
 		return target.is_hit)
 	return all_targets_hit
+
+func clamp_all_targets():
+	for target in targets:
+		clamp_target_within_bounds(target)
+
+func recovery_action():
+	for target in targets:
+		target.recovery_action()

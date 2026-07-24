@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://dvhdu1x8j8s3b" path="res://Scripts/menu/main_menu.gd" id="1_menu"]
 
-[node name="MainMenu" type="Control" unique_id=633825169 node_paths=PackedStringArray("title_group", "subtitle_group", "button_group", "start_button", "exit_button", "exit_confirmation", "status_label")]
+[node name="MainMenu" type="Control" unique_id=633825169 node_paths=PackedStringArray("title_group", "subtitle_group", "button_group", "start_button", "options_button", "exit_button", "exit_confirmation", "status_label")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -15,6 +15,7 @@ title_group = NodePath("MenuLayout/Title")
 subtitle_group = NodePath("MenuLayout/Subtitle")
 button_group = NodePath("MenuLayout/ButtonCenter/Buttons")
 start_button = NodePath("MenuLayout/ButtonCenter/Buttons/StartButton")
+options_button = NodePath("MenuLayout/ButtonCenter/Buttons/Options")
 exit_button = NodePath("MenuLayout/ButtonCenter/Buttons/ExitButton")
 exit_confirmation = NodePath("ExitConfirmation")
 status_label = NodePath("MenuLayout/ButtonCenter/Buttons/Status")
@@ -71,6 +72,11 @@ theme_override_constants/separation = 16
 custom_minimum_size = Vector2(160, 44)
 layout_mode = 2
 text = "Start"
+
+[node name="Options" type="Button" parent="MenuLayout/ButtonCenter/Buttons" unique_id=2105095459]
+custom_minimum_size = Vector2(160, 44)
+layout_mode = 2
+text = "Options"
 
 [node name="ExitButton" type="Button" parent="MenuLayout/ButtonCenter/Buttons" unique_id=1875770563]
 custom_minimum_size = Vector2(160, 44)

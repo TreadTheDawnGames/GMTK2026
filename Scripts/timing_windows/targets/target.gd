@@ -41,7 +41,6 @@ func hit(_timing_window : SliderTimingWindow = null) -> void:
 	is_hit = true
 	hide()
 
-
 ## Makes this target available for the next set.
 func unhit() -> void:
 	if single_use:
@@ -56,3 +55,7 @@ func is_overlapping(_input_rect : Rect2) -> bool:
 func place(placement_width : float) -> float:
 	var target_center_x := (randf() * placement_width)
 	return target_center_x
+
+## Called when the recovery bar successfully saves the streak
+func recovery_action():
+	pass
