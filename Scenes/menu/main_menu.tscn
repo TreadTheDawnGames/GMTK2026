@@ -46,7 +46,7 @@ grow_vertical = 2
 custom_minimum_size = Vector2(0, 67)
 layout_mode = 2
 theme_override_font_sizes/font_size = 48
-text = "GMTK2026"
+text = "Why Are You Here?"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -99,6 +99,7 @@ text = "JAM BUILD"
 horizontal_alignment = 2
 
 [node name="ExitConfirmation" type="ConfirmationDialog" parent="." unique_id=129160021]
+oversampling_override = 1.0
 title = "Exit Game?"
 ok_button_text = "Exit"
 dialog_text = "Really exit the game?"
