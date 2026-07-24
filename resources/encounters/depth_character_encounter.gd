@@ -7,7 +7,7 @@ extends Resource
 @export_range(1, 1_000_000, 1) var depth_from_surface: int = 1_000
 ## Resolves this encounter to zero remaining depth for any run length.
 @export var occurs_at_run_bottom: bool = false
-@export var appearance: MerchantAppearance
+@export var appearance: CharacterAppearance
 @export var conversation: DialogueConversation
 ## Used only when story text should remain encrypted in source control.
 @export var encrypted_conversation: EncryptedDialogueConversation

@@ -11,7 +11,7 @@ signal swing_finished
 @export_range(0.0, 1.0, 0.05) var combo_speed_bonus: float = 0.35
 
 @export_category("Placement")
-## Seats the miner on the pale top stratum at the surface and merchant floors.
+## Seats the miner on the pale top stratum at the surface and character floors.
 @export_range(0.0, 64.0, 1.0) var intact_floor_grounding_offset_y: float = 16.0
 ## Slightly overlaps the sampled dirt edge so texture filtering cannot show a gap.
 @export_range(0.0, 4.0, 0.25) var grounding_overlap_y: float = 1.0

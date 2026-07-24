@@ -80,7 +80,7 @@ signal path_direction_changed(direction: int)
 
 @onready var _game_state: RunState = RunState.get_global(self)
 
-# Authored progression contains exactly ten definitions; merchant grants only
+# Authored progression contains exactly ten definitions; character grants only
 # replace this bounded snapshot and never grow it per hit.
 var _active_pickaxes: Array[PickaxeDefinition] = []
 var _path_direction: int = 1

@@ -21,13 +21,13 @@
 [ext_resource type="PackedScene" uid="uid://faai1irb202y" path="res://Scenes/mining/dig_number.tscn" id="31_dig_number"]
 [ext_resource type="Script" uid="uid://d3fjog3we4ugh" path="res://Scripts/mining/terrain_layer_renderer.gd" id="32_layer_renderer"]
 [ext_resource type="Resource" path="res://resources/mining/default_terrain_layer_profile.tres" id="33_layer_profile"]
-[ext_resource type="PackedScene" path="res://Scenes/dialogue/merchant_presenter.tscn" id="34_merchant_presenter"]
+[ext_resource type="PackedScene" path="res://Scenes/dialogue/character_presenter.tscn" id="34_character_presenter"]
 [ext_resource type="Script" uid="uid://cxysje4e2miht" path="res://Scripts/ui/depth_review_control.gd" id="39_depth_review"]
 [ext_resource type="PackedScene" path="res://Scenes/mining/mining_impact_smoke.tscn" id="40_impact_smoke"]
 [ext_resource type="PackedScene" path="res://Scenes/dialogue/departure_choice.tscn" id="41_departure_choice"]
 [ext_resource type="Script" path="res://Scripts/dialogue/run_intro_controller.gd" id="42_intro_controller"]
 [ext_resource type="Resource" path="res://resources/dialogue/run_intro.tres" id="43_intro_conversation"]
-[ext_resource type="Resource" path="res://resources/encounters/traveler_merchant_appearance.tres" id="44_intro_appearance"]
+[ext_resource type="Resource" path="res://resources/encounters/traveler_character_appearance.tres" id="44_intro_appearance"]
 
 [node name="GameRoot" type="Node" unique_id=1769413368]
 
@@ -56,11 +56,11 @@ profile = ExtResource("33_layer_profile")
 [node name="MinerRig" parent="MiningScene" unique_id=726963260 instance=ExtResource("7_miner_rig")]
 z_index = 1
 
-[node name="IntroGuide" parent="MiningScene" instance=ExtResource("34_merchant_presenter")]
+[node name="IntroGuide" parent="MiningScene" instance=ExtResource("34_character_presenter")]
 z_index = 2
 position = Vector2(760, 260)
 
-[node name="MerchantLayer" type="Node2D" parent="MiningScene" unique_id=1096715694]
+[node name="CharacterLayer" type="Node2D" parent="MiningScene" unique_id=1096715694]
 z_index = 1
 
 [node name="MiningHitParticles" parent="MiningScene" unique_id=1668060940 node_paths=PackedStringArray("terrain_manager") instance=ExtResource("10_hit_particles")]
@@ -122,14 +122,14 @@ miner_rig = NodePath("../../MinerRig")
 mining_controller = NodePath("../MiningController")
 starter_pickaxe = ExtResource("20_basic_pickaxe")
 
-[node name="UpgradeEncounterController" type="Node" parent="MiningScene/Systems" unique_id=797816739 node_paths=PackedStringArray("dialogue_director", "timing_window", "merchant_parent", "pickaxe_progression", "mining_controller")]
+[node name="UpgradeEncounterController" type="Node" parent="MiningScene/Systems" unique_id=797816739 node_paths=PackedStringArray("dialogue_director", "timing_window", "character_parent", "pickaxe_progression", "mining_controller")]
 script = ExtResource("13_depth_encounter")
 encounter_config = ExtResource("14_encounter_config")
 mining_config = ExtResource("1_config")
 dialogue_director = NodePath("../../../DialogueDirector")
 timing_window = NodePath("../../HUD/TimingWindow")
-merchant_scene = ExtResource("34_merchant_presenter")
-merchant_parent = NodePath("../../MerchantLayer")
+character_scene = ExtResource("34_character_presenter")
+character_parent = NodePath("../../CharacterLayer")
 pickaxe_progression = NodePath("../PickaxeProgression")
 mining_controller = NodePath("../MiningController")
 

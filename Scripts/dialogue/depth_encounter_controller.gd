@@ -22,12 +22,12 @@ signal encounter_camera_released
 @export_category("References")
 @export var dialogue_director: DialogueDirector
 @export var timing_window: TimingWindowTask
-@export var merchant_scene: PackedScene
-@export var merchant_parent: Node2D
+@export var character_scene: PackedScene
+@export var character_parent: Node2D
 @export var pickaxe_progression: PickaxeProgression
 @export var mining_controller: MiningController
 
-var _presenters: Array[MerchantPresenter] = []
+var _presenters: Array[CharacterPresenter] = []
 var _next_encounter_index: int = 0
 var _pending_encounter_index: int = -1
 var _active_encounter_index: int = -1
@@ -85,7 +85,7 @@ func _on_view_position_changed(view_cell_position: Vector2) -> void:
 		mining_config.terrain_screen_center_x
 		- view_cell_position.x * cell_size
 	)
-	merchant_parent.position = Vector2(
+	character_parent.position = Vector2(
 		terrain_left,
 		mining_config.mining_face_screen_y
 			- view_cell_position.y * cell_size
@@ -274,8 +274,8 @@ func _prepare_authored_characters() -> bool:
 		or mining_config == null
 		or dialogue_director == null
 		or timing_window == null
-		or merchant_scene == null
-		or merchant_parent == null
+		or character_scene == null
+		or character_parent == null
 		or pickaxe_progression == null
 		or mining_controller == null
 	):
@@ -328,11 +328,11 @@ func _prepare_authored_characters() -> bool:
 
 	var cell_size := float(mining_config.terrain_cell_world_size)
 	for encounter in encounter_config.encounters:
-		var presenter := merchant_scene.instantiate() as MerchantPresenter
+		var presenter := character_scene.instantiate() as CharacterPresenter
 		if presenter == null:
-			push_error("Merchant Presenter could not be instantiated.")
+			push_error("Character presenter could not be instantiated.")
 			return false
-		merchant_parent.add_child(presenter)
+		character_parent.add_child(presenter)
 		presenter.apply_appearance(encounter.appearance)
 		presenter.position = Vector2(
 			(

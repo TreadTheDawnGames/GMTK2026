@@ -5,7 +5,7 @@ extends Resource
 ## Vertical values use gameplay depth measured from the miner's feet.
 
 @export_category("Named Encounters")
-## Lists every merchant and the final thief in authored depth order.
+## Lists every character and the final thief in authored depth order.
 @export var encounters: Array[DepthCharacterEncounter] = []
 
 @export_category("Chamber")

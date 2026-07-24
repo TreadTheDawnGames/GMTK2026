@@ -24,20 +24,20 @@ The conversation validates itself when playback begins. Missing IDs, duplicate
 participant slots, unknown speakers, and empty lines are reported as clear
 Godot errors instead of silently failing.
 
-## Configure merchant appearances
+## Configure character appearances
 
-Create a `MerchantAppearance` resource for every sprite option. Each resource
+Create a `CharacterAppearance` resource for every sprite option. Each resource
 stores:
 
 - either a single texture or one frame from a sprite sheet;
-- scale and offset values that align the merchant's feet with the floor;
+- scale and offset values that align the person's feet with the floor;
 - optional tint and horizontal flipping.
 
 Each named encounter references one appearance directly. Reuse the same
 appearance in multiple encounters when a character returns later in the run.
 
 The current appearance resources use tinted copies of the miner sheet as
-stand-ins. Replacing their textures does not change merchant scheduling.
+stand-ins. Replacing their textures does not change character scheduling.
 
 ## Configure named encounters
 
@@ -86,7 +86,7 @@ The current authored order keeps every reward before the late solo descent:
 - the full cast farewell at 84,000;
 - the thief at 100,000, which is zero remaining depth.
 
-There are no randomized merchants. Add another encounter resource to the
+There are no randomized people. Add another encounter resource to the
 array when a named character should return. Reusing an appearance keeps the
 character visually consistent while allowing a new conversation and reward.
 
@@ -96,18 +96,19 @@ character visually consistent while allowing a new conversation and reward.
 All six characters are created when the mining scene starts. They exist below
 the viewport and scroll into view with the terrain instead of appearing when
 the miner lands. Landing only starts the current character's dialogue.
-Finishing a merchant conversation stacks any assigned reward and advances to
-the next array entry. A combo of ten or more defers an overdue merchant until
-that streak actually ends. Characters otherwise remain at their original
-floors, so reviewing earlier terrain does not leave visited chambers empty.
+Finishing a character conversation stacks any assigned reward and advances to
+the next array entry. Combo state never postpones or relocates an encounter:
+each character moment begins when the miner lands at its authored depth.
+Characters remain at their original floors, so reviewing earlier terrain does
+not leave visited chambers empty.
 
-Merchant chambers are intentionally only 24 terrain rows tall. The farewell
-encounter opens through the right wall so the four named merchants can walk
+Character chambers are intentionally only 24 terrain rows tall. The farewell
+encounter opens through the right wall so the four named people can walk
 offscreen before the miner continues alone.
 
 Each encounter identifies its `Speaker Slot`. While that participant's text is
-being revealed, `MerchantPresenter` periodically bounces the sprite. Miner
-lines do not move the merchant.
+being revealed, `CharacterPresenter` periodically bounces the sprite. Miner
+lines do not move the character.
 
 During dialogue the gameplay tree pauses, while the dialogue overlay and dirt
 particles continue processing.

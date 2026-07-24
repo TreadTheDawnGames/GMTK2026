@@ -10,7 +10,7 @@ extends Node
 
 @export_category("Content")
 @export var conversation: DialogueConversation
-@export var guide_appearance: MerchantAppearance
+@export var guide_appearance: CharacterAppearance
 @export var guide_speaker_slot: StringName = &"lookout"
 
 @export_category("Animation")
@@ -21,7 +21,7 @@ extends Node
 
 @export_category("References")
 @export var dialogue_director: DialogueDirector
-@export var guide_presenter: MerchantPresenter
+@export var guide_presenter: CharacterPresenter
 @export var timing_window: TimingWindowTask
 @export var mining_controller: MiningController
 

@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="DepthCharacterEncounter" load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
-[ext_resource type="Resource" path="res://resources/encounters/traveler_merchant_appearance.tres" id="2_appearance"]
+[ext_resource type="Resource" path="res://resources/encounters/traveler_character_appearance.tres" id="2_appearance"]
 [ext_resource type="Resource" path="res://resources/dialogue/thiefbreaker_pickaxe_gift.tres" id="3_dialogue"]
 [ext_resource type="Resource" path="res://resources/pickaxes/thiefbreaker_pickaxe.tres" id="4_pickaxe"]
 

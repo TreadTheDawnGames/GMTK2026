@@ -35,7 +35,7 @@ func _ready() -> void:
 	_apply_stack()
 
 
-## Adds a merchant gift to the active stack and makes it the visible tool.
+## Adds a character's gift to the active stack and makes it the visible tool.
 func grant_upgrade(definition: PickaxeDefinition) -> bool:
 	if definition == null or definition.id.is_empty():
 		return false

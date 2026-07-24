@@ -1,7 +1,7 @@
-class_name MerchantAppearance
+class_name CharacterAppearance
 extends Resource
 
-## Defines one sprite configuration available to an underground merchant.
+## Defines one sprite configuration available to an underground character.
 
 @export var texture: Texture2D
 @export_range(1, 64, 1) var horizontal_frames: int = 1
