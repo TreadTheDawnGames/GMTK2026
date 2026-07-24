@@ -48,6 +48,7 @@ show_behind_parent = true
 layout_mode = 2
 
 [node name="Panel" type="Panel" parent="MiningWindow/Control" unique_id=1498988746]
+modulate = Color(1, 1, 1, 0.34901962)
 layout_mode = 0
 offset_right = 700.0
 offset_bottom = 81.0
@@ -105,9 +106,6 @@ animation_color = Color(0, 1, 1, 1)
 unique_name_in_owner = true
 stream = ExtResource("3_pu0v2")
 
-[node name="HitSound" type="AudioStreamPlayer2D" parent="." unique_id=2047278541]
-unique_name_in_owner = true
-
 [node name="StreakSavedSound" type="AudioStreamPlayer2D" parent="." unique_id=1410887463]
 unique_name_in_owner = true
 stream = ExtResource("11_74xn3")
@@ -117,6 +115,10 @@ unique_name_in_owner = true
 stream = ExtResource("12_2plp5")
 
 [node name="SaveBwahSound" type="AudioStreamPlayer2D" parent="." unique_id=800944095]
+unique_name_in_owner = true
+stream = ExtResource("13_53pw3")
+
+[node name="HitSound" type="AudioStreamPlayer2D" parent="." unique_id=144582511]
 unique_name_in_owner = true
 stream = ExtResource("13_53pw3")
 

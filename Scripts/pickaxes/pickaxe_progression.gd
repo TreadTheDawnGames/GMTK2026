@@ -16,12 +16,17 @@ signal target_unlocks_changed(definitions: Array[PickaxeDefinition])
 
 @export_category("Starting Equipment")
 @export var starter_pickaxe: PickaxeDefinition
+const DEBUG_PICKAXE = preload("uid://bktf56q4v503t")
 
 var loadout: PickaxeLoadout
 
 
 ## Creates the run stack and applies its starting pickaxe.
 func _ready() -> void:
+	
+	if Input.is_action_pressed("aim_right") and OS.has_feature("editor"):
+		starter_pickaxe = DEBUG_PICKAXE
+	
 	loadout = PickaxeLoadout.new(starter_pickaxe)
 	if not loadout.equipped_changed.is_connected(
 		_apply_visible_pickaxe

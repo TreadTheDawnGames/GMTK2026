@@ -23,6 +23,7 @@ var combo: int = 0:
 	set(value):
 		combo = value
 		combo_label.text = "Combo: " + str(-combo)
+var stored_combo : int = 0
 
 @export var mine_sounds: Array[AudioStream]
 @export var combo_saved_color: Color = Color.CYAN
@@ -91,11 +92,13 @@ func _apply_pickaxe_target_unlocks() -> void:
 ## Updates the combo or opens recovery after the main timing result.
 func _mining_window_pressed(
 	success: bool,
-	hit_direction: int = 0
+	hit_direction: int = 0,
+	consecutive_hits = 0
 ) -> void:
 	if success:
-		combo += 1
-		pressed.emit(true, combo, clampi(hit_direction, -1, 1))
+		if consecutive_hits > 0:
+			combo = consecutive_hits + stored_combo
+		pressed.emit(true, combo if consecutive_hits > 0 else abs(consecutive_hits), clampi(hit_direction, -1, 1))
 		mining_window.speed_multiplier = (
 			(mining_config.combo_speed_multiplier)
 		)
@@ -125,6 +128,7 @@ func _mining_window_pressed(
 		):
 			mining_window.add_target.call_deferred()
 	else:
+		stored_combo = combo
 		if combo >= mining_config.recovery_combo_threshold:
 			warning_sound.play()
 			await mining_window.pause(true)
@@ -134,6 +138,7 @@ func _mining_window_pressed(
 			var lost_combo := combo
 			pressed.emit(false, combo, 0)
 			combo = 0
+			stored_combo = 0
 			streak_ended.emit(lost_combo)
 			mining_window.remove_all_extra_targets()
 			mining_window.speed_multiplier = 1.0
@@ -144,10 +149,12 @@ func _mining_window_pressed(
 ## Resolves recovery and restarts the main timing bar.
 func _recovery_window_pressed(
 	success: bool,
-	_hit_direction: int = 0
+	_hit_direction: int = 0,
+	consecutive_hits = 0
 ) -> void:
 	if not success:
 		var lost_combo := combo
+		stored_combo = 0
 		combo = 0
 		mining_window.reset_all_targets()
 		pressed.emit(false, combo, 0)

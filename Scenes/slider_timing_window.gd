@@ -4,8 +4,7 @@ class_name SliderTimingWindow
 ## Moves the timing slider and tracks targets until every target is hit.
 
 ## Reports whether the press hit and which half of the bar received the hit.
-signal pressed(success: bool, hit_direction: int)
-
+signal pressed(success: bool, hit_direction: int, combo : int)
 @export var target_packed_scenes : Array[PackedScene] = [preload("uid://16edwc1adi0x")]
 
 @onready var slider: Panel = %Slider
@@ -22,6 +21,7 @@ signal pressed(success: bool, hit_direction: int)
 @export var slider_size: float = 5.0
 
 @export var one_shot: bool = false
+@export var stop_one_shot_when_done: bool = true
 @export var fixed_window: float = -1.0
 @export var animation_repeats: int = 3
 @export var animation_color : Color = Color.RED
@@ -32,6 +32,7 @@ var direction: float = 1.0
 # Growth is bounded by the configured baseline plus nine authored pickaxe
 # unlocks; a lost streak prunes the collection back to its baseline.
 var targets: Array[TimingTarget] = []
+var consecutive_hits : int = 0
 var _starting_target_count: int = 1
 
 
@@ -141,24 +142,34 @@ func remove_all_extra_targets() -> void:
 		baseline_target.initialize()
 		clamp_target(baseline_target)
 
-
-## Removes the most recently added target.
-func remove_target() -> void:
+## Removes the specified target or the most recently added target.
+func remove_target(specific_target : TimingTarget = null) -> void:
 	if not targets.is_empty():
-		targets.pop_back().queue_free()
+		if specific_target:
+			targets.erase(specific_target)
+			specific_target.ready_to_die.connect(specific_target.queue_free, CONNECT_ONE_SHOT)
+		else:
+			targets.pop_back().queue_free()
 
 
 ## Shows and rerolls every target after a completed set or lost streak.
 func reset_all_targets() -> void:
-	for target in targets:
+	var targets_to_remove : Array[TimingTarget] = []
+	for target : TimingTarget in targets:
 		target.unhit()
 		randomize_target(target)
-
+		if target.single_use:
+			targets_to_remove.append(target)
+	
+	for target in targets_to_remove:
+		remove_target(target)
+		add_target.call_deferred()
+	#remove_all_extra_targets()
 
 ## Moves the slider and resolves one press against every visible target.
 func _process(delta: float) -> void:
 	if Input.is_action_just_pressed(&"Space"):
-		var hit_targets: Array[TimingTarget] = targets.filter(
+		var hit_targets: Array = targets.filter(
 			func(target: TimingTarget) -> bool:
 				var hit_distance := (
 					target.size.x * 0.5
@@ -178,17 +189,16 @@ func _process(delta: float) -> void:
 		var hit_direction: int = 0
 		if success:
 			hit_direction = _get_slider_hit_direction()
-		pressed.emit(success, hit_direction)
-		var all_targets_hit := targets.all(
-			func(target: TimingTarget) -> bool:
-				return target.is_hit
-		)
-		if all_targets_hit and not one_shot:
+			consecutive_hits += 1
+		else:
+			consecutive_hits = 0
+		pressed.emit(success, hit_direction, consecutive_hits)
+		if is_all_targets_hit() and not one_shot:
 			reset_all_targets()
-
-		if one_shot:
-			await pause(true)
-			stop()
+		if stop_one_shot_when_done:
+			if one_shot:
+				await pause(true)
+				stop()
 
 	slider.position.x += speed * direction * delta * speed_multiplier
 
@@ -203,7 +213,7 @@ func _process(delta: float) -> void:
 		direction *= -1
 		bounce_sound.play()
 		if one_shot:
-			pressed.emit(false, 0)
+			pressed.emit(false, 0, consecutive_hits)
 			stop()
 
 
@@ -260,6 +270,11 @@ func on_freeze(stopped:bool):
 		pause(false)
 	else:
 		start()
+
+
+		if is_all_targets_hit() and not one_shot:
+			reset_all_targets()
+
 	pass
 
 func clamp_target(target : TimingTarget):
@@ -268,3 +283,9 @@ func clamp_target(target : TimingTarget):
 		target.size.x * 0.5,
 		backing.size.x - target.size.x * 0.5
 	)
+
+func is_all_targets_hit() -> bool:
+	var all_targets_hit := targets.all(
+	func(target: TimingTarget) -> bool:
+		return target.is_hit)
+	return all_targets_hit
