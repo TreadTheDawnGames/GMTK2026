@@ -9,6 +9,7 @@ id = &"wide_pickaxe"
 display_name = "Excavator Pickaxe"
 description = "Clears a wider path, but swings with less force."
 width_multiplier = 1.15
+swing_speed_multiplier = 1.0
 debris_multiplier = 1.05
 hammer_head_color = Color(0.36, 0.76, 1, 1)
 target_unlock_combo = 30

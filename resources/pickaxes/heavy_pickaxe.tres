@@ -9,6 +9,7 @@ id = &"heavy_pickaxe"
 display_name = "Heavy Pickaxe"
 description = "A slow, crushing strike followed by a full-width aftershock."
 power_multiplier = 1.1
+swing_speed_multiplier = 1.0
 debris_multiplier = 1.15
 special_effect = 1
 aftershock_depth_rows = 4

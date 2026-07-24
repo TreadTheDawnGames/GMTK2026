@@ -93,12 +93,18 @@ func _apply_pickaxe_target_unlocks() -> void:
 func _mining_window_pressed(
 	success: bool,
 	hit_direction: int = 0,
-	consecutive_hits = 0
+	consecutive_hits: int = 0
 ) -> void:
 	if success:
 		if consecutive_hits > 0:
 			combo = consecutive_hits + stored_combo
-		pressed.emit(true, combo if consecutive_hits > 0 else abs(consecutive_hits), clampi(hit_direction, -1, 1))
+		else:
+			combo += 1
+		pressed.emit(
+			true,
+			combo,
+			clampi(hit_direction, -1, 1)
+		)
 		mining_window.speed_multiplier = (
 			(mining_config.combo_speed_multiplier)
 		)

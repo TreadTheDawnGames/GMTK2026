@@ -9,6 +9,7 @@ id = &"seismic_pickaxe"
 display_name = "Seismic Pickaxe"
 description = "Each strike stores a smaller underground aftershock."
 power_multiplier = 1.08
+swing_speed_multiplier = 1.0
 debris_multiplier = 1.1
 special_effect = 1
 aftershock_depth_rows = 2
