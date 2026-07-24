@@ -219,41 +219,42 @@ func _get_slider_hit_direction() -> int:
 
 ## Moves one target to a valid position inside its backing bar.
 func randomize_target(target: TimingTarget) -> void:
-	var target_touple : Array[float] = target.place(backing.size.x)
-	var target_center_x = target_touple[0] if fixed_window < 0.0 else fixed_window*backing.size.x
-	
-	target_center_x = clampf(
-		target_center_x,
-		target_touple[1] * 0.5,
-		backing.size.x - target_touple[1] * 0.5
+	# Target sets reset on successful hits, so use the authored width directly
+	# instead of allocating a temporary position/width array on the hot path.
+	var target_width: float = maxf(target.my_width, 1.0)
+	var minimum_center_x: float = target_width * 0.5
+	var maximum_center_x: float = maxf(
+		backing.size.x - minimum_center_x,
+		minimum_center_x
 	)
-	var rerolls : int = 5
-	var do_again:bool =true
-	while do_again and rerolls > 0:
-		for _target in targets:
-			if _target == target:
-				continue
-			if target.get_rect().intersects(_target.get_rect()):
-				
-				target_center_x = target_center_x + clampf(
-				target_center_x + target_touple[1] + 25 * (randf() - randf()),
-				target_touple[1],#* 0.5,
-				backing.size.x - target_touple[1],# * 0.5
-				)
-				do_again = true
-				target_center_x = clampf(
-				target_center_x,
-				target_touple[1] ,#* 0.5,
-				backing.size.x - target_touple[1],# * 0.5
-				)
+	var requested_center_x: float = target.place(backing.size.x)
+	if fixed_window >= 0.0:
+		requested_center_x = fixed_window * backing.size.x
+	target.position.x = clampf(
+		requested_center_x,
+		minimum_center_x,
+		maximum_center_x
+	)
 
+	# Placement work stays bounded: at most five rerolls per target reset.
+	var rerolls_remaining: int = 5
+	while rerolls_remaining > 0:
+		var overlaps_existing_target: bool = false
+		for existing_target: TimingTarget in targets:
+			if existing_target == target:
+				continue
+			if target.get_rect().intersects(existing_target.get_rect()):
+				overlaps_existing_target = true
 				break
-			else:
-				do_again = false
-		rerolls -= 1
-	
-	target.position.x = target_center_x
-		
+		if not overlaps_existing_target:
+			break
+		target.position.x = randf_range(
+			minimum_center_x,
+			maximum_center_x
+		)
+		rerolls_remaining -= 1
+
+
 func on_freeze(stopped:bool):
 	if stopped:
 		pause(false)
