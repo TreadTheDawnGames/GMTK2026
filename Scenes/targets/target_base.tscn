@@ -5,6 +5,7 @@
 [ext_resource type="Texture2D" uid="uid://1midkroux0r2" path="res://Assets/TimeBar/Pickaxe.png" id="3_2228f"]
 
 [node name="Target" type="Panel" unique_id=980051362]
+self_modulate = Color(0, 0.56078434, 0, 1)
 anchors_preset = 13
 anchor_left = 0.5
 anchor_right = 0.5

@@ -168,7 +168,7 @@ func _process(delta: float) -> void:
 				)
 		)
 		for target: TimingTarget in hit_targets:
-			target.hit()
+			target.hit(self)
 
 		pressed.emit(not hit_targets.is_empty())
 		var all_targets_hit := targets.all(

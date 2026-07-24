@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://cf8q7ylnplo6c"]
 
 [ext_resource type="Script" uid="uid://yknrp1dp4whn" path="res://Scenes/slider_timing_window.gd" id="1_iyxre"]
-[ext_resource type="PackedScene" uid="uid://bcoaf8y2mxx7" path="res://Scenes/targets/shrinking_target.tscn" id="3_7ume1"]
+[ext_resource type="PackedScene" uid="uid://cv457nmc4e8qy" path="res://Scenes/targets/reverse_target.tscn" id="2_eprdb"]
 [ext_resource type="AudioStream" uid="uid://cbv4v668aoluj" path="res://Assets/Audio/LineHitEdge.wav" id="9_6q4rb"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_eprdb"]
@@ -24,7 +24,7 @@ grow_horizontal = 2
 grow_vertical = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_eprdb")
 script = ExtResource("1_iyxre")
-target_packed_scenes = Array[PackedScene]([ExtResource("3_7ume1")])
+target_packed_scenes = Array[PackedScene]([ExtResource("2_eprdb")])
 desired_target_heirarchy_index = 0
 
 [node name="Backing" type="Control" parent="." unique_id=953641845]

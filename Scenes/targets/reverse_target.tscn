@@ -1,0 +1,14 @@
+[gd_scene format=3 uid="uid://cv457nmc4e8qy"]
+
+[ext_resource type="PackedScene" uid="uid://16edwc1adi0x" path="res://Scenes/targets/target_base.tscn" id="1_yvcbw"]
+[ext_resource type="Script" uid="uid://c8a5c2rpf5l02" path="res://Scripts/timing_windows/targets/reverse_target.gd" id="2_ylfck"]
+[ext_resource type="Texture2D" uid="uid://dan8t5x00j3n8" path="res://Assets/TimeBar/Reversal.png" id="3_ylfck"]
+
+[node name="ReverseTarget" unique_id=980051362 instance=ExtResource("1_yvcbw")]
+self_modulate = Color(1, 1, 0.3254902, 1)
+script = ExtResource("2_ylfck")
+my_width = 48.0
+
+[node name="TextureRect" parent="." index="0" unique_id=1601954937]
+visible = true
+texture = ExtResource("3_ylfck")

@@ -12,8 +12,8 @@ func initialize():
 	timing_window2.pressed.connect(timing_hit2)
 	timing_window3.pressed.connect(timing_hit3)
 
-func hit():
-	super.hit()
+func hit(_timing_window : SliderTimingWindow = null):
+	super.hit(_timing_window)
 	freeze.emit(true)
 	timing_window.show()
 	await get_tree().create_timer(0.2).timeout

@@ -5,6 +5,7 @@
 [ext_resource type="PackedScene" uid="uid://cf8q7ylnplo6c" path="res://Scenes/slider_timing_window.tscn" id="3_1ajj0"]
 
 [node name="LaLaLandTarget" unique_id=980051362 instance=ExtResource("1_jlnua")]
+self_modulate = Color(1, 0.80784315, 0.2, 1)
 script = ExtResource("2_7selm")
 my_width = 128.0
 

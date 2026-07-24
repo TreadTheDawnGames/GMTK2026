@@ -11,8 +11,8 @@ func initialize():
 	Utils.set_control_width(self, my_width)
 	
 
-func hit() -> void:
-	super.hit()
+func hit(_timing_window : SliderTimingWindow = null) -> void:
+	super.hit(_timing_window)
 	var target_size := clampf(
 		size.x * shrink_rate,
 		min_width,

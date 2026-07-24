@@ -3,11 +3,8 @@
 [ext_resource type="PackedScene" uid="uid://16edwc1adi0x" path="res://Scenes/targets/target_base.tscn" id="1_1lgta"]
 [ext_resource type="Script" uid="uid://ycr6xrq7ef0e" path="res://Scripts/timing_windows/targets/fade_target.gd" id="2_ewmrw"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1lgta"]
-bg_color = Color(0.40392157, 0, 1, 1)
-
 [node name="FadeTarget" unique_id=980051362 instance=ExtResource("1_1lgta")]
-theme_override_styles/panel = SubResource("StyleBoxFlat_1lgta")
+self_modulate = Color(0.30588236, 0, 1, 1)
 script = ExtResource("2_ewmrw")
 fade_time = 2.0
 

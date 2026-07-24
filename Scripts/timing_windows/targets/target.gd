@@ -17,7 +17,7 @@ func initialize():
 	pass
 
 ## Marks this target collected and hides it until the set resets.
-func hit() -> void:
+func hit(_timing_window : SliderTimingWindow = null) -> void:
 	is_hit = true
 	hide()
 
