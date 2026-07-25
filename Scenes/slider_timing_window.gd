@@ -9,6 +9,7 @@ signal pressed(success: bool, hit_direction: int, combo : int)
 
 @onready var slider: Panel = %Slider
 @onready var backing: Control = %Backing
+@onready var bounce_sound: AudioStreamPlayer2D = %BounceSound
 @onready var _game_state: RunState = RunState.get_global(self)
 
 
@@ -230,7 +231,7 @@ func _process(delta: float) -> void:
 			or _game_state.save_game == null
 			or not _game_state.save_game.mute_bounce
 		):
-			AudioHandler.play_sound(AudioLibrary.BOUNCE)
+			bounce_sound.play()
 		if one_shot:
 			pressed.emit(false, 0, consecutive_hits)
 			stop()
