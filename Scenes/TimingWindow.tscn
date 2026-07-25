@@ -94,6 +94,7 @@ target_packed_scenes = Array[PackedScene]([ExtResource("13_sgvbc")])
 grace = 3.0
 targets_use_image = false
 one_shot = true
+stop_one_shot_when_done = false
 fixed_window = 0.9
 animation_repeats = 4
 animation_color = Color(0, 1, 1, 1)
@@ -103,6 +104,43 @@ show_behind_parent = true
 layout_mode = 2
 
 [node name="Panel" type="Panel" parent="RecoveryWindow/Control" unique_id=63423250]
+modulate = Color(1, 1, 1, 0.34901962)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -349.0
+offset_top = -13.5
+offset_right = 349.0
+offset_bottom = 13.5
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = ExtResource("12_sgvbc")
+
+[node name="RecoveryWindow2" parent="." unique_id=888560620 instance=ExtResource("2_73j0v")]
+unique_name_in_owner = true
+editor_description = "Lifted clear of the main bar's frame art. MiningWindow's nine-slice expand margin puts drawn wood 20 px above its own rect, reaching y -148, so at the old -151 this strip sat inside it and the two frames collided. The gap also leaves room for the frame TimingBarFeedback lends this strip while it is up."
+layout_mode = 1
+offset_left = -351.0
+offset_top = -261.0
+offset_right = 349.0
+offset_bottom = -244.0
+target_packed_scenes = Array[PackedScene]([ExtResource("13_sgvbc")])
+speed = 1250.0
+grace = 3.0
+targets_use_image = false
+one_shot = true
+fixed_window = 0.9
+animation_repeats = 4
+animation_color = Color(0, 1, 1, 1)
+
+[node name="Control" type="Control" parent="RecoveryWindow2" unique_id=2056035615]
+show_behind_parent = true
+layout_mode = 2
+
+[node name="Panel" type="Panel" parent="RecoveryWindow2/Control" unique_id=2077331031]
 modulate = Color(1, 1, 1, 0.34901962)
 layout_mode = 1
 anchors_preset = 8

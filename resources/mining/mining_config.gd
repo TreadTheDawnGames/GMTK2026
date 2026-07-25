@@ -1,4 +1,4 @@
-﻿@tool
+@tool
 class_name MiningConfig
 extends Resource
 
@@ -86,6 +86,8 @@ const MAX_PLAYABLE_DEPTH: int = 2_000_000_000
 @export_range(1.0, 5_000.0, 1.0) var mining_bar_speed: float = 500.0
 ## Sets the recovery slider's unmodified horizontal speed.
 @export_range(1.0, 5_000.0, 1.0) var recovery_bar_speed: float = 1_250.0
+## Sets the secondary recovery slider's unmodified horizontal speed.
+@export_range(1.0, 5_000.0, 1.0) var second_recovery_bar_speed: float = 1_500.0
 ## Applies a fixed speed multiplier while the mining combo is active.
 @export_range(0.1, 5.0, 0.05) var combo_speed_multiplier: float = 1.5
 ## Multiplies recovery speed after each successfully saved streak.
