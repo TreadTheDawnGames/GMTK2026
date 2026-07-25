@@ -10,14 +10,16 @@ needs them.
 
 ## Create a conversation
 
-1. Duplicate `res://resources/dialogue/stone_pickaxe_gift.tres`.
+1. Duplicate a current cast resource such as `res://resources/dialogue/cheese_girl_first_conversation.tres`.
 2. Rename the file and give `Conversation Id` a unique `snake_case` value.
 3. Expand `Participants` and add one `DialogueParticipant` for each speaker.
 4. Give every participant a short stable `Slot`, such as `miner` or
    `market_keeper`, and the name players should see in `Display Name`.
 5. Expand `Lines` and add `DialogueLine` resources in playback order.
 6. For each line, choose a participant slot and enter the spoken text.
-7. Leave `Auto Advance Delay Seconds` at `0` to wait for Space or Enter. Use a
+7. Optionally set `Speaker Pose` and `Stage Cue` to named entries provided by
+   that actor's pose set and encounter stage.
+8. Leave `Auto Advance Delay Seconds` at `0` to wait for Space or Enter. Use a
    positive delay only for intentionally automatic lines.
 
 The conversation validates itself when playback begins. Missing IDs, duplicate
@@ -32,6 +34,7 @@ stores:
 - either a single texture or one frame from a sprite sheet;
 - scale and offset values that align the person's feet with the floor;
 - optional tint and horizontal flipping.
+- an optional `ActorPoseSet` for human-named `idle`, `walk`, or story poses.
 
 Each named encounter references one appearance directly. Reuse the same
 appearance in multiple encounters when a character returns later in the run.
@@ -42,12 +45,14 @@ stand-ins. Replacing their textures does not change character scheduling.
 ## Configure named encounters
 
 Open `res://resources/encounters/depth_encounter_config.tres` in the Inspector.
-Its `Encounters` array controls both terrain generation and encounter timing.
+Its `Encounters` array controls both terrain generation and cutscene order.
 Each `DepthCharacterEncounter` assigns:
 
 - a unique `Encounter Id`;
-- a fixed depth measured from the starting surface;
+- a stable `Actor Id`, reused for every return by the same person;
+- a fixed `Depth From Surface`, measured in terrain rows;
 - one named character appearance and conversation;
+- an optional `CharacterEncounterStage` scene;
 - the character's participant slot for speech animation;
 - an optional pickaxe reward appended to the cumulative run stack.
 
@@ -74,41 +79,76 @@ it so Godot reloads the ciphertext.
 
 The current authored order keeps every reward before the late solo descent:
 
-- Traveler with the Stone Pickaxe at 1,000;
-- Tinkerer with the Swift Pickaxe at 6,000;
-- Tunnel Surveyor with the Excavator Pickaxe at 11,000;
-- Old Prospector with the Heavy Pickaxe at 16,000;
-- returning Traveler with the Lantern Pickaxe at 25,000;
-- returning Tinkerer with the Magnetic Pickaxe at 35,000;
-- returning Surveyor with the Seismic Pickaxe at 47,000;
-- returning Prospector with the Echo Pickaxe at 61,000;
-- returning Traveler with the Thiefbreaker Pickaxe at 76,000;
+- Cheese Girl at 1,000;
+- Treasure Hunter's first visit at 6,000;
+- Rutini's first visit at 11,000;
+- Treasure Hunter's second visit at 16,000;
+- Moody Teen at 25,000;
+- Rutini's second visit at 35,000;
+- Treasure Hunter's discovery at 47,000;
+- COFFEE CAT at 61,000;
+- Cloak/Lantern warning at 76,000;
 - the full cast farewell at 84,000;
 - the thief at 100,000, which is zero remaining depth.
 
-There are no randomized people. Add another encounter resource to the
-array when a named character should return. Reusing an appearance keeps the
-character visually consistent while allowing a new conversation and reward.
+To add a cutscene, duplicate one encounter `.tres`, assign its depth,
+conversation, appearance, and optional stage, then insert it into `Encounters`
+in strictly increasing depth order. That one entry makes terrain carve the
+tunnel above its floor and makes the matching landing start the cutscene.
+Reusing an `Actor Id` and appearance keeps a returning character visually
+consistent while allowing a new conversation and reward.
 
 `Chamber Height Rows` controls the open fall immediately above each floor.
 `Chamber Width Cells` controls the centered opening between the side walls.
 
-All six characters are created when the mining scene starts. They exist below
-the viewport and scroll into view with the terrain instead of appearing when
-the miner lands. Landing only starts the current character's dialogue.
-Finishing a character conversation stacks any assigned reward and advances to
-the next array entry. Combo state never postpones or relocates an encounter:
-each character moment begins when the miner lands at its authored depth.
-Characters remain at their original floors, so reviewing earlier terrain does
-not leave visited chambers empty.
+One presenter is created per stable `Actor Id`, so returning characters are the
+same runtime actor instead of duplicate scene-index entries. Mining to an
+encounter depth reserves that encounter, but does not start it. The miner must
+fall through the newly opened chamber and land on its authored floor before
+framing, stage motion, or dialogue begins. Finishing a conversation stacks its
+reward and advances the single ordered schedule.
 
 Character chambers are intentionally only 24 terrain rows tall. The farewell
-encounter opens through the right wall so the four named people can walk
-offscreen before the miner continues alone.
+is marked explicitly with `Is Farewell`; it is not inferred from array position
+or depth. `Farewell Actor Ids` controls the named group order, and the right
+wall remains open until those actors walk offscreen. The final thief stays
+at the authored bottom depth after that departure.
 
-Each encounter identifies its `Speaker Slot`. While that participant's text is
-being revealed, `CharacterPresenter` periodically bounces the sprite. Miner
-lines do not move the character.
+## Author encounter stages
+
+The standard encounters inherit
+`res://Scenes/cinematics/character_encounter_stage.tscn`. Duplicate or inherit
+it for a custom scene, then keep these human-named roots:
+
+- `ActorMarkers`: `Entrance`, `Conversation`, `Work`, `Rest`, and `Exit`;
+- `PropMarkers`: named objects such as `Gift`, `Cart`, or `Lantern`;
+- `ActionMarkers`: named effect points such as `WallStrike`.
+
+Move markers in the editor and author `AnimationPlayer` clips with readable
+names such as `offer_pickaxe` or `look_back`. Put that exact name in a dialogue
+line's `Stage Cue`. The controller opens the cinematic frame, walks the actor
+over sampled terrain, plays line cues, closes to `Rest`, then releases mining.
+An interrupted stage restores its captured presenter transform and animation.
+Calling `request_presentation_strike()` from an authored animation relays the
+marker through mining scene wiring so shared dirt, smoke, and shake effects can
+be reused without coupling the stage to mining systems.
+
+Each encounter identifies its `Speaker Slot`. Every visible participant,
+including the miner, bounces once when one of their lines is presented. The
+shared `SpeechReaction` component moves presentation-only visual roots; it
+never changes gameplay or encounter positions.
+
+The miner is intentionally silent. Any line authored with the stable `miner`
+slot is presented as `...`; keep the resource text as `...` as well so the
+Inspector communicates the same story rule.
+
+A future silent-teen beat should remain concrete story state: after 50
+completed conversations with that teen, select the authored first-spoken-line
+conversation. Do not add a generic condition language for that single case.
+
+`DialogueDirector` presents every conversation through the in-universe bottom
+dialogue box. Top and bottom cinematic bars frame all conversations and may be
+kept open between linked dialogue and movement beats.
 
 During dialogue the gameplay tree pauses, while the dialogue overlay and dirt
 particles continue processing.

@@ -1,28 +1,41 @@
-[gd_resource type="Resource" script_class="TerrainLayerProfile" load_steps=10 format=3]
+[gd_resource type="Resource" script_class="TerrainLayerProfile" load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://resources/mining/terrain_layer_profile.gd" id="1_profile"]
-[ext_resource type="Texture2D" path="res://Assets/Terrain/SmallHole2.png" id="2_small_2"]
-[ext_resource type="Texture2D" path="res://Assets/Terrain/SmallHole3.png" id="3_small_3"]
-[ext_resource type="Texture2D" path="res://Assets/Terrain/SmallHole4.png" id="4_small_4"]
-[ext_resource type="Texture2D" path="res://Assets/Terrain/BigHole2.png" id="5_big_2"]
-[ext_resource type="Texture2D" path="res://Assets/Terrain/BigHole3.png" id="6_big_3"]
-[ext_resource type="Texture2D" path="res://Assets/Terrain/BigHole4.png" id="7_big_4"]
+[ext_resource type="Texture2D" path="res://Assets/Terrain/hole_mask_small.png" id="2_small"]
+[ext_resource type="Texture2D" path="res://Assets/Terrain/hole_mask_medium.png" id="3_medium"]
+[ext_resource type="Texture2D" path="res://Assets/Terrain/hole_mask_large.png" id="4_large"]
+[ext_resource type="Texture2D" path="res://Assets/Terrain/surface_grass.png" id="5_grass"]
 
 [resource]
 script = ExtResource("1_profile")
-layer_tints = PackedColorArray(0.42, 0.32, 0.24, 1, 0.34, 0.25, 0.19, 1, 0.27, 0.2, 0.16, 1, 0.16, 0.13, 0.13, 1)
-layer_z_indices = PackedInt32Array(2, 0, -1, -2)
+layer_tints = PackedColorArray(0.54, 0.41, 0.29, 1, 0.4, 0.29, 0.21, 1, 0.27, 0.19, 0.15, 1, 0.15, 0.12, 0.12, 1, 0.188, 0.157, 0.173, 1, 0.141, 0.125, 0.153, 1)
+gameplay_layer_count = 4
+layer_z_indices = PackedInt32Array(2, 0, -1, -2, -3, -4)
+mask_pixels_per_cell = 6
+grass_texture = ExtResource("5_grass")
 layer_dirt_texture_enabled = true
-layer_dirt_detail_scales_px = PackedFloat32Array(64, 48, 32, 72)
-layer_dirt_detail_colors = PackedColorArray(0.25, 0.19, 0.15, 0.69, 0.2, 0.15, 0.11, 0.66, 0.15, 0.11, 0.09, 0.66, 0.09, 0.07, 0.07, 0.82)
-layer_dirt_variance_strengths = PackedFloat32Array(0.16, 0.15, 0.14, 0.1)
-layer_rock_densities = PackedFloat32Array(0.12, 0.22, 0.45, 0.14)
-layer_rock_detail_strengths = PackedFloat32Array(0.45, 0.5, 0.55, 0.4)
-small_hole_masks = Array[Texture2D]([ExtResource("4_small_4"), ExtResource("3_small_3"), ExtResource("2_small_2"), ExtResource("2_small_2")])
-big_hole_masks = Array[Texture2D]([ExtResource("7_big_4"), ExtResource("6_big_3"), ExtResource("5_big_2"), ExtResource("5_big_2")])
+dirt_shade_steps = 4.0
+sharpen_mask_edges = true
+edge_shade_world_pixels = 3.5
+edge_shade_strength = 0.32
+edge_light_strength = 0.38
+layer_dirt_detail_scales_px = PackedFloat32Array(64, 48, 32, 104, 56, 64)
+layer_dirt_detail_colors = PackedColorArray(0.25, 0.19, 0.15, 0.69, 0.2, 0.15, 0.11, 0.66, 0.15, 0.11, 0.09, 0.66, 0.08, 0.07, 0.08, 0.7, 0.08, 0.06, 0.07, 0.84, 0.06, 0.045, 0.055, 0.86)
+layer_dirt_variance_strengths = PackedFloat32Array(0.16, 0.15, 0.14, 0.18, 0.12, 0.1)
+layer_rock_densities = PackedFloat32Array(0.12, 0.22, 0.45, 0.6, 0.28, 0.22)
+layer_rock_detail_strengths = PackedFloat32Array(0.45, 0.5, 0.55, 0.3, 0.52, 0.48)
+small_hole_masks = Array[Texture2D]([ExtResource("3_medium"), ExtResource("3_medium"), ExtResource("2_small"), ExtResource("2_small"), ExtResource("2_small"), ExtResource("2_small")])
+big_hole_masks = Array[Texture2D]([ExtResource("4_large"), ExtResource("3_medium"), ExtResource("2_small"), ExtResource("2_small"), ExtResource("2_small"), ExtResource("2_small")])
 rim_width = 16
-layer_impact_offsets = PackedVector2Array(-14, -6, 11, 5, -7, 10, 4, -3)
+layer_impact_offsets = PackedVector2Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+layer_impact_scales = PackedFloat32Array(1, 0.95, 0.8, 0.7, 0.64, 0.58)
 keep_back_layer_solid = true
+fracture_line_luminance_threshold = 0.38
+fracture_line_strength = 0.85
+fracture_shade_color = Color(0.14, 0.11, 0.1, 1)
+fracture_line_layer_depth = 1
+fracture_line_depth_falloff = 0.4
+fracture_rim_reach_px = 9.0
 chamber_layer_two_floor_reveal_px = 20.0
 impact_smoke_color = Color(0.52, 0.4, 0.3, 1)
-debris_colors = PackedColorArray(0.42, 0.32, 0.24, 1, 0.34, 0.25, 0.19, 1, 0.27, 0.2, 0.16, 1, 0.16, 0.13, 0.13, 1)
+debris_colors = PackedColorArray(0.42, 0.32, 0.24, 1, 0.34, 0.25, 0.19, 1, 0.27, 0.2, 0.16, 1, 0.16, 0.13, 0.13, 1, 0.188, 0.157, 0.173, 1, 0.141, 0.125, 0.153, 1)

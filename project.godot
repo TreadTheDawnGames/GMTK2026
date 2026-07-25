@@ -55,10 +55,6 @@ aim_right={
 ]
 }
 
-[internationalization]
-
-locale/translations=PackedStringArray("res://addons/maaacks_menus_template/base/translations/menus_translations.en.translation", "res://addons/maaacks_menus_template/base/translations/menus_translations.fr.translation")
-
 [maaacks_menus_template]
 
 disable_install_audio_busses=true
@@ -75,3 +71,4 @@ textures/canvas_textures/default_texture_filter=0
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+environment/defaults/default_clear_color=Color(0.008, 0.006, 0.008, 1)

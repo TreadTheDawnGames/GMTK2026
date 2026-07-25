@@ -1,0 +1,56 @@
+[gd_resource type="Resource" script_class="DialogueConversation" load_steps=13 format=3]
+
+[ext_resource type="Script" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
+[ext_resource type="Script" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
+[ext_resource type="Script" path="res://resources/dialogue/dialogue_line.gd" id="3_line"]
+
+[sub_resource type="Resource" id="Participant_miner"]
+script = ExtResource("2_participant")
+slot = &"miner"
+display_name = "Miner"
+
+[sub_resource type="Resource" id="Participant_rutini"]
+script = ExtResource("2_participant")
+slot = &"rutini"
+display_name = "Rutini the Rat"
+
+[sub_resource type="Resource" id="Line_why"]
+script = ExtResource("3_line")
+speaker_slot = &"rutini"
+text = "Sniffle, sniffle... Wow, why are you here?"
+
+[sub_resource type="Resource" id="Line_miner_one"]
+script = ExtResource("3_line")
+speaker_slot = &"miner"
+text = "..."
+
+[sub_resource type="Resource" id="Line_mining"]
+script = ExtResource("3_line")
+speaker_slot = &"rutini"
+text = "Sniffle, sniffle... I've been mining for days. I can't get enough."
+
+[sub_resource type="Resource" id="Line_thief"]
+script = ExtResource("3_line")
+speaker_slot = &"rutini"
+text = "Are you headed to meet the Thief?"
+
+[sub_resource type="Resource" id="Line_miner_two"]
+script = ExtResource("3_line")
+speaker_slot = &"miner"
+text = "..."
+
+[sub_resource type="Resource" id="Line_party"]
+script = ExtResource("3_line")
+speaker_slot = &"rutini"
+text = "I've heard stories, but I'm headed another 10,000 to a party. Sniffle, sniffle."
+
+[sub_resource type="Resource" id="Line_later"]
+script = ExtResource("3_line")
+speaker_slot = &"rutini"
+text = "Well, catch you later! Keep the pickaxe the crew left behind."
+
+[resource]
+script = ExtResource("1_conversation")
+conversation_id = &"rutini_second"
+participants = Array[ExtResource("2_participant")]([SubResource("Participant_miner"), SubResource("Participant_rutini")])
+lines = Array[ExtResource("3_line")]([SubResource("Line_why"), SubResource("Line_miner_one"), SubResource("Line_mining"), SubResource("Line_thief"), SubResource("Line_miner_two"), SubResource("Line_party"), SubResource("Line_later")])

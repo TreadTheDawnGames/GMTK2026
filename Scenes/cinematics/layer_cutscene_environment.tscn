@@ -1,0 +1,79 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://Scripts/cinematics/layer_cutscene_environment.gd" id="1_environment"]
+[ext_resource type="Script" path="res://Scripts/cinematics/cinematic_terrain_preview.gd" id="2_preview"]
+[ext_resource type="Resource" uid="uid://dhlm43rg16rkw" path="res://resources/mining/mining_config.tres" id="3_config"]
+[ext_resource type="Resource" path="res://resources/mining/default_terrain_layer_profile.tres" id="4_profile"]
+[ext_resource type="Script" uid="uid://b38bkkdjcto5g" path="res://Scripts/mining/terrain_manager.gd" id="5_terrain_manager"]
+[ext_resource type="Script" uid="uid://d3fjog3we4ugh" path="res://Scripts/mining/terrain_layer_renderer.gd" id="6_terrain_renderer"]
+
+[node name="LayerCutsceneEnvironment" type="Node2D" node_paths=PackedStringArray("passage_bounds_root", "passage_bounds_top_left", "passage_bounds_bottom_right", "tunnel_bounds_top_left", "tunnel_bounds_bottom_right", "stage_floor_anchor", "actor_markers_root", "action_markers_root")]
+editor_description = "Reusable tunnel stage entered by the player's real gameplay fall. Source layer 4 is the cutscene destination and deeper strata remain backing."
+process_mode = 3
+z_index = 10
+script = ExtResource("1_environment")
+passage_bounds_root = NodePath("PassageBounds")
+passage_bounds_top_left = NodePath("PassageBounds/TopLeft")
+passage_bounds_bottom_right = NodePath("PassageBounds/BottomRight")
+tunnel_bounds_top_left = NodePath("DestinationStage/TunnelBounds/TopLeft")
+tunnel_bounds_bottom_right = NodePath("DestinationStage/TunnelBounds/BottomRight")
+stage_floor_anchor = NodePath("DestinationStage/StageFloor")
+actor_markers_root = NodePath("DestinationStage/ActorMarkers")
+action_markers_root = NodePath("DestinationStage/ActionMarkers")
+
+[node name="PassageBounds" type="Node2D" parent="."]
+editor_description = "Runtime centers this local marker pair on the qualifying miner impact."
+
+[node name="TopLeft" type="Marker2D" parent="PassageBounds"]
+position = Vector2(-96, -96)
+
+[node name="BottomRight" type="Marker2D" parent="PassageBounds"]
+position = Vector2(96, 96)
+
+[node name="DestinationStage" type="Node2D" parent="."]
+editor_description = "Edit the cutscene room, floor, and concrete actor/action markers here."
+
+[node name="TunnelBounds" type="Node2D" parent="DestinationStage"]
+editor_description = "The production destination stratum is opened inside this normalized marker pair."
+
+[node name="TopLeft" type="Marker2D" parent="DestinationStage/TunnelBounds"]
+position = Vector2(-180, 126)
+
+[node name="BottomRight" type="Marker2D" parent="DestinationStage/TunnelBounds"]
+position = Vector2(956, 448)
+
+[node name="StageFloor" type="Marker2D" parent="DestinationStage"]
+editor_description = "Only x is authoritative; runtime grounds y on the opened production mask."
+position = Vector2(540, 448)
+
+[node name="ActorMarkers" type="Node2D" parent="DestinationStage"]
+editor_description = "Concrete cutscenes add actor spawn, pause, and exit markers under this root."
+
+[node name="ActionMarkers" type="Node2D" parent="DestinationStage"]
+editor_description = "Concrete cutscenes add interaction targets and action markers under this root."
+
+[node name="EditorTerrainPreview" type="Node2D" parent="." node_paths=PackedStringArray("terrain_manager", "terrain_renderer", "test_impacts_root")]
+z_index = -100
+editor_description = "Editor-only. Runs the production TerrainManager and TerrainLayerRenderer so this scene shows the terrain it really plays against, and digs a real tunnel at every TestImpacts marker. It frees itself in a running game and nothing reads from it."
+script = ExtResource("2_preview")
+terrain_manager = NodePath("TerrainManager")
+terrain_renderer = NodePath("TerrainLayerRenderer")
+test_impacts_root = NodePath("TestImpacts")
+preview_depth_rows = 400
+preview_combo = 8
+
+[node name="TerrainManager" type="Node" parent="EditorTerrainPreview"]
+script = ExtResource("5_terrain_manager")
+config = ExtResource("3_config")
+
+[node name="TerrainLayerRenderer" type="Node2D" parent="EditorTerrainPreview" node_paths=PackedStringArray("terrain_manager")]
+script = ExtResource("6_terrain_renderer")
+terrain_manager = NodePath("../TerrainManager")
+profile = ExtResource("4_profile")
+preview_in_editor = true
+
+[node name="TestImpacts" type="Node2D" parent="EditorTerrainPreview"]
+editor_description = "Each Marker2D here is dug with a real hit. Drag one to move the opening, duplicate for more, delete to heal the rock."
+
+[node name="EntryImpact" type="Marker2D" parent="EditorTerrainPreview/TestImpacts"]
+position = Vector2(576, 260)

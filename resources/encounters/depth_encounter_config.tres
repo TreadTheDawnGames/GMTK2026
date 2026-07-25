@@ -2,20 +2,21 @@
 
 [ext_resource type="Script" path="res://resources/encounters/depth_encounter_config.gd" id="1_config"]
 [ext_resource type="Script" path="res://resources/encounters/depth_character_encounter.gd" id="2_encounter_type"]
-[ext_resource type="Resource" path="res://resources/encounters/stone_character_encounter.tres" id="3_stone"]
-[ext_resource type="Resource" path="res://resources/encounters/swift_character_encounter.tres" id="4_swift"]
-[ext_resource type="Resource" path="res://resources/encounters/excavator_character_encounter.tres" id="5_excavator"]
-[ext_resource type="Resource" path="res://resources/encounters/heavy_character_encounter.tres" id="6_heavy"]
+[ext_resource type="Resource" path="res://resources/encounters/cheese_girl_first_encounter.tres" id="3_cheese_girl"]
+[ext_resource type="Resource" path="res://resources/encounters/treasure_hunter_first_encounter.tres" id="4_treasure_first"]
+[ext_resource type="Resource" path="res://resources/encounters/rutini_first_encounter.tres" id="5_rutini_first"]
+[ext_resource type="Resource" path="res://resources/encounters/treasure_hunter_second_encounter.tres" id="6_treasure_second"]
 [ext_resource type="Resource" path="res://resources/encounters/thief_final_encounter.tres" id="7_thief"]
-[ext_resource type="Resource" path="res://resources/encounters/traveler_return_encounter.tres" id="8_traveler_return"]
-[ext_resource type="Resource" path="res://resources/encounters/magnetic_character_encounter.tres" id="9_magnetic"]
-[ext_resource type="Resource" path="res://resources/encounters/seismic_character_encounter.tres" id="10_seismic"]
-[ext_resource type="Resource" path="res://resources/encounters/echo_character_encounter.tres" id="11_echo"]
-[ext_resource type="Resource" path="res://resources/encounters/thiefbreaker_character_encounter.tres" id="12_thiefbreaker"]
+[ext_resource type="Resource" path="res://resources/encounters/moody_teen_first_encounter.tres" id="8_moody_teen"]
+[ext_resource type="Resource" path="res://resources/encounters/rutini_second_encounter.tres" id="9_rutini_second"]
+[ext_resource type="Resource" path="res://resources/encounters/treasure_hunter_treasure_encounter.tres" id="10_treasure_treasure"]
+[ext_resource type="Resource" path="res://resources/encounters/coffee_cat_first_encounter.tres" id="11_coffee_cat"]
+[ext_resource type="Resource" path="res://resources/encounters/cloak_lantern_warning_encounter.tres" id="12_cloak_lantern"]
 [ext_resource type="Resource" path="res://resources/encounters/cast_farewell_encounter.tres" id="13_farewell"]
 
 [resource]
 script = ExtResource("1_config")
 chamber_height_rows = 24
 chamber_ceiling_inset_cells = 12
-encounters = Array[ExtResource("2_encounter_type")]([ExtResource("3_stone"), ExtResource("4_swift"), ExtResource("5_excavator"), ExtResource("6_heavy"), ExtResource("8_traveler_return"), ExtResource("9_magnetic"), ExtResource("10_seismic"), ExtResource("11_echo"), ExtResource("12_thiefbreaker"), ExtResource("13_farewell"), ExtResource("7_thief")])
+farewell_actor_ids = Array[StringName]([&"cheese_girl", &"treasure_hunter", &"rutini", &"moody_teen", &"coffee_cat", &"cloak_lantern"])
+encounters = Array[ExtResource("2_encounter_type")]([ExtResource("3_cheese_girl"), ExtResource("4_treasure_first"), ExtResource("5_rutini_first"), ExtResource("6_treasure_second"), ExtResource("8_moody_teen"), ExtResource("9_rutini_second"), ExtResource("10_treasure_treasure"), ExtResource("11_coffee_cat"), ExtResource("12_cloak_lantern"), ExtResource("13_farewell"), ExtResource("7_thief")])

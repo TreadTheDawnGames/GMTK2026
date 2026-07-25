@@ -1,61 +1,71 @@
 class_name DialogueDirector
 extends CanvasLayer
 
-## Displays and advances one conversation at a time.
+## Presents and advances one conversation through the in-universe dialogue box.
+
+const CinematicFrameType = preload(
+	"res://Scripts/dialogue/cinematic_frame.gd"
+)
+const SILENT_MINER_SLOT: StringName = &"miner"
+const SILENT_MINER_TEXT := "..."
 
 signal conversation_started(conversation_id: StringName)
 signal line_presented(
 	conversation_id: StringName,
 	line_index: int,
-	speaker_slot: StringName
+	speaker_slot: StringName,
+	speaker_pose: StringName
 )
 signal conversation_finished(conversation_id: StringName)
+signal cinematic_frame_opened
+signal cinematic_frame_closed
 
+@export_category("Behavior")
 @export var pause_gameplay: bool = true
+@export var auto_frame_conversations: bool = true
+
+@export_category("References")
 @export var dialogue_root: Control
+@export var bottom_panel: Control
 @export var speaker_label: Label
 @export var body_label: RichTextLabel
 @export var continue_label: Label
+@export var cinematic_frame: CinematicFrameType
 
-@export var character_display_speed : float = 0.03
-
-@export var characters_for_slowest_time : Array[String] = ["."]
-@export var characters_for_slower : Array[String] = [","]
+@export_category("Typewriter")
+@export_range(0.001, 0.2, 0.001) var character_display_speed: float = 0.03
+@export var characters_for_slowest_time: Array[String] = ["."]
+@export var characters_for_slower: Array[String] = [","]
 
 var _active_conversation: DialogueConversation
 var _current_line_index: int = -1
 var _presentation_token: int = 0
 var _tree_was_paused: bool = false
+var _keep_frame_open_after_conversation: bool = false
+var _references_valid: bool = false
 
 
-## Hides the dialogue box when the scene loads.
+## Starts hidden and owns the internal presentation signal connections.
 func _ready() -> void:
-	dialogue_root.hide()
-	
-## An attempt at displaying characters one at a time
-func show_next_character():
-	if not visible:
-		body_label.visible_characters = 0
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	_references_valid = _validate_references()
+	if not _references_valid:
+		push_error("DialogueDirector references are incomplete.")
 		return
-	if body_label.visible_characters < body_label.text.length():
-		body_label.visible_characters += 1
-		get_tree().create_timer(character_delay(body_label.text[body_label.visible_characters-1])).timeout.connect(show_next_character, CONNECT_ONE_SHOT)
-
-func character_delay(letter : String) -> float:
-	if letter.length() > 1:
-		return character_display_speed
-	
-	var display_speed : float = character_display_speed
-	
-	if characters_for_slowest_time.has(letter):
-		display_speed *= 5
-	elif characters_for_slower.has(letter):
-		display_speed *= 3
-	
-	return display_speed
+	dialogue_root.hide()
+	# CinematicFrame owns its own opening state so a scene handed over from a
+	# faded-to-black menu can start fully covered.
+	_connect_once(
+		cinematic_frame.frame_opened,
+		_on_cinematic_frame_opened
+	)
+	_connect_once(
+		cinematic_frame.frame_closed,
+		_on_cinematic_frame_closed
+	)
 
 
-## Advances dialogue when the player presses Space, Enter, or left click.
+## Advances active dialogue from keyboard or mouse input.
 func _unhandled_input(event: InputEvent) -> void:
 	var is_continue_press := event.is_action_pressed(&"ui_accept")
 	if event is InputEventMouseButton:
@@ -71,15 +81,23 @@ func _unhandled_input(event: InputEvent) -> void:
 	):
 		return
 	get_viewport().set_input_as_handled()
-	if body_label.visible_characters == body_label.text.length():
+	if _get_visible_character_count() >= _get_current_text_length():
 		advance()
 	else:
-		body_label.visible_characters = body_label.text.length()
+		_set_visible_character_count(_get_current_text_length())
 
 
 ## Validates and starts a conversation. Returns whether it started.
-func start_conversation(conversation: DialogueConversation) -> bool:
-	if conversation == null or is_conversation_active():
+## The optional hold keeps the frame open for a linked action or conversation.
+func start_conversation(
+	conversation: DialogueConversation,
+	keep_frame_open_after_finish: bool = false
+) -> bool:
+	if (
+		not _references_valid
+		or conversation == null
+		or is_conversation_active()
+	):
 		return false
 
 	var validation_errors := conversation.validate()
@@ -94,7 +112,10 @@ func start_conversation(conversation: DialogueConversation) -> bool:
 	_current_line_index = 0
 	_presentation_token += 1
 	_tree_was_paused = get_tree().paused
+	_keep_frame_open_after_conversation = keep_frame_open_after_finish
 	dialogue_root.show()
+	if auto_frame_conversations:
+		open_cinematic_frame()
 	if pause_gameplay:
 		get_tree().paused = true
 	conversation_started.emit(conversation.conversation_id)
@@ -119,10 +140,14 @@ func finish_conversation() -> void:
 	if not is_conversation_active():
 		return
 	var finished_id := _active_conversation.conversation_id
+	var keep_frame_open := _keep_frame_open_after_conversation
 	_presentation_token += 1
 	_active_conversation = null
 	_current_line_index = -1
+	_keep_frame_open_after_conversation = false
 	dialogue_root.hide()
+	if auto_frame_conversations and not keep_frame_open:
+		close_cinematic_frame()
 	if pause_gameplay:
 		get_tree().paused = _tree_was_paused
 	conversation_finished.emit(finished_id)
@@ -133,25 +158,100 @@ func is_conversation_active() -> bool:
 	return _active_conversation != null
 
 
-## Displays the current speaker and line.
+## Slides the authored letterbox bars into view.
+func open_cinematic_frame(instant: bool = false) -> void:
+	if cinematic_frame != null:
+		cinematic_frame.open_frame(instant)
+
+
+## Slides the authored letterbox bars out of view.
+func close_cinematic_frame(instant: bool = false) -> void:
+	if cinematic_frame != null:
+		cinematic_frame.close_frame(instant)
+
+
+## Splits an opening blackout apart into the authored letterbox.
+func reveal_cinematic_frame_from_blackout(instant: bool = false) -> void:
+	if cinematic_frame != null:
+		cinematic_frame.reveal_from_blackout(instant)
+
+
+## Suspends until an opening blackout has finished splitting apart.
+func wait_until_blackout_revealed() -> void:
+	if cinematic_frame == null:
+		return
+	await cinematic_frame.wait_until_blackout_revealed()
+
+
+## Suspends until framing has finished, or returns immediately if already open.
+func wait_until_frame_open() -> void:
+	if cinematic_frame == null or cinematic_frame.is_open():
+		return
+	await cinematic_frame_opened
+
+
+## Suspends until framing has cleared, or returns immediately if already closed.
+func wait_until_frame_closed() -> void:
+	if cinematic_frame == null or cinematic_frame.is_closed():
+		return
+	await cinematic_frame_closed
+
+
+## Reveals one more character if this line is still current.
+func _show_next_character(token: int) -> void:
+	if not is_conversation_active() or token != _presentation_token:
+		return
+	var visible_count := _get_visible_character_count()
+	var text_length := _get_current_text_length()
+	if visible_count >= text_length:
+		return
+	visible_count += 1
+	_set_visible_character_count(visible_count)
+	var current_text := body_label.text
+	var delay := character_delay(current_text[visible_count - 1])
+	await get_tree().create_timer(delay, true).timeout
+	_show_next_character(token)
+
+
+## Returns the typewriter delay for a revealed character.
+func character_delay(letter: String) -> float:
+	if letter.length() > 1:
+		return character_display_speed
+	var display_speed := character_display_speed
+	if characters_for_slowest_time.has(letter):
+		display_speed *= 5.0
+	elif characters_for_slower.has(letter):
+		display_speed *= 3.0
+	return display_speed
+
+
+## Displays the current speaker and line through the bottom dialogue box.
 func _present_current_line() -> void:
 	var line := _active_conversation.lines[_current_line_index]
-	speaker_label.text = (
+	var display_name := (
 		_active_conversation.get_participant_display_name(line.speaker_slot)
 	)
-	body_label.text = line.text
-	body_label.visible_characters = 0
-	show_next_character()
-	
-	continue_label.text = (
+	var continue_text := (
 		"Continuing..."
 		if line.auto_advance_delay_seconds > 0.0
 		else "Space / Enter / Left Click"
 	)
+	var presented_text := (
+		SILENT_MINER_TEXT
+		if line.speaker_slot == SILENT_MINER_SLOT
+		else line.text
+	)
+	speaker_label.text = display_name
+	body_label.text = presented_text
+	continue_label.text = continue_text
+	_set_visible_character_count(0)
+	_show_next_character(_presentation_token)
+
 	line_presented.emit(
 		_active_conversation.conversation_id,
 		_current_line_index,
-		line.speaker_slot
+		line.speaker_slot,
+		line.speaker_pose
 	)
 	if line.auto_advance_delay_seconds > 0.0:
 		_auto_advance_after_delay(
@@ -165,3 +265,39 @@ func _auto_advance_after_delay(delay_seconds: float, token: int) -> void:
 	await get_tree().create_timer(delay_seconds, true).timeout
 	if is_conversation_active() and token == _presentation_token:
 		advance()
+
+
+func _set_visible_character_count(value: int) -> void:
+	body_label.visible_characters = value
+
+
+func _get_visible_character_count() -> int:
+	return body_label.visible_characters
+
+
+func _get_current_text_length() -> int:
+	return body_label.text.length()
+
+
+func _connect_once(source_signal: Signal, callback: Callable) -> void:
+	if not source_signal.is_connected(callback):
+		source_signal.connect(callback)
+
+
+func _validate_references() -> bool:
+	return (
+		dialogue_root != null
+		and bottom_panel != null
+		and speaker_label != null
+		and body_label != null
+		and continue_label != null
+		and cinematic_frame != null
+	)
+
+
+func _on_cinematic_frame_opened() -> void:
+	cinematic_frame_opened.emit()
+
+
+func _on_cinematic_frame_closed() -> void:
+	cinematic_frame_closed.emit()

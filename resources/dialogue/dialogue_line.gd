@@ -5,5 +5,8 @@ extends Resource
 ## player; a positive value advances after that many seconds.
 
 @export var speaker_slot: StringName
+@export var speaker_pose: StringName
+## Optional same-named AnimationPlayer cue on the active encounter stage.
+@export var stage_cue: StringName
 @export_multiline var text: String
 @export_range(0.0, 30.0, 0.1) var auto_advance_delay_seconds: float = 0.0

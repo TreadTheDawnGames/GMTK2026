@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="DialogueConversation" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
+[ext_resource type="Script" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
+[ext_resource type="Script" path="res://resources/dialogue/dialogue_line.gd" id="3_line"]
+
+[sub_resource type="Resource" id="Participant_rat"]
+script = ExtResource("2_participant")
+slot = &"rat"
+display_name = "Rutini the Rat"
+
+[sub_resource type="Resource" id="Line_warning"]
+script = ExtResource("3_line")
+speaker_slot = &"rat"
+text = "Whoa! Sorry to break it to you, but this path is in use."
+
+[sub_resource type="Resource" id="Line_crew"]
+script = ExtResource("3_line")
+speaker_slot = &"rat"
+text = "Come on, boys! We'll find that Cheese Café soon enough!"
+
+[resource]
+script = ExtResource("1_conversation")
+conversation_id = &"rat_miner_warning"
+participants = Array[ExtResource("2_participant")]([SubResource("Participant_rat")])
+lines = Array[ExtResource("3_line")]([SubResource("Line_warning"), SubResource("Line_crew")])

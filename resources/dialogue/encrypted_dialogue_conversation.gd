@@ -52,6 +52,9 @@ func decrypt_conversation() -> DialogueConversation:
 		line.speaker_slot = StringName(
 			str(line_data.get("speaker_slot", ""))
 		)
+		line.speaker_pose = StringName(
+			str(line_data.get("speaker_pose", ""))
+		)
 		line.text = str(line_data.get("text", ""))
 		line.auto_advance_delay_seconds = float(
 			line_data.get("auto_advance_delay_seconds", 0.0)

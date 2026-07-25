@@ -1,6 +1,8 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://Scripts/dialogue/character_presenter.gd" id="1_presenter"]
+[ext_resource type="Script" path="res://Scripts/dialogue/speech_reaction.gd" id="2_speech"]
+[ext_resource type="Script" path="res://Scripts/actors/actor_sprite_view.gd" id="3_pose_view"]
 
 [sub_resource type="Animation" id="Animation_idle_reset"]
 resource_name = "RESET"
@@ -40,15 +42,29 @@ _data = {
 &"idle": SubResource("Animation_idle")
 }
 
-[node name="CharacterPresenter" type="Node2D" node_paths=PackedStringArray("character_sprite")]
+[node name="CharacterPresenter" type="Node2D" node_paths=PackedStringArray("character_sprite", "actor_sprite_view", "speech_reaction")]
 editor_description = "Shared character presentation. Edit the idle clip in AnimationPlayer; dialogue bounce stays on CharacterSprite so both motions can play together."
 process_mode = 3
 script = ExtResource("1_presenter")
-character_sprite = NodePath("IdleRoot/CharacterSprite")
+character_sprite = NodePath("IdleRoot/SpeechRoot/CharacterSprite")
+actor_sprite_view = NodePath("ActorSpriteView")
+speech_reaction = NodePath("SpeechReaction")
 
 [node name="IdleRoot" type="Node2D" parent="."]
 
-[node name="CharacterSprite" type="Sprite2D" parent="IdleRoot"]
+[node name="SpeechRoot" type="Node2D" parent="IdleRoot"]
+
+[node name="CharacterSprite" type="Sprite2D" parent="IdleRoot/SpeechRoot"]
+texture_filter = 4
+
+[node name="ActorSpriteView" type="Node" parent="." node_paths=PackedStringArray("actor_sprite")]
+editor_description = "Optional named pose presentation. Assign a pose set on actor-specific scene instances; an empty set preserves CharacterAppearance exactly."
+script = ExtResource("3_pose_view")
+actor_sprite = NodePath("../IdleRoot/SpeechRoot/CharacterSprite")
+
+[node name="SpeechReaction" type="Node" parent="." node_paths=PackedStringArray("visual_root")]
+script = ExtResource("2_speech")
+visual_root = NodePath("../IdleRoot/SpeechRoot")
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="."]
 autoplay = "idle"

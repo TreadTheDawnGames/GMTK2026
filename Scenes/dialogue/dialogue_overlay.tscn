@@ -1,29 +1,76 @@
-[gd_scene format=3 uid="uid://bwnqpopl5iayr"]
+[gd_scene load_steps=6 format=3 uid="uid://bwnqpopl5iayr"]
 
 [ext_resource type="Script" uid="uid://1h124vfbvc4" path="res://Scripts/dialogue/dialogue_director.gd" id="1_director"]
+[ext_resource type="Script" path="res://Scripts/dialogue/cinematic_frame.gd" id="2_frame"]
+[ext_resource type="Shader" path="res://Shaders/cinematic_iris.gdshader" id="4_iris"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_dialogue"]
-bg_color = Color(0.035, 0.035, 0.045, 0.94)
-border_width_left = 3
-border_width_top = 3
-border_width_right = 3
-border_width_bottom = 3
-border_color = Color(0.92, 0.92, 0.92, 1)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
+bg_color = Color(0.075, 0.055, 0.047, 0.97)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.62, 0.37, 0.18, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+shadow_color = Color(0, 0, 0, 0.48)
+shadow_size = 9
 
-[node name="DialogueDirector" type="CanvasLayer" unique_id=1373788107 node_paths=PackedStringArray("dialogue_root", "speaker_label", "body_label", "continue_label")]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_iris"]
+resource_local_to_scene = true
+shader = ExtResource("4_iris")
+
+[node name="DialogueDirector" type="CanvasLayer" unique_id=1373788107 node_paths=PackedStringArray("dialogue_root", "bottom_panel", "speaker_label", "body_label", "continue_label", "cinematic_frame")]
 process_mode = 3
 layer = 20
 script = ExtResource("1_director")
 dialogue_root = NodePath("DialogueRoot")
-speaker_label = NodePath("DialogueRoot/Panel/Margin/Content/SpeakerLabel")
-body_label = NodePath("DialogueRoot/Panel/Margin/Content/BodyLabel")
-continue_label = NodePath("DialogueRoot/Panel/Margin/Content/ContinueLabel")
+bottom_panel = NodePath("DialogueRoot/BottomPanel")
+speaker_label = NodePath("DialogueRoot/BottomPanel/Margin/Content/SpeakerLabel")
+body_label = NodePath("DialogueRoot/BottomPanel/Margin/Content/BodyLabel")
+continue_label = NodePath("DialogueRoot/BottomPanel/Margin/Content/ContinueLabel")
+cinematic_frame = NodePath("CinematicFrame")
+
+[node name="CinematicFrame" type="Control" parent="." node_paths=PackedStringArray("iris_overlay", "top_bar", "bottom_bar")]
+process_mode = 3
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2_frame")
+starts_blacked_out = true
+iris_overlay = NodePath("IrisMask")
+top_bar = NodePath("TopBar")
+bottom_bar = NodePath("BottomBar")
+
+[node name="IrisMask" type="ColorRect" parent="CinematicFrame"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+material = SubResource("ShaderMaterial_iris")
+
+[node name="TopBar" type="ColorRect" parent="CinematicFrame"]
+layout_mode = 0
+mouse_filter = 2
+color = Color(0.008, 0.006, 0.008, 1)
+
+[node name="BottomBar" type="ColorRect" parent="CinematicFrame"]
+layout_mode = 0
+mouse_filter = 2
+color = Color(0.008, 0.006, 0.008, 1)
 
 [node name="DialogueRoot" type="Control" parent="." unique_id=265472886]
+process_mode = 3
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -32,7 +79,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 1
 
-[node name="Panel" type="PanelContainer" parent="DialogueRoot" unique_id=1586836139]
+[node name="BottomPanel" type="PanelContainer" parent="DialogueRoot" unique_id=1586836139]
 layout_mode = 1
 anchors_preset = 12
 anchor_top = 1.0
@@ -46,32 +93,34 @@ grow_horizontal = 2
 grow_vertical = 0
 theme_override_styles/panel = SubResource("StyleBox_dialogue")
 
-[node name="Margin" type="MarginContainer" parent="DialogueRoot/Panel" unique_id=1636964935]
+[node name="Margin" type="MarginContainer" parent="DialogueRoot/BottomPanel" unique_id=1636964935]
 layout_mode = 2
 theme_override_constants/margin_left = 22
 theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 22
 theme_override_constants/margin_bottom = 14
 
-[node name="Content" type="VBoxContainer" parent="DialogueRoot/Panel/Margin" unique_id=1906505661]
+[node name="Content" type="VBoxContainer" parent="DialogueRoot/BottomPanel/Margin" unique_id=1906505661]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="SpeakerLabel" type="Label" parent="DialogueRoot/Panel/Margin/Content" unique_id=316394064]
+[node name="SpeakerLabel" type="Label" parent="DialogueRoot/BottomPanel/Margin/Content" unique_id=316394064]
 layout_mode = 2
+theme_override_colors/font_color = Color(0.94, 0.66, 0.31, 1)
 theme_override_font_sizes/font_size = 24
 text = "Speaker"
 
-[node name="BodyLabel" type="RichTextLabel" parent="DialogueRoot/Panel/Margin/Content" unique_id=104233342]
+[node name="BodyLabel" type="RichTextLabel" parent="DialogueRoot/BottomPanel/Margin/Content" unique_id=104233342]
 custom_minimum_size = Vector2(0, 72)
 layout_mode = 2
 size_flags_vertical = 3
+theme_override_colors/default_color = Color(0.93, 0.86, 0.72, 1)
 theme_override_font_sizes/normal_font_size = 20
 text = "Dialogue text"
 fit_content = true
 scroll_active = false
 
-[node name="ContinueLabel" type="Label" parent="DialogueRoot/Panel/Margin/Content" unique_id=2123947753]
+[node name="ContinueLabel" type="Label" parent="DialogueRoot/BottomPanel/Margin/Content" unique_id=2123947753]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.72, 0.72, 0.76, 1)
 text = "Space / Enter"

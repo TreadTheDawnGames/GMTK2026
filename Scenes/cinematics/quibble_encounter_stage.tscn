@@ -1,0 +1,8 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
+[ext_resource type="Script" path="res://Scripts/cinematics/quibble_encounter_stage.gd" id="2_quibble"]
+
+[node name="QuibbleEncounterStage" instance=ExtResource("1_stage")]
+script = ExtResource("2_quibble")
+hide_actor_after_closing = true

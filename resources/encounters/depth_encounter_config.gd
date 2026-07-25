@@ -18,6 +18,8 @@ extends Resource
 @export_category("Flow")
 ## Waits before the timing bar accepts input after dialogue.
 @export_range(0.0, 5.0, 0.1) var post_dialogue_buffer_seconds: float = 0.5
+## Stable identities gathered and departed in this authored order.
+@export var farewell_actor_ids: Array[StringName] = []
 
 
 ## Reports whether a terrain row belongs to any encounter chamber.

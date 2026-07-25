@@ -18,6 +18,7 @@
 [ext_resource type="PackedScene" uid="uid://ce2kgb3fjtjut" path="res://Scenes/Options.tscn" id="22_a0hll"]
 [ext_resource type="Script" uid="uid://boq33gsihoh51" path="res://Scripts/ui/playtime_reveal.gd" id="22_playtime_reveal"]
 [ext_resource type="Script" uid="uid://b54eqv80difeg" path="res://Scripts/mining/mining_scene_wiring.gd" id="25_wiring"]
+[ext_resource type="Script" path="res://Scripts/mining/breakthrough_target_highlight.gd" id="26_target_highlight"]
 [ext_resource type="Script" uid="uid://7cxed37q80pf" path="res://Scripts/mining/dig_number_presenter.gd" id="30_dig_number_presenter"]
 [ext_resource type="PackedScene" uid="uid://faai1irb202y" path="res://Scenes/mining/dig_number.tscn" id="31_dig_number"]
 [ext_resource type="Script" uid="uid://d3fjog3we4ugh" path="res://Scripts/mining/terrain_layer_renderer.gd" id="32_layer_renderer"]
@@ -28,7 +29,29 @@
 [ext_resource type="PackedScene" path="res://Scenes/dialogue/departure_choice.tscn" id="41_departure_choice"]
 [ext_resource type="Script" uid="uid://vrpny10f1lau" path="res://Scripts/dialogue/run_intro_controller.gd" id="42_intro_controller"]
 [ext_resource type="Resource" uid="uid://dt1ue7jav8nj4" path="res://resources/dialogue/run_intro.tres" id="43_intro_conversation"]
-[ext_resource type="Resource" path="res://resources/encounters/traveler_character_appearance.tres" id="44_intro_appearance"]
+[ext_resource type="Resource" path="res://resources/encounters/old_miner_character_appearance.tres" id="44_intro_appearance"]
+[ext_resource type="Script" path="res://Scripts/mining/mining_cinematic_flow.gd" id="45_cinematic_flow"]
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/layer_breakthrough_sequence.tscn" id="46_breakthrough_sequence"]
+[ext_resource type="Script" path="res://Scripts/mining/layer_breakthrough_controller.gd" id="47_breakthrough_controller"]
+[ext_resource type="Resource" path="res://resources/dialogue/rat_miner_warning.tres" id="48_rat_warning"]
+[ext_resource type="Resource" path="res://resources/dialogue/rat_miner_response.tres" id="49_miner_response"]
+[ext_resource type="PackedScene" path="res://Scenes/dialogue/final_encounter.tscn" id="50_final_encounter"]
+[ext_resource type="Resource" path="res://resources/dialogue/rat_cave_discovery.tres" id="51_discovery"]
+[ext_resource type="Script" path="res://Scripts/mining/surface_presentation.gd" id="52_surface_presentation"]
+[ext_resource type="Shader" path="res://Shaders/surface_sky.gdshader" id="53_surface_sky"]
+[ext_resource type="Shader" path="res://Shaders/sunlight_wash.gdshader" id="55_sunlight_wash"]
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/arrival_intro.tscn" id="56_arrival_intro"]
+[ext_resource type="Script" path="res://Scripts/mining/run_timeline.gd" id="57_run_timeline"]
+[ext_resource type="Script" uid="uid://vm58e0gjcupp" path="res://Scripts/mining/gem_outcrop_field.gd" id="58_gem_field"]
+[ext_resource type="Texture2D" uid="uid://ding6yepfwaw4" path="res://Assets/Props/gem_crystals.png" id="59_gem_crystals"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_surface_sky"]
+resource_local_to_scene = true
+shader = ExtResource("53_surface_sky")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sunlight_wash"]
+resource_local_to_scene = true
+shader = ExtResource("55_sunlight_wash")
 
 [node name="GameRoot" type="Node" unique_id=1769413368]
 
@@ -37,12 +60,13 @@
 [node name="ImpactCamera" type="Camera2D" parent="MiningScene" unique_id=1747921436]
 position = Vector2(576, 324)
 
-[node name="Background" type="ColorRect" parent="MiningScene" unique_id=1093987671]
+[node name="SurfaceSky" type="ColorRect" parent="MiningScene" unique_id=1093987671]
+editor_description = "Daylight sky and sun behind everything. Below the ground line it collapses to the underground void color, so descending looks unchanged. SurfacePresentation drives its horizon."
 z_index = -10
+material = SubResource("ShaderMaterial_surface_sky")
 offset_right = 1152.0
 offset_bottom = 648.0
 mouse_filter = 2
-color = Color(0.075, 0.095, 0.13, 1)
 
 [node name="TerrainManager" type="Node" parent="MiningScene" unique_id=381932075]
 script = ExtResource("3_terrain")
@@ -54,15 +78,21 @@ script = ExtResource("32_layer_renderer")
 terrain_manager = NodePath("../TerrainManager")
 profile = ExtResource("33_layer_profile")
 
+[node name="ArrivalIntro" parent="MiningScene" node_paths=PackedStringArray("miner_rig", "surface_presentation", "terrain_renderer") instance=ExtResource("56_arrival_intro")]
+miner_rig = NodePath("../MinerRig")
+surface_presentation = NodePath("../Systems/SurfacePresentation")
+terrain_renderer = NodePath("../TerrainLayerRenderer")
+
 [node name="MinerRig" parent="MiningScene" unique_id=726963260 instance=ExtResource("7_miner_rig")]
 z_index = 1
 
-[node name="IntroGuide" parent="MiningScene" unique_id=124219569 instance=ExtResource("34_character_presenter")]
-z_index = 2
-position = Vector2(760, 260)
-
 [node name="CharacterLayer" type="Node2D" parent="MiningScene" unique_id=1096715694]
 z_index = 1
+
+[node name="LayerBreakthroughSequence" parent="MiningScene" node_paths=PackedStringArray("miner_rig", "terrain_renderer", "miner_iris_anchor") instance=ExtResource("46_breakthrough_sequence")]
+miner_rig = NodePath("../MinerRig")
+terrain_renderer = NodePath("../TerrainLayerRenderer")
+miner_iris_anchor = NodePath("../MinerRig/VisualRoot/CinematicFocusAnchor")
 
 [node name="MiningHitParticles" parent="MiningScene" unique_id=1668060940 node_paths=PackedStringArray("terrain_manager") instance=ExtResource("10_hit_particles")]
 z_index = 3
@@ -75,9 +105,25 @@ terrain_manager = NodePath("../TerrainManager")
 terrain_renderer = NodePath("../TerrainLayerRenderer")
 view_controller = NodePath("../Systems/ViewController")
 
+[node name="GemOutcropField" type="Node2D" parent="MiningScene" node_paths=PackedStringArray("terrain_manager", "terrain_renderer")]
+editor_description = "Rarely leaves a drawn crystal jutting out of a stratum a hit just cut through, and stands authored ones for cutscenes. It builds one drawing shelf per stratum and sits after the terrain renderer, so each crystal is covered by the layers still standing in front of it."
+script = ExtResource("58_gem_field")
+terrain_manager = NodePath("../TerrainManager")
+terrain_profile = ExtResource("33_layer_profile")
+terrain_renderer = NodePath("../TerrainLayerRenderer")
+gem_texture = ExtResource("59_gem_crystals")
+
+[node name="SunlightWash" type="ColorRect" parent="MiningScene"]
+editor_description = "Additive daylight pool under the sun. It draws above the cast so sunlight touches the characters too. SurfacePresentation drives its horizon."
+z_index = 6
+material = SubResource("ShaderMaterial_sunlight_wash")
+offset_right = 1152.0
+offset_bottom = 648.0
+mouse_filter = 2
+
 [node name="Systems" type="Node" parent="MiningScene" unique_id=1573949011]
 
-[node name="SceneWiring" type="Node" parent="MiningScene/Systems" unique_id=1434760342 node_paths=PackedStringArray("mining_controller", "timing_bridge", "view_controller", "terrain_manager", "terrain_renderer", "miner_rig", "hit_particles", "impact_smoke", "dig_number_presenter", "impact_shake", "pickaxe_progression", "hud", "timing_window", "depth_review_control", "encounter_controller", "intro_controller", "dialogue_director", "departure_choice")]
+[node name="SceneWiring" type="Node" parent="MiningScene/Systems" unique_id=1434760342 node_paths=PackedStringArray("mining_controller", "timing_bridge", "view_controller", "terrain_manager", "terrain_renderer", "miner_rig", "hit_particles", "gem_outcrop_field", "impact_smoke", "dig_number_presenter", "impact_shake", "pickaxe_progression", "cinematic_flow", "run_timeline", "layer_breakthrough_controller", "layer_breakthrough_sequence", "breakthrough_target_highlight", "hud", "playtime_reveal", "timing_window", "depth_review_control", "encounter_controller", "intro_controller", "dialogue_director", "departure_choice", "final_encounter_controller")]
 script = ExtResource("25_wiring")
 mining_controller = NodePath("../MiningController")
 timing_bridge = NodePath("../TimingBridge")
@@ -86,20 +132,33 @@ terrain_manager = NodePath("../../TerrainManager")
 terrain_renderer = NodePath("../../TerrainLayerRenderer")
 miner_rig = NodePath("../../MinerRig")
 hit_particles = NodePath("../../MiningHitParticles")
+gem_outcrop_field = NodePath("../../GemOutcropField")
 impact_smoke = NodePath("../../MiningImpactSmoke")
 dig_number_presenter = NodePath("../../../DigNumberPresenter")
 impact_shake = NodePath("../ImpactShake")
 pickaxe_progression = NodePath("../PickaxeProgression")
+cinematic_flow = NodePath("../CinematicFlow")
+run_timeline = NodePath("../RunTimeline")
+layer_breakthrough_controller = NodePath("../LayerBreakthroughController")
+layer_breakthrough_sequence = NodePath("../../LayerBreakthroughSequence")
+breakthrough_target_highlight = NodePath("../BreakthroughTargetHighlight")
 hud = NodePath("../../HUD")
+playtime_reveal = NodePath("../../HUD/PlaytimeReveal")
 timing_window = NodePath("../../HUD/TimingWindow")
 depth_review_control = NodePath("../../HUD/DepthReviewControl")
 encounter_controller = NodePath("../UpgradeEncounterController")
 intro_controller = NodePath("../RunIntroController")
 dialogue_director = NodePath("../../../DialogueDirector")
 departure_choice = NodePath("../../../DepartureChoice")
+final_encounter_controller = NodePath("../../../FinalEncounter")
 
 [node name="TimingBridge" type="Node" parent="MiningScene/Systems" unique_id=1886677998 node_paths=PackedStringArray("timing_window")]
 script = ExtResource("4_timing_bridge")
+timing_window = NodePath("../../HUD/TimingWindow")
+
+[node name="BreakthroughTargetHighlight" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("timing_window")]
+editor_description = "Turns the mining bar's targets gold while the next successful hit would spend the one-time layer breakthrough. Repaint-only adapter; it never touches the timing bar's own logic."
+script = ExtResource("26_target_highlight")
 timing_window = NodePath("../../HUD/TimingWindow")
 
 [node name="ViewController" type="Node" parent="MiningScene/Systems" unique_id=844951694 node_paths=PackedStringArray("terrain_manager")]
@@ -123,26 +182,62 @@ miner_rig = NodePath("../../MinerRig")
 mining_controller = NodePath("../MiningController")
 starter_pickaxe = ExtResource("20_basic_pickaxe")
 
-[node name="UpgradeEncounterController" type="Node" parent="MiningScene/Systems" unique_id=797816739 node_paths=PackedStringArray("dialogue_director", "timing_window", "character_parent", "pickaxe_progression", "mining_controller")]
+[node name="CinematicFlow" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("timing_window", "mining_controller", "gameplay_hud", "impact_feedback_layer")]
+script = ExtResource("45_cinematic_flow")
+timing_window = NodePath("../../HUD/TimingWindow")
+mining_controller = NodePath("../MiningController")
+gameplay_hud = NodePath("../../HUD")
+impact_feedback_layer = NodePath("../../../DigNumberPresenter")
+
+[node name="RunTimeline" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("cinematic_flow")]
+process_mode = 3
+script = ExtResource("57_run_timeline")
+cinematic_flow = NodePath("../CinematicFlow")
+
+[node name="UpgradeEncounterController" type="Node" parent="MiningScene/Systems" unique_id=797816739 node_paths=PackedStringArray("dialogue_director", "character_parent", "pickaxe_progression", "miner_rig", "cinematic_flow", "terrain_renderer")]
 script = ExtResource("13_depth_encounter")
 encounter_config = ExtResource("14_encounter_config")
 mining_config = ExtResource("1_config")
 dialogue_director = NodePath("../../../DialogueDirector")
-timing_window = NodePath("../../HUD/TimingWindow")
 character_scene = ExtResource("34_character_presenter")
 character_parent = NodePath("../../CharacterLayer")
 pickaxe_progression = NodePath("../PickaxeProgression")
-mining_controller = NodePath("../MiningController")
+miner_rig = NodePath("../../MinerRig")
+cinematic_flow = NodePath("../CinematicFlow")
+terrain_renderer = NodePath("../../TerrainLayerRenderer")
 
-[node name="RunIntroController" type="Node" parent="MiningScene/Systems" unique_id=1079054404 node_paths=PackedStringArray("dialogue_director", "guide_presenter", "timing_window", "mining_controller")]
+[node name="SurfacePresentation" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("terrain_manager", "sky_rect", "sunlight_wash_rect")]
+script = ExtResource("52_surface_presentation")
+terrain_manager = NodePath("../../TerrainManager")
+config = ExtResource("1_config")
+sky_rect = NodePath("../../SurfaceSky")
+sunlight_wash_rect = NodePath("../../SunlightWash")
+
+[node name="RunIntroController" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("dialogue_director", "arrival_sequence", "attendant_presenter", "miner_rig", "cinematic_flow")]
 process_mode = 3
 script = ExtResource("42_intro_controller")
 conversation = ExtResource("43_intro_conversation")
-guide_appearance = ExtResource("44_intro_appearance")
+attendant_appearance = ExtResource("44_intro_appearance")
 dialogue_director = NodePath("../../../DialogueDirector")
-guide_presenter = NodePath("../../IntroGuide")
-timing_window = NodePath("../../HUD/TimingWindow")
-mining_controller = NodePath("../MiningController")
+arrival_sequence = NodePath("../../ArrivalIntro")
+attendant_presenter = NodePath("../../ArrivalIntro/Attendant")
+miner_rig = NodePath("../../MinerRig")
+cinematic_flow = NodePath("../CinematicFlow")
+
+[node name="LayerBreakthroughController" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("sequence", "dialogue_director", "cinematic_flow", "encounter_controller", "miner_rig", "lead_rat")]
+process_mode = 3
+script = ExtResource("47_breakthrough_controller")
+minimum_combo = 8
+minimum_run_depth = 400
+discovery_conversation = ExtResource("51_discovery")
+rat_warning_conversation = ExtResource("48_rat_warning")
+miner_response_conversation = ExtResource("49_miner_response")
+sequence = NodePath("../../LayerBreakthroughSequence")
+dialogue_director = NodePath("../../../DialogueDirector")
+cinematic_flow = NodePath("../CinematicFlow")
+encounter_controller = NodePath("../UpgradeEncounterController")
+miner_rig = NodePath("../../MinerRig")
+lead_rat = NodePath("../../LayerBreakthroughSequence/DestinationStage/ActorMarkers/RatContainer/LeadRat")
 
 [node name="HUD" type="CanvasLayer" parent="MiningScene" unique_id=557922213 node_paths=PackedStringArray("depth_label", "bottom_eta_label", "fps_label")]
 script = ExtResource("6_hud")
@@ -223,6 +318,9 @@ script = ExtResource("22_playtime_reveal")
 [node name="DialogueDirector" parent="." unique_id=1751798570 instance=ExtResource("11_dialogue_overlay")]
 
 [node name="DepartureChoice" parent="." unique_id=335229642 instance=ExtResource("41_departure_choice")]
+
+[node name="FinalEncounter" parent="." node_paths=PackedStringArray("dialogue_director") instance=ExtResource("50_final_encounter")]
+dialogue_director = NodePath("../DialogueDirector")
 
 [node name="DigNumberPresenter" type="CanvasLayer" parent="." unique_id=483995659 node_paths=PackedStringArray("timing_window", "player_visual") groups=["dig_number_presenter"]]
 process_mode = 3

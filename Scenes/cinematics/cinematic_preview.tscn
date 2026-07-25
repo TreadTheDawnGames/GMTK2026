@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/cinematics/cinematic_preview_harness.gd" id="1_harness"]
+
+[node name="CinematicPreview" type="Node"]
+editor_description = "Isolated cinematic runner. Press F6 with this scene open, or launch it directly, to jump straight to a beat without playing up to its trigger. It boots the real mining scene and drives the real controllers, so anything broken here is broken in the game too. 1 = surface arrival, 2 = layer breakthrough, 3 = depth encounter, R = replay, Esc = quit."
+script = ExtResource("1_harness")

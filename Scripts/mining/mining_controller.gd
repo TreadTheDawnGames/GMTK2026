@@ -52,7 +52,8 @@ signal mine_missed(combo: int)
 signal swing_requested(
 	combo: int,
 	combo_strength: float,
-	swing_speed_multiplier: float
+	swing_speed_multiplier: float,
+	path_direction: int
 )
 ## Reports combo before synchronous terrain damage chooses its layer masks.
 signal dig_presentation_started(combo: int)
@@ -72,9 +73,6 @@ signal dig_number_requested(
 	combo_strength: float,
 	swing_side: int
 )
-## Faces the miner toward the successful timing hit's side of the bar.
-signal path_direction_changed(direction: int)
-
 @export var config: MiningConfig
 @export var terrain_manager: TerrainManager
 @export var view_controller: ViewController
@@ -184,7 +182,6 @@ func _start_swing(swing: SwingRequest) -> void:
 		left_turn_cell_x,
 		right_turn_cell_x
 	)
-	path_direction_changed.emit(swing.path_direction)
 	_pending_swing = swing
 	_pending_combo_strength = clampf(
 		float(swing.combo) / float(config.maximum_effect_combo),
@@ -200,7 +197,8 @@ func _start_swing(swing: SwingRequest) -> void:
 			swing.pickaxes,
 			&"swing_speed_multiplier",
 			config.maximum_stack_swing_speed_multiplier
-		) * swing.speed_scale
+		) * swing.speed_scale,
+		swing.path_direction
 	)
 
 
@@ -240,9 +238,10 @@ func resolve_impact(
 	var requested_half_width_cells := (
 		_get_requested_half_width_cells(_pending_swing)
 	)
-	var impact_cell_x := terrain_manager.screen_x_to_terrain_cell_x(
-		impact_screen_position.x
-	)
+	# The swing's planned target is the reachable pickaxe contact. The animated
+	# marker remains presentation-only because camera movement or a queued swing
+	# can briefly place its screen coordinate over terrain the miner cannot reach.
+	var impact_cell_x := _pending_swing.target_cell_x
 	var fall_cell := Vector2i(
 		_game_state.mining_x,
 		_game_state.mining_y
@@ -261,7 +260,8 @@ func resolve_impact(
 		terrain_manager.find_tunnel_surface_cell(
 			fall_cell,
 			_pending_swing.target_cell_x,
-			requested_depth_rows
+			requested_depth_rows,
+			impact_cell_x
 		)
 	)
 	var surface_after_primary_hit_y: int = surface_after_primary_hit.y
@@ -331,7 +331,8 @@ func resolve_impact(
 		terrain_manager.find_tunnel_surface_cell(
 			fall_cell,
 			_pending_swing.target_cell_x,
-			requested_depth_rows
+			requested_depth_rows,
+			impact_cell_x
 		)
 	)
 	var new_mining_y: int = new_mining_position.y
@@ -390,6 +391,11 @@ func set_swing_queue_paused(is_paused: bool) -> void:
 	if is_paused:
 		return
 	_try_start_queued_swing()
+
+
+## Reports whether a conversation or camera flow owns the retained-hit gate.
+func is_swing_queue_paused() -> bool:
+	return _is_swing_queue_paused
 
 
 ## Replaces the cumulative snapshot captured by future earned swings.

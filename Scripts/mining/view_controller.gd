@@ -7,6 +7,7 @@ extends Node
 ## - Smooth mode eases after the miner and closes its lag after contact.
 ## - Chunk mode holds one page until the miner crosses its halfway point.
 ## - Review mode moves the view only; returning uses its own fast free fall.
+## - Encounter framing and release tween from the currently presented view.
 ## The invariant is that screen offset always equals miner position minus view.
 
 signal landing_reached(mining_y: int)
@@ -22,6 +23,12 @@ enum ViewMode {
 
 @export var config: MiningConfig
 @export var terrain_manager: TerrainManager
+
+@export_category("Cinematic Framing")
+## Places the miner at the viewport center while a shared interaction owns view.
+@export_range(0.3, 0.7, 0.01) var encounter_focus_viewport_y_ratio: float = 0.5
+@export_range(0.05, 2.0, 0.05) var encounter_focus_duration: float = 0.35
+@export_range(0.05, 2.0, 0.05) var encounter_release_duration: float = 0.25
 
 ## Terrain row currently presented at the fixed mining-face screen position.
 var current_view_x: float
@@ -39,6 +46,8 @@ var _last_landing_y: int
 var _view_mode: ViewMode = ViewMode.FOLLOWING_MINER
 var _last_miner_screen_offset := Vector2(NAN, NAN)
 var _is_encounter_focus_active: bool = false
+var _is_encounter_release_active: bool = false
+var _encounter_view_tween: Tween
 
 
 ## Starts the view at the ground surface.
@@ -57,7 +66,10 @@ func _ready() -> void:
 
 ## Advances the active follow, review, or free-fall movement.
 func _process(delta: float) -> void:
-	if not _is_encounter_focus_active:
+	if (
+		not _is_encounter_focus_active
+		and not _is_encounter_release_active
+	):
 		match _view_mode:
 			ViewMode.FOLLOWING_MINER:
 				_follow_miner(delta)
@@ -71,32 +83,112 @@ func _process(delta: float) -> void:
 	_publish_miner_screen_offset()
 
 
-## Finishes camera catch-up before an encounter dialogue covers the screen.
-func focus_miner_for_encounter() -> void:
+## Tweens from the live view to the visible subject's authored focus.
+func focus_miner_for_encounter(subject_rest_screen_y: float = NAN) -> void:
+	_cancel_encounter_view_tween()
 	_is_encounter_focus_active = true
-	current_view_x = target_view_position.x
-	current_view_y = target_view_position.y
+	_is_encounter_release_active = false
+	var cell_size := float(config.terrain_cell_world_size)
+	var focus_screen_y: float = (
+		get_viewport().get_visible_rect().size.y
+			* encounter_focus_viewport_y_ratio
+	)
+	var focus_view_y: float
+	if is_nan(subject_rest_screen_y):
+		focus_view_y = (
+			target_view_position.y
+			- (focus_screen_y - config.mining_face_screen_y) / cell_size
+		)
+	else:
+		# The caller removes the current world/view displacement, leaving only
+		# the authored subject offset. Camera logic never duplicates rig art.
+		focus_view_y = (
+			target_view_position.y
+			- (focus_screen_y - subject_rest_screen_y) / cell_size
+		)
 	_current_miner_position = target_view_position
 	_fall_start_position = target_view_position
 	_review_target_y = target_view_position.y
 	_mining_fall_velocity = 0.0
 	_return_velocity = 0.0
 	_view_mode = ViewMode.FOLLOWING_MINER
-	terrain_manager.set_view_position(
-		Vector2(current_view_x, current_view_y)
+	_tween_encounter_view_to(
+		Vector2(target_view_position.x, focus_view_y),
+		encounter_focus_duration,
+		_on_encounter_focus_tween_finished
 	)
+
+
+## Exposes the last published view displacement for presentation composition.
+func get_miner_screen_offset() -> Vector2:
+	return _last_miner_screen_offset
+
+
+## Tweens back to the selected smooth or chunked mining framing.
+func release_encounter_focus() -> void:
+	if not _is_encounter_focus_active:
+		return
+	_cancel_encounter_view_tween()
+	_is_encounter_focus_active = false
+	_is_encounter_release_active = true
+	var release_view_position := target_view_position
+	if config.mining_camera_style == MiningConfig.MiningCameraStyle.CHUNK_SNAP:
+		release_view_position.y = _get_chunk_camera_y(
+			target_view_position.y
+		)
+	_tween_encounter_view_to(
+		release_view_position,
+		encounter_release_duration,
+		_on_encounter_release_tween_finished
+	)
+
+
+## Starts a pause-safe camera interpolation from exactly the presented frame.
+func _tween_encounter_view_to(
+	view_position: Vector2,
+	duration: float,
+	finished_callback: Callable
+) -> void:
+	var current_view_position := Vector2(current_view_x, current_view_y)
+	if current_view_position.is_equal_approx(view_position):
+		_apply_encounter_view_position(view_position)
+		finished_callback.call()
+		return
+	_encounter_view_tween = create_tween()
+	_encounter_view_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_encounter_view_tween.tween_method(
+		_apply_encounter_view_position,
+		current_view_position,
+		view_position,
+		maxf(duration, 0.01)
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_encounter_view_tween.tween_callback(finished_callback)
+
+
+## Applies tween progress through the same terrain and miner offset publication.
+func _apply_encounter_view_position(view_position: Vector2) -> void:
+	current_view_x = view_position.x
+	current_view_y = view_position.y
+	terrain_manager.set_view_position(view_position)
 	_publish_miner_screen_offset()
 
 
-## Returns camera movement to the selected smooth or chunked mining style.
-func release_encounter_focus() -> void:
-	_is_encounter_focus_active = false
-	if config.mining_camera_style == MiningConfig.MiningCameraStyle.CHUNK_SNAP:
-		current_view_y = _get_chunk_camera_y(target_view_position.y)
-		terrain_manager.set_view_position(
-			Vector2(current_view_x, current_view_y)
-		)
-		_publish_miner_screen_offset()
+## Retains focus ownership after the arrival tween itself is complete.
+func _on_encounter_focus_tween_finished() -> void:
+	_encounter_view_tween = null
+
+
+## Hands normal follow logic the exact frame where release motion ended.
+func _on_encounter_release_tween_finished() -> void:
+	_encounter_view_tween = null
+	_is_encounter_release_active = false
+
+
+## Kills only presentation interpolation, preserving gameplay camera state.
+func _cancel_encounter_view_tween() -> void:
+	if _encounter_view_tween != null and _encounter_view_tween.is_valid():
+		_encounter_view_tween.kill()
+	_encounter_view_tween = null
 
 
 ## Publishes the miner's screen displacement from one coordinate conversion.

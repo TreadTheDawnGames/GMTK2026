@@ -19,14 +19,14 @@ func write_savegame() -> void:
 static func save_exists() -> bool:
 	return ResourceLoader.exists(save_path)
 
-static func load_savegame() -> Resource:
-	var loaded_save
+static func load_savegame() -> SaveGame:
+	var loaded_save: SaveGame
 	if save_exists():
-		loaded_save = load(save_path)
+		loaded_save = load(save_path) as SaveGame
 		print("loaded existing")
-	else:
+	if loaded_save == null:
 		printerr("No save exists")
-		return null
+		loaded_save = SaveGame.new()
 	print("---- Save ----",
 	"\nmaster_audio_level: ", loaded_save.master_volume,
 	"\nsfx_audio_level: ", loaded_save.sfx_volume,

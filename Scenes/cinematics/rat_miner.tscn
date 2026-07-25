@@ -1,0 +1,300 @@
+[gd_scene load_steps=13 format=3]
+
+[ext_resource type="Script" path="res://Scripts/cinematics/cinematic_rat_miner.gd" id="1_rat"]
+[ext_resource type="Script" path="res://Scripts/dialogue/speech_reaction.gd" id="2_speech"]
+[ext_resource type="Texture2D" path="res://Assets/Characters/mice/mouse_brown.png" id="3_idle"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_brown.tres" id="4_default"]
+[ext_resource type="Script" path="res://Scripts/actors/actor_sprite_view.gd" id="5_pose_view"]
+
+[sub_resource type="Animation" id="Animation_rat_reset"]
+resource_name = "RESET"
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("SpeechRoot/VisualRoot:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector2(0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("SpeechRoot/VisualRoot:rotation")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [0.0]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("SpeechRoot/VisualRoot/SquashRoot:scale")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector2(1, 1)]
+}
+
+[sub_resource type="Animation" id="Animation_rat_idle"]
+resource_name = "idle"
+length = 0.8
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("SpeechRoot/VisualRoot:position")
+tracks/0/interp = 2
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.4, 0.8),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(0, 0), Vector2(0, -2), Vector2(0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("SpeechRoot/VisualRoot/SquashRoot:scale")
+tracks/1/interp = 2
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.4, 0.8),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(1.035, 0.965), Vector2(0.982, 1.022), Vector2(1.035, 0.965)]
+}
+
+[sub_resource type="Animation" id="Animation_rat_run"]
+resource_name = "run"
+length = 0.26
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("SpeechRoot/VisualRoot:position")
+tracks/0/interp = 2
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.13, 0.26),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(0, 0), Vector2(0, -5), Vector2(0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("SpeechRoot/VisualRoot:rotation")
+tracks/1/interp = 2
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.13, 0.26),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [-0.04, 0.04, -0.04]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("SpeechRoot/VisualRoot/SquashRoot:scale")
+tracks/2/interp = 2
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.13, 0.26),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(1.1, 0.9), Vector2(0.92, 1.09), Vector2(1.1, 0.9)]
+}
+
+[sub_resource type="Animation" id="Animation_rat_strike"]
+resource_name = "strike"
+length = 0.42
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("SpeechRoot/VisualRoot:position")
+tracks/0/interp = 2
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.15, 0.22, 0.42),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"update": 0,
+"values": [Vector2(0, 0), Vector2(-5, -3), Vector2(7, 3), Vector2(0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("SpeechRoot/VisualRoot:rotation")
+tracks/1/interp = 2
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.15, 0.22, 0.42),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"update": 0,
+"values": [0.0, -0.16, 0.12, 0.0]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("SpeechRoot/VisualRoot/SquashRoot:scale")
+tracks/2/interp = 2
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.15, 0.22, 0.3, 0.42),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector2(1, 1), Vector2(0.9, 1.1), Vector2(1.16, 0.86), Vector2(0.97, 1.03), Vector2(1, 1)]
+}
+tracks/3/type = "method"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath(".")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0.15, 0.22),
+"transitions": PackedFloat32Array(1, 1),
+"values": [{
+"args": [],
+"method": &"_show_strike_appearance"
+}, {
+"args": [],
+"method": &"_emit_strike_contact"
+}]
+}
+
+[sub_resource type="Animation" id="Animation_rat_jump"]
+resource_name = "jump"
+length = 0.5
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("SpeechRoot/VisualRoot/SquashRoot:scale")
+tracks/0/interp = 2
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.15, 0.35, 0.5),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"update": 0,
+"values": [Vector2(1.14, 0.86), Vector2(0.88, 1.14), Vector2(0.92, 1.09), Vector2(1.18, 0.84)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("SpeechRoot/VisualRoot:rotation")
+tracks/1/interp = 2
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.25, 0.5),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [-0.08, 0.05, 0.0]
+}
+
+[sub_resource type="Animation" id="Animation_rat_land"]
+resource_name = "land"
+length = 0.24
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("SpeechRoot/VisualRoot/SquashRoot:scale")
+tracks/0/interp = 2
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.07, 0.16, 0.24),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"update": 0,
+"values": [Vector2(1.26, 0.78), Vector2(0.93, 1.07), Vector2(1.04, 0.97), Vector2(1, 1)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("SpeechRoot/VisualRoot:position")
+tracks/1/interp = 2
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.07, 0.16, 0.24),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"update": 0,
+"values": [Vector2(0, 0), Vector2(0, -3), Vector2(0, 0), Vector2(0, 0)]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("SpeechRoot/VisualRoot:rotation")
+tracks/2/interp = 2
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.24),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [0.0, 0.0]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_rat"]
+_data = {
+&"RESET": SubResource("Animation_rat_reset"),
+&"idle": SubResource("Animation_rat_idle"),
+&"jump": SubResource("Animation_rat_jump"),
+&"land": SubResource("Animation_rat_land"),
+&"run": SubResource("Animation_rat_run"),
+&"strike": SubResource("Animation_rat_strike")
+}
+
+[node name="RatMiner" type="Node2D" node_paths=PackedStringArray("animation_player", "visual_root", "strike_anchor", "actor_sprite", "actor_sprite_view", "speech_reaction")]
+editor_description = "Reusable mouse actor. Default Appearance and the sequence's appearance list pair each color's resting and strike art."
+process_mode = 3
+z_index = 16
+script = ExtResource("1_rat")
+animation_player = NodePath("AnimationPlayer")
+visual_root = NodePath("SpeechRoot/VisualRoot")
+strike_anchor = NodePath("SpeechRoot/VisualRoot/StrikeAnchor")
+actor_sprite = NodePath("SpeechRoot/VisualRoot/SquashRoot/ActorSprite")
+actor_sprite_view = NodePath("ActorSpriteView")
+speech_reaction = NodePath("SpeechReaction")
+default_appearance = ExtResource("4_default")
+appearance_scale = 0.22
+
+[node name="SpeechRoot" type="Node2D" parent="."]
+editor_description = "Presentation-only speech bounce. Motion here composes with the actor animation below."
+
+[node name="VisualRoot" type="Node2D" parent="SpeechRoot"]
+editor_description = "Facing lives here: set_facing_direction owns the sign of this node's scale.x. Clips animate only its position and rotation, never its scale, or turning around would fight the squash."
+
+[node name="SquashRoot" type="Node2D" parent="SpeechRoot/VisualRoot"]
+editor_description = "Squash and stretch only. Its origin is the mouse's soles, so scaling keeps the feet planted instead of sinking or floating the body."
+
+[node name="ActorSprite" type="Sprite2D" parent="SpeechRoot/VisualRoot/SquashRoot"]
+editor_description = "Editor preview for the default brown appearance. Runtime appearance assignment preserves this canvas registration. Every mouse PNG is cropped to one shared 938x648 content box, so this offset is derived, not tuned: it puts the resting body's center on the actor root's x and its soles exactly on the root's y."
+texture_filter = 4
+position = Vector2(8.4, -19.5)
+scale = Vector2(0.22, 0.22)
+texture = ExtResource("3_idle")
+flip_h = true
+
+[node name="StrikeAnchor" type="Marker2D" parent="SpeechRoot/VisualRoot"]
+editor_description = "Stable right-wall strike contact. Deliberately a sibling of SquashRoot so the reported contact point does not wobble with squash and stretch."
+position = Vector2(48, 18)
+
+[node name="ActorSpriteView" type="Node" parent="." node_paths=PackedStringArray("actor_sprite")]
+editor_description = "Optional idle, walk, and strike sprite-sheet presentation. An unassigned pose set preserves the paired PNG appearance."
+script = ExtResource("5_pose_view")
+actor_sprite = NodePath("../SpeechRoot/VisualRoot/SquashRoot/ActorSprite")
+
+[node name="SpeechReaction" type="Node" parent="." node_paths=PackedStringArray("visual_root")]
+script = ExtResource("2_speech")
+visual_root = NodePath("../SpeechRoot")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+editor_description = "Run, strike, jump, and land clips animate paired mouse art through stable presentation roots. Position and rotation ride VisualRoot; every scale key rides SquashRoot."
+libraries/ = SubResource("AnimationLibrary_rat")

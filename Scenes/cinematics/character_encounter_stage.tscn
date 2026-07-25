@@ -1,0 +1,60 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://Scripts/cinematics/character_encounter_stage.gd" id="1_stage"]
+
+[sub_resource type="Animation" id="Animation_reset"]
+resource_name = "RESET"
+
+[sub_resource type="Animation" id="Animation_opening"]
+resource_name = "opening"
+length = 0.01
+
+[sub_resource type="Animation" id="Animation_closing"]
+resource_name = "closing"
+length = 0.01
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_stage"]
+_data = {
+&"RESET": SubResource("Animation_reset"),
+&"closing": SubResource("Animation_closing"),
+&"opening": SubResource("Animation_opening")
+}
+
+[node name="CharacterEncounterStage" type="Node2D" node_paths=PackedStringArray("actor_markers_root", "prop_markers_root", "action_markers_root", "entrance_marker", "conversation_marker", "work_marker", "rest_marker", "exit_marker", "animation_player")]
+editor_description = "Reusable encounter stage facade. Inherit this scene, move the named markers, add props/effects under their roots, and author AnimationPlayer clips whose names match DialogueLine Stage Cue values."
+process_mode = 3
+script = ExtResource("1_stage")
+actor_markers_root = NodePath("ActorMarkers")
+prop_markers_root = NodePath("PropMarkers")
+action_markers_root = NodePath("ActionMarkers")
+entrance_marker = NodePath("ActorMarkers/Entrance")
+conversation_marker = NodePath("ActorMarkers/Conversation")
+work_marker = NodePath("ActorMarkers/Work")
+rest_marker = NodePath("ActorMarkers/Rest")
+exit_marker = NodePath("ActorMarkers/Exit")
+animation_player = NodePath("AnimationPlayer")
+
+[node name="ActorMarkers" type="Node2D" parent="."]
+editor_description = "Human-named actor travel and persistence markers."
+
+[node name="Entrance" type="Marker2D" parent="ActorMarkers"]
+position = Vector2(-320, 0)
+
+[node name="Conversation" type="Marker2D" parent="ActorMarkers"]
+
+[node name="Work" type="Marker2D" parent="ActorMarkers"]
+position = Vector2(160, 0)
+
+[node name="Rest" type="Marker2D" parent="ActorMarkers"]
+
+[node name="Exit" type="Marker2D" parent="ActorMarkers"]
+position = Vector2(640, 0)
+
+[node name="PropMarkers" type="Node2D" parent="."]
+editor_description = "Concrete stages add named prop anchors such as Discovery, Handoff, or Collection."
+
+[node name="ActionMarkers" type="Node2D" parent="."]
+editor_description = "Concrete stages add named action anchors such as WallStrike or EffectOrigin."
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+libraries/ = SubResource("AnimationLibrary_stage")

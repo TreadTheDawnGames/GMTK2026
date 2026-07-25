@@ -1,0 +1,121 @@
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/layer_cutscene_environment.tscn" id="1_environment"]
+[ext_resource type="Script" path="res://Scripts/cinematics/layer_breakthrough_sequence.gd" id="2_sequence"]
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/rat_miner.tscn" id="3_rat"]
+[ext_resource type="Script" path="res://Scripts/cinematics/cinematic_rat_mining_target.gd" id="4_target"]
+[ext_resource type="Script" path="res://Scripts/cinematics/cinematic_rat_entry_point.gd" id="5_entry"]
+[ext_resource type="Script" path="res://Scripts/cinematics/cinematic_rat_appearance.gd" id="6_appearance"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_brown.tres" id="7_brown"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_grey.tres" id="8_grey"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_red.tres" id="9_red"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_white.tres" id="10_white"]
+
+[node name="LayerBreakthroughSequence" node_paths=PackedStringArray("mining_targets_root", "lead_rat", "rat_container", "rat_spawn_anchor", "lead_warning_anchor", "rat_exit_anchor", "rat_entry_points_root") instance=ExtResource("1_environment")]
+editor_description = "Rat-specific dialogue, actors, entries, mining actions, and drain composed on the reusable production-terrain environment."
+script = ExtResource("2_sequence")
+mining_targets_root = NodePath("DestinationStage/ActionMarkers/MiningTargets")
+lead_rat = NodePath("DestinationStage/ActorMarkers/RatContainer/LeadRat")
+rat_scene = ExtResource("3_rat")
+rat_container = NodePath("DestinationStage/ActorMarkers/RatContainer")
+rat_spawn_anchor = NodePath("DestinationStage/ActorMarkers/RatSpawn")
+lead_warning_anchor = NodePath("DestinationStage/ActorMarkers/LeadWarning")
+rat_exit_anchor = NodePath("DestinationStage/ActorMarkers/RatExit")
+rat_entry_points_root = NodePath("DestinationStage/ActorMarkers/RatEntryPoints")
+follower_spawn_interval = 0.45
+rat_exit_duration = 0.18
+rat_exit_step_distance = 72.0
+rat_tunnel_root_margin = 64.0
+rat_indent_diameter = 96.0
+rat_entry_behind_draw_order = 1
+rat_entry_duration = 0.42
+rat_entry_indent_diameter = 64.0
+lead_rat_appearance = ExtResource("9_red")
+rat_appearances = Array[ExtResource("6_appearance")]([ExtResource("7_brown"), ExtResource("8_grey"), ExtResource("10_white")])
+
+[node name="RatSpawn" type="Marker2D" parent="DestinationStage/ActorMarkers"]
+editor_description = "Offscreen-left entrance for the lead rat miner. Runtime grounds it on the opened production floor."
+position = Vector2(-90, 419)
+
+[node name="LeadWarning" type="Marker2D" parent="DestinationStage/ActorMarkers"]
+editor_description = "The lead rat pauses here to deliver the warning before the procession."
+position = Vector2(720, 419)
+
+[node name="RatEntryPoints" type="Node2D" parent="DestinationStage/ActorMarkers"]
+editor_description = "Followers cycle these entrances in child order: the open left side, then three holes punched at staggered heights in the backing wall."
+
+[node name="OpenSideEntry" type="Marker2D" parent="DestinationStage/ActorMarkers/RatEntryPoints"]
+editor_description = "Already-open side route used without a terrain breach. Mice run in along the floor."
+position = Vector2(-100, 360)
+script = ExtResource("5_entry")
+requires_breach = false
+behind_start_offset = Vector2(-160, 0)
+emergence_travel_x = 180.0
+
+[node name="LowBackWallBreach" type="Marker2D" parent="DestinationStage/ActorMarkers/RatEntryPoints"]
+editor_description = "Backing-wall hole low over the room's left third. A short pop and a short drop."
+position = Vector2(240, 306)
+script = ExtResource("5_entry")
+behind_start_offset = Vector2(-40, 0)
+emergence_travel_x = 40.0
+
+[node name="HighBackWallBreach" type="Marker2D" parent="DestinationStage/ActorMarkers/RatEntryPoints"]
+editor_description = "Backing-wall hole high over the room center. The longest fall of the three."
+position = Vector2(516, 196)
+script = ExtResource("5_entry")
+behind_start_offset = Vector2(-40, 0)
+emergence_travel_x = 54.0
+
+[node name="MidBackWallBreach" type="Marker2D" parent="DestinationStage/ActorMarkers/RatEntryPoints"]
+editor_description = "Backing-wall hole at mid height over the room's right third."
+position = Vector2(780, 252)
+script = ExtResource("5_entry")
+behind_start_offset = Vector2(-40, 0)
+emergence_travel_x = 46.0
+
+[node name="RatExit" type="Marker2D" parent="DestinationStage/ActorMarkers"]
+editor_description = "Rats repeatedly mine overlapping production-mask steps until this offscreen exit."
+position = Vector2(1248, 419)
+
+[node name="RatContainer" type="Node2D" parent="DestinationStage/ActorMarkers"]
+z_index = 7
+editor_description = "Bounded live rat cast. Followers are replenished during dialogue and freed on exit."
+
+[node name="LeadRat" parent="DestinationStage/ActorMarkers/RatContainer" instance=ExtResource("3_rat")]
+editor_description = "Reaching LeadWarning starts the mining loop and warning dialogue together."
+
+[node name="MiningTargets" type="Node2D" parent="DestinationStage/ActionMarkers"]
+editor_description = "Rat action destinations; strike anchors alone reach the solid production wall."
+
+[node name="LowFrontIndent" type="Marker2D" parent="DestinationStage/ActionMarkers/MiningTargets"]
+editor_description = "Floor-level lane. Zero jump height keeps this one reachable on foot, so a mouse that just landed runs to it instead of arcing."
+position = Vector2(900, 419)
+script = ExtResource("4_target")
+floor_offset_y = 0.0
+jump_height = 0.0
+front_of_miner = true
+strike_count = 3
+
+[node name="HighBackIndent" type="Marker2D" parent="DestinationStage/ActionMarkers/MiningTargets"]
+position = Vector2(918, 419)
+script = ExtResource("4_target")
+floor_offset_y = -86.0
+jump_height = 112.0
+front_of_miner = false
+strike_count = 2
+
+[node name="MiddleFrontIndent" type="Marker2D" parent="DestinationStage/ActionMarkers/MiningTargets"]
+position = Vector2(936, 419)
+script = ExtResource("4_target")
+floor_offset_y = -42.0
+jump_height = 84.0
+front_of_miner = true
+strike_count = 3
+
+[node name="UpperBackIndent" type="Marker2D" parent="DestinationStage/ActionMarkers/MiningTargets"]
+position = Vector2(948, 419)
+script = ExtResource("4_target")
+floor_offset_y = -126.0
+jump_height = 126.0
+front_of_miner = false
+strike_count = 2

@@ -11,3 +11,5 @@ extends Resource
 @export var sprite_offset: Vector2 = Vector2.ZERO
 @export var tint: Color = Color.WHITE
 @export var flip_h: bool = false
+## Optional named idle/walk/speech poses; null preserves the current still sprite.
+@export var pose_set: ActorPoseSet

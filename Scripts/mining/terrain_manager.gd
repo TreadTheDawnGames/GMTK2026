@@ -1,7 +1,11 @@
+@tool
 class_name TerrainManager
 extends Node
 
 ## Owns terrain occupancy, mining damage, and encounter openings.
+## @tool so an editor terrain preview digs through this same authority rather
+## than faking openings: what a designer breaks in the editor is a real
+## dig_tunnel call against real cells, not a drawing that mimics one.
 
 class DigResult:
 	## Carries the terrain damage caused by one mining hit.
@@ -20,10 +24,11 @@ const MAX_LIGHTNING_CRACK_LENGTH: int = 32
 const MAX_LIGHTNING_CRACK_DEPTH: int = 8
 
 
-## Reports newly opened terrain so presentation can reveal the damage.
+## Reports opened cells plus the pickaxe-contact center for their visual stamp.
 signal terrain_damaged(
 	destroyed_cells: Array[Vector2i],
-	horizontal_direction: int
+	horizontal_direction: int,
+	impact_origin_cell: Vector2i
 )
 ## Reports related narrow paths as one batch so presentation uploads once.
 signal terrain_paths_damaged(
@@ -36,7 +41,8 @@ signal view_position_changed(view_cell_position: Vector2)
 @export var config: MiningConfig
 @export var encounter_config: DepthEncounterConfig
 
-# Masks prevent destroyed cells from being mined or collected twice.
+# One bit per terrain cell prevents repeat mining. Growth is bounded by the
+# configured run size (about 2.3 MiB for the default 192 x 100,000-cell run).
 var _destruction_masks: Dictionary[int, PackedByteArray] = {}
 var _current_view_x: float
 var _current_view_y: float
@@ -45,6 +51,10 @@ var _random := RandomNumberGenerator.new()
 
 ## Initializes coordinate conversion at the starting surface.
 func _ready() -> void:
+	if config == null:
+		if not Engine.is_editor_hint():
+			push_error("TerrainManager requires a config.")
+		return
 	_current_view_x = float(config.terrain_width_cells) * 0.5
 	_current_view_y = float(config.initial_surface_row)
 	_random.randomize()
@@ -68,6 +78,15 @@ func dig_tunnel(
 		start_cell.y + depth_rows,
 		final_mineable_row
 	)
+	var path_start_cell_x := (
+		start_cell.x
+		if surface_contact_cell_x < 0
+		else clampi(
+			surface_contact_cell_x,
+			0,
+			config.terrain_width_cells - 1
+		)
+	)
 	var safe_target_cell_x := (
 		start_cell.x
 		if target_cell_x < 0
@@ -80,7 +99,7 @@ func dig_tunnel(
 	for row_index in range(tunnel_row_count):
 		var cell_y := start_cell.y + row_index
 		var path_center_x: int = _get_tunnel_center_x(
-			start_cell.x,
+			path_start_cell_x,
 			safe_target_cell_x,
 			row_index,
 			tunnel_row_count
@@ -91,9 +110,11 @@ func dig_tunnel(
 			break
 		var left_cell_x := path_center_x - half_width_cells
 		var right_cell_x := path_center_x + half_width_cells
-		if cell_y == start_cell.y and surface_contact_cell_x >= 0:
-			left_cell_x = mini(left_cell_x, surface_contact_cell_x)
-			right_cell_x = maxi(right_cell_x, surface_contact_cell_x)
+		if cell_y == start_cell.y:
+			# The pickaxe contact owns the blast center, while this short bridge
+			# back to the player's feet keeps the new tunnel safely connected.
+			left_cell_x = mini(left_cell_x, start_cell.x)
+			right_cell_x = maxi(right_cell_x, start_cell.x)
 		for cell_x in range(left_cell_x, right_cell_x + 1):
 			var cell := Vector2i(cell_x, cell_y)
 			if not _is_mineable_cell(cell):
@@ -105,7 +126,8 @@ func dig_tunnel(
 	if not destroyed_cells.is_empty():
 		terrain_damaged.emit(
 			destroyed_cells,
-			clampi(horizontal_direction, -1, 1)
+			clampi(horizontal_direction, -1, 1),
+			Vector2i(path_start_cell_x, start_cell.y)
 		)
 	return result
 
@@ -241,6 +263,11 @@ func dig_branching_lightning(
 	return result
 
 
+## Discards every recorded hit so a preview can rebuild from intact terrain.
+func clear_damage() -> void:
+	_destruction_masks.clear()
+
+
 ## Converts a screen x-coordinate into a terrain column.
 func screen_x_to_terrain_cell_x(screen_x: float) -> int:
 	var cell_size := float(config.terrain_cell_world_size)
@@ -328,7 +355,8 @@ func find_surface_row(cell_x: int, starting_row: int) -> int:
 func find_tunnel_surface_cell(
 	start_cell: Vector2i,
 	target_cell_x: int,
-	tunnel_depth_rows: int
+	tunnel_depth_rows: int,
+	surface_contact_cell_x: int = -1
 ) -> Vector2i:
 	var bottom_surface_row: int = config.get_bottom_surface_row()
 	var safe_start := Vector2i(
@@ -344,6 +372,15 @@ func find_tunnel_surface_cell(
 		0,
 		config.terrain_width_cells - 1
 	)
+	var path_start_cell_x: int = (
+		safe_start.x
+		if surface_contact_cell_x < 0
+		else clampi(
+			surface_contact_cell_x,
+			0,
+			config.terrain_width_cells - 1
+		)
+	)
 	var tunnel_end_row: int = mini(
 		safe_start.y + maxi(tunnel_depth_rows, 0),
 		bottom_surface_row
@@ -356,7 +393,7 @@ func find_tunnel_surface_cell(
 			tunnel_row_count
 		)
 		var path_center_x: int = _get_tunnel_center_x(
-			safe_start.x,
+			path_start_cell_x,
 			safe_target_cell_x,
 			row_index,
 			tunnel_row_count
@@ -438,7 +475,9 @@ func _is_cell_destroyed(cell: Vector2i) -> bool:
 	var local_y := cell.y - chunk_index * config.chunk_height_cells
 	var mask := _destruction_masks[chunk_index] as PackedByteArray
 	var mask_offset := local_y * config.terrain_width_cells + cell.x
-	return mask[mask_offset] != 0
+	var byte_offset := mask_offset >> 3
+	var bit_mask := 1 << (mask_offset & 7)
+	return mask[byte_offset] & bit_mask != 0
 
 
 ## Resolves one row of the shared destruction and player-fall centerline.
@@ -470,7 +509,9 @@ func _set_cell_destroyed(cell: Vector2i) -> void:
 	var local_y := cell.y - chunk_index * config.chunk_height_cells
 	var mask := _get_or_create_mask(chunk_index)
 	var mask_offset := local_y * config.terrain_width_cells + cell.x
-	mask[mask_offset] = 1
+	var byte_offset := mask_offset >> 3
+	var bit_mask := 1 << (mask_offset & 7)
+	mask[byte_offset] = mask[byte_offset] | bit_mask
 	_destruction_masks[chunk_index] = mask
 
 
@@ -479,7 +520,10 @@ func _get_or_create_mask(chunk_index: int) -> PackedByteArray:
 	if _destruction_masks.has(chunk_index):
 		return _destruction_masks[chunk_index] as PackedByteArray
 	var mask := PackedByteArray()
-	mask.resize(config.terrain_width_cells * config.chunk_height_cells)
+	var cell_count := (
+		config.terrain_width_cells * config.chunk_height_cells
+	)
+	mask.resize(ceili(float(cell_count) / 8.0))
 	_destruction_masks[chunk_index] = mask
 	return mask
 
