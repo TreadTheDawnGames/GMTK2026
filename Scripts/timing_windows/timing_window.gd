@@ -65,6 +65,23 @@ func set_audio_handler(audio_handler: PlayerAudioHandler) -> void:
 	_audio_handler = audio_handler
 
 
+## Plays optional feedback when this reusable timing scene has an audio owner.
+func _play_sound(
+	sound: AudioStream,
+	bus_name: String = "SFX",
+	do_pitch_scale: bool = false,
+	pitch_scale: float = 1.0
+) -> void:
+	if _audio_handler == null:
+		return
+	_audio_handler.play_sound(
+		sound,
+		bus_name,
+		do_pitch_scale,
+		pitch_scale
+	)
+
+
 ## Applies the saved bounce preference to both authored timing bars.
 func set_bounce_muted(is_muted: bool) -> void:
 	_bounce_muted = is_muted
@@ -147,7 +164,7 @@ func _mining_window_pressed(
 			var steps_past_ladder = maxi(
 				combo - AudioLibrary.MINE_SOUNDS.size(), 0
 			)
-			_audio_handler.play_sound(
+			_play_sound(
 				AudioLibrary.MINE_SOUNDS[
 					clampi(combo - 1, 0, AudioLibrary.MINE_SOUNDS.size() - 1)
 				],
@@ -193,10 +210,10 @@ func _mining_window_pressed(
 	else:
 		stored_combo = combo
 		if combo >= mining_config.recovery_combo_threshold:
-			_audio_handler.play_sound(AudioLibrary.MISS_WITH_SAVE)
+			_play_sound(AudioLibrary.MISS_WITH_SAVE)
 			await mining_window.pause(true)
 			recovery_window.start()
-			_audio_handler.play_sound(AudioLibrary.SAVE_BUILDUP)
+			_play_sound(AudioLibrary.SAVE_BUILDUP)
 		else:
 			var lost_combo := combo
 			pressed.emit(false, combo, 0)
@@ -206,7 +223,7 @@ func _mining_window_pressed(
 			mining_window.remove_all_extra_targets()
 			mining_window.speed_multiplier = 1.0
 			mining_window.play_animation(Color.RED)
-			_audio_handler.play_sound(AudioLibrary.STREAK_LOST)
+			_play_sound(AudioLibrary.STREAK_LOST)
 			mining_window.reset_all_targets()
 
 
@@ -223,7 +240,7 @@ func _recovery_window_pressed(
 		mining_window.reset_all_targets()
 		pressed.emit(false, combo, 0)
 		streak_ended.emit(lost_combo)
-		_audio_handler.play_sound(AudioLibrary.STREAK_LOST)
+		_play_sound(AudioLibrary.STREAK_LOST)
 		#recovery_window.stop()
 
 		mining_window.speed_multiplier = 1.0
@@ -235,7 +252,7 @@ func _recovery_window_pressed(
 		recovery_window.speed_multiplier *= (
 			(mining_config.recovery_speed_multiplier)
 		)
-		_audio_handler.play_sound(AudioLibrary.SAVE)
+		_play_sound(AudioLibrary.SAVE)
 		recovery_window.animation_color = combo_saved_color
 		
 	await recovery_window.pause(true)

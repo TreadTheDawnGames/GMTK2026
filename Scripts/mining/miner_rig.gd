@@ -173,8 +173,6 @@ func _emit_success_impact() -> void:
 	_set_miner_texture(impact_miner_texture)
 	if _audio_handler != null:
 		_audio_handler.play_sound(AudioLibrary.IMPACT)
-	else:
-		push_error("MinerRig requires an injected PlayerAudioHandler.")
 	impact_contact.emit(impact_point.global_position)
 
 
