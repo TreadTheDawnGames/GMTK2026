@@ -33,7 +33,8 @@ git show <commit>
 | Commit | File | What | Why |
 | --- | --- | --- | --- |
 | `6b6e8bf` | `TimingWindow.tscn` | `ComboLabel` re-anchored from the viewport's top-right to `MiningWindow`'s bottom-centre, and moved inside the frame's upper-left interior. | It sat across the frame art's drawn top edge. The nine-slice `expand_margin_top` of 20 px put wood underneath the text. Its old top-right anchors also meant it drifted relative to the bar at other window sizes. |
-| `5f423e6` | `TimingWindow.tscn` | `ComboLabel` hidden (`visible = false`). Node kept. | The combo is now the charge gauge drawn along the bar's lower edge, which also shows the effect ceiling and the quick-save threshold. Hidden rather than deleted so `timing_window.gd` keeps its `combo_label` target and the number can be switched back on for debugging. |
+| `5f423e6` | `TimingWindow.tscn` | `ComboLabel` hidden (`visible = false`). Node kept. | The combo is now the charge gauge drawn below the bar, which also shows the effect ceiling and the quick-save threshold. Hidden rather than deleted so `timing_window.gd` keeps its `combo_label` target and the number can be switched back on for debugging. |
+| `7c36152` | `TimingWindow.tscn` | `RecoveryWindow` moved up: `offset_top` -151 → -178, `offset_bottom` -134 → -161. | `MiningWindow`'s frame is a nine-slice whose `expand_margin_top` of 20 puts drawn wood 20 px above its own rect, reaching -148. At -151 the quick-save strip sat inside that art and the two frames collided. Size, anchors, speed, grace, and targets are unchanged. |
 
 Nothing in `slider_timing_window.gd`, `slider_timing_window.tscn`, or
 `timing_window.gd` has been modified. Every behaviour change lives outside them.

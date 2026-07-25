@@ -36,8 +36,6 @@ class Mark:
 	## Seconds the mark takes to run that 1.0 down to 0.0.
 	var lifetime: float
 	var color: Color
-	## Width of the strike column at rest, before it spreads as it fades.
-	var reach_px: float
 	var is_miss: bool
 
 @export_category("References")
@@ -57,9 +55,10 @@ class Mark:
 ## Inset from the bar's own ends. Large enough to clear the frame art's drawn
 ## corners, so the strip never runs into the rounded ends.
 @export_range(0.0, 80.0, 1.0) var charge_side_inset_px: float = 26.0
-## Inset from the bar's lower edge. Kept small so the strip sits on the frame's
-## inner lip rather than crossing the depth number in the middle of the bar.
-@export_range(0.0, 60.0, 1.0) var charge_bottom_inset_px: float = 11.0
+## Clearance between the bottom of the drawn frame art and the gauge. The gauge
+## sits outside the box, so it never competes with the slider, the targets, or
+## the depth number for the same pixels.
+@export_range(0.0, 60.0, 1.0) var charge_gap_px: float = 7.0
 ## Extra height carried by lit segments only. The fill boundary then reads as a
 ## change in shape rather than only as a change in brightness.
 @export_range(0.0, 16.0, 0.5) var charge_lit_extra_px: float = 3.0
@@ -78,12 +77,6 @@ class Mark:
 @export_range(0.05, 1.5, 0.01) var miss_seconds: float = 0.34
 
 @export_category("Shape")
-## Strike column width at zero heat and at the heat ceiling.
-@export_range(2.0, 120.0, 1.0) var cold_strike_width_px: float = 13.0
-@export_range(2.0, 200.0, 1.0) var hot_strike_width_px: float = 44.0
-## How far the column spreads as it dies. Spreading and fading is the whole
-## motion; it never leaves the bar, so it cannot cross the depth number.
-@export_range(1.0, 6.0, 0.1) var strike_spread: float = 2.1
 ## Stroke weight shared by the miss slash and any future line work.
 @export_range(1.0, 16.0, 0.5) var stroke_width_px: float = 5.0
 ## How far the flashed frame swells past the bar's own art: outward on a hit,
@@ -94,6 +87,11 @@ class Mark:
 @export_range(0.0, 2.0, 0.05) var shine_strength: float = 0.85
 ## Brightness of the frame borrowed by the quick-save strip while it is up.
 @export_range(0.0, 2.0, 0.05) var recovery_frame_strength: float = 0.55
+## Expand margin used when the quick-save strip borrows that frame. The art's
+## own 20 px would spill a third of the frame's height past a 17 px strip and
+## collide with the main bar's art below it; the strip is far too thin to wear
+## the margins the main bar was drawn for.
+@export_range(0.0, 40.0, 1.0) var recovery_frame_expand_px: float = 8.0
 
 @export_category("Performance")
 ## Bounded per-press accumulation: a press at capacity retires the oldest mark
@@ -158,7 +156,6 @@ func _on_timing_pressed(
 		if mark.is_miss
 		else hit_color.lerp(hot_combo_color, heat)
 	)
-	mark.reach_px = lerpf(cold_strike_width_px, hot_strike_width_px, heat)
 	_marks.append(mark)
 	queue_redraw()
 
@@ -197,17 +194,22 @@ func _draw() -> void:
 
 	# The gauge belongs to the main bar even while the quick-save line is up:
 	# it is the streak being fought for, not the bar you are currently hitting.
-	_draw_charge(_to_local_rect(main_bar.get_global_rect()))
+	# It is placed against the drawn art rather than the Control rect, so it
+	# clears the frame's expand margins and stays outside the box.
+	_draw_charge(_drawn_frame_rect(main_bar))
 	_draw_recovery_frame(main_bar)
 
+	# Only a miss marks the track itself. A success used to strike a bright
+	# column at the slider, which sat exactly where the slider was and cost you
+	# the one thing you need after a hit: knowing where the slider now is. A
+	# success is reported entirely outside the track instead, by the frame
+	# flashing, the gauge gaining a segment, and the spark at the pickaxe.
 	for mark in _marks:
+		if not mark.is_miss:
+			continue
 		var mark_color := mark.color
 		mark_color.a = mark.life
-		var active_rect := _to_local_rect(bar.get_global_rect())
-		if mark.is_miss:
-			_draw_slash(mark, active_rect, mark_color)
-		else:
-			_draw_strike(mark, active_rect, mark_color)
+		_draw_slash(mark, _to_local_rect(bar.get_global_rect()), mark_color)
 
 	# The frame flash belongs to the newest press alone. One per mark stacks
 	# redraws during a streak and reads as a flicker rather than as a kick.
@@ -224,7 +226,7 @@ func _draw_charge(bar_rect: Rect2) -> void:
 		return
 	var track := Rect2(
 		bar_rect.position.x + charge_side_inset_px,
-		bar_rect.end.y - charge_bottom_inset_px - charge_height_px,
+		bar_rect.end.y + charge_gap_px,
 		bar_rect.size.x - charge_side_inset_px * 2.0,
 		charge_height_px
 	)
@@ -258,7 +260,41 @@ func _draw_charge(bar_rect: Rect2) -> void:
 			lit_color if is_lit else track_color
 		)
 
+	# Dividers first, quick-save notch second: where the two land on the same
+	# combo the notch is the more urgent read and should sit on top.
+	_draw_tier_dividers(track, segment_width, ceiling)
 	_draw_threshold_notch(track, segment_width, ceiling, lit_color)
+
+
+## The divisions at MiningConfig.combo_tier_thresholds. Crossing one is what
+## adds a music layer and punches the camera, so the gauge shows where those
+## steps are rather than leaving the escalation as something only heard.
+func _draw_tier_dividers(
+	track: Rect2,
+	segment_width: float,
+	ceiling: int
+) -> void:
+	var reached_combo := _current_combo()
+	for threshold: int in _tier_thresholds():
+		if threshold <= 0 or threshold > ceiling:
+			continue
+		var divider_color := hot_combo_color
+		divider_color.a = (
+			charge_lit_alpha * 0.5
+			if reached_combo >= threshold
+			else charge_track_alpha * 1.5
+		)
+		draw_rect(
+			Rect2(
+				track.position.x
+					+ segment_width * float(threshold)
+					- charge_segment_gap_px,
+				track.position.y,
+				maxf(charge_segment_gap_px, 1.0),
+				track.size.y
+			),
+			divider_color
+		)
 
 
 ## The standing mark at recovery_combo_threshold. Past it a miss buys a
@@ -303,25 +339,9 @@ func _draw_recovery_frame(main_bar: SliderTimingWindow) -> void:
 		return
 	var tint := recovery_color
 	tint.a = recovery_frame_strength
-	_tinted_style(frame_style, tint).draw(
+	_tinted_style(frame_style, tint, recovery_frame_expand_px).draw(
 		get_canvas_item(),
 		_to_local_rect(recovery_bar.get_global_rect())
-	)
-
-
-## Flat column struck at the slider, widening as it fades. It borrows the
-## slider's own shape and stays inside the bar, where the ring and spokes it
-## replaced sprawled across the depth number and the targets.
-func _draw_strike(mark: Mark, bar_rect: Rect2, mark_color: Color) -> void:
-	var width := mark.reach_px * lerpf(strike_spread, 1.0, mark.life)
-	draw_rect(
-		Rect2(
-			mark.position.x - width * 0.5,
-			bar_rect.position.y,
-			width,
-			bar_rect.size.y
-		),
-		mark_color
 	)
 
 
@@ -347,10 +367,34 @@ func _draw_frame_flash(mark: Mark, bar: SliderTimingWindow) -> void:
 	tint.a = mark.life * shine_strength
 	var kick := frame_kick_px * mark.life
 	var surface := _get_shine_surface(bar)
-	_tinted_style(frame_style, tint).draw(
+	# -1 keeps the art's authored margins, so the flash lands exactly on the
+	# frame it is flashing.
+	_tinted_style(frame_style, tint, -1.0).draw(
 		get_canvas_item(),
 		_to_local_rect(surface.get_global_rect()).grow(
 			-kick if mark.is_miss else kick
+		)
+	)
+
+
+## The rectangle the frame art actually covers: the Control rect grown by the
+## StyleBox's expand margins. Placing against this rather than the bare rect is
+## what keeps the gauge outside the drawn box even if the art's margins change.
+func _drawn_frame_rect(bar: SliderTimingWindow) -> Rect2:
+	var rect := _to_local_rect(_get_shine_surface(bar).get_global_rect())
+	var textured_style := _frame_style_of(bar) as StyleBoxTexture
+	if textured_style == null:
+		return rect
+	return Rect2(
+		rect.position - Vector2(
+			textured_style.expand_margin_left,
+			textured_style.expand_margin_top
+		),
+		rect.size + Vector2(
+			textured_style.expand_margin_left
+				+ textured_style.expand_margin_right,
+			textured_style.expand_margin_top
+				+ textured_style.expand_margin_bottom
 		)
 	)
 
@@ -382,15 +426,36 @@ func _get_shine_surface(bar: SliderTimingWindow) -> Control:
 ## Returns a tinted copy of one of the bar's styleboxes, duplicated once and
 ## reused, so a press never allocates and the bar's own resource is never
 ## written to. StyleBox has no shared tint property, so each kind sets its own.
-## Callers must draw immediately after asking, because one source box maps to
-## one shared copy.
-func _tinted_style(source_style: StyleBox, tint: Color) -> StyleBox:
+## expand_px overrides the art's nine-slice expand margins; pass -1 to keep
+## them. Callers must draw immediately after asking, because one source box maps
+## to one shared copy.
+func _tinted_style(
+	source_style: StyleBox,
+	tint: Color,
+	expand_px: float
+) -> StyleBox:
 	var tinted: StyleBox = _tinted_styles.get(source_style)
 	if tinted == null:
 		tinted = source_style.duplicate()
 		_tinted_styles[source_style] = tinted
 	if tinted is StyleBoxTexture:
-		(tinted as StyleBoxTexture).modulate_color = tint
+		var textured := tinted as StyleBoxTexture
+		textured.modulate_color = tint
+		var source_textured := source_style as StyleBoxTexture
+		textured.expand_margin_left = (
+			source_textured.expand_margin_left if expand_px < 0.0 else expand_px
+		)
+		textured.expand_margin_top = (
+			source_textured.expand_margin_top if expand_px < 0.0 else expand_px
+		)
+		textured.expand_margin_right = (
+			source_textured.expand_margin_right if expand_px < 0.0 else expand_px
+		)
+		textured.expand_margin_bottom = (
+			source_textured.expand_margin_bottom
+			if expand_px < 0.0
+			else expand_px
+		)
 	elif tinted is StyleBoxFlat:
 		var flat_style := tinted as StyleBoxFlat
 		flat_style.bg_color = Color(tint, tint.a * 0.3)
@@ -428,6 +493,14 @@ func _combo_ceiling() -> int:
 	if timing_window == null or timing_window.mining_config == null:
 		return 0
 	return maxi(timing_window.mining_config.maximum_effect_combo, 1)
+
+
+## Combos that promote the run into its next escalation step. Shared with
+## ComboDirector through the config, so the gauge and the music agree.
+func _tier_thresholds() -> Array[int]:
+	if timing_window == null or timing_window.mining_config == null:
+		return [] as Array[int]
+	return timing_window.mining_config.combo_tier_thresholds
 
 
 ## Combo at which a miss earns a quick-save instead of ending the streak.
