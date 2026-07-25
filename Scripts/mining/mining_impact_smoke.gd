@@ -33,6 +33,10 @@ class SmokeLobe:
 	var total_lifetime: float
 	var remaining_lifetime: float
 	var stuck_seconds: float
+	## Where the open space either side was last measured, and whether that
+	## answer is still good enough to draw with.
+	var sampled_position: Vector2
+	var needs_open_space_sample: bool = true
 
 
 class SmokeCloud:
@@ -197,6 +201,9 @@ func play_at_impact(
 		nearest_lobe.remaining_lifetime = nearest_lobe.total_lifetime
 		nearest_lobe.stuck_seconds = 0.0
 
+	# This strike just cut rock away, so every cached open-space answer is stale.
+	for existing_lobe in _cloud.lobes:
+		existing_lobe.needs_open_space_sample = true
 	_cloud.pressure = clampf(
 		_cloud.pressure
 			+ pressure_per_hit
@@ -280,24 +287,41 @@ func _advance_lobe(
 	delta: float
 ) -> void:
 	var previous_position := lobe.terrain_position
+	var previous_radius := lobe.current_radius
 	lobe.current_radius = move_toward(
 		lobe.current_radius,
 		lobe.target_radius,
 		growth_speed * delta
 	)
-	var open_horizontal_radii := _get_open_horizontal_radii(
-		lobe.terrain_position,
-		minf(
-			lobe.current_radius * horizontal_fill_scale,
-			maximum_horizontal_radius
+	# The open-space scan walks a cell at a time and is the only per-frame cost
+	# here that grows with how much open tunnel a puff sits in, so it is only
+	# redone once the puff has drifted or swollen far enough for the answer to
+	# change. Terrain edits force it directly, from play_at_impact.
+	var resample_distance := float(
+		terrain_manager.config.terrain_cell_world_size
+	) * 0.5
+	if (
+		lobe.needs_open_space_sample
+		or absf(lobe.current_radius - previous_radius) >= resample_distance
+		or lobe.terrain_position.distance_squared_to(
+			lobe.sampled_position
+		) >= resample_distance * resample_distance
+	):
+		var open_horizontal_radii := _get_open_horizontal_radii(
+			lobe.terrain_position,
+			minf(
+				lobe.current_radius * horizontal_fill_scale,
+				maximum_horizontal_radius
+			)
 		)
-	)
-	lobe.display_left_radius = open_horizontal_radii.x
-	lobe.display_right_radius = open_horizontal_radii.y
-	lobe.display_radius = minf(
-		lobe.display_left_radius,
-		lobe.display_right_radius
-	)
+		lobe.display_left_radius = open_horizontal_radii.x
+		lobe.display_right_radius = open_horizontal_radii.y
+		lobe.display_radius = minf(
+			lobe.display_left_radius,
+			lobe.display_right_radius
+		)
+		lobe.sampled_position = lobe.terrain_position
+		lobe.needs_open_space_sample = false
 	lobe.shape_phase += delta * (0.45 + _cloud.pressure * 0.8)
 	lobe.velocity *= drag_multiplier
 	lobe.velocity.y = minf(lobe.velocity.y, 0.0)
@@ -576,9 +600,14 @@ func _move_lobe(
 	):
 		lobe.terrain_position = next_position
 		return
-	if terrain_manager.is_solid_at_terrain_position(current_position):
-		# The puff is already inside rock, so every axis reads as blocked and
-		# nothing below would ever release it. Let it travel out of the wall.
+	# A puff already inside rock reads as blocked on every axis, and nothing
+	# below would ever release it. Only a puff that has already failed to move
+	# can be in that state, and this probe is the most expensive call on the
+	# smoke's per-frame path, so a puff still sliding along rock never pays it.
+	if (
+		lobe.stuck_seconds > 0.0
+		and terrain_manager.is_solid_at_terrain_position(current_position)
+	):
 		lobe.terrain_position = next_position
 		return
 
