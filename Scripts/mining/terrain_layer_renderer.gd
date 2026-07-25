@@ -2330,9 +2330,9 @@ func _create_hole_mask_data(
 ## cavity, and loose scribbles standing off in the surrounding rock. The outline
 ## is the broken edge and matches the characters' inked silhouettes, so it is
 ## kept; the scribbles read as marks lying on top of the dirt, so anything
-## further out than the authored reach fades away. Strata behind the authored
-## depth print nothing, which is what stops one hit from stacking four
-## near-parallel bands into the worms this replaced.
+## further out than the authored reach fades away. Each configured cuttable
+## stratum prints the stroke against its own smaller opening, while strata
+## behind the authored depth print nothing.
 func _write_fracture_lines(
 	fracture_source: Image,
 	cavity_cells: PackedByteArray,

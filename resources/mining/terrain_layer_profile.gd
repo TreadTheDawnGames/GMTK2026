@@ -184,10 +184,12 @@ extends Resource
 ## Multiplies the rock beneath a stroke rather than pasting neutral pixels over
 ## it, so an inked edge still carries the stratum's own hue.
 @export var fracture_shade_color: Color = Color(0.14, 0.11, 0.10)
-## How many strata in front carry the authored strokes at all. One inked rim
-## reads as a broken edge; four stacked copies read as concentric worms.
+## How many front strata carry the authored stroke around their own opening.
+## Set this to the number of cuttable strata to ink every exposed layer edge;
+## an immutable backing layer remains uninked because it has no opening.
 @export_range(0, 8, 1) var fracture_line_layer_depth: int = 1
-## Multiplies stroke strength again for each stratum behind the first.
+## Multiplies stroke strength again for each stratum behind the first. A value
+## of 1.0 gives every inked layer edge the same authored weight.
 @export_range(0.0, 1.0, 0.05) var fracture_line_depth_falloff: float = 0.4
 ## How far out from the cavity an authored stroke may sit before it is dropped,
 ## measured in the authored mask's own pixels, not world or mask-chunk pixels.
@@ -298,9 +300,8 @@ func get_layer_impact_offset(layer_index: int) -> Vector2:
 	return layer_impact_offsets[layer_index]
 
 
-## Returns how strongly one stratum prints the authored crack strokes. Strata
-## behind the authored depth draw none, so a single hit leaves one fracture
-## rather than one repeated per layer.
+## Returns how strongly one stratum prints the authored stroke around its own
+## opening. Strata behind the authored depth draw none.
 func get_fracture_line_layer_scale(layer_index: int) -> float:
 	if layer_index < 0 or layer_index >= fracture_line_layer_depth:
 		return 0.0
