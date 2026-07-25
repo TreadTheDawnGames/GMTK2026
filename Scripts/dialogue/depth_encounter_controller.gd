@@ -4,6 +4,7 @@ extends Node
 ## How it works:
 ## - Each encounter resource places one mineable chamber at an authored depth.
 ## - Crossing its ceiling captures the interaction even when one hit skips rows.
+## - Dialogue begins only after the presentation miner lands on that floor.
 ## - Stable actor IDs reuse presenters across visits and the cafe gathering.
 ## - Optional encounter stages own reversible movement and named line cues.
 ## - MiningCinematicFlow gates input while this controller owns an interaction.
@@ -67,8 +68,29 @@ func _on_depth_changed(depth: int) -> void:
 	)
 	if depth < ceiling_depth:
 		return
-	if _schedule_next_encounter():
-		_activate_pending_encounter()
+	_schedule_next_encounter()
+
+
+## Promotes a reserved encounter only after the visible fall reaches its floor.
+## Mining may report the crossed depth before ViewController receives its new
+## target, so activating from depth_changed can freeze focus at the old height.
+func _on_landing_reached(mining_y: int) -> void:
+	if (
+		_pending_encounter_index < 0
+		or _active_encounter_index >= 0
+		or not cinematic_flow.is_owned_by(FLOW_OWNER)
+	):
+		return
+	var pending_encounter := encounter_config.encounters[
+		_pending_encounter_index
+	]
+	var encounter_floor_y := (
+		mining_config.initial_surface_row
+		+ pending_encounter.resolve_depth(mining_config.total_run_depth)
+	)
+	if mining_y < encounter_floor_y:
+		return
+	_activate_pending_encounter()
 
 
 func _can_schedule_next_encounter() -> bool:

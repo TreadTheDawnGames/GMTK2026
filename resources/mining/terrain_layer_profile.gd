@@ -189,11 +189,24 @@ extends Resource
 @export_range(0, 8, 1) var fracture_line_layer_depth: int = 1
 ## Multiplies stroke strength again for each stratum behind the first.
 @export_range(0.0, 1.0, 0.05) var fracture_line_depth_falloff: float = 0.4
-## How far out from the cavity an authored stroke may sit before it is dropped.
-## The mask art outlines its hole and then adds loose scribbles standing off in
-## the surrounding rock. The outline is the inked edge that matches the
-## characters; the scribbles read as marks lying on top of the dirt.
-@export_range(1.0, 128.0, 1.0) var fracture_rim_reach_px: float = 9.0
+## How far out from the cavity an authored stroke may sit before it is dropped,
+## measured in the authored mask's own pixels, not world or mask-chunk pixels.
+## The hole art inks its rim and then throws crack spurs out into the
+## surrounding rock; both belong to the drawing. This exists only to drop
+## strokes that have wandered far enough out to read as marks lying on the dirt
+## rather than as part of the break, so it has to clear the authored spurs. At
+## the delivered 512px masks the spurs reach about 70px.
+@export_range(1.0, 256.0, 1.0) var fracture_rim_reach_px: float = 96.0
+## Restores the authored stroke at screen resolution. The mask stores strokes at
+## mask_pixels_per_cell, so without this a drawn line arrives as a soft grey
+## ramp however boldly it was inked. See the shader block for the method.
+@export var fracture_line_sharpen: bool = true
+## Multiplies recovered stroke coverage before it is re-thresholded, which is
+## what pulls a stroke that the per-hit downscale left partial back to full ink.
+@export_range(1.0, 4.0, 0.05) var fracture_line_gain: float = 1.6
+## Stroke weight in world pixels. Authored in world space so a stroke keeps the
+## same drawn weight whether it was stamped into a small hole or a large one.
+@export_range(0.0, 8.0, 0.25) var fracture_line_weight_world_px: float = 0.5
 
 @export_category("Encounter Chambers")
 ## Lowers layer one so layer two forms the visible chamber standing surface.

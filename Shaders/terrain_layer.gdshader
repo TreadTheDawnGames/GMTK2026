@@ -8,6 +8,9 @@ shader_type canvas_item;
 // - Three scatter passes place drawn rocks from one atlas, far to near, gated by
 //   a shared cluster field so stones arrive in piles instead of a sprinkle.
 // - The mask luminance carries fracture strokes while alpha carries cutouts.
+// - Both are stored below world resolution, so both are re-thresholded here
+//   against their own screen gradient: the cut stays a crisp edge and the
+//   authored stroke stays a drawn line instead of a filtered smudge.
 // - The terrain mask affects only alpha; fracture art affects only shaded RGB.
 // - All work is loop-free and constant per fragment for GL Compatibility/web.
 
@@ -93,6 +96,20 @@ uniform bool use_layer_edge_shading = true;
 uniform float edge_shade_world_pixels = 6.0;
 uniform float edge_shade_strength = 0.45;
 uniform float edge_light_strength = 0.3;
+
+// Authored crack strokes. The renderer prints them into the mask's luminance,
+// but the mask is stored well below world resolution, so a stroke the artist
+// inked several pixels thick arrives about one mask pixel wide and is then
+// magnified with linear filtering into a grey smudge. These restore the drawn
+// line at screen resolution: widen it by a world-space weight so it does not
+// thin out as a hole is stamped larger, then re-threshold it against its own
+// screen gradient the same way sharpen_mask_edges does for the cut itself.
+// fracture_line_ink is this stratum's darkest authored stroke value, so zero
+// disables the whole block for the strata that print no strokes at all.
+uniform bool sharpen_fracture_lines = true;
+uniform float fracture_line_ink = 0.0;
+uniform float fracture_line_gain = 1.6;
+uniform float fracture_line_weight_world_px = 0.5;
 
 // Surface dressing. Grass and the packed crust belong to the foreground
 // stratum itself rather than to an overlay, so digging removes them for free:
@@ -668,6 +685,34 @@ void fragment() {
 			surface_color,
 			neighbor_alpha
 		);
+	}
+
+	// Recover the drawn stroke before it shades anything. Neighbour taps are
+	// gated on their own solidity: a cleared mask pixel carries luminance zero,
+	// which would otherwise read as maximum ink and ring every opening in the
+	// chunk with a line no artist drew.
+	if (sharpen_fracture_lines && fracture_line_ink > 0.0) {
+		float ink = 1.0 - fracture_value;
+		if (fracture_line_weight_world_px > 0.0) {
+			vec2 ink_step = vec2(fracture_line_weight_world_px)
+				/ max(chunk_world_size, vec2(1.0));
+			vec4 ink_left = texture(TEXTURE, UV - vec2(ink_step.x, 0.0));
+			vec4 ink_right = texture(TEXTURE, UV + vec2(ink_step.x, 0.0));
+			vec4 ink_up = texture(TEXTURE, UV - vec2(0.0, ink_step.y));
+			vec4 ink_down = texture(TEXTURE, UV + vec2(0.0, ink_step.y));
+			ink = max(ink, (1.0 - ink_left.r) * step(0.5, ink_left.a));
+			ink = max(ink, (1.0 - ink_right.r) * step(0.5, ink_right.a));
+			ink = max(ink, (1.0 - ink_up.r) * step(0.5, ink_up.a));
+			ink = max(ink, (1.0 - ink_down.r) * step(0.5, ink_down.a));
+		}
+		ink = clamp(ink / fracture_line_ink, 0.0, 1.0);
+		float ink_softness = max(fwidth(ink), 0.0001);
+		ink = smoothstep(
+			0.5 - ink_softness,
+			0.5 + ink_softness,
+			ink * fracture_line_gain
+		);
+		fracture_value = 1.0 - ink * fracture_line_ink;
 	}
 
 	// A stroke tints the rock toward its own deep-earth tone instead of printing

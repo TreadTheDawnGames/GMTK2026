@@ -50,6 +50,9 @@ var _cinematic_rest_visual_scale: Vector2
 var _cinematic_rest_z_index: int
 var _cinematic_rest_z_as_relative: bool
 var _cinematic_tween: Tween
+@onready var _audio_handler: PlayerAudioHandler = (
+	PlayerAudioHandler.get_global(self)
+)
 
 
 ## Connects animation events and starts the idle animation.
@@ -99,7 +102,7 @@ func _show_success_wind_up() -> void:
 ## Reports the hammer-tip position when the animation reaches the ground.
 func _emit_success_impact() -> void:
 	_set_miner_texture(impact_miner_texture)
-	AudioHandler.play_sound(AudioLibrary.IMPACT)
+	_audio_handler.play_sound(AudioLibrary.IMPACT)
 	impact_contact.emit(impact_point.global_position)
 
 

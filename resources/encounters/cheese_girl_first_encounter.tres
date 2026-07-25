@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
 [ext_resource type="Resource" path="res://resources/encounters/cheese_girl_character_appearance.tres" id="2_appearance"]
 [ext_resource type="Resource" path="res://resources/dialogue/cheese_girl_first_conversation.tres" id="3_dialogue"]
-[ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="5_stage"]
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/cheese_girl_encounter_stage.tscn" id="5_stage"]
 
 [resource]
 script = ExtResource("1_encounter")

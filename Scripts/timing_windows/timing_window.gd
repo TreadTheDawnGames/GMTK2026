@@ -24,6 +24,9 @@ var stored_combo : int = 0
 @export var combo_lost_color: Color = Color.RED
 
 @onready var _game_state: RunState = RunState.get_global(self)
+@onready var _audio_handler: PlayerAudioHandler = (
+	PlayerAudioHandler.get_global(self)
+)
 var _target_unlocks: Array[PickaxeDefinition] = []
 
 ## Connects both timing bars to the combo flow.
@@ -101,7 +104,7 @@ func _mining_window_pressed(
 			(mining_config.combo_speed_multiplier)
 		)
 		if not AudioLibrary.MINE_SOUNDS.is_empty():
-			AudioHandler.play_sound(AudioLibrary.MINE_SOUNDS[
+			_audio_handler.play_sound(AudioLibrary.MINE_SOUNDS[
 				clampi(combo - 1, 0, AudioLibrary.MINE_SOUNDS.size() - 1)
 			],)
 
@@ -127,10 +130,10 @@ func _mining_window_pressed(
 	else:
 		stored_combo = combo
 		if combo >= mining_config.recovery_combo_threshold:
-			AudioHandler.play_sound(AudioLibrary.MISS_WITH_SAVE)
+			_audio_handler.play_sound(AudioLibrary.MISS_WITH_SAVE)
 			await mining_window.pause(true)
 			recovery_window.start()
-			AudioHandler.play_sound(AudioLibrary.SAVE_BUILDUP)
+			_audio_handler.play_sound(AudioLibrary.SAVE_BUILDUP)
 		else:
 			var lost_combo := combo
 			pressed.emit(false, combo, 0)
@@ -140,7 +143,7 @@ func _mining_window_pressed(
 			mining_window.remove_all_extra_targets()
 			mining_window.speed_multiplier = 1.0
 			mining_window.play_animation(Color.RED)
-			AudioHandler.play_sound(AudioLibrary.STREAK_LOST)
+			_audio_handler.play_sound(AudioLibrary.STREAK_LOST)
 			mining_window.reset_all_targets()
 
 
@@ -157,7 +160,7 @@ func _recovery_window_pressed(
 		mining_window.reset_all_targets()
 		pressed.emit(false, combo, 0)
 		streak_ended.emit(lost_combo)
-		AudioHandler.play_sound(AudioLibrary.STREAK_LOST)
+		_audio_handler.play_sound(AudioLibrary.STREAK_LOST)
 		#recovery_window.stop()
 
 		mining_window.speed_multiplier = 1.0
@@ -169,7 +172,7 @@ func _recovery_window_pressed(
 		recovery_window.speed_multiplier *= (
 			(mining_config.recovery_speed_multiplier)
 		)
-		AudioHandler.play_sound(AudioLibrary.SAVE)
+		_audio_handler.play_sound(AudioLibrary.SAVE)
 		recovery_window.animation_color = combo_saved_color
 		
 	await recovery_window.pause(true)

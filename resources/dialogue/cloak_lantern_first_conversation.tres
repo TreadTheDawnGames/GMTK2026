@@ -27,7 +27,7 @@ text = "..."
 [sub_resource type="Resource" id="Line_thief"]
 script = ExtResource("3_line")
 speaker_slot = &"cloak_lantern"
-text = "If you seek the Thief, remember: not everything below wishes to be found."
+text = "How many people do you have to meet until you start to see how lonely they are?"
 
 [resource]
 script = ExtResource("1_conversation")

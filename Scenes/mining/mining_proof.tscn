@@ -26,7 +26,7 @@
 [ext_resource type="Script" uid="uid://cxysje4e2miht" path="res://Scripts/ui/depth_review_control.gd" id="39_depth_review"]
 [ext_resource type="PackedScene" path="res://Scenes/mining/mining_impact_smoke.tscn" id="40_impact_smoke"]
 [ext_resource type="Script" path="res://Scripts/dialogue/run_intro_controller.gd" id="42_intro_controller"]
-[ext_resource type="Resource" path="res://resources/encounters/old_miner_character_appearance.tres" id="44_intro_appearance"]
+[ext_resource type="Resource" path="res://resources/encounters/newspaper_reader_character_appearance.tres" id="44_intro_appearance"]
 [ext_resource type="Script" path="res://Scripts/mining/mining_cinematic_flow.gd" id="45_cinematic_flow"]
 [ext_resource type="PackedScene" path="res://Scenes/dialogue/final_encounter.tscn" id="50_final_encounter"]
 [ext_resource type="Script" path="res://Scripts/mining/surface_presentation.gd" id="52_surface_presentation"]

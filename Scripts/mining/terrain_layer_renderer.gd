@@ -1963,19 +1963,28 @@ func _get_resized_stamp_images(
 		return cached_images
 
 	var stamp_images := ResizedStampImages.new()
+	# blit_rect_mask cuts wherever the mask alpha is not exactly zero, so an
+	# interpolated erase mask cuts its whole feathered skirt at full strength and
+	# the opening creeps about a third of a pixel past the drawing - taking the
+	# inked rim, which is only about one pixel wide at this scale, with it.
+	# Nearest keeps the cut on the silhouette the artist drew. Nothing is lost by
+	# it: the cut was already hard-edged, because that same test discards every
+	# partial value bilinear produced.
 	stamp_images.erase_mask = _transform_stamp_image(
 		mask_data.erase_mask,
 		stamp_size,
 		flip_x,
 		flip_y,
-		rotation_quarters
+		rotation_quarters,
+		Image.INTERPOLATE_NEAREST
 	)
 	stamp_images.fracture_source = _transform_stamp_image(
 		mask_data.fracture_source,
 		stamp_size,
 		flip_x,
 		flip_y,
-		rotation_quarters
+		rotation_quarters,
+		Image.INTERPOLATE_BILINEAR
 	)
 	stamp_images.transparent_source = Image.create(
 		stamp_size.x,
@@ -2007,18 +2016,22 @@ func _clear_temporary_stamp_cache() -> void:
 
 
 ## Applies one cached orientation identically to the hole and its drawn cracks.
+## The cavity and the strokes take different filters for the reason given at the
+## call site, so the caller states which one it wants rather than sharing a
+## default that is only correct for one of them.
 func _transform_stamp_image(
 	source: Image,
 	stamp_size: Vector2i,
 	flip_x: bool,
 	flip_y: bool,
-	rotation_quarters: int
+	rotation_quarters: int,
+	interpolation: Image.Interpolation
 ) -> Image:
 	var transformed := source.duplicate()
 	transformed.resize(
 		stamp_size.x,
 		stamp_size.y,
-		Image.INTERPOLATE_BILINEAR
+		interpolation
 	)
 	if flip_x:
 		transformed.flip_x()
@@ -2036,7 +2049,7 @@ func _transform_stamp_image(
 		transformed.resize(
 			stamp_size.x,
 			stamp_size.y,
-			Image.INTERPOLATE_BILINEAR
+			interpolation
 		)
 	return transformed
 
@@ -2201,7 +2214,12 @@ func _create_hole_mask_data(
 		false,
 		Image.FORMAT_LA8
 	)
-	fracture_source.fill(Color(1.0, 1.0, 1.0, 0.0))
+	# Carry the stroke value in the unwritten pixels too. Coverage lives in
+	# alpha, and the per-hit resize interpolates luminance and alpha separately,
+	# so a white backing would mix a shrinking stroke toward white before its
+	# coverage ever reached blend_rect - fading the same line twice.
+	var line_value := 1.0 - profile.fracture_line_strength
+	fracture_source.fill(Color(line_value, line_value, line_value, 0.0))
 	var writes_fracture_lines := fracture_line_scale > 0.0
 	# Three temporary buffers the size of one authored mask. They are local to
 	# this call and released with it; nothing accumulates per hit or per chunk.
@@ -2549,6 +2567,26 @@ func _create_layer_material(
 	material.set_shader_parameter(
 		&"fracture_shade_color",
 		profile.fracture_shade_color
+	)
+	# The darkest stroke value this stratum can hold, which is what the shader
+	# normalises recovered ink against. Strata past fracture_line_layer_depth
+	# print nothing, so this is zero for them and the recovery block is skipped.
+	material.set_shader_parameter(
+		&"fracture_line_ink",
+		profile.fracture_line_strength
+			* profile.get_fracture_line_layer_scale(layer_index)
+	)
+	material.set_shader_parameter(
+		&"sharpen_fracture_lines",
+		profile.fracture_line_sharpen
+	)
+	material.set_shader_parameter(
+		&"fracture_line_gain",
+		profile.fracture_line_gain
+	)
+	material.set_shader_parameter(
+		&"fracture_line_weight_world_px",
+		profile.fracture_line_weight_world_px
 	)
 	material.set_shader_parameter(
 		&"dirt_shade_steps",

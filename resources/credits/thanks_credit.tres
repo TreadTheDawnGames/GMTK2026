@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="CreditEntry" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/credits/credit_entry.gd" id="1_entry"]
+
+[resource]
+script = ExtResource("1_entry")
+depth_offset = 175
+heading = "THANK YOU FOR PLAYING"
+body = "THE END IS BEHIND YOU.
+
+KEEP DIGGING."
