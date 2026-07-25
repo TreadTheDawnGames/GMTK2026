@@ -485,6 +485,13 @@ func _sync_encounter_selector() -> void:
 		return
 	_encounter_selector.disabled = false
 	var selected_index := 0
+	# A stage that names no encounter must not show one as if it were chosen.
+	# Selecting an item programmatically emits nothing, so a dropdown reading
+	# "cheese_girl_first" while the preview holds no encounter id would leave
+	# every button below it refusing to act for no visible reason.
+	if _context.preview.encounter_id.is_empty():
+		_encounter_selector.add_item("— pick the encounter to author —")
+		_encounter_selector.set_item_metadata(0, &"")
 	for encounter in encounter_config.encounters:
 		if encounter == null:
 			continue
@@ -506,9 +513,10 @@ func _sync_encounter_selector() -> void:
 func _on_encounter_selected(item_index: int) -> void:
 	if _context == null or _context.preview == null:
 		return
-	_context.preview.encounter_id = _encounter_selector.get_item_metadata(
-		item_index
-	)
+	var chosen: StringName = _encounter_selector.get_item_metadata(item_index)
+	if chosen.is_empty():
+		return
+	_context.preview.encounter_id = chosen
 	_context.encounter = _context.preview.get_encounter()
 	_context.sculpt = _context.preview.get_sculpt()
 	_context.notify_authored_data_changed()
