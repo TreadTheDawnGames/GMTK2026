@@ -1,8 +1,9 @@
-[gd_resource type="Resource" script_class="DepthCharacterEncounter" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="DepthCharacterEncounter" format=3 uid="uid://bi6dnpfhd6y3m"]
 
-[ext_resource type="Script" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
+[ext_resource type="Script" uid="uid://sqs37vj87ep8" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
 [ext_resource type="Resource" path="res://resources/encounters/cheese_girl_character_appearance.tres" id="2_appearance"]
 [ext_resource type="Resource" path="res://resources/dialogue/cheese_girl_first_conversation.tres" id="3_dialogue"]
+[ext_resource type="Resource" uid="uid://fmu3mx22a3fu" path="res://resources/cinematics/sculpts/cheese_girl_first_room.tres" id="5_nacqn"]
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/cheese_girl_encounter_stage.tscn" id="5_stage"]
 
 [resource]
@@ -14,3 +15,4 @@ appearance = ExtResource("2_appearance")
 conversation = ExtResource("3_dialogue")
 stage_scene = ExtResource("5_stage")
 speaker_slot = &"cheese_girl"
+terrain_sculpt = ExtResource("5_nacqn")

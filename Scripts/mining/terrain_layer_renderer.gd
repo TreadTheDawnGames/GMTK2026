@@ -2549,12 +2549,13 @@ func _create_layer_material(
 		profile.rock_loner_scale
 	)
 	material.set_shader_parameter(
-		&"rock_depth_ramp_world_px",
-		profile.rock_depth_ramp_world_px
+		&"rock_run_world_px",
+		float(terrain_manager.config.total_run_depth)
+			* float(terrain_manager.config.terrain_cell_world_size)
 	)
 	material.set_shader_parameter(
-		&"rock_depth_ramp_gain",
-		profile.rock_depth_ramp_gain
+		&"rock_bottom_density_multiplier",
+		profile.rock_bottom_density_multiplier
 	)
 	material.set_shader_parameter(
 		&"use_rock_shadows",
@@ -2563,6 +2564,53 @@ func _create_layer_material(
 	material.set_shader_parameter(
 		&"rock_shadow_strength",
 		profile.rock_shadow_strength
+	)
+	# Foreground crystals are part of the intact face, not mined-out outcrops.
+	# Only layer zero pays the additional atlas read; its terrain mask clips the
+	# crystal automatically when that piece of rock is removed.
+	material.set_shader_parameter(
+		&"foreground_gem_texture",
+		profile.foreground_gem_texture
+	)
+	material.set_shader_parameter(
+		&"use_foreground_gems",
+		layer_index == 0
+			and profile.foreground_gem_texture != null
+			and profile.foreground_gem_density > 0.0
+	)
+	material.set_shader_parameter(
+		&"foreground_gem_atlas_count",
+		profile.foreground_gem_atlas_count
+	)
+	var foreground_gem_aspect := 1.0
+	if (
+		profile.foreground_gem_texture != null
+		and profile.foreground_gem_texture.get_height() > 0
+	):
+		foreground_gem_aspect = (
+			float(profile.foreground_gem_texture.get_width())
+			/ float(maxi(profile.foreground_gem_atlas_count, 1))
+			/ float(profile.foreground_gem_texture.get_height())
+		)
+	material.set_shader_parameter(
+		&"foreground_gem_cell_aspect",
+		foreground_gem_aspect
+	)
+	material.set_shader_parameter(
+		&"foreground_gem_density",
+		profile.foreground_gem_density
+	)
+	material.set_shader_parameter(
+		&"foreground_gem_cell_world_px",
+		profile.foreground_gem_cell_world_px
+	)
+	material.set_shader_parameter(
+		&"foreground_gem_minimum_height",
+		profile.foreground_gem_minimum_height
+	)
+	material.set_shader_parameter(
+		&"foreground_gem_maximum_height",
+		profile.foreground_gem_maximum_height
 	)
 	material.set_shader_parameter(
 		&"fracture_shade_color",

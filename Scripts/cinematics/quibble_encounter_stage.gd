@@ -4,23 +4,23 @@ extends CharacterEncounterStage
 ## How it works:
 ## - prepare() starts Quibble's presentation-only vibration and coffee clock.
 ## - The sprite snaps through a tiny fixed jitter pattern at a bounded rate.
-## - Every seven seconds it plays hold, drink, hold, then returns to idle.
+## - Rapidly repeats hold, gulp, hold, then returns briefly to idle.
 ## - Dialogue may still request poses; the next coffee phase resumes the loop.
 ## - Closing or cancellation restores the exact authored sprite position.
 ## - The invariant is that Quibble never moves the authoritative actor root.
 
-const DRINK_INTERVAL_SECONDS: float = 7.0
-const HOLD_CUP_SECONDS: float = 0.18
-const DRINK_SECONDS: float = 0.72
-const JITTER_STEP_SECONDS: float = 0.035
+const DRINK_INTERVAL_SECONDS: float = 1.25
+const HOLD_CUP_SECONDS: float = 0.08
+const DRINK_SECONDS: float = 0.22
+const JITTER_STEP_SECONDS: float = 0.02
 const JITTER_OFFSETS := [
-	Vector2(-2.0, 0.0),
-	Vector2(2.0, -1.0),
-	Vector2(-1.0, 1.0),
-	Vector2(1.0, 0.0),
-	Vector2(0.0, -1.0),
-	Vector2(2.0, 1.0),
-	Vector2(-2.0, -1.0),
+	Vector2(-3.0, 0.0),
+	Vector2(3.0, -2.0),
+	Vector2(-2.0, 2.0),
+	Vector2(2.0, 0.0),
+	Vector2(0.0, -2.0),
+	Vector2(3.0, 2.0),
+	Vector2(-3.0, -2.0),
 	Vector2.ZERO,
 ]
 

@@ -119,8 +119,6 @@ func _skip_run_intro() -> void:
 	arrival.bus_arrival_seconds = 0.2
 	arrival.bus_settle_seconds = 0.0
 	arrival.miner_exit_delay_seconds = 0.05
-	arrival.miner_reveal_hold_seconds = 0.05
-	arrival.miner_walk_seconds = 0.1
 	arrival.hold_before_dialogue_seconds = 0.0
 	arrival.bus_departure_seconds = 0.2
 	if director.cinematic_frame != null:

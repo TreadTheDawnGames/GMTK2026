@@ -7,6 +7,7 @@ shader_type canvas_item;
 // - Shared world-space bedding fades in as strata become deeper.
 // - Three scatter passes place drawn rocks from one atlas, far to near, gated by
 //   a shared cluster field so stones arrive in piles instead of a sprinkle.
+// - One rare atlas pass embeds deterministic crystals in the foreground only.
 // - The mask luminance carries fracture strokes while alpha carries cutouts.
 // - Both are stored below world resolution, so both are re-thresholded here
 //   against their own screen gradient: the cut stays a crisp edge and the
@@ -74,16 +75,27 @@ uniform float rock_cluster_coverage = 0.5;
 // Presence multiplier for a cell outside every cluster, so bare dirt still
 // carries the occasional loner instead of being perfectly clean.
 uniform float rock_loner_scale = 0.22;
-// Rock presence also ramps with how far below the original ground line a pixel
-// sits, so topsoil stays clean and the deep run becomes visibly stonier. The
-// ramp reaches its full gain rock_depth_ramp_world_px below the surface.
-uniform float rock_depth_ramp_world_px = 2600.0;
-uniform float rock_depth_ramp_gain = 2.4;
+// Rock presence ramps linearly across the entire run. A bottom multiplier of
+// 2.0 therefore produces 1.5x density at the halfway depth.
+uniform float rock_run_world_px = 800000.0;
+uniform float rock_bottom_density_multiplier = 2.0;
 // Seats the near rocks on the dirt by printing their own displaced silhouette
 // underneath them. This is the fourth and last atlas read; leave it off if a
 // web build ever needs the sample back.
 uniform bool use_rock_shadows = true;
 uniform float rock_shadow_strength = 0.45;
+
+// Rare foreground crystals. This pass is disabled on every buried stratum, so
+// only layer zero pays its one atlas read. The shared terrain mask later clips
+// each crystal with the intact rock, requiring no persistent spawn records.
+uniform sampler2D foreground_gem_texture : source_color, filter_linear;
+uniform bool use_foreground_gems = false;
+uniform int foreground_gem_atlas_count = 5;
+uniform float foreground_gem_cell_aspect = 0.5667;
+uniform float foreground_gem_density = 0.008;
+uniform float foreground_gem_cell_world_px = 96.0;
+uniform float foreground_gem_minimum_height = 24.0;
+uniform float foreground_gem_maximum_height = 42.0;
 
 // Cut-edge shading. Every stratum's mask is beveled against its own opening so
 // the rims read as one connected rock face receding backward, instead of flat
@@ -308,10 +320,10 @@ vec4 sample_drawn_rock(
 	// Depth is measured from the cell center as well, for the same reason.
 	float depth_gain = mix(
 		1.0,
-		max(rock_depth_ramp_gain, 0.0),
+		max(rock_bottom_density_multiplier, 0.0),
 		clamp(
 			(cell_center_world.y - surface_world_y)
-				/ max(rock_depth_ramp_world_px, 1.0),
+				/ max(rock_run_world_px, 1.0),
 			0.0,
 			1.0
 		)
@@ -421,6 +433,102 @@ vec4 sample_drawn_rock(
 		mix(stone, dirt_surface * 0.94, depth_fade),
 		silhouette * footprint * rock_present
 	);
+}
+
+// Samples the one deterministic crystal candidate owned by this scatter cell.
+// The candidate's rotated bounding circle stays inside its cell, so no neighbor
+// search is needed and a crystal cannot be clipped by a procedural grid edge.
+vec4 sample_foreground_gem(vec2 world_position) {
+	float cell_world_px = max(foreground_gem_cell_world_px, 1.0);
+	vec2 grid_position = world_position / cell_world_px + vec2(19.7, 73.1);
+	vec2 gem_cell = floor(grid_position);
+	vec2 cell_local = fract(grid_position);
+	vec2 gem_seed = gem_cell + vec2(41.3, 7.9);
+	float gem_present = step(
+		1.0 - clamp(foreground_gem_density, 0.0, 1.0),
+		dirt_hash(gem_seed)
+	);
+
+	float minimum_height = min(
+		foreground_gem_minimum_height,
+		foreground_gem_maximum_height
+	);
+	float maximum_height = max(
+		foreground_gem_minimum_height,
+		foreground_gem_maximum_height
+	);
+	float height_fraction = mix(
+		minimum_height,
+		maximum_height,
+		dirt_hash(gem_seed + vec2(13.1, 61.7))
+	) / cell_world_px;
+	float aspect = max(foreground_gem_cell_aspect, 0.01);
+	float gem_angle = dirt_hash(gem_seed + vec2(29.3, 17.5)) * 6.2831853;
+	float gem_cosine = cos(gem_angle);
+	float gem_sine = sin(gem_angle);
+	float bounding_radius = height_fraction
+		* 0.5
+		* sqrt(1.0 + aspect * aspect);
+	float jitter_reach = max(0.5 - bounding_radius, 0.0);
+	vec2 gem_center = vec2(0.5) + jitter_reach * (
+		vec2(
+			dirt_hash(gem_seed + vec2(5.7, 47.9)),
+			dirt_hash(gem_seed + vec2(83.1, 3.7))
+		) * 2.0 - 1.0
+	);
+	vec2 gem_delta = cell_local - gem_center;
+	vec2 rotated_delta = vec2(
+		gem_cosine * gem_delta.x + gem_sine * gem_delta.y,
+		gem_cosine * gem_delta.y - gem_sine * gem_delta.x
+	);
+	vec2 gem_uv = rotated_delta / vec2(
+		height_fraction * aspect,
+		height_fraction
+	) + vec2(0.5);
+	vec2 inside_low = step(vec2(0.0), gem_uv);
+	vec2 inside_high = step(gem_uv, vec2(1.0));
+	float footprint = (
+		inside_low.x * inside_low.y * inside_high.x * inside_high.y
+	);
+
+	float atlas_count = float(max(foreground_gem_atlas_count, 1));
+	float atlas_index = min(
+		floor(
+			dirt_hash(gem_seed + vec2(71.9, 23.3))
+				* atlas_count
+		),
+		atlas_count - 1.0
+	);
+	float mirrored_u = mix(
+		gem_uv.x,
+		1.0 - gem_uv.x,
+		step(0.5, dirt_hash(gem_seed + vec2(37.7, 89.1)))
+	);
+	vec4 art = texture(
+		foreground_gem_texture,
+		vec2(
+			(atlas_index + clamp(mirrored_u, 0.0, 1.0))
+				/ atlas_count,
+			clamp(gem_uv.y, 0.0, 1.0)
+		)
+	);
+	float alpha_softness = max(fwidth(art.a), 0.0001);
+	float silhouette = smoothstep(
+		0.5 - alpha_softness,
+		0.5 + alpha_softness,
+		art.a
+	);
+	return vec4(art.rgb, silhouette * footprint * gem_present);
+}
+
+// Keeps the optional crystal composition identical whether drawn rocks are
+// enabled or the foreground is using dirt plus gems alone.
+vec3 apply_foreground_gem(vec3 surface_color, vec2 world_position) {
+	if (!use_foreground_gems) {
+		return surface_color;
+	}
+	vec4 foreground_gem = sample_foreground_gem(world_position);
+	return mix(surface_color, foreground_gem.rgb, foreground_gem.a);
 }
 
 // Grass helpers. Godot will not let a user function take the built-in TEXTURE
@@ -544,7 +652,7 @@ vec3 apply_strata_texture(vec3 surface_color, vec2 world_position) {
 		detail_mix
 	);
 	if (!use_rock_texture) {
-		return dirt_only_surface;
+		return apply_foreground_gem(dirt_only_surface, world_position);
 	}
 
 	// Drawn rock clusters, composited far to near over the finished dirt. The
@@ -616,11 +724,12 @@ vec3 apply_strata_texture(vec3 surface_color, vec2 world_position) {
 		ROCK_NEAR_PRESENCE,
 		0.0
 	);
-	return mix(
+	vec3 detailed_surface = mix(
 		clustered_surface,
 		near_rock.rgb,
 		near_rock.a * rock_strength
 	);
+	return apply_foreground_gem(detailed_surface, world_position);
 }
 
 // Composes optional art, tint, procedural strata detail, and the damage mask.

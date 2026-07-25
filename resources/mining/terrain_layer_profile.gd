@@ -82,11 +82,9 @@ extends Resource
 ## Presence multiplier for a scatter cell outside every cluster, which is what
 ## leaves the occasional loner in otherwise clean dirt.
 @export_range(0.0, 1.0, 0.01) var rock_loner_scale: float = 0.15
-## Rock presence also climbs with distance below the original ground line, so
-## topsoil stays readable and the deep run becomes visibly stonier. The ramp
-## reaches its full gain this far below the surface.
-@export_range(64.0, 20_000.0, 10.0) var rock_depth_ramp_world_px: float = 2600.0
-@export_range(1.0, 6.0, 0.1) var rock_depth_ramp_gain: float = 2.4
+## Rock presence climbs linearly across the full run. At the default 2x bottom
+## multiplier, reaching half depth gives exactly 1.5x the starting probability.
+@export_range(1.0, 6.0, 0.1) var rock_bottom_density_multiplier: float = 2.0
 ## Prints each near rock's own displaced silhouette underneath it, so a cluster
 ## sits on the dirt instead of on top of it. This is the shader's fourth and last
 ## atlas read per pixel; turn it off to buy that sample back on the web build.
@@ -108,6 +106,17 @@ extends Resource
 	Color(0.07, 0.06, 0.05),
 	Color(0.05, 0.04, 0.04),
 ])
+
+@export_category("Foreground Gems")
+## Rare crystals share the foreground terrain mask, so they may appear anywhere
+## on intact front rock and disappear with that rock when it is mined.
+@export var foreground_gem_texture: Texture2D
+@export_range(1, 16, 1) var foreground_gem_atlas_count: int = 5
+## Probability that one world-space scatter cell contains a crystal.
+@export_range(0.0, 1.0, 0.001) var foreground_gem_density: float = 0.008
+@export_range(32.0, 256.0, 1.0) var foreground_gem_cell_world_px: float = 96.0
+@export_range(4.0, 160.0, 1.0) var foreground_gem_minimum_height: float = 24.0
+@export_range(4.0, 160.0, 1.0) var foreground_gem_maximum_height: float = 42.0
 
 ## Flat shading bands the dirt variation is quantised into, matching the hard
 ## steps the characters are drawn with. Zero keeps a continuous gradient.

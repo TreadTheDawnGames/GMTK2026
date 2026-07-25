@@ -16,18 +16,15 @@ until the bars settle on `bar_height_ratio`. Keep `StartFadeOverlay`'s colour
 matched to the bars or the handover will flash.
 
 Beats, in order: blackout splits open, hold, the bus drives in **right to left**
-and settles right on top of the stop, its door opens, the miner gets off out of
-sight behind it, the bus pulls away left and its trailing edge **wipes him into
-view**, and he walks left to his dig spot at centre screen. He turns to face the
-stop before anyone speaks. Every duration is an Inspector property on the
-sequence root.
+and settles at centre screen on top of the stop, its door opens, the miner gets
+off out of sight behind it at his centre-screen dig spot, and the bus pulls away
+left so its trailing edge **wipes him into view** already beside the newspaper
+reader. Every duration is an Inspector property on the sequence root.
 
 The reveal depends on draw order: `Bus` is `z_index 5`, in front of the whole
 cast, and parked at `BusStopAnchor` it covers the shelter completely. The miner
 is placed at `MinerDropOffAnchor` *while still hidden*, so the departure
 uncovers someone already standing there rather than popping him in afterwards.
-`miner_reveal_hold_seconds` is how long the bus gets to slide before he sets
-off; too short and he walks out of a solid bus.
 
 The bus art is mirrored with a negative `scale.x` to face left, and its sprite
 offset is mirrored with it so the body stays centred on the node. Wheel-shine
@@ -47,7 +44,9 @@ script from `sign(scale.x)`.
 - `BusArrivalAnchor` (offscreen right) and `BusExitAnchor` (offscreen left) use
   only their x coordinate. `BusStopAnchor` uses both: x is the stop, y is the
   ground the suspension dip returns to. `MinerDropOffAnchor` must sit inside the
-  parked bus's span or the wipe has nothing to uncover.
+  parked bus's span or the wipe has nothing to uncover. For the opening layout,
+  both anchors use the fixed centre-screen mining x so the miner does not walk
+  away from the bench before play begins.
 - The miner moves only through `MinerRig`'s shared cinematic visual override.
   His gameplay root, `RunState`, and mining depth are never touched, and
   `RunIntroController` hands grounding back with `show_intact_floor_grounding()`
