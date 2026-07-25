@@ -39,6 +39,9 @@
 [ext_resource type="PackedScene" path="res://Scenes/mining/credits_overlay.tscn" id="60_credits"]
 [ext_resource type="Script" path="res://Scripts/mining/coffee_speed_boost.gd" id="61_coffee"]
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/rat_colony_followers.tscn" id="62_rat_followers"]
+[ext_resource type="PackedScene" path="res://Scenes/mining/impact_spark.tscn" id="63_impact_spark"]
+[ext_resource type="PackedScene" path="res://Scenes/mining/combo_impact_vignette.tscn" id="64_combo_vignette"]
+[ext_resource type="Script" path="res://Scripts/timing_windows/timing_bar_feedback.gd" id="65_bar_feedback"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_surface_sky"]
 resource_local_to_scene = true
@@ -98,6 +101,10 @@ terrain_manager = NodePath("../TerrainManager")
 terrain_renderer = NodePath("../TerrainLayerRenderer")
 view_controller = NodePath("../Systems/ViewController")
 
+[node name="ImpactSpark" parent="MiningScene" node_paths=PackedStringArray("terrain_manager") instance=ExtResource("63_impact_spark")]
+z_index = 4
+terrain_manager = NodePath("../TerrainManager")
+
 [node name="GemOutcropField" type="Node2D" parent="MiningScene" node_paths=PackedStringArray("terrain_manager", "terrain_renderer")]
 editor_description = "Rarely leaves a drawn crystal jutting out of a stratum a hit just cut through, and stands authored ones for cutscenes. It builds one drawing shelf per stratum and sits after the terrain renderer, so each crystal is covered by the layers still standing in front of it."
 script = ExtResource("58_gem_field")
@@ -114,9 +121,11 @@ offset_right = 1152.0
 offset_bottom = 648.0
 mouse_filter = 2
 
+[node name="ComboImpactVignette" parent="MiningScene" instance=ExtResource("64_combo_vignette")]
+
 [node name="Systems" type="Node" parent="MiningScene" unique_id=1573949011]
 
-[node name="SceneWiring" type="Node" parent="MiningScene/Systems" unique_id=1434760342 node_paths=PackedStringArray("mining_controller", "timing_bridge", "view_controller", "terrain_manager", "terrain_renderer", "miner_rig", "hit_particles", "gem_outcrop_field", "impact_smoke", "dig_number_presenter", "impact_shake", "pickaxe_progression", "cinematic_flow", "run_timeline", "coffee_speed_boost", "rat_colony_followers", "hud", "playtime_reveal", "timing_window", "depth_review_control", "encounter_controller", "dialogue_director", "final_encounter_controller", "credits_overlay")]
+[node name="SceneWiring" type="Node" parent="MiningScene/Systems" unique_id=1434760342 node_paths=PackedStringArray("mining_controller", "timing_bridge", "view_controller", "terrain_manager", "terrain_renderer", "miner_rig", "hit_particles", "gem_outcrop_field", "impact_smoke", "impact_spark", "combo_vignette", "dig_number_presenter", "impact_shake", "pickaxe_progression", "cinematic_flow", "run_timeline", "coffee_speed_boost", "rat_colony_followers", "hud", "playtime_reveal", "timing_window", "timing_bar_feedback", "depth_review_control", "encounter_controller", "dialogue_director", "final_encounter_controller", "credits_overlay")]
 script = ExtResource("25_wiring")
 mining_controller = NodePath("../MiningController")
 timing_bridge = NodePath("../TimingBridge")
@@ -127,6 +136,8 @@ miner_rig = NodePath("../../MinerRig")
 hit_particles = NodePath("../../MiningHitParticles")
 gem_outcrop_field = NodePath("../../GemOutcropField")
 impact_smoke = NodePath("../../MiningImpactSmoke")
+impact_spark = NodePath("../../ImpactSpark")
+combo_vignette = NodePath("../../ComboImpactVignette")
 dig_number_presenter = NodePath("../../../DigNumberPresenter")
 impact_shake = NodePath("../ImpactShake")
 pickaxe_progression = NodePath("../PickaxeProgression")
@@ -137,6 +148,7 @@ rat_colony_followers = NodePath("../../RatColonyFollowers")
 hud = NodePath("../../HUD")
 playtime_reveal = NodePath("../../HUD/PlaytimeReveal")
 timing_window = NodePath("../../HUD/TimingWindow")
+timing_bar_feedback = NodePath("../../HUD/TimingBarFeedback")
 depth_review_control = NodePath("../../HUD/DepthReviewControl")
 encounter_controller = NodePath("../UpgradeEncounterController")
 dialogue_director = NodePath("../../../DialogueDirector")
@@ -221,6 +233,18 @@ fps_label = NodePath("Layout/Content/FPS")
 options_scene = ExtResource("22_a0hll")
 
 [node name="TimingWindow" parent="MiningScene/HUD" unique_id=1764051259 instance=ExtResource("8_timing_window")]
+
+[node name="TimingBarFeedback" type="Control" parent="MiningScene/HUD" node_paths=PackedStringArray("timing_window")]
+editor_description = "Read-only impact feedback drawn over the timing bar. It reads the active bar's rect and slider position and never writes to the bar, so Caspian's timing scene keeps its own behaviour."
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("65_bar_feedback")
+timing_window = NodePath("../TimingWindow")
 
 [node name="DepthReviewControl" type="Control" parent="MiningScene/HUD" unique_id=1329828240 node_paths=PackedStringArray("return_button", "timing_window", "mining_controller")]
 process_mode = 3

@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/mining/impact_spark.gd" id="1_spark"]
+
+[node name="ImpactSpark" type="Node2D"]
+editor_description = "Strikes a short flat-filled spark at the pickaxe contact point. Draws above the dirt debris so the hot flash is never buried by the burst it belongs to."
+script = ExtResource("1_spark")

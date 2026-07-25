@@ -13,6 +13,8 @@ extends Node
 @export var hit_particles: MiningHitParticles
 @export var gem_outcrop_field: GemOutcropField
 @export var impact_smoke: MiningImpactSmoke
+@export var impact_spark: ImpactSpark
+@export var combo_vignette: ComboImpactVignette
 @export var dig_number_presenter: DigNumberPresenter
 @export var impact_shake: ImpactShake
 @export var pickaxe_progression: PickaxeProgression
@@ -34,6 +36,7 @@ extends Node
 @export var hud: MiningHud
 @export var playtime_reveal: PlaytimeReveal
 @export var timing_window: TimingWindowTask
+@export var timing_bar_feedback: TimingBarFeedback
 @export var depth_review_control: DepthReviewControl
 @export var encounter_controller: DepthEncounterController
 @export var dialogue_director: DialogueDirector
@@ -161,6 +164,24 @@ func _ready() -> void:
 		impact_smoke.play_at_impact
 	)
 	_connect_once(
+		mining_controller.impact_resolved,
+		impact_spark.play_at_impact
+	)
+	_connect_once(
+		mining_controller.impact_resolved,
+		combo_vignette.play_at_impact
+	)
+	# A lost streak gives the darkened frame straight back instead of letting it
+	# decay, so the release reads as part of losing the combo.
+	_connect_once(
+		mining_controller.mine_missed,
+		combo_vignette.release
+	)
+	_connect_once(
+		timing_window.pressed,
+		timing_bar_feedback._on_timing_pressed
+	)
+	_connect_once(
 		mining_controller.dig_number_requested,
 		dig_number_presenter.show_dig_number_at_impact
 	)
@@ -283,6 +304,13 @@ func _play_cinematic_strike_feedback(screen_position: Vector2) -> void:
 		0.0,
 		1
 	)
+	impact_spark.play_at_impact(
+		screen_position,
+		1,
+		0.2,
+		0.45,
+		1
+	)
 
 
 ## Seats authored floors on layer one and mined landings on visible layer two.
@@ -328,6 +356,13 @@ func _play_landing_impact_feedback() -> void:
 		landing_impact_cells,
 		landing_impact_strength,
 		0.0,
+		0
+	)
+	impact_spark.play_at_impact(
+		foot_position,
+		landing_impact_cells,
+		landing_impact_strength,
+		1.0,
 		0
 	)
 
