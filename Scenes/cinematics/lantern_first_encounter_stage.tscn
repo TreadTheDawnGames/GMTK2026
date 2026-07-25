@@ -14,35 +14,38 @@ sprite_scale = Vector2(0.44, 0.44)
 sprite_offset = Vector2(0, -68)
 
 [node name="LanternFirstEncounterStage" unique_id=211847311 instance=ExtResource("1_stage")]
-editor_description = "Story beat 3, depth 1,400: the player first meets the man with the lantern staff, who cryptically foreshadows the Thief, then steps off his ledge into the pit beneath it. He stands on the miner's LEFT here, on authored rock, which is why Conversation Tracks Miner is off - a ledge cannot slide to meet a landing column. That costs the constant spacing the cheese girl room has: he sits anywhere from 128px to 512px left of the miner depending where the fall left him. That is the open question on this room, not an oversight. The jagged end wall is on the miner's RIGHT, the cheese girl wall mirrored."
-opening_move_seconds = 2.0
+editor_description = "Story beat 3, depth 1,400: the player first meets the man with the lantern staff, who cryptically foreshadows the Thief, then hops once and fades away where he stands. He is ALREADY on his ledge when the miner breaks through - he does not walk in - so Entrance sits on the same mark as Conversation and the opening move is only long enough to keep the tween honest. He stands with his back to the miner over the drop, turns to deliver the warning, and turns back to it before he goes; that is what the three Actor Facing values do. Conversation Tracks Miner is off because a ledge cannot slide to meet a landing column, so his distance from the miner varies with where the fall left him. The jagged end wall is on the miner's RIGHT, the cheese girl wall mirrored."
+opening_move_seconds = 0.2
 closing_move_seconds = 0.9
 opening_step_height = 6.0
 hide_actor_after_closing = true
 closing_fade_seconds = 0.9
+entrance_facing = -1
+conversation_facing = 1
+closing_facing = -1
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
-editor_description = "Off the left end of the ledge and past the frame edge, so he walks in out of the dark rather than appearing on it. y is -64 because the ledge stands eight rows above the miner's ground, and every marker here is authored on the surface it is used from."
-position = Vector2(-1000, -64)
+editor_description = "Same mark as Conversation. He is already standing on the ledge when the miner breaks through, so there is no approach to walk."
+position = Vector2(-592, -64)
 
 [node name="Conversation" parent="ActorMarkers" index="1"]
-editor_description = "On the ledge, back from its lip, so there is rock under him for the whole conversation."
-position = Vector2(-363, -26)
+editor_description = "Near the TIP of the overhang, out where the slab has nothing under it. y is -64 because the ledge stands eight rows above the miner's ground, and every marker here is authored on the surface it is used from."
+position = Vector2(-592, -64)
 
 [node name="Work" parent="ActorMarkers" index="2"]
-editor_description = "The lip itself. He steps here before going over it."
-position = Vector2(-377, -26)
+editor_description = "The very end of the overhang, kept as the spot to aim any later beat that walks him out to the edge."
+position = Vector2(-632, -64)
 
 [node name="Rest" parent="ActorMarkers" index="3"]
-position = Vector2(-348, -18)
+position = Vector2(-592, -64)
 
 [node name="Exit" parent="ActorMarkers" index="4"]
-editor_description = "Barely off his conversation mark, because he does not leave by walking. Closing Fade Seconds hops him once and fades him out where he stands, so the tiny move is only enough to keep the closing tween honest. He is gone by the time the frame closes; the shaft below him is scenery and a place for his staff to end up, not somewhere he is seen to fall."
-position = Vector2(-392, -28)
+editor_description = "His own mark: he does not leave by walking. Closing Fade Seconds hops him once and fades him out where he stands, and Closing Facing turns him back to the drop first."
+position = Vector2(-592, -64)
 
 [node name="LanternStaff" parent="PropMarkers" index="0" unique_id=2096771290 instance=ExtResource("6_staff")]
 editor_description = "Standing in the floor at the dead centre of the shaft, 95 rows below the room - far under the bottom of the cutscene frame, so nothing of it is visible while he is still talking. The miner mines straight down past the shaft afterwards and meets it on the way by. Placed here rather than spawned: an encounter stage lives for the whole run, so the staff is simply already there when the player arrives."
-position = Vector2(-488, 764)
+position = Vector2(-704, 764)
 scale = Vector2(0.2462, 0.2462)
 
 [node name="EditorTerrainPreview" parent="." index="4"]

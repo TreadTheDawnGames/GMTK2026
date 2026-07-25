@@ -58,6 +58,23 @@ signal sequence_dialogue_requested(
 ## three times he appears, so anything that dims him has to be certain to put him
 ## back.
 @export_range(0.0, 4.0, 0.05) var closing_fade_seconds: float = 0.0
+
+@export_category("Actor Facing")
+## Which way an actor faces on arrival, while settled to speak, and on leaving.
+## -1 looks left, 1 looks right, and 0 leaves the facing alone.
+##
+## Zero everywhere preserves the old behaviour, where facing is whatever the walk
+## last set. It matters for a visitor who is not looking at the miner: the
+## lantern-staff man stands at the lip of his drop with his back turned, turns to
+## deliver his warning, and turns back to it before he goes. Without this the
+## walk's own direction is the only thing that can aim anyone, so a character who
+## does not walk cannot be aimed at all.
+##
+## Facing is a world direction. CharacterPresenter folds art_faces_left in when
+## it applies this, so -1 always means looking left whichever way the art is drawn.
+@export_range(-1, 1, 1) var entrance_facing: int = 0
+@export_range(-1, 1, 1) var conversation_facing: int = 0
+@export_range(-1, 1, 1) var closing_facing: int = 0
 ## Dynamically keeps this actor beside the miner regardless of landing column.
 @export var conversation_tracks_miner: bool = false
 ## Presenter-root offset; actor sprite offsets remain authored by appearance.
@@ -167,6 +184,7 @@ func prepare(
 	_presenter.cancel_grounded_motion()
 	_presenter.global_position = entrance_marker.global_position
 	_presenter.show()
+	_apply_facing(entrance_facing)
 	_is_active = true
 	return true
 
@@ -193,6 +211,9 @@ func play_opening() -> void:
 	if not _is_active:
 		return
 	_play_pose_if_available(conversation_pose)
+	# After the walk, not before: a MOVE aims the actor along its own travel, so
+	# anything set earlier is overwritten by the approach.
+	_apply_facing(conversation_facing)
 	opening_finished.emit()
 
 
@@ -215,6 +236,7 @@ func play_closing() -> void:
 	if not _is_active:
 		return
 	_play_pose_if_available(closing_pose)
+	_apply_facing(closing_facing)
 	_start_closing_fade()
 	var target_marker := (
 		exit_marker if hide_actor_after_closing else rest_marker
@@ -377,6 +399,13 @@ func _finish_closing_fade() -> void:
 		return
 	_presenter.hide()
 	_presenter.modulate = _restore_modulate
+
+
+## Turns the actor to face a world direction, or leaves them as they are on zero.
+func _apply_facing(direction: int) -> void:
+	if direction == 0 or not is_instance_valid(_presenter):
+		return
+	_presenter.set_facing_direction(direction)
 
 
 func _play_pose_if_available(pose_name: StringName) -> void:

@@ -139,10 +139,6 @@ func _try_activate_pending_encounter() -> void:
 		_latest_landing_world_y
 		< encounter_floor_y - LANDING_FLOOR_TOLERANCE_ROWS
 	):
-		print("[ENC] pending, landing %d has not reached floor %d" % [
-			_latest_landing_world_y,
-			encounter_floor_y,
-		])
 		return
 	_activate_pending_encounter()
 
@@ -185,9 +181,7 @@ func _schedule_next_encounter() -> bool:
 	if not _can_schedule_next_encounter():
 		return false
 	if not cinematic_flow.try_begin(FLOW_OWNER):
-		print("[ENC] flow refused - another cinematic owns it")
 		return false
-	print("[ENC] scheduled index=%d" % _next_encounter_index)
 	_pending_encounter_index = _next_encounter_index
 	_try_activate_pending_encounter()
 	return true
@@ -327,21 +321,18 @@ func _begin_active_encounter() -> void:
 	_reset_speech_reactions()
 	if _is_gathering_encounter(_active_encounter_index):
 		_gather_cafe_characters()
-	# TEMPORARY ENCOUNTER TRACE - remove once the soft lock is closed.
-	print("[ENC] begin id=%s stage=%s" % [
-		encounter.encounter_id,
-		_stages[_active_encounter_index],
-	])
 	_active_stage = _stages[_active_encounter_index]
+	if _active_stage == null:
+		# Revealing a presenter is the stage's job, through prepare(). An
+		# encounter authored without one still has to be seen to speak.
+		presenter.show()
 	if _active_stage != null:
 		# Before the frame opens, so the first drawn cutscene frame already has
 		# them in front of the foreground layer instead of popping forward.
 		miner_rig.enter_cutscene_draw_order()
 		_enter_cast_cutscene_draw_order()
 		dialogue_director.open_cinematic_frame()
-		print("[ENC] waiting for frame")
 		await dialogue_director.wait_until_frame_open()
-		print("[ENC] frame open")
 		if _active_encounter_index < 0:
 			return
 		# Layer one, the stratum the cast actually stands on.
@@ -364,9 +355,7 @@ func _begin_active_encounter() -> void:
 			)
 			_fail_active_encounter()
 			return
-		print("[ENC] prepared, playing opening")
 		await _active_stage.play_opening()
-		print("[ENC] opening done")
 		if _active_encounter_index < 0:
 			return
 	_active_conversation = encounter.conversation
@@ -610,6 +599,16 @@ func _prepare_authored_characters() -> bool:
 			character_parent.add_child(presenter)
 			presenter.apply_appearance(encounter.appearance)
 			presenter.position = encounter_position
+			# Hidden until their own cutscene claims them.
+			#
+			# Every character is built up front and parked at the depth they are
+			# owed, which is what lets one presenter be reused across repeat
+			# visits and gathered for the cafe. Parked and visible, though, means
+			# a player mining down to 300 finds Cheese Girl already standing in
+			# the rock waiting for him, and then watches her teleport off screen
+			# so she can walk back in. The stage's prepare() reveals whoever it
+			# takes, and the cafe gathering shows its own roster explicitly.
+			presenter.hide()
 			_presenters_by_actor_id[encounter.actor_id] = presenter
 			_speaker_slots_by_actor_id[encounter.actor_id] = (
 				encounter.speaker_slot
