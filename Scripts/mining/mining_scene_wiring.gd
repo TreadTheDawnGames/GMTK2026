@@ -287,6 +287,11 @@ func _play_cinematic_strike_feedback(screen_position: Vector2) -> void:
 
 ## Seats authored floors on layer one and mined landings on visible layer two.
 func _on_miner_landing_grounding(mining_y: int) -> void:
+	# The first landing below the run's starting row is the moment he stops
+	# standing on the surface and starts standing in the hole, which is what
+	# decides whether the foreground stratum draws over him.
+	if mining_y > terrain_manager.config.initial_surface_row:
+		miner_rig.leave_surface_draw_order()
 	if terrain_manager.is_authored_landing_floor(mining_y):
 		miner_rig.show_intact_floor_grounding()
 		# An encounter floor is the frame a cutscene opens on, so kicking dirt

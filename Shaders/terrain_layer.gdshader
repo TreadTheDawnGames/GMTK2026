@@ -146,10 +146,43 @@ uniform float grass_cell_aspect = 0.461;
 uniform float grass_cell_world_px = 16.0;
 // How far below the ground line the mask is probed to decide grass survives.
 uniform float grass_support_probe_px = 4.0;
+// The blades are drawn in flat daylight green. At the surface they stand
+// against the same low sun as every other prop, so they take a cool shade and a
+// warm tip light here, or the grass line reads as a sticker across the horizon.
+uniform vec4 grass_shade_color : source_color = vec4(0.44, 0.46, 0.58, 1.0);
+uniform float grass_shade_strength = 0.42;
+uniform vec4 grass_tip_light_color : source_color = vec4(1.0, 0.80, 0.44, 1.0);
+uniform float grass_tip_light_strength = 0.60;
+
 // Packed earth on the exposed top of the surface, in place of the old overlay.
 uniform float crust_depth_world_px = 10.0;
 uniform vec4 crust_color : source_color = vec4(0.46, 0.42, 0.36, 1.0);
 uniform float crust_strength = 0.5;
+
+// The ground the miner is standing on, between the grass and the cut face. It
+// is the only horizontal plane in a side-on shot, so it is the one band facing
+// the sky: lighting it warm and letting it fall away into the face below is
+// what stops the surface reading as a wall he is standing in front of.
+uniform float ground_shelf_depth_world_px = 44.0;
+// Fraction of that depth the plane holds full light before it rolls off. A
+// plane needs a far edge to read as a plane, so this deliberately does not
+// fade from the ground line: it stays lit, then turns down.
+uniform float ground_shelf_plateau : hint_range(0.0, 1.0) = 0.5;
+uniform vec4 ground_shelf_light_color : source_color = vec4(
+	1.0,
+	0.78,
+	0.52,
+	1.0
+);
+uniform float ground_shelf_light_strength = 0.34;
+// Shadow the shelf's far edge drops onto the cut face below it. This is the
+// band that actually turns the corner; without it the light just fades out.
+uniform float ground_face_shade_depth_world_px = 34.0;
+uniform float ground_face_shade_strength = 0.24;
+// Shade where the grass mat sits on the earth. Without it the blades look
+// printed on the dirt instead of growing out of it.
+uniform float ground_contact_depth_world_px = 6.0;
+uniform float ground_contact_strength = 0.42;
 
 // Darkens a solid pixel that sits near its own layer's cut edge and lights the
 // upward-facing lip, using four mask taps to find which way the edge faces.
@@ -858,13 +891,76 @@ void fragment() {
 				vec4 blade = sample_surface_grass(world_position);
 				float grass = blade.a * grass_band * step(0.5, support_alpha);
 				if (grass > 0.0) {
-					surface_color = blade.rgb;
+					// Height inside the blade strip: 1 at the tip, 0 at the
+					// mat. The sun is at the horizon, so only what stands clear
+					// of the mat catches any of it.
+					float blade_height = clamp(
+						(surface_world_y - world_position.y)
+							/ max(grass_height_world_px, 1.0),
+						0.0,
+						1.0
+					);
+					surface_color = blade.rgb * mix(
+						vec3(1.0),
+						grass_shade_color.rgb * 2.0,
+						clamp(grass_shade_strength, 0.0, 1.0)
+					);
+					surface_color += grass_tip_light_color.rgb
+						* pow(blade_height, 2.2)
+						* max(grass_tip_light_strength, 0.0);
 					final_alpha = grass;
 				}
 			}
 		} else {
-			// Packed earth on the exposed top of the original ground line.
+			// The top of the ground, built from the widest band to the
+			// tightest so each one shades what the last laid down: the lit
+			// shelf, the shadow off its far edge, the packed lip on it, then
+			// the grass's contact shade over all of it. Read together they
+			// give the dirt a top face, a far edge, and a cut face below.
 			float depth_below_surface = world_position.y - surface_world_y;
+			float shelf_depth = max(ground_shelf_depth_world_px, 1.0);
+			float shelf_edge = shelf_depth
+				* clamp(ground_shelf_plateau, 0.0, 0.99);
+
+			// Sunlit top plane, held flat to its far edge and then turned
+			// down. Fading it from the ground line instead would read as a
+			// gradient painted on a wall rather than as a surface.
+			float shelf = step(-1.0, depth_below_surface) * (
+				1.0 - smoothstep(
+					shelf_edge,
+					shelf_depth,
+					depth_below_surface
+				)
+			);
+			surface_color = mix(
+				surface_color,
+				ground_shelf_light_color.rgb,
+				clamp(shelf * ground_shelf_light_strength, 0.0, 1.0)
+			);
+
+			// The corner itself: darkest just past the shelf's far edge, back
+			// to open dirt over its own depth.
+			float face_shade = smoothstep(
+				shelf_edge,
+				shelf_depth,
+				depth_below_surface
+			) * (
+				1.0 - smoothstep(
+					shelf_depth,
+					shelf_depth + max(
+						ground_face_shade_depth_world_px,
+						1.0
+					),
+					depth_below_surface
+				)
+			);
+			surface_color *= 1.0 - clamp(
+				face_shade * ground_face_shade_strength,
+				0.0,
+				0.9
+			);
+
+			// Packed earth on the exposed top of the original ground line.
 			float crust = step(-1.0, depth_below_surface) * (
 				1.0 - smoothstep(
 					0.0,
@@ -876,6 +972,22 @@ void fragment() {
 				surface_color,
 				crust_color.rgb,
 				clamp(crust * crust_strength, 0.0, 1.0)
+			);
+
+			// Contact shade last, so it darkens the finished lip rather than
+			// being covered by it. It is tighter than the crust, which leaves
+			// the order dark line, bright lip, falling face.
+			float contact = step(-1.0, depth_below_surface) * (
+				1.0 - smoothstep(
+					0.0,
+					max(ground_contact_depth_world_px, 1.0),
+					depth_below_surface
+				)
+			);
+			surface_color *= 1.0 - clamp(
+				contact * ground_contact_strength,
+				0.0,
+				0.9
 			);
 		}
 	}

@@ -91,23 +91,27 @@ render every beat to PNG and check the framing by eye.
 
 ### Layering rule: the cast stands behind the ground they stand in
 
-During play the miner is on layer two and **terrain layer one draws in front of
-him** (`layer_z_indices` starts at `2`; `MinerRig` is `z_index 1`). That is what
-makes his legs read as being down in the dig rather than pasted on top of it.
+Once the miner has dug in he is on layer two and **terrain layer one draws in
+front of him** (`layer_z_indices` starts at `2`; `MinerRig.buried_draw_order` is
+`1`). That is what makes his legs read as being down in the dig rather than
+pasted on top of it.
 
-Every surface has to obey the same rule, or the surface looks like a different
-game from the mining:
+The surface is the one exception, because there he is standing *on* the ground
+rather than in it:
 
-- `SurfaceGround` (grass and gravel) is `z_index 3`, in front of the whole cast.
-  Everyone stands behind the grass at the surface, exactly as everyone stands
-  behind layer one underground.
-- The arrival's `miner_settle_draw_order` is `1` — his gameplay value. The intro
-  hands that back on the settle beat, while he is visibly planting his feet, so
-  the foreground closing over his legs reads as intentional. Handing it back
-  after the shot ends instead makes his legs clip away in a single frame.
+- `MinerRig` owns both values (`surface_draw_order` `3`, `buried_draw_order`
+  `1`) and nothing else sets its `z_index`. He opens the run in front of layer
+  one so the arrival shot shows a whole miner, and `MiningSceneWiring` calls
+  `leave_surface_draw_order()` on the first landing below
+  `initial_surface_row`, after which every shot layers exactly as before.
+- The arrival hands his order back with `miner_rig.get_rest_draw_order()` on the
+  settle beat, while he is visibly planting his feet, rather than carrying its
+  own copy of the number.
 - A cinematic may lift the miner above the strata (`miner_cinematic_draw_order`)
-  while it owns him, but it must return him to the gameplay value as part of a
-  visible motion, never as a bare assignment once the frame is already open.
+  while it owns him, but it must return him to `get_rest_draw_order()` as part
+  of a visible motion, never as a bare assignment once the frame is already
+  open. The restore reads that value live, so a shot that ends at a different
+  depth than it started still lands on the right layer.
 
 ## Surface daylight and ground
 

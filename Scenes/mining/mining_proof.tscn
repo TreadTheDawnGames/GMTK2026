@@ -79,7 +79,7 @@ surface_presentation = NodePath("../Systems/SurfacePresentation")
 terrain_renderer = NodePath("../TerrainLayerRenderer")
 
 [node name="MinerRig" parent="MiningScene" unique_id=726963260 instance=ExtResource("7_miner_rig")]
-z_index = 1
+editor_description = "No z_index override on purpose. MinerRig owns its draw order through its surface_draw_order and buried_draw_order exports: he starts in front of terrain layer one (z_index 2) while standing on the untouched surface, and the first landing below it hands him back to the buried order the rest of the run plays at."
 
 [node name="RatColonyFollowers" parent="MiningScene" node_paths=PackedStringArray("follow_target") instance=ExtResource("62_rat_followers")]
 follow_target = NodePath("../MinerRig")

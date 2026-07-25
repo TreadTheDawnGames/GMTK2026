@@ -52,7 +52,7 @@ grow_vertical = 2
 custom_minimum_size = Vector2(0, 67)
 layout_mode = 2
 theme_override_font_sizes/font_size = 48
-text = "Why Are You Here?"
+text = "Digger's Remorse"
 horizontal_alignment = 1
 vertical_alignment = 1
 

@@ -1,20 +1,67 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene format=3 uid="uid://b4cudxpsminnk"]
 
-[ext_resource type="Script" path="res://Scripts/cinematics/arrival_intro_sequence.gd" id="1_arrival"]
+[ext_resource type="Script" uid="uid://xlm5djjf0ej0" path="res://Scripts/cinematics/arrival_intro_sequence.gd" id="1_arrival"]
 [ext_resource type="PackedScene" path="res://Scenes/dialogue/character_presenter.tscn" id="2_character_presenter"]
-[ext_resource type="Texture2D" path="res://Assets/Props/bus_side_right.png" id="3_bus"]
-[ext_resource type="Texture2D" path="res://Assets/Props/bus_side_left.png" id="10_bus_left"]
-[ext_resource type="Shader" path="res://Shaders/bus_wheel_shine.gdshader" id="5_wheel_shine"]
-[ext_resource type="Texture2D" path="res://Assets/Props/bus_stop.png" id="6_bus_stop"]
-[ext_resource type="Script" path="res://Scripts/cinematics/cinematic_terrain_preview.gd" id="7_preview"]
+[ext_resource type="Texture2D" uid="uid://bkpyxrkd6p3so" path="res://Assets/Props/bus_side_right.png" id="3_bus"]
+[ext_resource type="Shader" uid="uid://drytyhqip6is2" path="res://Shaders/bus_wheel_shine.gdshader" id="5_wheel_shine"]
+[ext_resource type="Texture2D" uid="uid://b3hhpddv4br3f" path="res://Assets/Props/bus_stop.png" id="6_bus_stop"]
+[ext_resource type="Script" uid="uid://bgmwqct2laiko" path="res://Scripts/cinematics/cinematic_terrain_preview.gd" id="7_preview"]
 [ext_resource type="Resource" uid="uid://dhlm43rg16rkw" path="res://resources/mining/mining_config.tres" id="8_config"]
 [ext_resource type="Resource" path="res://resources/mining/default_terrain_layer_profile.tres" id="9_profile"]
+[ext_resource type="Texture2D" uid="uid://ptqdkvxje5ac" path="res://Assets/Props/bus_side_left.png" id="10_bus_left"]
 [ext_resource type="Script" uid="uid://b38bkkdjcto5g" path="res://Scripts/mining/terrain_manager.gd" id="11_terrain_manager"]
 [ext_resource type="Script" uid="uid://d3fjog3we4ugh" path="res://Scripts/mining/terrain_layer_renderer.gd" id="12_terrain_renderer"]
+[ext_resource type="Resource" path="res://resources/encounters/depth_encounter_config.tres" id="12_vtugv"]
+[ext_resource type="Shader" uid="uid://basjt8wi65bkp" path="res://Shaders/sunset_prop.gdshader" id="13_sunset_prop"]
+[ext_resource type="Texture2D" uid="uid://bkgia2xwepbwk" path="res://Assets/Terrain/grass_band.png" id="14_grass_band"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_grass_far"]
+resource_local_to_scene = true
+shader = ExtResource("13_sunset_prop")
+shader_parameter/sun_direction = Vector2(0.98, 0.2)
+shader_parameter/shade_color = Color(0.3, 0.26, 0.4, 1)
+shader_parameter/shade_strength = 0.42
+shader_parameter/shade_desaturation = 0.5
+shader_parameter/rim_color = Color(1, 0.82, 0.52, 1)
+shader_parameter/rim_strength = 0.35
+shader_parameter/rim_texels = 3.0
+shader_parameter/bounce_color = Color(1, 0.54, 0.27, 1)
+shader_parameter/bounce_strength = 0.0
+shader_parameter/bounce_height = 0.3
+shader_parameter/haze_color = Color(0.68, 0.36, 0.33, 1)
+shader_parameter/haze_strength = 0.62
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_grass_mid"]
+resource_local_to_scene = true
+shader = ExtResource("13_sunset_prop")
+shader_parameter/sun_direction = Vector2(0.98, 0.2)
+shader_parameter/shade_color = Color(0.28, 0.3, 0.42, 1)
+shader_parameter/shade_strength = 0.6
+shader_parameter/shade_desaturation = 0.18
+shader_parameter/rim_color = Color(1, 0.82, 0.52, 1)
+shader_parameter/rim_strength = 0.7
+shader_parameter/rim_texels = 3.0
+shader_parameter/bounce_color = Color(1, 0.54, 0.27, 1)
+shader_parameter/bounce_strength = 0.1
+shader_parameter/bounce_height = 0.3
+shader_parameter/haze_color = Color(0.68, 0.36, 0.33, 1)
+shader_parameter/haze_strength = 0.22
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_bus_wheels"]
 resource_local_to_scene = true
 shader = ExtResource("5_wheel_shine")
+shader_parameter/sun_direction = Vector2(-0.99, 0.12)
+shader_parameter/shade_color = Color(0.29, 0.29, 0.47, 1)
+shader_parameter/shade_strength = 0.5
+shader_parameter/shade_desaturation = 0.34
+shader_parameter/rim_color = Color(1, 0.82, 0.5, 1)
+shader_parameter/rim_strength = 0.0
+shader_parameter/rim_texels = 5.0
+shader_parameter/bounce_color = Color(1, 0.54, 0.27, 1)
+shader_parameter/bounce_strength = 0.24
+shader_parameter/bounce_height = 0.3
+shader_parameter/haze_color = Color(1, 0.55, 0.3, 1)
+shader_parameter/haze_strength = 0.05
 shader_parameter/wheel_one_uv = Vector2(0.390962, 0.568345)
 shader_parameter/wheel_two_uv = Vector2(0.684128, 0.568345)
 shader_parameter/wheel_radius_uv = 0.031175
@@ -28,10 +75,26 @@ shader_parameter/rim_inner = 0.42
 shader_parameter/rim_outer = 1.0
 shader_parameter/sun_up_bias = 1.6
 
-[node name="ArrivalIntro" type="Node2D" node_paths=PackedStringArray("bus", "bus_sprite", "bus_front_sprite", "station", "attendant", "bus_arrival_anchor", "bus_stop_anchor", "bus_exit_anchor", "door_step_anchor", "miner_drop_off_anchor", "attendant_pickup_stop_anchor")]
-editor_description = "Surface arrival staging. Every prop is authored around the original terrain surface centre at (576, 262). Process priority 100 re-anchors that terrain point on both axes after each view update, while the shared Camera2D gives terrain and stop identical shake. The letterbox top bar covers the first 91 px: keep every prop's art below that. Assign miner_rig and surface_presentation from the mining scene."
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_station"]
+resource_local_to_scene = true
+shader = ExtResource("13_sunset_prop")
+shader_parameter/sun_direction = Vector2(0.98, 0.18)
+shader_parameter/shade_color = Color(0.3, 0.3, 0.48, 1)
+shader_parameter/shade_strength = 0.62
+shader_parameter/shade_desaturation = 0.42
+shader_parameter/rim_color = Color(1, 0.82, 0.5, 1)
+shader_parameter/rim_strength = 1.15
+shader_parameter/rim_texels = 5.0
+shader_parameter/bounce_color = Color(1, 0.52, 0.26, 1)
+shader_parameter/bounce_strength = 0.2
+shader_parameter/bounce_height = 0.28
+shader_parameter/haze_color = Color(1, 0.55, 0.3, 1)
+shader_parameter/haze_strength = 0.06
+
+[node name="ArrivalIntro" type="Node2D" unique_id=1350024243 node_paths=PackedStringArray("bus", "bus_sprite", "bus_front_sprite", "station", "attendant", "bus_arrival_anchor", "bus_stop_anchor", "bus_exit_anchor", "door_step_anchor", "miner_drop_off_anchor", "attendant_pickup_stop_anchor")]
 process_mode = 3
 process_priority = 100
+editor_description = "Surface arrival staging. Every prop is authored around the original terrain surface centre at (576, 262). Process priority 100 re-anchors that terrain point on both axes after each view update, while the shared Camera2D gives terrain and stop identical shake. The letterbox top bar covers the first 91 px: keep every prop's art below that. Assign miner_rig and surface_presentation from the mining scene."
 script = ExtResource("1_arrival")
 bus = NodePath("Bus")
 bus_sprite = NodePath("Bus/BusSprite")
@@ -47,98 +110,129 @@ door_step_anchor = NodePath("Bus/DoorStepAnchor")
 miner_drop_off_anchor = NodePath("MinerDropOffAnchor")
 attendant_pickup_stop_anchor = NodePath("AttendantPickupStopAnchor")
 
-[node name="BusArrivalAnchor" type="Marker2D" parent="."]
+[node name="BusArrivalAnchor" type="Marker2D" parent="." unique_id=1314320869]
 editor_description = "Offscreen RIGHT. Only the x coordinate is used; keep the whole bus past the viewport edge so the arrival starts clean. The bus runs right-to-left, so it enters here and leaves at BusExitAnchor on the far side."
 position = Vector2(1500, 262)
 
-[node name="BusStopAnchor" type="Marker2D" parent="."]
+[node name="BusStopAnchor" type="Marker2D" parent="." unique_id=2041891707]
 editor_description = "Where the bus parks with its left-facing front at viewport centre. Both coordinates are used: x is the bus root, y is the ground line the suspension dip returns to. Parked here the bus spans about 576-1142, putting its leftmost/front edge directly over the miner at x 576."
 position = Vector2(859, 262)
 
-[node name="AttendantPickupStopAnchor" type="Marker2D" parent="."]
+[node name="AttendantPickupStopAnchor" type="Marker2D" parent="." unique_id=914022260]
 editor_description = "Where the returning bus parks to collect the attendant. Only x is used. Placed so the bus door lines up with the stop while the bus stays behind it in draw order, reading as the road behind the bench. Clearing this anchor disables the pickup without breaking the intro."
 position = Vector2(332, 262)
 
-[node name="BusExitAnchor" type="Marker2D" parent="."]
+[node name="BusExitAnchor" type="Marker2D" parent="." unique_id=111098797]
 editor_description = "Offscreen LEFT. Only the x coordinate is used. The bus draws in FRONT of the cast, so sliding away left uncovers the miner from behind its trailing edge."
 position = Vector2(-700, 262)
 
-[node name="MinerDropOffAnchor" type="Marker2D" parent="."]
+[node name="MinerDropOffAnchor" type="Marker2D" parent="." unique_id=2110078351]
 editor_description = "Where the miner is standing when the bus pulls away: the fixed centre-screen mining point, immediately right of the bench reader and directly at the stopped bus's left-facing front edge. The miner is already at the place where play begins."
 position = Vector2(576, 262)
 
-[node name="Bus" type="Node2D" parent="."]
+[node name="SurfaceBackdrop" type="Node2D" parent="." unique_id=1170740603]
+editor_description = "The field the stop is standing in. Two bands of the same drawn grass, both sunk far enough below the ground line that terrain layer one covers everything except the tops clearing the horizon, which is exactly what you see of a field that runs away from you. Depth comes from three things together: how much of each band clears the line, how much haze its material mixes in, and the sky ridges behind them. Negative z keeps both behind the terrain, so digging removes the ground in front of them and they scroll away with the surface."
+
+[node name="FarGrassBand" type="Sprite2D" parent="SurfaceBackdrop" unique_id=1672168181]
+editor_description = "The far field. region_rect is three texture widths and texture_repeat is on, so one sprite tiles the drawn band across the shot; the seams fall inside the strip hidden under the ground line and only unrelated blade tips clear the horizon. About 18 px of it shows, hazed hardest, so it reads as distance rather than as small grass."
+z_index = -9
+texture_filter = 4
+texture_repeat = 2
+material = SubResource("ShaderMaterial_grass_far")
+position = Vector2(576, 262.8)
+scale = Vector2(0.42, 0.42)
+texture = ExtResource("14_grass_band")
+region_enabled = true
+region_rect = Rect2(0, 0, 3072, 92)
+
+[node name="MidGrassBand" type="Sprite2D" parent="SurfaceBackdrop" unique_id=178202384]
+editor_description = "The near field, standing in front of the far one. Bigger, less hazed, and offset sideways so the two silhouettes never line up. About 32 px of it clears the horizon."
+z_index = -8
+texture_filter = 4
+texture_repeat = 2
+material = SubResource("ShaderMaterial_grass_mid")
+position = Vector2(430, 258.3)
+scale = Vector2(0.62, 0.62)
+texture = ExtResource("14_grass_band")
+region_enabled = true
+region_rect = Rect2(0, 0, 3072, 92)
+
+[node name="Bus" type="Node2D" parent="." unique_id=1214144581]
 editor_description = "Bus root, with the ground under its wheels at y = 0. The drawn art carries its own door, so opening it is a texture swap on BusSprite rather than a moving panel. z_index 5 puts it in front of the whole cast on purpose: the miner boards and waits behind it, and its departure is what reveals him."
 z_index = 5
 position = Vector2(1500, 262)
 
-[node name="BusSprite" type="Sprite2D" parent="Bus"]
-editor_description = "Full drawn bus body. During the miner exit this sits behind him; BusFrontOccluder redraws only the leading section above him so he emerges from the front instead of being uncovered by the rear. Placement is measured from the art: wheels bottom out at texture y=1002. Each travel frame carries its own sprite offset and wheel-shine UVs, applied together in _apply_bus_art. The import is capped at 1024 px; this compensated scale preserves the original footprint."
+[node name="BusSprite" type="Sprite2D" parent="Bus" unique_id=1886361131]
+editor_description = "rim_strength is 0 on purpose: a lit contour around the bus read as an outline pasted on the shot rather than as sunlight, so the bus takes only the twilight shade and the ground bounce. The stop still uses its rim. Full drawn bus body. During the miner exit this sits behind him; BusFrontOccluder redraws only the leading section above him so he emerges from the front instead of being uncovered by the rear. Placement is measured from the art: wheels bottom out at texture y=1002. Each travel frame carries its own sprite offset and wheel-shine UVs, applied together in _apply_bus_art. The import is capped at 1024 px; this compensated scale preserves the original footprint."
 texture_filter = 4
 material = SubResource("ShaderMaterial_bus_wheels")
 position = Vector2(-14, -74)
 scale = Vector2(0.955625, 0.955625)
 texture = ExtResource("3_bus")
 
-[node name="BusFrontOccluder" type="Sprite2D" parent="Bus"]
-editor_description = "Runtime-aligned crop of the bus's leading section. It is absolute z 5 above the cinematic miner while the full BusSprite remains below him, then hides before ambient bus passes."
+[node name="BusFrontOccluder" type="Sprite2D" parent="Bus" unique_id=2082180730]
+editor_description = "Runtime-aligned crop of the bus's leading section. It is absolute z 5 above the cinematic miner while the full BusSprite remains below him, then hides before ambient bus passes. It shares BusSprite's material on purpose: same texture, same UV space, so one copy of the sunset light and the wheel shine covers both and the crop can never be lit differently from the body it overlaps."
 visible = false
 z_index = 5
 z_as_relative = false
 texture_filter = 4
+material = SubResource("ShaderMaterial_bus_wheels")
 position = Vector2(207.6, -74)
 scale = Vector2(0.955625, 0.955625)
 texture = ExtResource("3_bus")
 region_enabled = true
 region_rect = Rect2(464, 0, 560, 768)
 
-[node name="FrontEdgeAnchor" type="Marker2D" parent="Bus"]
+[node name="FrontEdgeAnchor" type="Marker2D" parent="Bus" unique_id=613728874]
 editor_description = "Measured leftmost/front edge of the left-facing bus art. At BusStopAnchor x 859 this lands at screen x 576, exactly on MinerDropOffAnchor."
 position = Vector2(-283, 0)
 
-[node name="DoorStepAnchor" type="Marker2D" parent="Bus"]
+[node name="DoorStepAnchor" type="Marker2D" parent="Bus" unique_id=1918650185]
 editor_description = "Middle of the drawn doorway, texture x about 1690, on the unmirrored door-facing art. The miner boards out of sight behind the bus rather than stepping down through it, so this is kept for placement reference and for any future visible step-off."
 position = Vector2(240, -4)
 
-[node name="Station" type="Node2D" parent="."]
+[node name="Station" type="Node2D" parent="." unique_id=1418366201]
 editor_description = "Bus stop, standing on the ground at y = 0. It is offset 64 px left of viewport centre so the drawn bench and reader sit immediately left of the fixed centre-screen miner while the stop remains the shot's focal point. The drawn shelter is on StationSprite; the placeholder polygons it replaced have been removed."
 z_index = 1
 position = Vector2(512, 262)
 
-[node name="StationSprite" type="Sprite2D" parent="Station"]
+[node name="StationSprite" type="Sprite2D" parent="Station" unique_id=1369341008]
 editor_description = "Drawn bus stop. Placement is measured from the art: the opaque base sits at texture y=1262 and the art is already centred on the texture, so no x correction is needed. It is then sunk about 10 px past the ground line on purpose - seated exactly on it, the bright horizon glow shows through the gap under the shelter's base. Terrain layer one draws in front of this node, so the sunk edge is covered by the ground it stands in. The import is capped at 1024 px; the compensated scale keeps it 151 px tall and clear of the 91 px letterbox bar."
 texture_filter = 4
+material = SubResource("ShaderMaterial_station")
 position = Vector2(0, -112)
 scale = Vector2(0.618984, 0.618984)
 texture = ExtResource("6_bus_stop")
 
-[node name="AttendantSeatAnchor" type="Marker2D" parent="Station"]
+[node name="AttendantSeatAnchor" type="Marker2D" parent="Station" unique_id=1225748299]
 editor_description = "Measured to the drawn bench: seat surface at texture y=1150, bench centred on texture x=1147. At this staging its screen x is 522, immediately left of the miner at x 576. The standing stand-in cannot sit here without floating, so this is the reference point for the seated art swap, not a live position."
 position = Vector2(10, -32)
 
-[node name="Attendant" parent="." instance=ExtResource("2_character_presenter")]
+[node name="Attendant" parent="." unique_id=750824844 instance=ExtResource("2_character_presenter")]
 editor_description = "A silent, unrelated bystander reading a newspaper at the stop; he is not the lantern-staff man or another story character. Stands at the drawn bench (x 477-567), immediately left of the miner's x 576 starting point, with feet on the ground line so the stand-in already previews where the seated character will be. Do not move it left onto the trellis panel: the figure then reads as standing inside a cage. The current appearance is a standing 256 px frame, so seating it on the bench would float it and push its head under the letterbox. When seated art arrives, move this to AttendantSeatAnchor and re-check the head against the top bar."
 z_index = 2
 position = Vector2(522, 264)
 
-[node name="EditorTerrainPreview" type="Node2D" parent="." node_paths=PackedStringArray("terrain_manager", "terrain_renderer", "test_impacts_root")]
-z_index = -100
+[node name="EditorTerrainPreview" type="Node2D" parent="." unique_id=1669499363 node_paths=PackedStringArray("terrain_manager", "terrain_renderer", "test_impacts_root")]
 editor_description = "Editor-only. Runs the production TerrainManager and TerrainLayerRenderer so the props are placed against the real ground line, grass and crust rather than an empty canvas. Depth 0 keeps it on the surface. It frees itself in a running game and nothing reads from it."
+z_index = -100
+position = Vector2(-576, -260)
 script = ExtResource("7_preview")
 terrain_manager = NodePath("TerrainManager")
 terrain_renderer = NodePath("TerrainLayerRenderer")
 test_impacts_root = NodePath("TestImpacts")
 preview_depth_rows = 0
 
-[node name="TerrainManager" type="Node" parent="EditorTerrainPreview"]
+[node name="TerrainManager" type="Node" parent="EditorTerrainPreview" unique_id=36426966]
 script = ExtResource("11_terrain_manager")
 config = ExtResource("8_config")
+encounter_config = ExtResource("12_vtugv")
 
-[node name="TerrainLayerRenderer" type="Node2D" parent="EditorTerrainPreview" node_paths=PackedStringArray("terrain_manager")]
+[node name="TerrainLayerRenderer" type="Node2D" parent="EditorTerrainPreview" unique_id=1750977510 node_paths=PackedStringArray("terrain_manager")]
 script = ExtResource("12_terrain_renderer")
 terrain_manager = NodePath("../TerrainManager")
 profile = ExtResource("9_profile")
 preview_in_editor = true
 
-[node name="TestImpacts" type="Node2D" parent="EditorTerrainPreview"]
+[node name="TestImpacts" type="Node2D" parent="EditorTerrainPreview" unique_id=881216552]
 editor_description = "Empty on the surface: the arrival plays against intact ground. Add a Marker2D here to dig a real opening and check a prop against broken ground."

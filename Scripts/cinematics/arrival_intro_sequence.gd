@@ -116,11 +116,6 @@ signal attendant_picked_up
 ## Used for the ambient passes. They happen while the player is mining, so the
 ## bus runs behind the cast and can never sweep across the miner.
 @export_range(-16, 16, 1) var bus_behind_draw_order: int = 0
-## The miner's gameplay draw order. Terrain layer one sits at z_index 2, so at
-## this value the foreground stratum covers his legs exactly as it does during
-## play. Handing it back on the settle step makes that read as him planting his
-## feet, instead of his legs clipping away in one frame once the shot is over.
-@export_range(0, 16, 1) var miner_settle_draw_order: int = 1
 
 var _is_playing: bool = false
 var _is_pickup_active: bool = false
@@ -278,11 +273,12 @@ func finish(restore_seconds: float = 0.2) -> void:
 	_kill_prop_tween()
 	miner_rig.show()
 	# Hand back gameplay draw order in place. The miner is already at the exact
-	# dig spot, so the foreground can close over his legs without inventing a
-	# walk or another translation before input unlocks.
+	# dig spot, so he settles without inventing a walk or another translation
+	# before input unlocks. The rig owns the order itself: the shot ends with him
+	# standing on the untouched surface, in front of the foreground stratum.
 	miner_rig.place_cinematic_foot_at(
 		Vector2(_dig_foot_x, _ground_foot_y),
-		miner_settle_draw_order
+		miner_rig.get_rest_draw_order()
 	)
 	var restore_tween := miner_rig.restore_cinematic_visual(restore_seconds)
 	if restore_tween != null:
