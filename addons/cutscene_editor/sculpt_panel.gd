@@ -128,8 +128,32 @@ func refresh() -> void:
 		)
 		return
 	if sculpt == null:
-		_create_button.text = "Create a room for this encounter"
+		# A button that can do nothing must say so rather than absorb the
+		# click. Until an encounter is chosen there is nothing to build a room
+		# for, and pressing this looked like the tool was broken.
+		var has_encounter := _context.encounter != null
+		_create_button.disabled = not has_encounter
+		_create_button.text = (
+			"Create a room for this encounter"
+			if has_encounter
+			else "Pick the encounter above first"
+		)
+		_missing_label.visible = true
+		_missing_label.text = (
+			(
+				"This encounter uses the generated chamber. Creating a room "
+				+ "copies that same chamber so nothing changes at first; the "
+				+ "brush tools appear once it exists."
+			)
+			if has_encounter
+			else (
+				"Choose which encounter this stage is authoring. The preview "
+				+ "moves to its depth and shows its room."
+			)
+		)
 		return
+	_missing_label.visible = false
+	_create_button.disabled = false
 	_sync_layer_selector()
 	_sync_sculpt_controls(sculpt)
 	_update_status(sculpt)
@@ -480,8 +504,20 @@ func _sync_encounter_selector() -> void:
 	)
 	_encounter_selector.clear()
 	if encounter_config == null:
-		_encounter_selector.add_item("No encounter schedule on this preview")
+		# The usual cause is a deleted or moved room file. An encounter holding
+		# a reference to a resource that is no longer there fails to load, and
+		# it takes the whole schedule down with it, so the panel would
+		# otherwise report only that everything is missing.
+		_encounter_selector.add_item("Encounter schedule could not be loaded")
 		_encounter_selector.disabled = true
+		_missing_label.visible = true
+		_missing_label.text = (
+			"resources/encounters/depth_encounter_config.tres did not load. "
+			+ "If a room .tres under resources/cinematics/sculpts/ was deleted "
+			+ "or moved, the encounter pointing at it fails to load and takes "
+			+ "the schedule with it. Check the Output dock for the file it "
+			+ "cannot find, and clear that encounter's Terrain Sculpt."
+		)
 		return
 	_encounter_selector.disabled = false
 	var selected_index := 0
