@@ -101,10 +101,10 @@ func finish_with_presentation_fade(
 ) -> bool:
 	if not is_owned_by(owner):
 		return false
-	var hud_alpha := (
+	var hud_alpha: float = (
 		gameplay_hud.modulate.a if gameplay_hud != null else 1.0
 	)
-	var feedback_alpha := (
+	var feedback_alpha: float = (
 		impact_feedback_layer.modulate.a
 		if impact_feedback_layer != null
 		else 1.0

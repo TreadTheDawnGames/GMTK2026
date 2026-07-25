@@ -221,7 +221,6 @@ func _on_dialogue_line_presented(
 		if line_index >= 0 and line_index < _active_conversation.lines.size()
 		else null
 	)
-	var encounter := encounter_config.encounters[_active_encounter_index]
 	if (
 		encounter.occurs_at_run_bottom
 		and active_line != null
