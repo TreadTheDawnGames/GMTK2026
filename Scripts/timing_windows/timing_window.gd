@@ -5,12 +5,7 @@ class_name TimingWindowTask
 
 @onready var mining_window: SliderTimingWindow = %MiningWindow
 @onready var recovery_window: SliderTimingWindow = %RecoveryWindow
-@onready var streak_lost_sound: AudioStreamPlayer2D = %StreakLostSound
 @onready var combo_label: Label = %ComboLabel
-@onready var hit_sound: AudioStreamPlayer2D = %HitSound
-@onready var streak_saved_sound: AudioStreamPlayer2D = %StreakSavedSound
-@onready var warning_sound: AudioStreamPlayer2D = %WarningSound
-@onready var save_bwah_sound: AudioStreamPlayer2D = %SaveBwahSound
 @onready var depth_label: Label = %DepthLabel
 
 signal pressed(success: bool, combo: int, hit_direction: int)
