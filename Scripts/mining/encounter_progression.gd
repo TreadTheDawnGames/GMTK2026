@@ -59,6 +59,8 @@ func _on_run_reset() -> void:
 
 
 ## Replaces both gameplay consumers with one self-contained authored level.
+## Add new production pickaxe-era rules here as explicit typed handoffs; never
+## make a consumer search PickaxeProgression or the scene tree for current state.
 func apply_level(level_index: int) -> bool:
 	if (
 		config == null
