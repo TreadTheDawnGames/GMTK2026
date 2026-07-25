@@ -143,12 +143,24 @@ func _ready() -> void:
 		mining_controller.resolve_attempt
 	)
 	_connect_once(
+		timing_bridge.impact_candidates_changed,
+		mining_controller._on_impact_candidates_changed
+	)
+	_connect_once(
 		encounter_controller.encounter_completed,
 		encounter_progression._on_encounter_completed
 	)
 	_connect_once(
 		mining_controller.dig_presentation_started,
 		terrain_renderer._on_dig_presentation_started
+	)
+	_connect_once(
+		mining_controller.dig_visuals_preparation_started,
+		terrain_renderer._on_dig_visuals_preparation_started
+	)
+	_connect_once(
+		mining_controller.dig_visuals_preparation_requested,
+		terrain_renderer._on_dig_visuals_preparation_requested
 	)
 	_connect_once(
 		view_controller.landing_reached,

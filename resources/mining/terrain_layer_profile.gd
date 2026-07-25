@@ -26,8 +26,10 @@ extends Resource
 	-1,
 	-2,
 ])
-## Sets mask detail independently from gameplay-cell and screen size.
-@export_range(1, 8, 1) var mask_pixels_per_cell: int = 4
+## Sets mask detail independently from gameplay-cell and screen size. The
+## renderer's fixed three-tile contract keeps up to 16 pixels/cell below 4096
+## per WebGL texture without changing the world-space silhouette.
+@export_range(1, 16, 1) var mask_pixels_per_cell: int = 4
 @export var fill_texture_world_size: Vector2 = Vector2(256.0, 256.0)
 
 @export_category("Strata Dirt Texture")

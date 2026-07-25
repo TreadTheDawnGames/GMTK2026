@@ -17,7 +17,9 @@ extends Node2D
 class TerrainChunkVisual:
 	var root: Node2D
 	var mask_images: Array[Image] = []
-	var mask_textures: Array[ImageTexture] = []
+	var mask_texture_tiles: Array[Array] = []
+	var dirty_mask_tiles: PackedInt32Array = PackedInt32Array()
+	var layer_revisions: PackedInt32Array = PackedInt32Array()
 	var layer_sprites: Array[Sprite2D] = []
 	## One bit per stratum still drawing the shared intact mask. A shared stratum
 	## owns no image and no texture, so streaming untouched rock allocates
@@ -28,6 +30,7 @@ class TerrainChunkVisual:
 class HoleMaskData:
 	var erase_mask: Image
 	var fracture_source: Image
+	var has_fracture_lines: bool = false
 	var transparent_bounds: Rect2i
 	var cache_id: int
 
@@ -44,9 +47,20 @@ class ImpactStamp:
 	var flip_y: bool
 	var rotation_quarters: int
 	var size_variation: float = 1.0
+	var include_fracture_lines: bool = true
 	## Seeds this hit's per-stratum orientation and size jitter. Kept on the
 	## stamp so a chunk streamed back in redraws the exact same rims.
 	var variation_hash: int = 0
+	## Exact logical inputs shared by prediction and authoritative damage. Only
+	## ordinary primary impacts set it; aftershocks always use the cold path.
+	var preparation_key: String = ""
+
+
+class PreparedLayerPatch:
+	var image: Image
+	var destination_position: Vector2i
+	var source_revision: int
+	var dirty_tile_bits: int
 
 
 class ImpactRasterWork:
@@ -56,6 +70,21 @@ class ImpactRasterWork:
 	var layer_index: int
 	var raster_band_index: int
 	var raster_band_count: int
+	var prepare_only: bool = false
+	var finish_preparation: bool = false
+	var prepared_patch: PreparedLayerPatch
+	var image_preparation
+
+
+class ImpactStampPreparation:
+	var stamp: ImpactStamp
+	var layer_index: int
+	var chunk: TerrainChunkVisual
+	var chunk_index: int = -1
+	var raster_band_index: int = 0
+	var raster_band_count: int = 1
+	var prepares_patch: bool = false
+	var image_preparation
 
 
 const TerrainStampImageCache = preload(
@@ -84,10 +113,26 @@ const CHUNK_VISUAL_POOL_LIMIT: int = 4
 # them, the oldest single layer completes before another is accepted, so memory
 # cannot grow with hit count and the renderer never drops an opening.
 const MAX_PENDING_IMPACT_WORK_ITEMS: int = 192
-# The shipped six-pixel mask restores the authored silhouette. Sixty-four-row
-# bands keep its fully-stacked queue under 192 items while preserving a bounded
-# work unit; the deferred benchmark protects the existing 7 ms ceiling.
-const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 64
+const MAX_PREDICTED_IMPACT_CANDIDATES: int = 5
+# Every terrain mask is published as three 128-cell GPU tiles. The usual mining
+# x=192 lies inside the middle tile rather than on a seam, and 16 px/cell stays
+# below 4096 while leaving one sampler free on minimum WebGL hardware.
+const MASK_HORIZONTAL_TILE_COUNT: int = 3
+const MASK_TILE_GUTTER_PIXELS: int = 1
+const ALL_MASK_TILES_DIRTY: int = (
+	(1 << MASK_HORIZONTAL_TILE_COUNT) - 1
+)
+# Authored fracture spurs are optional detail inside the shader's continuous cut
+# outline. Cap them at a 32-cell radius so a theoretical fully-stacked impact
+# cannot turn sparse line art into a full-stamp blend whose area grows 4x.
+const MAX_FRACTURE_RADIUS_CELLS: float = 32.0
+# High-density transform work is its own queue item. Raster bands remove
+# repeated setup while the deferred benchmark protects the unchanged 7 ms
+# atomic ceiling; their height remains benchmark-protected at every density.
+# Twelve-pixel profiling leaves enough atomic headroom for 192 rows. The larger
+# band removes repeated clipping/blit setup while the 7 ms benchmark still
+# guards the final band plus its one dirty-tile upload.
+const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 192
 @export_category("References")
 @export var terrain_manager: TerrainManager
 @export var profile: TerrainLayerProfile
@@ -107,7 +152,10 @@ const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 64
 
 @export_category("Chamber Integration")
 ## Places overlapping organic openings across each encounter-room ceiling.
-@export_range(0, 32, 1) var chamber_circle_count: int = 8
+## The logical chamber taper already owns the continuous opening. One decorative
+## stamp breaks up that edge without replaying eight impact-sized masks when a
+## chamber streams in; the chunk benchmark protects the 12 ms crossing ceiling.
+@export_range(0, 32, 1) var chamber_circle_count: int = 1
 @export_range(1, 16, 1) var chamber_circle_min_radius_cells: int = 5
 @export_range(1, 16, 1) var chamber_circle_max_radius_cells: int = 8
 @export_range(0.0, 8.0, 0.5) var chamber_circle_jitter_cells: float = 3.0
@@ -131,6 +179,10 @@ var _chunk_visual_pool: Array[TerrainChunkVisual] = []
 var _pristine_mask_image: Image
 var _pristine_mask_texture: ImageTexture
 var _pristine_mask_size := Vector2i.ZERO
+# The three upload images are reused for every stratum. Their one-pixel gutters
+# duplicate the neighboring CPU columns so shader filtering stays continuous at
+# all tile seams; memory is bounded by one tiled copy of a chunk mask.
+var _mask_upload_images: Array[Image] = []
 # One authored room rasterized at mask resolution, keyed by its sculpt and
 # indexed by stratum plus one, where index zero is the shared logical shape.
 var _sculpt_mask_images: Dictionary[CutsceneTerrainSculpt, Array] = {}
@@ -148,6 +200,11 @@ var _stamp_image_cache := TerrainStampImageCache.new()
 var _resized_stamp_cache: Dictionary:
 	get:
 		return _stamp_image_cache.entries
+# Two sequential LA8 scratch bands replace per-band Image.get_region
+# allocations. They grow only to one chunk width x the 128-row work ceiling
+# and every consumed rectangle is overwritten before blending.
+var _fracture_band_scratch: Image
+var _solid_band_scratch: Image
 var _current_view_x: float
 var _current_view_y: float
 var _loaded_first_chunk: int = -1
@@ -165,6 +222,18 @@ var _pending_impact_work: Array[ImpactRasterWork] = []
 var _pending_impact_work_head: int = 0
 var _impact_work_pool: Array[ImpactRasterWork] = []
 var _defer_impact_rasterization: bool = false
+# Five timing targets produce at most five candidates, each with one transform
+# per writable gameplay stratum. A new target batch replaces this bounded queue;
+# completed images live in the cache's equally bounded prepared generation.
+var _pending_stamp_preparation: Array[ImpactStampPreparation] = []
+var _pending_stamp_preparation_head: int = 0
+var _stamp_preparation_pool: Array[ImpactStampPreparation] = []
+var _preparation_candidate_count: int = 0
+# Candidate patches are keyed by exact swing plan, chunk, and layer. Partial
+# patches never enter this dictionary; cancellation drops their bounded working
+# images, while completed patches live only until contact or target replacement.
+var _prepared_layer_patches: Dictionary[String, PreparedLayerPatch] = {}
+var _preparing_layer_patches: Dictionary[String, PreparedLayerPatch] = {}
 
 
 ## Connects terrain events and loads the initial visible strata.
@@ -231,27 +300,54 @@ func _ready() -> void:
 	_on_view_position_changed(terrain_manager.get_view_position())
 
 
-## Spreads browser mask rasterization across rendered frames. Gameplay cells
-## change immediately; only the layered artwork catches up, one atomic stratum
-## at a time, under the configured CPU budget.
+## Spreads prediction and browser mask rasterization across rendered frames.
+## Prediction only fills CPU caches; gameplay cells and visible textures remain
+## unchanged until the real impact signal arrives.
 func _process(_delta: float) -> void:
+	var has_preparation := (
+		_pending_stamp_preparation_head
+		< _pending_stamp_preparation.size()
+	)
+	var has_impact_work := (
+		_defer_impact_rasterization
+		and _pending_impact_work_head < _pending_impact_work.size()
+	)
 	if (
-		not _defer_impact_rasterization
-		or _pending_impact_work_head >= _pending_impact_work.size()
+		not has_preparation
+		and not has_impact_work
 	):
 		return
 	var frame_started_at: int = Time.get_ticks_usec()
 	var frame_budget_usec: int = roundi(
 		web_impact_frame_budget_ms * 1000.0
 	)
-	while _pending_impact_work_head < _pending_impact_work.size():
+	# Committed terrain always wins the shared budget. Authoritative preparation
+	# work is inserted into this same queue immediately before its raster bands,
+	# so a partial prediction can never delay an older visible hit.
+	while (
+		_defer_impact_rasterization
+		and _pending_impact_work_head < _pending_impact_work.size()
+	):
 		_process_next_pending_impact_work()
 		if (
 			Time.get_ticks_usec() - frame_started_at
 			>= frame_budget_usec
 		):
-			break
+			return
 	_compact_pending_impact_work()
+	# Only unused terrain time prepares future candidates. If contact arrives
+	# mid-calculation, the authoritative queue above takes ownership next frame.
+	while (
+		_pending_stamp_preparation_head
+		< _pending_stamp_preparation.size()
+	):
+		_prepare_next_pending_stamp_layer()
+		if (
+			Time.get_ticks_usec() - frame_started_at
+			>= frame_budget_usec
+		):
+			break
+	_compact_pending_stamp_preparation()
 
 
 ## Rasterizes every authored room before the run starts. Reaching one mid-run
@@ -271,6 +367,445 @@ func _on_dig_presentation_started(combo: int) -> void:
 	_active_impact_combo = maxi(combo, 0)
 
 
+## Replaces unfinished candidate work. Exact success keeps completed candidate
+## images so contact can promote the matching keys without recomputing them.
+func _on_dig_visuals_preparation_started(
+	keep_completed: bool
+) -> void:
+	for work_index in range(
+		_pending_stamp_preparation_head,
+		_pending_stamp_preparation.size()
+	):
+		var work := _pending_stamp_preparation[work_index]
+		work.stamp = null
+		work.chunk = null
+		work.chunk_index = -1
+		work.raster_band_index = 0
+		work.raster_band_count = 1
+		work.prepares_patch = false
+		work.image_preparation = null
+		if (
+			_stamp_preparation_pool.size()
+			< MAX_PENDING_IMPACT_WORK_ITEMS
+		):
+			_stamp_preparation_pool.append(work)
+	_pending_stamp_preparation.clear()
+	_pending_stamp_preparation_head = 0
+	_preparation_candidate_count = 0
+	_stamp_image_cache.begin_preparation(not keep_completed)
+	_preparing_layer_patches.clear()
+	if not keep_completed:
+		_prepared_layer_patches.clear()
+
+
+## Adds one of at most five fresh primary openings to the current target batch.
+## Existing holes or encounter geometry may shorten authoritative damage; the
+## actual stamp then uses a different key and the queued contact path prepares it.
+func _on_dig_visuals_preparation_requested(
+	start_cell: Vector2i,
+	depth_rows: int,
+	half_width_cells: int,
+	target_cell_x: int,
+	combo: int
+) -> void:
+	if (
+		depth_rows <= 0
+		or _preparation_candidate_count
+			>= MAX_PREDICTED_IMPACT_CANDIDATES
+	):
+		return
+	var config := terrain_manager.config
+	var safe_target_cell_x := clampi(
+		target_cell_x,
+		0,
+		config.terrain_width_cells - 1
+	)
+	var safe_half_width := maxi(half_width_cells, 0)
+	var tunnel_end_row := mini(
+		start_cell.y + depth_rows,
+		config.get_bottom_surface_row()
+	)
+	var row_count := tunnel_end_row - start_cell.y
+	if row_count <= 0:
+		return
+	var row_left := maxi(safe_target_cell_x - safe_half_width, 0)
+	var row_right := mini(
+		safe_target_cell_x + safe_half_width,
+		config.terrain_width_cells - 1
+	)
+	var first_left := mini(row_left, start_cell.x)
+	var first_right := maxi(row_right, start_cell.x)
+	var predicted_cell_count := (
+		first_right - first_left + 1
+		+ maxi(row_count - 1, 0) * (row_right - row_left + 1)
+	)
+	var stamp := _create_ordinary_impact_stamp_from_bounds(
+		Vector2i(first_left, start_cell.y),
+		Vector2i(first_right, tunnel_end_row - 1),
+		predicted_cell_count,
+		signi(safe_target_cell_x - start_cell.x),
+		safe_target_cell_x,
+		maxi(combo, 0)
+	)
+	_preparation_candidate_count += 1
+	for layer_index in range(profile.get_gameplay_layer_count()):
+		if not _can_apply_impact_stamp_layer(stamp, layer_index):
+			continue
+		var work := _obtain_stamp_preparation_work()
+		work.stamp = stamp
+		work.layer_index = layer_index
+		_pending_stamp_preparation.append(work)
+
+
+## Prepares either one exact transform or one band of a composited candidate
+## patch. Only the completed patch is published to the candidate dictionary.
+func _prepare_next_pending_stamp_layer() -> void:
+	if (
+		_pending_stamp_preparation_head
+		>= _pending_stamp_preparation.size()
+	):
+		return
+	var work := _pending_stamp_preparation[
+		_pending_stamp_preparation_head
+	]
+	_pending_stamp_preparation_head += 1
+	var stamp := work.stamp
+	var layer_index := work.layer_index
+	if work.prepares_patch:
+		_prepare_stamp_layer_patch_band(work)
+		return
+	if not _advance_speculative_stamp_images(work):
+		_pending_stamp_preparation_head -= 1
+		return
+	for chunk_index in _get_stamp_chunk_indices(stamp):
+		if not _active_chunks.has(chunk_index):
+			continue
+		var chunk: TerrainChunkVisual = _active_chunks[chunk_index]
+		_queue_stamp_layer_patch_preparation(
+			stamp,
+			layer_index,
+			chunk,
+			chunk_index
+		)
+
+
+func _advance_speculative_stamp_images(
+	work: ImpactStampPreparation
+) -> bool:
+	if work.image_preparation == null:
+		work.image_preparation = _create_stamp_image_preparation(
+			work.stamp,
+			work.layer_index,
+			true
+		)
+	if work.image_preparation == null:
+		return true
+	return _stamp_image_cache.advance_image_preparation(
+		work.image_preparation,
+		MAX_IMPACT_RASTER_BAND_HEIGHT
+	)
+
+
+func _advance_committed_stamp_images(
+	work: ImpactRasterWork
+) -> bool:
+	if work.image_preparation == null:
+		work.image_preparation = _create_stamp_image_preparation(
+			work.stamp,
+			work.layer_index,
+			false
+		)
+	if work.image_preparation == null:
+		return true
+	return _stamp_image_cache.advance_image_preparation(
+		work.image_preparation,
+		MAX_IMPACT_RASTER_BAND_HEIGHT
+	)
+
+
+## Creates one destination-agnostic transform state shared by speculative and
+## authoritative queues. Each caller advances it under the same frame budget.
+func _create_stamp_image_preparation(
+	stamp: ImpactStamp,
+	layer_index: int,
+	is_speculative: bool
+) -> Variant:
+	var mask_data := _get_hole_mask_data(
+		layer_index,
+		stamp.use_big_hole
+	)
+	if mask_data == null:
+		return null
+	var opening_rect := _get_layer_opening_rect(stamp, layer_index)
+	var layer_variation := _get_layer_stamp_variation(
+		stamp,
+		layer_index
+	)
+	var full_stamp_rect := _get_full_stamp_world_rect(
+		opening_rect,
+		mask_data,
+		layer_variation.x == 1,
+		layer_variation.y == 1,
+		layer_variation.z
+	)
+	if not full_stamp_rect.has_area():
+		return null
+	return _stamp_image_cache.start_image_preparation(
+		mask_data.cache_id,
+		mask_data.erase_mask,
+		mask_data.fracture_source,
+		mask_data.has_fracture_lines
+			and stamp.include_fracture_lines,
+		_get_stamp_pixel_size(full_stamp_rect.size),
+		layer_variation.x == 1,
+		layer_variation.y == 1,
+		layer_variation.z,
+		is_speculative
+	)
+
+
+## Reuses one bounded descriptor for transform and patch preparation.
+func _obtain_stamp_preparation_work() -> ImpactStampPreparation:
+	var work: ImpactStampPreparation = (
+		_stamp_preparation_pool.pop_back()
+		if not _stamp_preparation_pool.is_empty()
+		else ImpactStampPreparation.new()
+	)
+	work.chunk_index = -1
+	work.raster_band_index = 0
+	work.raster_band_count = 1
+	work.prepares_patch = false
+	work.image_preparation = null
+	return work
+
+
+## Queues the exact candidate pixels for one visible chunk/layer. Completed
+## patches at the current terrain revision are retained across the exact swing.
+func _queue_stamp_layer_patch_preparation(
+	stamp: ImpactStamp,
+	layer_index: int,
+	chunk: TerrainChunkVisual,
+	chunk_index: int
+) -> void:
+	var patch_key := _get_prepared_layer_patch_key(
+		stamp,
+		chunk_index,
+		layer_index
+	)
+	var completed_patch: PreparedLayerPatch = (
+		_prepared_layer_patches.get(patch_key)
+	)
+	if (
+		completed_patch != null
+		and completed_patch.source_revision
+			== chunk.layer_revisions[layer_index]
+	):
+		return
+	var affected_rect := _get_stamp_layer_chunk_mask_rect(
+		stamp,
+		layer_index,
+		chunk_index
+	)
+	if not affected_rect.has_area():
+		return
+	var raster_band_count := maxi(
+		ceili(
+			float(affected_rect.size.y)
+			/ float(MAX_IMPACT_RASTER_BAND_HEIGHT)
+		),
+		1
+	)
+	for raster_band_index in range(raster_band_count):
+		var work := _obtain_stamp_preparation_work()
+		work.stamp = stamp
+		work.layer_index = layer_index
+		work.chunk = chunk
+		work.chunk_index = chunk_index
+		work.raster_band_index = raster_band_index
+		work.raster_band_count = raster_band_count
+		work.prepares_patch = true
+		_pending_stamp_preparation.append(work)
+
+
+## Builds one immutable patch from a terrain revision. If contact or streaming
+## changes that revision mid-build, the partial image is discarded.
+func _prepare_stamp_layer_patch_band(
+	work: ImpactStampPreparation
+) -> void:
+	if (
+		_active_chunks.get(work.chunk_index) != work.chunk
+		or work.stamp.preparation_key.is_empty()
+	):
+		return
+	var patch_key := _get_prepared_layer_patch_key(
+		work.stamp,
+		work.chunk_index,
+		work.layer_index
+	)
+	var patch: PreparedLayerPatch = _preparing_layer_patches.get(
+		patch_key
+	)
+	if patch == null:
+		var affected_rect := _get_stamp_layer_chunk_mask_rect(
+			work.stamp,
+			work.layer_index,
+			work.chunk_index
+		)
+		if not affected_rect.has_area():
+			return
+		patch = PreparedLayerPatch.new()
+		patch.image = work.chunk.mask_images[
+			work.layer_index
+		].get_region(affected_rect)
+		patch.destination_position = affected_rect.position
+		patch.source_revision = work.chunk.layer_revisions[
+			work.layer_index
+		]
+		patch.dirty_tile_bits = _get_stamp_dirty_tile_bits(
+			work.stamp,
+			work.layer_index
+		)
+		_preparing_layer_patches[patch_key] = patch
+	if (
+		patch.source_revision
+		!= work.chunk.layer_revisions[work.layer_index]
+	):
+		_preparing_layer_patches.erase(patch_key)
+		return
+	var mask_data := _get_hole_mask_data(
+		work.layer_index,
+		work.stamp.use_big_hole
+	)
+	if mask_data == null:
+		return
+	var opening_rect := _get_layer_opening_rect(
+		work.stamp,
+		work.layer_index
+	)
+	var layer_variation := _get_layer_stamp_variation(
+		work.stamp,
+		work.layer_index
+	)
+	_punch_hole(
+		patch.image,
+		work.chunk_index,
+		opening_rect,
+		mask_data,
+		layer_variation.x == 1,
+		layer_variation.y == 1,
+		layer_variation.z,
+		work.stamp.include_fracture_lines,
+		work.raster_band_index,
+		work.raster_band_count,
+		patch.destination_position
+	)
+	if work.raster_band_index == work.raster_band_count - 1:
+		_preparing_layer_patches.erase(patch_key)
+		_prepared_layer_patches[patch_key] = patch
+
+
+func _get_prepared_layer_patch_key(
+	stamp: ImpactStamp,
+	chunk_index: int,
+	layer_index: int
+) -> String:
+	return "%s|%d|%d" % [
+		stamp.preparation_key,
+		chunk_index,
+		layer_index,
+	]
+
+
+## Returns a candidate only while both its logical plan and source terrain
+## revision still match the authoritative chunk.
+func _get_valid_prepared_layer_patch(
+	stamp: ImpactStamp,
+	chunk: TerrainChunkVisual,
+	chunk_index: int,
+	layer_index: int
+) -> PreparedLayerPatch:
+	if stamp.preparation_key.is_empty():
+		return null
+	var patch: PreparedLayerPatch = _prepared_layer_patches.get(
+		_get_prepared_layer_patch_key(
+			stamp,
+			chunk_index,
+			layer_index
+		)
+	)
+	if (
+		patch == null
+		or patch.source_revision != chunk.layer_revisions[layer_index]
+	):
+		return null
+	return patch
+
+
+## Resolves one exact transform key for speculative or committed ownership.
+func _prepare_stamp_layer_images(
+	stamp: ImpactStamp,
+	layer_index: int,
+	is_speculative: bool
+) -> void:
+	var mask_data := _get_hole_mask_data(
+		layer_index,
+		stamp.use_big_hole
+	)
+	if mask_data == null:
+		return
+	var opening_rect := _get_layer_opening_rect(
+		stamp,
+		layer_index
+	)
+	var layer_variation := _get_layer_stamp_variation(
+		stamp,
+		layer_index
+	)
+	var full_stamp_rect := _get_full_stamp_world_rect(
+		opening_rect,
+		mask_data,
+		layer_variation.x == 1,
+		layer_variation.y == 1,
+		layer_variation.z
+	)
+	if not full_stamp_rect.has_area():
+		return
+	_get_resized_stamp_images(
+		mask_data,
+		_get_stamp_pixel_size(full_stamp_rect.size),
+		layer_variation.x == 1,
+		layer_variation.y == 1,
+		layer_variation.z,
+		is_speculative,
+		stamp.include_fracture_lines
+	)
+
+
+## Recycles completed candidate descriptors; transformed images remain in the
+## cache's bounded prepared generation until contact or a target regeneration.
+func _compact_pending_stamp_preparation() -> void:
+	if _pending_stamp_preparation_head <= 0:
+		return
+	for work_index in range(_pending_stamp_preparation_head):
+		var work := _pending_stamp_preparation[work_index]
+		work.stamp = null
+		work.chunk = null
+		work.chunk_index = -1
+		work.raster_band_index = 0
+		work.raster_band_count = 1
+		work.prepares_patch = false
+		work.image_preparation = null
+		if (
+			_stamp_preparation_pool.size()
+			< MAX_PENDING_IMPACT_WORK_ITEMS
+		):
+			_stamp_preparation_pool.append(work)
+	_pending_stamp_preparation = _pending_stamp_preparation.slice(
+		_pending_stamp_preparation_head
+	)
+	_pending_stamp_preparation_head = 0
+
+
 ## Saves and applies one organic opening for newly destroyed terrain.
 func _on_terrain_damaged(
 	destroyed_cells: Array[Vector2i],
@@ -279,6 +814,9 @@ func _on_terrain_damaged(
 ) -> void:
 	if destroyed_cells.is_empty():
 		return
+	# Contact owns the queue now. Completed speculative keys remain available for
+	# promotion, while unfinished candidates cannot run ahead of real terrain.
+	_on_dig_visuals_preparation_started(true)
 	var stamp := _create_impact_stamp(
 		destroyed_cells,
 		horizontal_direction,
@@ -319,6 +857,47 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 			affected_chunk_lookup[chunk_index] = true
 	if _defer_impact_rasterization:
 		var layer_count: int = profile.get_gameplay_layer_count()
+		var queued_authoritative_preparation := false
+		# The authoritative transform is a first-class queue item immediately
+		# before fallback raster bands. Fully prepared layers skip both costs and
+		# promote their immutable terrain patch instead.
+		for stamp in stamps:
+			if not stamp.narrow_path_points.is_empty():
+				continue
+			var preparation_layers: Array[int] = []
+			for layer_index in range(layer_count):
+				if not _can_apply_impact_stamp_layer(stamp, layer_index):
+					continue
+				for chunk_index in _get_stamp_chunk_indices(stamp):
+					if not _active_chunks.has(chunk_index):
+						continue
+					var chunk: TerrainChunkVisual = _active_chunks[
+						chunk_index
+					]
+					if (
+						_get_valid_prepared_layer_patch(
+							stamp,
+							chunk,
+							chunk_index,
+							layer_index
+						)
+						== null
+					):
+						preparation_layers.append(layer_index)
+						break
+			for preparation_index in range(preparation_layers.size()):
+				queued_authoritative_preparation = true
+				_append_impact_work(
+					stamp,
+					preparation_layers[preparation_index],
+					null,
+					-1,
+					0,
+					1,
+					true,
+					preparation_index
+						== preparation_layers.size() - 1
+				)
 		for chunk_index in affected_chunk_lookup:
 			if not _active_chunks.has(chunk_index):
 				continue
@@ -327,25 +906,49 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 				if chunk_index not in _get_stamp_chunk_indices(stamp):
 					continue
 				for layer_index in range(layer_count):
-					var raster_band_count := 1
-					if stamp.narrow_path_points.is_empty():
-						var opening_rect := _get_layer_opening_rect(
+					# Do not allocate queue capacity for strata the production
+					# stamp contract will reject. At high mask density these
+					# no-op bands otherwise create artificial queue backpressure.
+					if not _can_apply_impact_stamp_layer(
+						stamp,
+						layer_index
+					):
+						continue
+					var prepared_patch := (
+						_get_valid_prepared_layer_patch(
 							stamp,
+							chunk,
+							chunk_index,
 							layer_index
 						)
-						var mask_pixels_per_world_unit := (
-							float(profile.mask_pixels_per_cell)
-							/ float(
-								terrain_manager.config.terrain_cell_world_size
+					)
+					if prepared_patch != null:
+						_append_impact_work(
+							stamp,
+							layer_index,
+							chunk,
+							chunk_index,
+							0,
+							1,
+							false,
+							false,
+							prepared_patch
+						)
+						continue
+					var raster_band_count := 1
+					if stamp.narrow_path_points.is_empty():
+						var affected_rect := (
+							_get_stamp_layer_chunk_mask_rect(
+								stamp,
+								layer_index,
+								chunk_index
 							)
 						)
-						var opening_mask_height := ceili(
-							opening_rect.size.y
-							* mask_pixels_per_world_unit
-						)
+						if not affected_rect.has_area():
+							continue
 						raster_band_count = maxi(
 							ceili(
-								float(opening_mask_height)
+								float(affected_rect.size.y)
 								/ float(
 									MAX_IMPACT_RASTER_BAND_HEIGHT
 								)
@@ -353,25 +956,18 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 							1
 						)
 					for raster_band_index in range(raster_band_count):
-						while (
-							_pending_impact_work.size()
-							- _pending_impact_work_head
-							>= MAX_PENDING_IMPACT_WORK_ITEMS
-						):
-							_process_next_pending_impact_work()
-							_compact_pending_impact_work()
-						var work: ImpactRasterWork = (
-							_impact_work_pool.pop_back()
-							if not _impact_work_pool.is_empty()
-							else ImpactRasterWork.new()
+						_append_impact_work(
+							stamp,
+							layer_index,
+							chunk,
+							chunk_index,
+							raster_band_index,
+							raster_band_count
 						)
-						work.chunk = chunk
-						work.chunk_index = chunk_index
-						work.stamp = stamp
-						work.layer_index = layer_index
-						work.raster_band_index = raster_band_index
-						work.raster_band_count = raster_band_count
-						_pending_impact_work.append(work)
+		_prepared_layer_patches.clear()
+		_preparing_layer_patches.clear()
+		if not queued_authoritative_preparation:
+			_stamp_image_cache.discard_prepared()
 		return
 	for chunk_index in affected_chunk_lookup:
 		if not _active_chunks.has(chunk_index):
@@ -388,6 +984,45 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 			)
 		_upload_chunk_masks(chunk, changed_layers)
 	_clear_temporary_stamp_cache()
+	_stamp_image_cache.discard_prepared()
+
+
+## Appends one bounded authoritative item, applying queue backpressure without
+## dropping either preparation or pixels.
+func _append_impact_work(
+	stamp: ImpactStamp,
+	layer_index: int,
+	chunk: TerrainChunkVisual,
+	chunk_index: int,
+	raster_band_index: int,
+	raster_band_count: int,
+	prepare_only: bool = false,
+	finish_preparation: bool = false,
+	prepared_patch: PreparedLayerPatch = null
+) -> void:
+	while (
+		_pending_impact_work.size()
+		- _pending_impact_work_head
+		>= MAX_PENDING_IMPACT_WORK_ITEMS
+	):
+		_process_next_pending_impact_work()
+		_compact_pending_impact_work()
+	var work: ImpactRasterWork = (
+		_impact_work_pool.pop_back()
+		if not _impact_work_pool.is_empty()
+		else ImpactRasterWork.new()
+	)
+	work.chunk = chunk
+	work.chunk_index = chunk_index
+	work.stamp = stamp
+	work.layer_index = layer_index
+	work.raster_band_index = raster_band_index
+	work.raster_band_count = raster_band_count
+	work.prepare_only = prepare_only
+	work.finish_preparation = finish_preparation
+	work.prepared_patch = prepared_patch
+	work.image_preparation = null
+	_pending_impact_work.append(work)
 
 
 ## Completes one queued stratum and publishes only that texture. Work targeting
@@ -398,7 +1033,45 @@ func _process_next_pending_impact_work() -> void:
 		return
 	var work := _pending_impact_work[_pending_impact_work_head]
 	_pending_impact_work_head += 1
-	if _active_chunks.get(work.chunk_index) == work.chunk:
+	if work.prepared_patch != null:
+		if _active_chunks.get(work.chunk_index) == work.chunk:
+			_make_layer_writable(work.chunk, work.layer_index)
+			if (
+				work.prepared_patch.source_revision
+				== work.chunk.layer_revisions[work.layer_index]
+			):
+				work.chunk.mask_images[
+					work.layer_index
+				].blit_rect(
+					work.prepared_patch.image,
+					Rect2i(
+						Vector2i.ZERO,
+						work.prepared_patch.image.get_size()
+					),
+					work.prepared_patch.destination_position
+				)
+				work.chunk.dirty_mask_tiles[work.layer_index] |= (
+					work.prepared_patch.dirty_tile_bits
+				)
+				work.chunk.layer_revisions[work.layer_index] += 1
+				_publish_layer_texture(work.chunk, work.layer_index)
+			else:
+				# A non-mining terrain mutation invalidated the candidate after
+				# queue construction. This rare path stays authoritative.
+				_apply_impact_stamp_layer(
+					work.chunk,
+					work.chunk_index,
+					work.stamp,
+					work.layer_index
+				)
+				_publish_layer_texture(work.chunk, work.layer_index)
+	elif work.prepare_only:
+		if not _advance_committed_stamp_images(work):
+			_pending_impact_work_head -= 1
+			return
+		if work.finish_preparation:
+			_stamp_image_cache.discard_prepared()
+	elif _active_chunks.get(work.chunk_index) == work.chunk:
 		_apply_impact_stamp_layer(
 			work.chunk,
 			work.chunk_index,
@@ -413,6 +1086,10 @@ func _process_next_pending_impact_work() -> void:
 	work.stamp = null
 	work.raster_band_index = 0
 	work.raster_band_count = 1
+	work.prepare_only = false
+	work.finish_preparation = false
+	work.prepared_patch = null
+	work.image_preparation = null
 	if _impact_work_pool.size() < MAX_PENDING_IMPACT_WORK_ITEMS:
 		_impact_work_pool.append(work)
 
@@ -449,11 +1126,15 @@ func rebuild_all_chunks() -> void:
 		pending_work.stamp = null
 		pending_work.raster_band_index = 0
 		pending_work.raster_band_count = 1
+		pending_work.prepared_patch = null
+		pending_work.image_preparation = null
 		if _impact_work_pool.size() < MAX_PENDING_IMPACT_WORK_ITEMS:
 			_impact_work_pool.append(pending_work)
 	_pending_impact_work.clear()
 	_pending_impact_work_head = 0
 	_clear_temporary_stamp_cache()
+	_prepared_layer_patches.clear()
+	_preparing_layer_patches.clear()
 	for chunk_index in _active_chunks.keys():
 		_unload_chunk(chunk_index)
 	# A rebuild is how an authored edit reaches the screen, so nothing built from
@@ -578,6 +1259,7 @@ func _load_chunk(chunk_index: int) -> void:
 			chunk.mask_images[0],
 			chunk_index
 		)
+		chunk.dirty_mask_tiles[0] = ALL_MASK_TILES_DIRTY
 
 	var chamber_stamps: Array = _chamber_stamps_by_chunk.get(
 		chunk_index,
@@ -640,12 +1322,21 @@ func _create_chunk_visual(layer_count: int) -> TerrainChunkVisual:
 	chunk.root = Node2D.new()
 	add_child(chunk.root)
 	var chunk_world_size := _get_chunk_world_size()
+	chunk.dirty_mask_tiles.resize(layer_count)
+	chunk.dirty_mask_tiles.fill(ALL_MASK_TILES_DIRTY)
+	chunk.layer_revisions.resize(layer_count)
+	chunk.layer_revisions.fill(0)
 	for layer_index in range(layer_count):
 		var sprite := Sprite2D.new()
 		sprite.name = "TerrainLayer_%d" % layer_index
 		sprite.centered = false
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		sprite.scale = Vector2.ONE * (
+		# One sprite spans the full chunk while its two mask samplers each own
+		# half the pixels. Doubling only X preserves the exact world dimensions.
+		sprite.scale = Vector2(
+			float(MASK_HORIZONTAL_TILE_COUNT),
+			1.0
+		) * (
 			float(terrain_manager.config.terrain_cell_world_size)
 			/ float(profile.mask_pixels_per_cell)
 		)
@@ -658,7 +1349,9 @@ func _create_chunk_visual(layer_count: int) -> TerrainChunkVisual:
 		chunk.root.add_child(sprite)
 		chunk.layer_sprites.append(sprite)
 		chunk.mask_images.append(null)
-		chunk.mask_textures.append(null)
+		var texture_tiles: Array[ImageTexture] = []
+		texture_tiles.resize(MASK_HORIZONTAL_TILE_COUNT)
+		chunk.mask_texture_tiles.append(texture_tiles)
 	return chunk
 
 
@@ -703,8 +1396,16 @@ func _share_intact_masks(
 	var intact_image := _get_pristine_mask_image()
 	for layer_index in range(layer_count):
 		chunk.mask_images[layer_index] = intact_image
-		chunk.mask_textures[layer_index] = _pristine_mask_texture
-		chunk.layer_sprites[layer_index].texture = _pristine_mask_texture
+		var texture_tiles: Array[ImageTexture] = []
+		texture_tiles.resize(MASK_HORIZONTAL_TILE_COUNT)
+		texture_tiles.fill(_pristine_mask_texture)
+		chunk.mask_texture_tiles[layer_index] = texture_tiles
+		_set_sprite_mask_textures(
+			chunk.layer_sprites[layer_index],
+			texture_tiles
+		)
+		chunk.dirty_mask_tiles[layer_index] = 0
+		chunk.layer_revisions[layer_index] = 0
 	chunk.shared_layers = (1 << layer_count) - 1
 
 
@@ -777,6 +1478,7 @@ func _build_chunk_masks(
 				layer_index
 			)
 		chunk.mask_images[layer_index] = layer_mask
+		chunk.dirty_mask_tiles[layer_index] = ALL_MASK_TILES_DIRTY
 
 
 ## Gives one stratum an image of its own before a stamp writes into it.
@@ -811,22 +1513,125 @@ func _publish_layer_texture(
 	var sprite := chunk.layer_sprites[layer_index]
 	if chunk.shared_layers & (1 << layer_index) != 0:
 		if sprite.texture != _pristine_mask_texture:
-			chunk.mask_textures[layer_index] = _pristine_mask_texture
-			sprite.texture = _pristine_mask_texture
+			var shared_tiles: Array[ImageTexture] = []
+			shared_tiles.resize(MASK_HORIZONTAL_TILE_COUNT)
+			shared_tiles.fill(_pristine_mask_texture)
+			chunk.mask_texture_tiles[layer_index] = shared_tiles
+			_set_sprite_mask_textures(sprite, shared_tiles)
+		chunk.dirty_mask_tiles[layer_index] = 0
 		return
-	var mask_texture: ImageTexture = chunk.mask_textures[layer_index]
+	var dirty_tiles: int = chunk.dirty_mask_tiles[layer_index]
+	if dirty_tiles == 0:
+		return
+	var texture_tiles: Array = chunk.mask_texture_tiles[layer_index]
+	for tile_index in range(MASK_HORIZONTAL_TILE_COUNT):
+		if dirty_tiles & (1 << tile_index) == 0:
+			continue
+		_prepare_mask_upload_tile(mask_image, tile_index)
+		var upload_image := _mask_upload_images[tile_index]
+		var mask_texture: ImageTexture = texture_tiles[tile_index]
+		if (
+			mask_texture == null
+			or mask_texture == _pristine_mask_texture
+			or Vector2i(mask_texture.get_size())
+				!= upload_image.get_size()
+		):
+			texture_tiles[tile_index] = ImageTexture.create_from_image(
+				upload_image
+			)
+		else:
+			mask_texture.update(upload_image)
+	chunk.mask_texture_tiles[layer_index] = texture_tiles
+	_set_sprite_mask_textures(sprite, texture_tiles)
+	chunk.dirty_mask_tiles[layer_index] = 0
+
+
+## Binds one layer's fixed tile set to its single full-width sprite.
+func _set_sprite_mask_textures(
+	sprite: Sprite2D,
+	texture_tiles: Array
+) -> void:
+	sprite.texture = texture_tiles[0]
+	sprite.scale.x = (
+		_get_chunk_world_size().x
+		/ float((texture_tiles[0] as Texture2D).get_width())
+	)
+	var material := sprite.material as ShaderMaterial
+	for tile_index in range(MASK_HORIZONTAL_TILE_COUNT):
+		material.set_shader_parameter(
+			"mask_tile_%d" % tile_index,
+			texture_tiles[tile_index]
+		)
+
+
+## Copies one dirty CPU column into its reusable GPU upload image. Its gutters
+## carry neighboring authoritative columns, so updating one tile preserves
+## bilinear continuity without copying or uploading the other two.
+func _prepare_mask_upload_tile(
+	mask_image: Image,
+	tile_index: int
+) -> void:
+	assert(
+		mask_image.get_width() % MASK_HORIZONTAL_TILE_COUNT == 0,
+		"Terrain mask width must divide evenly across its GPU tiles."
+	)
+	var tile_content_width := (
+		mask_image.get_width() / MASK_HORIZONTAL_TILE_COUNT
+	)
+	var tile_size := Vector2i(
+		tile_content_width + MASK_TILE_GUTTER_PIXELS * 2,
+		mask_image.get_height()
+	)
 	if (
-		mask_texture == null
-		or mask_texture == _pristine_mask_texture
-		or Vector2i(mask_texture.get_size()) != mask_image.get_size()
+		_mask_upload_images.size() != MASK_HORIZONTAL_TILE_COUNT
+		or _mask_upload_images[0] == null
+		or _mask_upload_images[0].get_size() != tile_size
 	):
-		mask_texture = ImageTexture.create_from_image(mask_image)
-		chunk.mask_textures[layer_index] = mask_texture
-		sprite.texture = mask_texture
-		return
-	mask_texture.update(mask_image)
-	if sprite.texture != mask_texture:
-		sprite.texture = mask_texture
+		_mask_upload_images.clear()
+		for _upload_index in range(MASK_HORIZONTAL_TILE_COUNT):
+			_mask_upload_images.append(
+				Image.create(
+					tile_size.x,
+					tile_size.y,
+					false,
+					Image.FORMAT_LA8
+				)
+			)
+	var tile_start_x := tile_index * tile_content_width
+	var upload_image := _mask_upload_images[tile_index]
+	upload_image.blit_rect(
+		mask_image,
+		Rect2i(
+			tile_start_x,
+			0,
+			tile_content_width,
+			tile_size.y
+		),
+		Vector2i(MASK_TILE_GUTTER_PIXELS, 0)
+	)
+	upload_image.blit_rect(
+		mask_image,
+		Rect2i(
+			maxi(tile_start_x - 1, 0),
+			0,
+			1,
+			tile_size.y
+		),
+		Vector2i.ZERO
+	)
+	upload_image.blit_rect(
+		mask_image,
+		Rect2i(
+			mini(
+				tile_start_x + tile_content_width,
+				mask_image.get_width() - 1
+			),
+			0,
+			1,
+			tile_size.y
+		),
+		Vector2i(tile_size.x - 1, 0)
+	)
 
 
 ## Returns the one solid mask every intact stratum draws.
@@ -842,8 +1647,9 @@ func _get_pristine_mask_image() -> Image:
 		Image.FORMAT_LA8
 	)
 	_pristine_mask_image.fill(SOLID_MASK_COLOR)
+	_prepare_mask_upload_tile(_pristine_mask_image, 0)
 	_pristine_mask_texture = ImageTexture.create_from_image(
-		_pristine_mask_image
+		_mask_upload_images[0]
 	)
 	return _pristine_mask_image
 
@@ -914,8 +1720,16 @@ func _release_chunk_masks(chunk: TerrainChunkVisual) -> void:
 	var intact_image := _get_pristine_mask_image()
 	for layer_index in range(chunk.mask_images.size()):
 		chunk.mask_images[layer_index] = intact_image
-		chunk.mask_textures[layer_index] = _pristine_mask_texture
-		chunk.layer_sprites[layer_index].texture = _pristine_mask_texture
+		var texture_tiles: Array[ImageTexture] = []
+		texture_tiles.resize(MASK_HORIZONTAL_TILE_COUNT)
+		texture_tiles.fill(_pristine_mask_texture)
+		chunk.mask_texture_tiles[layer_index] = texture_tiles
+		_set_sprite_mask_textures(
+			chunk.layer_sprites[layer_index],
+			texture_tiles
+		)
+		chunk.dirty_mask_tiles[layer_index] = 0
+		chunk.layer_revisions[layer_index] = 0
 	chunk.shared_layers = (1 << chunk.mask_images.size()) - 1
 
 
@@ -1480,6 +2294,15 @@ func _create_impact_stamp(
 		minimum_cell.y = mini(minimum_cell.y, cell.y)
 		maximum_cell.x = maxi(maximum_cell.x, cell.x)
 		maximum_cell.y = maxi(maximum_cell.y, cell.y)
+	if not is_narrow_path:
+		return _create_ordinary_impact_stamp_from_bounds(
+			minimum_cell,
+			maximum_cell,
+			destroyed_cells.size(),
+			horizontal_direction,
+			impact_origin_cell_x,
+			_active_impact_combo
+		)
 
 	var cell_size := terrain_manager.config.terrain_cell_world_size
 	var stamp := ImpactStamp.new()
@@ -1565,6 +2388,71 @@ func _create_impact_stamp(
 	return stamp
 
 
+## Builds the one ordinary-stamp contract shared by candidates and real damage.
+func _create_ordinary_impact_stamp_from_bounds(
+	minimum_cell: Vector2i,
+	maximum_cell: Vector2i,
+	damaged_cell_count: int,
+	horizontal_direction: int,
+	impact_origin_cell_x: int,
+	impact_combo: int
+) -> ImpactStamp:
+	var cell_size := terrain_manager.config.terrain_cell_world_size
+	var stamp := ImpactStamp.new()
+	var damage_rect := Rect2(
+		Vector2(minimum_cell * cell_size),
+		Vector2(
+			(maximum_cell - minimum_cell + Vector2i.ONE)
+			* cell_size
+		)
+	)
+	stamp.center = damage_rect.get_center()
+	if impact_origin_cell_x >= 0:
+		stamp.center.x = (
+			float(impact_origin_cell_x) + 0.5
+		) * float(cell_size)
+	stamp.damage_bounds = damage_rect
+	stamp.core_radius = (
+		maxf(damage_rect.size.x, damage_rect.size.y) * 0.5
+	)
+	stamp.include_fracture_lines = (
+		stamp.core_radius
+		<= MAX_FRACTURE_RADIUS_CELLS * float(cell_size)
+	)
+	stamp.use_big_hole = (
+		impact_combo >= deepest_layer_combo_threshold
+		and stamp.core_radius * 2.0
+		>= float(profile.big_hole_minimum_size)
+	)
+	var variation_hash := (
+		minimum_cell.x * 73_856_093
+		^ minimum_cell.y * 19_349_663
+		^ damaged_cell_count * 83_492_791
+	)
+	stamp.flip_x = (
+		horizontal_direction < 0
+		or (horizontal_direction == 0 and variation_hash % 2 == 0)
+	)
+	stamp.flip_y = variation_hash % 3 == 0
+	stamp.rotation_quarters = posmod(variation_hash, 4)
+	stamp.size_variation = (
+		0.92
+		+ float(posmod(variation_hash / 4, 9)) * 0.02
+	)
+	stamp.variation_hash = variation_hash
+	stamp.preparation_key = "%d,%d:%d,%d:%d:%d:%d:%d" % [
+		minimum_cell.x,
+		minimum_cell.y,
+		maximum_cell.x,
+		maximum_cell.y,
+		damaged_cell_count,
+		horizontal_direction,
+		impact_origin_cell_x,
+		impact_combo,
+	]
+	return stamp
+
+
 ## Returns one stratum's own orientation and size jitter for a hit.
 ##
 ## Every layer used to punch the identical silhouette at a smaller scale, so a
@@ -1642,6 +2530,190 @@ func _apply_impact_stamp_layer(
 	raster_band_index: int = 0,
 	raster_band_count: int = 1
 ) -> bool:
+	if not _can_apply_impact_stamp_layer(stamp, layer_index):
+		return false
+	_make_layer_writable(chunk, layer_index)
+	var changed := false
+	if not stamp.narrow_path_points.is_empty():
+		changed = _punch_narrow_path(
+			chunk.mask_images[layer_index],
+			chunk_index,
+			stamp,
+			layer_index
+		)
+	else:
+		var mask_data := _get_hole_mask_data(
+			layer_index,
+			stamp.use_big_hole
+		)
+		if mask_data == null:
+			return false
+		var opening_rect := _get_layer_opening_rect(stamp, layer_index)
+		var layer_variation := _get_layer_stamp_variation(
+			stamp,
+			layer_index
+		)
+		changed = _punch_hole(
+			chunk.mask_images[layer_index],
+			chunk_index,
+			opening_rect,
+			mask_data,
+			layer_variation.x == 1,
+			layer_variation.y == 1,
+			layer_variation.z,
+			stamp.include_fracture_lines,
+			raster_band_index,
+			raster_band_count
+		)
+	if changed:
+		chunk.dirty_mask_tiles[layer_index] |= (
+			_get_stamp_dirty_tile_bits(stamp, layer_index)
+		)
+		chunk.layer_revisions[layer_index] += 1
+	return changed
+
+
+## Maps one stamp's authored extent onto the fixed tile lattice. Expanding by
+## one mask pixel marks both neighbors only when a gutter column can change.
+func _get_stamp_dirty_tile_bits(
+	stamp: ImpactStamp,
+	layer_index: int
+) -> int:
+	var stamp_rect := _get_stamp_broad_rect(stamp)
+	if stamp.narrow_path_points.is_empty():
+		var mask_data := _get_hole_mask_data(
+			layer_index,
+			stamp.use_big_hole
+		)
+		if mask_data == null:
+			return 0
+		var opening_rect := _get_layer_opening_rect(stamp, layer_index)
+		var layer_variation := _get_layer_stamp_variation(
+			stamp,
+			layer_index
+		)
+		stamp_rect = _get_full_stamp_world_rect(
+			opening_rect,
+			mask_data,
+			layer_variation.x == 1,
+			layer_variation.y == 1,
+			layer_variation.z
+		)
+	if not stamp_rect.has_area():
+		return 0
+	var mask_pixels_per_world_unit := (
+		float(profile.mask_pixels_per_cell)
+		/ float(terrain_manager.config.terrain_cell_world_size)
+	)
+	var mask_width := _get_chunk_mask_size().x
+	var tile_width := mask_width / MASK_HORIZONTAL_TILE_COUNT
+	var first_mask_x := clampi(
+		floori(stamp_rect.position.x * mask_pixels_per_world_unit) - 1,
+		0,
+		mask_width - 1
+	)
+	var last_mask_x := clampi(
+		ceili(stamp_rect.end.x * mask_pixels_per_world_unit),
+		0,
+		mask_width - 1
+	)
+	var first_tile := clampi(
+		floori(float(first_mask_x) / float(tile_width)),
+		0,
+		MASK_HORIZONTAL_TILE_COUNT - 1
+	)
+	var last_tile := clampi(
+		floori(float(last_mask_x) / float(tile_width)),
+		first_tile,
+		MASK_HORIZONTAL_TILE_COUNT - 1
+	)
+	var dirty_tiles := 0
+	for tile_index in range(first_tile, last_tile + 1):
+		dirty_tiles |= 1 << tile_index
+	return dirty_tiles
+
+
+## Returns the exact full-mask rectangle a primary stamp can change in one
+## chunk. Prediction crops this rect before rastering; the normal punch path
+## clips against the same integer lattice, so promoted pixels are byte-identical.
+func _get_stamp_layer_chunk_mask_rect(
+	stamp: ImpactStamp,
+	layer_index: int,
+	chunk_index: int
+) -> Rect2i:
+	if not stamp.narrow_path_points.is_empty():
+		return Rect2i()
+	var mask_data := _get_hole_mask_data(
+		layer_index,
+		stamp.use_big_hole
+	)
+	if mask_data == null:
+		return Rect2i()
+	var opening_rect := _get_layer_opening_rect(stamp, layer_index)
+	var layer_variation := _get_layer_stamp_variation(
+		stamp,
+		layer_index
+	)
+	var full_stamp_rect := _get_full_stamp_world_rect(
+		opening_rect,
+		mask_data,
+		layer_variation.x == 1,
+		layer_variation.y == 1,
+		layer_variation.z
+	)
+	if not full_stamp_rect.has_area():
+		return Rect2i()
+	var mask_pixels_per_world_unit := (
+		float(profile.mask_pixels_per_cell)
+		/ float(terrain_manager.config.terrain_cell_world_size)
+	)
+	var stamp_size := _get_stamp_pixel_size(full_stamp_rect.size)
+	var chunk_mask_top := (
+		chunk_index
+		* terrain_manager.config.chunk_height_cells
+		* profile.mask_pixels_per_cell
+	)
+	var destination_position := Vector2i(
+		floori(full_stamp_rect.position.x * mask_pixels_per_world_unit),
+		floori(full_stamp_rect.position.y * mask_pixels_per_world_unit)
+			- chunk_mask_top
+	)
+	var config := terrain_manager.config
+	var surface_local_y := (
+		config.initial_surface_row * profile.mask_pixels_per_cell
+		- chunk_mask_top
+	)
+	var clipped_height := stamp_size.y
+	if destination_position.y < surface_local_y:
+		var clipped_rows := surface_local_y - destination_position.y
+		if clipped_rows >= clipped_height:
+			return Rect2i()
+		clipped_height -= clipped_rows
+		destination_position.y = surface_local_y
+	var floor_local_y := (
+		(config.get_bottom_surface_row() + 1) * profile.mask_pixels_per_cell
+		- chunk_mask_top
+	)
+	clipped_height = mini(
+		clipped_height,
+		floor_local_y - destination_position.y
+	)
+	if clipped_height <= 0:
+		return Rect2i()
+	return Rect2i(
+		destination_position,
+		Vector2i(stamp_size.x, clipped_height)
+	).intersection(
+		Rect2i(Vector2i.ZERO, _get_chunk_mask_size())
+	)
+
+
+## Shares the exact visible-layer contract between synchronous stamping and
+## deferred queue construction, so rejected strata never become queued no-ops.
+func _can_apply_impact_stamp_layer(
+	stamp: ImpactStamp,
+	layer_index: int
+) -> bool:
 	var gameplay_layer_count := profile.get_gameplay_layer_count()
 	if (
 		layer_index < 0
@@ -1652,45 +2724,14 @@ func _apply_impact_stamp_layer(
 		)
 	):
 		return false
+	# Orange remains the decorative tunnel backdrop below combo seven. At or
+	# above the combo gate, the size threshold still prevents a physically
+	# small secondary path from exposing the brown back wall.
 	var is_layer_covering_backdrop := (
 		profile.keep_back_layer_solid
 		and layer_index == gameplay_layer_count - 2
 	)
-	# Orange remains the decorative tunnel backdrop below combo seven. At or
-	# above the combo gate, the size threshold still prevents a physically
-	# small secondary path from exposing the brown back wall.
-	if is_layer_covering_backdrop and not stamp.use_big_hole:
-		return false
-	_make_layer_writable(chunk, layer_index)
-	if not stamp.narrow_path_points.is_empty():
-		return _punch_narrow_path(
-			chunk.mask_images[layer_index],
-			chunk_index,
-			stamp,
-			layer_index
-		)
-	var mask_data := _get_hole_mask_data(
-		layer_index,
-		stamp.use_big_hole
-	)
-	if mask_data == null:
-		return false
-	var opening_rect := _get_layer_opening_rect(stamp, layer_index)
-	var layer_variation := _get_layer_stamp_variation(
-		stamp,
-		layer_index
-	)
-	return _punch_hole(
-		chunk.mask_images[layer_index],
-		chunk_index,
-		opening_rect,
-		mask_data,
-		layer_variation.x == 1,
-		layer_variation.y == 1,
-		layer_variation.z,
-		raster_band_index,
-		raster_band_count
-	)
+	return not is_layer_covering_backdrop or stamp.use_big_hole
 
 
 ## Returns the organic opening drawn for one ordinary impact layer.
@@ -2176,32 +3217,22 @@ func _punch_hole(
 	flip_x: bool,
 	flip_y: bool,
 	rotation_quarters: int,
+	include_fracture_lines: bool = true,
 	raster_band_index: int = 0,
-	raster_band_count: int = 1
+	raster_band_count: int = 1,
+	destination_mask_origin: Vector2i = Vector2i.ZERO
 ) -> bool:
-	var source_bounds := _get_oriented_transparent_bounds(
+	var full_stamp_rect := _get_full_stamp_world_rect(
+		opening_world_rect,
 		mask_data,
 		flip_x,
 		flip_y,
 		rotation_quarters
 	)
-	if source_bounds.size.x <= 0.0 or source_bounds.size.y <= 0.0:
+	if not full_stamp_rect.has_area():
 		return false
-
-	var full_stamp_size := Vector2(
-		opening_world_rect.size.x
-		/ source_bounds.size.x,
-		opening_world_rect.size.y
-		/ source_bounds.size.y
-	)
-	var full_stamp_position := (
-		opening_world_rect.position
-		- source_bounds.position * full_stamp_size
-	)
-	var full_stamp_rect := Rect2(
-		full_stamp_position,
-		full_stamp_size
-	)
+	var full_stamp_size := full_stamp_rect.size
+	var full_stamp_position := full_stamp_rect.position
 	var chunk_world_size := _get_chunk_world_size()
 	var chunk_world_rect := Rect2(
 		Vector2(
@@ -2220,26 +3251,15 @@ func _punch_hole(
 		float(profile.mask_pixels_per_cell)
 		/ float(terrain_manager.config.terrain_cell_world_size)
 	)
-	var stamp_size := Vector2i(
-		maxi(
-			ceili(
-				full_stamp_size.x * mask_pixels_per_world_unit
-			),
-			1
-		),
-		maxi(
-			ceili(
-				full_stamp_size.y * mask_pixels_per_world_unit
-			),
-			1
-		)
-	)
+	var stamp_size := _get_stamp_pixel_size(full_stamp_size)
 	var stamp_images := _get_resized_stamp_images(
 		mask_data,
 		stamp_size,
 		flip_x,
 		flip_y,
-		rotation_quarters
+		rotation_quarters,
+		false,
+		include_fracture_lines
 	)
 	var chunk_mask_top := (
 		chunk_index
@@ -2256,6 +3276,7 @@ func _punch_hole(
 				* mask_pixels_per_world_unit
 			) - chunk_mask_top
 	)
+	destination_position -= destination_mask_origin
 	# The mask artwork carries its crack strokes as opaque pixels, and blending
 	# them onto a row that holds no terrain would turn a stroke into solid
 	# ground. Clip the stamp to the real strata so cracks can never draw against
@@ -2265,6 +3286,7 @@ func _punch_hole(
 	var surface_local_y := (
 		config.initial_surface_row * profile.mask_pixels_per_cell
 		- chunk_mask_top
+		- destination_mask_origin.y
 	)
 	if destination_position.y < surface_local_y:
 		var clipped_rows := surface_local_y - destination_position.y
@@ -2276,6 +3298,7 @@ func _punch_hole(
 	var floor_local_y := (
 		(config.get_bottom_surface_row() + 1) * profile.mask_pixels_per_cell
 		- chunk_mask_top
+		- destination_mask_origin.y
 	)
 	if destination_position.y + source_rect.size.y > floor_local_y:
 		source_rect.size.y = floor_local_y - destination_position.y
@@ -2323,16 +3346,56 @@ func _punch_hole(
 		source_rect.position + affected_rect.position - destination_position,
 		affected_rect.size
 	)
-	var solid_before_stamp := destination.get_region(affected_rect)
-	var fracture_region := (
-		stamp_images.fracture_source.get_region(clipped_source_rect)
-	)
-	destination.blend_rect_mask(
-		fracture_region,
-		solid_before_stamp,
-		Rect2i(Vector2i.ZERO, affected_rect.size),
-		affected_rect.position
-	)
+	if stamp_images.fracture_source != null:
+		var scratch_size := affected_rect.size
+		if (
+			_fracture_band_scratch == null
+			or _fracture_band_scratch.get_width() < scratch_size.x
+			or _fracture_band_scratch.get_height() < scratch_size.y
+		):
+			var grown_size := Vector2i(
+				maxi(
+					scratch_size.x,
+					_fracture_band_scratch.get_width()
+						if _fracture_band_scratch != null
+						else 1
+				),
+				maxi(
+					scratch_size.y,
+					_fracture_band_scratch.get_height()
+						if _fracture_band_scratch != null
+						else 1
+				)
+			)
+			_fracture_band_scratch = Image.create(
+				grown_size.x,
+				grown_size.y,
+				false,
+				Image.FORMAT_LA8
+			)
+			_solid_band_scratch = Image.create(
+				grown_size.x,
+				grown_size.y,
+				false,
+				Image.FORMAT_LA8
+			)
+		_fracture_band_scratch.blit_rect(
+			stamp_images.fracture_source,
+			clipped_source_rect,
+			Vector2i.ZERO
+		)
+		_solid_band_scratch.blit_rect(
+			destination,
+			affected_rect,
+			Vector2i.ZERO
+		)
+		var scratch_rect := Rect2i(Vector2i.ZERO, scratch_size)
+		destination.blend_rect_mask(
+			_fracture_band_scratch,
+			_solid_band_scratch,
+			scratch_rect,
+			affected_rect.position
+		)
 
 	# Only now carve this stamp's own cavity.
 	destination.blit_rect_mask(
@@ -2342,6 +3405,53 @@ func _punch_hole(
 		affected_rect.position
 	)
 	return true
+
+
+## Resolves the transformed authored stamp once for queue sizing and punching.
+## Both callers use this exact rect, so per-chunk bands cover every crack pixel
+## without repeating the full multi-chunk height in each touched chunk.
+func _get_full_stamp_world_rect(
+	opening_world_rect: Rect2,
+	mask_data: HoleMaskData,
+	flip_x: bool,
+	flip_y: bool,
+	rotation_quarters: int
+) -> Rect2:
+	var source_bounds := _get_oriented_transparent_bounds(
+		mask_data,
+		flip_x,
+		flip_y,
+		rotation_quarters
+	)
+	if source_bounds.size.x <= 0.0 or source_bounds.size.y <= 0.0:
+		return Rect2()
+	var full_stamp_size := Vector2(
+		opening_world_rect.size.x / source_bounds.size.x,
+		opening_world_rect.size.y / source_bounds.size.y
+	)
+	return Rect2(
+		opening_world_rect.position
+			- source_bounds.position * full_stamp_size,
+		full_stamp_size
+	)
+
+
+## Converts the shared predicted/authoritative world size into one cache key.
+func _get_stamp_pixel_size(stamp_world_size: Vector2) -> Vector2i:
+	var mask_pixels_per_world_unit := (
+		float(profile.mask_pixels_per_cell)
+		/ float(terrain_manager.config.terrain_cell_world_size)
+	)
+	return Vector2i(
+		maxi(
+			ceili(stamp_world_size.x * mask_pixels_per_world_unit),
+			1
+		),
+		maxi(
+			ceili(stamp_world_size.y * mask_pixels_per_world_unit),
+			1
+		)
+	)
 
 
 ## Maps the mask's real transparent cavity through its authored orientation.
@@ -2386,16 +3496,20 @@ func _get_resized_stamp_images(
 	stamp_size: Vector2i,
 	flip_x: bool,
 	flip_y: bool,
-	rotation_quarters: int
+	rotation_quarters: int,
+	is_preparation: bool = false,
+	include_fracture_lines: bool = true
 ) -> TerrainStampImageCache.StampImages:
 	return _stamp_image_cache.get_images(
 		mask_data.cache_id,
 		mask_data.erase_mask,
 		mask_data.fracture_source,
+		mask_data.has_fracture_lines and include_fracture_lines,
 		stamp_size,
 		flip_x,
 		flip_y,
-		rotation_quarters
+		rotation_quarters,
+		is_preparation
 	)
 
 
@@ -2481,6 +3595,10 @@ func _prepare_chamber_transition_stamps() -> void:
 			stamp.flip_y = random.randi_range(0, 1) == 1
 			stamp.rotation_quarters = random.randi_range(0, 3)
 			stamp.size_variation = random.randf_range(0.92, 1.08)
+			# Chamber ceilings already receive the continuous shader cut outline.
+			# Their eight overlapping transition stamps omit authored fracture
+			# spurs so streamed rooms do not repeat the heaviest impact-only blend.
+			stamp.include_fracture_lines = false
 
 			for chunk_index in _get_stamp_chunk_indices(stamp):
 				var chunk_stamps: Array = _chamber_stamps_by_chunk.get(
@@ -2560,19 +3678,21 @@ func _create_hole_mask_data(
 		Image.FORMAT_LA8
 	)
 	erase_mask.fill(EMPTY_MASK_COLOR)
-	var fracture_source := Image.create(
-		mask_width,
-		mask_height,
-		false,
-		Image.FORMAT_LA8
-	)
-	# Carry the stroke value in the unwritten pixels too. Coverage lives in
-	# alpha, and the per-hit resize interpolates luminance and alpha separately,
-	# so a white backing would mix a shrinking stroke toward white before its
-	# coverage ever reached blend_rect - fading the same line twice.
-	var line_value := 1.0 - profile.fracture_line_strength
-	fracture_source.fill(Color(line_value, line_value, line_value, 0.0))
 	var writes_fracture_lines := fracture_line_scale > 0.0
+	var fracture_source: Image
+	if writes_fracture_lines:
+		fracture_source = Image.create(
+			mask_width,
+			mask_height,
+			false,
+			Image.FORMAT_LA8
+		)
+		# Carry the stroke value in unwritten pixels too. Coverage lives in
+		# alpha, so a white backing would fade a shrinking line twice.
+		var line_value := 1.0 - profile.fracture_line_strength
+		fracture_source.fill(
+			Color(line_value, line_value, line_value, 0.0)
+		)
 	# Three temporary buffers the size of one authored mask. They are local to
 	# this call and released with it; nothing accumulates per hit or per chunk.
 	var cell_count := mask_width * mask_height
@@ -2642,32 +3762,41 @@ func _create_hole_mask_data(
 			fracture_line_scale
 		)
 
-	# Remove opaque margins before any per-hit resize. Mirroring the crop around
-	# the authored image center retains the exact flip and quarter-turn pivot.
-	var crop_minimum := Vector2i(
-		mini(
-			content_minimum.x,
-			mask_width - 1 - content_maximum.x
-		),
-		mini(
-			content_minimum.y,
-			mask_height - 1 - content_maximum.y
-		)
-	)
-	var crop_maximum := Vector2i(
-		mask_width - 1 - crop_minimum.x,
-		mask_height - 1 - crop_minimum.y
-	)
+	# Fracture spurs retain their symmetric art canvas because their offset from
+	# the cavity is authored. Alpha-only layers need only the tight cavity: the
+	# opening rect already defines its final world placement, so resizing empty
+	# canvas margins spends CPU without contributing a visible mask pixel.
 	var crop_rect := Rect2i(
-		crop_minimum,
-		crop_maximum - crop_minimum + Vector2i.ONE
+		minimum,
+		maximum - minimum + Vector2i.ONE
 	)
+	if writes_fracture_lines:
+		var crop_minimum := Vector2i(
+			mini(
+				content_minimum.x,
+				mask_width - 1 - content_maximum.x
+			),
+			mini(
+				content_minimum.y,
+				mask_height - 1 - content_maximum.y
+			)
+		)
+		var crop_maximum := Vector2i(
+			mask_width - 1 - crop_minimum.x,
+			mask_height - 1 - crop_minimum.y
+		)
+		crop_rect = Rect2i(
+			crop_minimum,
+			crop_maximum - crop_minimum + Vector2i.ONE
+		)
 	erase_mask = erase_mask.get_region(crop_rect)
-	fracture_source = fracture_source.get_region(crop_rect)
+	if fracture_source != null:
+		fracture_source = fracture_source.get_region(crop_rect)
 
 	var data := HoleMaskData.new()
 	data.erase_mask = erase_mask
 	data.fracture_source = fracture_source
+	data.has_fracture_lines = writes_fracture_lines
 	data.cache_id = cache_id
 	data.transparent_bounds = Rect2i(
 		minimum - crop_rect.position,
