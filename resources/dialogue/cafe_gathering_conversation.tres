@@ -7,7 +7,7 @@
 [sub_resource type="Resource" id="Line_cheese"]
 script = ExtResource("3_line")
 speaker_slot = &"cheese_girl"
-text = "You found it. I knew you would."
+text = "You found it! I knew you would."
 
 [sub_resource type="Resource" id="Line_treasure"]
 script = ExtResource("3_line")

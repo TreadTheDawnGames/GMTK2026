@@ -8,13 +8,13 @@
 script = ExtResource("3_line")
 speaker_slot = &"coffee_cat"
 speaker_pose = &"idle"
-text = "I'm Quib-Quib-Quibble!"
+text = "I'm Quib-Quib-Quib-Quib-Quibble!"
 
 [sub_resource type="Resource" id="Line_enough"]
 script = ExtResource("3_line")
 speaker_slot = &"coffee_cat"
 speaker_pose = &"idle"
-text = "Have you seen the cafe? Cafe. Coffee. Cafe coffee."
+text = "Have you seen seen seen the cafe? Cafe? Coffee? Coffee cafe?"
 
 [sub_resource type="Resource" id="Line_miner"]
 script = ExtResource("3_line")
@@ -31,13 +31,13 @@ text = "(Quibble rapidly finishes another cup.)"
 script = ExtResource("3_line")
 speaker_slot = &"coffee_cat"
 speaker_pose = &"hold_cup"
-text = "This is travel coffee. T-t-take it."
+text = "This is is is travel coffee. T-t-take it."
 
 [sub_resource type="Resource" id="Line_go"]
 script = ExtResource("3_line")
 speaker_slot = &"coffee_cat"
 speaker_pose = &"idle"
-text = "It makes everything go f-f-faster!"
+text = "It makes ev-ev-ev-ev-erything go f-f-faster!"
 
 [sub_resource type="Resource" id="Participant_miner"]
 script = ExtResource("2_participant")

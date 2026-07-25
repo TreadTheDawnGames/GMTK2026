@@ -72,6 +72,11 @@ func _enter_tree() -> void:
 	timeline_tab.name = "Timeline"
 	timeline_tab.add_child(_timeline_panel)
 	timeline_tab.add_child(_beat_inspector)
+	# Negative offsets are measured from the right edge, so the beat editor keeps
+	# this much width however wide the dock is. Left to itself the split gave the
+	# whole tab to the timeline, whose canvas asks for 900 pixels, and the panel
+	# holding the fields you edit a beat with was pushed off the end.
+	timeline_tab.split_offset = -420
 
 	var tabs := TabContainer.new()
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -98,13 +103,16 @@ func _enter_tree() -> void:
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.custom_minimum_size.y = 190.0
+	# Tall enough to write in. The old 190 fitted the sculpt controls and
+	# nothing else: a beat's fields, and the dialogue that goes with them, ran
+	# past the bottom of the dock where they could not be reached at all.
+	scroll.custom_minimum_size.y = 330.0
 	scroll.add_child(tabs)
 	tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	_dock = VBoxContainer.new()
 	_dock.name = "Cutscene"
-	_dock.custom_minimum_size.y = 220.0
+	_dock.custom_minimum_size.y = 370.0
 	_dock.add_child(toolbar)
 	_dock.add_child(scroll)
 	add_control_to_bottom_panel(_dock, "Cutscene")

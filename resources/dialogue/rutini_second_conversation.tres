@@ -7,7 +7,7 @@
 [sub_resource type="Resource" id="Line_again"]
 script = ExtResource("3_line")
 speaker_slot = &"rutini"
-text = "You again! Did you find a way through?"
+text = "You again! Did you find the cheese cafe?"
 
 [sub_resource type="Resource" id="Line_miner_one"]
 script = ExtResource("3_line")

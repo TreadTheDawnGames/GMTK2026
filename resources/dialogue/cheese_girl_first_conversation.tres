@@ -9,6 +9,11 @@ script = ExtResource("3_line")
 speaker_slot = &"cheese_girl"
 text = "Hi! I'm Cheese Girl. I'm on my way down to the Cheese Cafe."
 
+[sub_resource type="Resource" id="Line_invitation"]
+script = ExtResource("3_line")
+speaker_slot = &"cheese_girl"
+text = "Mr. Man, will you come to my cheese shop?"
+
 [sub_resource type="Resource" id="Line_miner"]
 script = ExtResource("3_line")
 speaker_slot = &"miner"
@@ -38,4 +43,4 @@ display_name = "Cheese Girl"
 script = ExtResource("1_conversation")
 conversation_id = &"cheese_girl_first"
 participants = Array[ExtResource("2_participant")]([SubResource("Participant_miner"), SubResource("Participant_cheese_girl")])
-lines = Array[ExtResource("3_line")]([SubResource("Line_intro"), SubResource("Line_miner"), SubResource("Line_thief"), SubResource("Line_cafe")])
+lines = Array[ExtResource("3_line")]([SubResource("Line_intro"), SubResource("Line_invitation"), SubResource("Line_miner"), SubResource("Line_thief"), SubResource("Line_cafe")])

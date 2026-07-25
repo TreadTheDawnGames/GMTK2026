@@ -9,33 +9,85 @@
 [ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_red.tres" id="7_red"]
 
 [node name="RatColonyFollowers" type="Node2D" node_paths=PackedStringArray("followers")]
-editor_description = "Persistent, presentation-only colony activated after Rotini's second encounter. Assign Follow Target to the production MinerRig when instanced."
+editor_description = "Persistent, presentation-only colony activated after Rotini's second encounter. Assign Follow Target to the production MinerRig when instanced. The pool below is the whole colony: rank, scale, tint, draw order and slot position are all derived at runtime from the Depth Ranks settings, so moving a rat here changes nothing. Web builds light a smaller slice of the same pool and swing fewer of them per hit.
+
+Clump art goes in Clump Appearances: make one CinematicRatAppearance per drawing, set its idle and strike textures to the pair, and set Depicted Rat Count to how many rats it shows. Those are handed to every rank from Clump First Rank back, so the crowd deepens without another actor being added. While that array is empty every rank keeps single-rat art and nothing changes."
 process_mode = 3
-z_index = 2
 script = ExtResource("1_followers")
-followers = Array[NodePath]([NodePath("Formation/RatLeftFar"), NodePath("Formation/RatLeftNear"), NodePath("Formation/RatRightNear"), NodePath("Formation/RatRightFar"), NodePath("Formation/RatRear")])
+followers = Array[NodePath]([NodePath("Formation/Rat00"), NodePath("Formation/Rat01"), NodePath("Formation/Rat02"), NodePath("Formation/Rat03"), NodePath("Formation/Rat04"), NodePath("Formation/Rat05"), NodePath("Formation/Rat06"), NodePath("Formation/Rat07"), NodePath("Formation/Rat08"), NodePath("Formation/Rat09"), NodePath("Formation/Rat10"), NodePath("Formation/Rat11"), NodePath("Formation/Rat12"), NodePath("Formation/Rat13"), NodePath("Formation/Rat14"), NodePath("Formation/Rat15"), NodePath("Formation/Rat16"), NodePath("Formation/Rat17"), NodePath("Formation/Rat18"), NodePath("Formation/Rat19"), NodePath("Formation/Rat20"), NodePath("Formation/Rat21"), NodePath("Formation/Rat22"), NodePath("Formation/Rat23")])
 rat_appearances = Array[ExtResource("3_appearance")]([ExtResource("4_brown"), ExtResource("5_grey"), ExtResource("6_white"), ExtResource("7_red")])
 
 [node name="Formation" type="Node2D" parent="."]
-editor_description = "Fixed five-actor growth bound. Runtime hides the rear pair on web builds. Every rat is kept at least 56 pixels clear of the follow target's column: the colony draws in front of the miner, so a rat parked on his origin covers the character the player is actually controlling. Keep that clearance when moving anyone here."
+editor_description = "Fixed twenty-four-actor growth bound. Index modulo four decides a rat's rank, so trimming the live count for web thins all four ranks evenly instead of deleting the back of the crowd."
 
-[node name="RatLeftFar" parent="Formation" instance=ExtResource("2_rat")]
-position = Vector2(-126, 52)
-z_index = 1
+[node name="Rat00" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
 
-[node name="RatLeftNear" parent="Formation" instance=ExtResource("2_rat")]
-position = Vector2(-76, 32)
-z_index = 3
+[node name="Rat01" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
 
-[node name="RatRightNear" parent="Formation" instance=ExtResource("2_rat")]
-position = Vector2(78, 44)
-z_index = 3
+[node name="Rat02" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
 
-[node name="RatRightFar" parent="Formation" instance=ExtResource("2_rat")]
-position = Vector2(128, 20)
-z_index = 1
+[node name="Rat03" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
 
-[node name="RatRear" parent="Formation" instance=ExtResource("2_rat")]
-editor_description = "Trails behind and below the miner rather than sitting on him. At its old spot, twenty pixels off his origin, it drew straight over his legs the entire descent."
-position = Vector2(-58, 62)
-z_index = 0
+[node name="Rat04" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat05" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat06" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat07" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat08" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat09" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat10" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat11" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat12" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat13" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat14" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat15" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat16" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat17" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat18" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat19" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat20" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat21" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat22" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat23" parent="Formation" instance=ExtResource("2_rat")]
+visible = false

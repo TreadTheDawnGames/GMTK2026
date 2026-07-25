@@ -80,13 +80,14 @@ the thief is speaking. The command overwrites only the encrypted resource;
 plain text is never written to a project file. Reopen the editor after running
 it so Godot reloads the ciphertext.
 
-The approved canonical story order is:
+The current canonical story order is:
 
 - the bus opening at depth 0;
-- Cheese Girl at 600, pointing straight down to the cafe near 14,000;
+- Cheese Girl at 600, inviting the Miner to her shop near 14,000;
 - the lantern-staff man's cryptic first warning at 1,400;
-- the Treasure Hunter's introduction and first improved pickaxe at 2,500;
-- Rotini's introduction at 4,000;
+- Rotini's introduction at 2,500;
+- the Treasure Hunter mining in from the side and gifting the first improved
+  pickaxe at 4,000;
 - the lantern-staff man's clearer Thief warning at 5,600;
 - the Treasure Hunter's discovery and second distinct pickaxe at 7,400;
 - Quibble's cafe-bound introduction and coffee speed boost at 9,200;

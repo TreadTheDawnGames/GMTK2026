@@ -29,6 +29,18 @@ const FIELD_CONVERSATION: StringName = &"conversation"
 const FIELD_LINE_RANGE: StringName = &"line_range"
 const FIELD_CUE: StringName = &"cue"
 
+## The DialogueDirector's own typewriter settings, mirrored so the editor can
+## say how long a line runs without a director in the scene to ask. Keep these
+## in step with dialogue_director.gd; they are only used to estimate timing,
+## never to drive playback.
+## Narrowest this panel may be squeezed to. Wide enough to hold a line of
+## dialogue and its speed control side by side.
+const _MINIMUM_WIDTH: float = 360.0
+
+const _DEFAULT_CHARACTER_SPEED: float = 0.03
+const _SLOWEST_CHARACTERS: Array[String] = ["."]
+const _SLOWER_CHARACTERS: Array[String] = [","]
+
 var _context: CutsceneEditorContext
 var _selected_beat: CutsceneBeat
 var _form: VBoxContainer
@@ -106,10 +118,23 @@ func _ready() -> void:
 func _rebuild() -> void:
 	for child in get_children():
 		child.free()
+	# The panel has to claim width and scroll its own contents. It shares a
+	# split with a timeline that demands 900 pixels, so without a minimum it
+	# gets squeezed to nothing and the fields are simply not on screen; and the
+	# bottom dock is short, so a form taller than it needs somewhere to scroll
+	# rather than being clipped with no way to reach the rest.
+	custom_minimum_size.x = maxf(custom_minimum_size.x, _MINIMUM_WIDTH)
+	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var scroll := ScrollContainer.new()
+	scroll.name = "BeatFieldsScroll"
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	add_child(scroll)
 	_form = VBoxContainer.new()
 	_form.name = "BeatFields"
 	_form.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	add_child(_form)
+	scroll.add_child(_form)
 	if _selected_beat == null:
 		var empty := Label.new()
 		empty.text = "Select a beat to edit its details."
@@ -435,6 +460,181 @@ func _add_line_range_field() -> void:
 	if _selected_beat.conversation == null:
 		start_option.disabled = true
 		end_option.disabled = true
+	_add_dialogue_script()
+
+
+## Writes the beat's dialogue out line by line, editable in place, with the pace
+## each line is typed at and how long that takes.
+##
+## A DIALOGUE beat used to be a conversation id and two index dropdowns, so the
+## only way to read the words was to open the conversation resource in a second
+## Inspector and count. The lines are the content of the shot; writing them is
+## the work, so they belong on the beat.
+func _add_dialogue_script() -> void:
+	if _selected_beat.conversation == null:
+		return
+	var lines := _selected_beat.conversation.lines
+	var first := _selected_beat.line_range.x
+	var last := _selected_beat.line_range.y
+	if first < 0:
+		first = 0
+	if last < 0 or last >= lines.size():
+		last = lines.size() - 1
+	if first > last:
+		return
+
+	var total_seconds := 0.0
+	for line_index in range(first, last + 1):
+		var line: DialogueLine = lines[line_index]
+		if line == null:
+			continue
+		total_seconds += _typing_seconds_for(line)
+		total_seconds += maxf(line.auto_advance_delay_seconds, 0.0)
+
+	var heading := Label.new()
+	heading.text = "Dialogue  (%d line%s, about %.1fs typed)" % [
+		last - first + 1,
+		"" if last == first else "s",
+		total_seconds,
+	]
+	heading.add_theme_font_size_override("font_size", 14)
+	_form.add_child(heading)
+
+	var fit_button := Button.new()
+	fit_button.text = "Fit beat length to the dialogue"
+	fit_button.tooltip_text = (
+		"Sets this beat's duration to how long these lines take to type out, "
+		+ "including their auto-advance waits. A beat shorter than its words "
+		+ "runs the next beat over the top of them."
+	)
+	fit_button.pressed.connect(
+		_on_fit_beat_to_dialogue_pressed.bind(total_seconds)
+	)
+	_form.add_child(fit_button)
+
+	for line_index in range(first, last + 1):
+		var line: DialogueLine = lines[line_index]
+		if line == null:
+			continue
+		_add_dialogue_line_row(line_index, line)
+
+
+## Returns how long one line takes to type, asking the line itself when it can
+## answer and counting the characters here when it cannot.
+##
+## The fallback is not decoration. A resource whose script is not @tool loads in
+## the editor with its values readable but its methods missing, and calling one
+## aborts the panel mid-build - which is exactly how this section came to render
+## nothing at all while every field around it looked fine. Degrading to a local
+## count keeps the words editable even when the timing estimate is the thing
+## that breaks.
+func _typing_seconds_for(line: DialogueLine) -> float:
+	if line == null:
+		return 0.0
+	if line.has_method(&"get_typing_seconds"):
+		return line.get_typing_seconds(
+			_DEFAULT_CHARACTER_SPEED,
+			_SLOWEST_CHARACTERS,
+			_SLOWER_CHARACTERS
+		)
+	var speed := _DEFAULT_CHARACTER_SPEED
+	var override_value: Variant = line.get("character_display_speed_override")
+	if override_value is float and float(override_value) > 0.0:
+		speed = float(override_value)
+	var total := 0.0
+	for index in range(line.text.length()):
+		var letter := line.text[index]
+		if _SLOWEST_CHARACTERS.has(letter):
+			total += speed * 5.0
+		elif _SLOWER_CHARACTERS.has(letter):
+			total += speed * 3.0
+		else:
+			total += speed
+	return total
+
+
+## One line: who says it, what they say, and how fast it types.
+func _add_dialogue_line_row(line_index: int, line: DialogueLine) -> void:
+	var speaker := str(line.speaker_slot)
+	if speaker.is_empty():
+		speaker = "(no speaker)"
+	var seconds := _typing_seconds_for(line)
+	var caption := Label.new()
+	caption.text = "%d  %s  -  %.1fs" % [line_index, speaker, seconds]
+	caption.add_theme_color_override(&"font_color", Color("#9aa4b4"))
+	_form.add_child(caption)
+
+	var text_edit := TextEdit.new()
+	text_edit.text = line.text
+	text_edit.custom_minimum_size = Vector2(0.0, 54.0)
+	text_edit.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+	text_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_form.add_child(text_edit)
+	text_edit.focus_exited.connect(
+		_on_dialogue_text_committed.bind(line, text_edit)
+	)
+
+	var speed_row := HBoxContainer.new()
+	var speed_label := Label.new()
+	speed_label.text = "Typing speed"
+	speed_label.custom_minimum_size.x = 110.0
+	speed_row.add_child(speed_label)
+	var speed_spin := SpinBox.new()
+	speed_spin.min_value = 0.0
+	speed_spin.max_value = 0.2
+	speed_spin.step = 0.001
+	speed_spin.value = line.character_display_speed_override
+	speed_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	speed_spin.tooltip_text = (
+		"Seconds per character for this line. Zero uses the game's own speed, "
+		+ "currently %.3f. Larger is slower." % _DEFAULT_CHARACTER_SPEED
+	)
+	speed_spin.value_changed.connect(
+		_on_dialogue_speed_changed.bind(line)
+	)
+	speed_row.add_child(speed_spin)
+	_form.add_child(speed_row)
+
+
+func _on_fit_beat_to_dialogue_pressed(total_seconds: float) -> void:
+	if _selected_beat == null:
+		return
+	_commit_property(
+		FIELD_DURATION_SECONDS,
+		snappedf(total_seconds, 0.1),
+		"Fit beat to dialogue"
+	)
+
+
+## Commits an edited line on focus loss rather than per keystroke, so one undo
+## entry covers one rewrite instead of one per letter.
+func _on_dialogue_text_committed(line: DialogueLine, editor: TextEdit) -> void:
+	if line == null or not is_instance_valid(editor):
+		return
+	if line.text == editor.text:
+		return
+	_commit_resource_changes(
+		line,
+		{"text": {"before": line.text, "after": editor.text}},
+		"Edit dialogue line"
+	)
+	_rebuild()
+
+
+func _on_dialogue_speed_changed(value: float, line: DialogueLine) -> void:
+	if line == null or is_equal_approx(line.character_display_speed_override, value):
+		return
+	_commit_resource_changes(
+		line,
+		{
+			"character_display_speed_override": {
+				"before": line.character_display_speed_override,
+				"after": value,
+			}
+		},
+		"Edit dialogue typing speed"
+	)
+	_rebuild()
 
 
 func _make_line_option(is_start: bool) -> OptionButton:

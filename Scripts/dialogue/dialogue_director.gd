@@ -229,15 +229,34 @@ func _show_next_character(token: int) -> void:
 
 
 ## Returns the typewriter delay for a revealed character.
+##
+## The base speed comes from the line being presented when that line overrides
+## it, so a line authored to land slowly keeps its pace here rather than only in
+## the editor's estimate of it.
 func character_delay(letter: String) -> float:
+	var display_speed := _get_active_character_display_speed()
 	if letter.length() > 1:
-		return character_display_speed
-	var display_speed := character_display_speed
+		return display_speed
 	if characters_for_slowest_time.has(letter):
 		display_speed *= 5.0
 	elif characters_for_slower.has(letter):
 		display_speed *= 3.0
 	return display_speed
+
+
+## Returns the per-character speed in force right now: the current line's
+## override, or this director's own speed when the line does not set one.
+func _get_active_character_display_speed() -> float:
+	if (
+		_active_conversation == null
+		or _current_line_index < 0
+		or _current_line_index >= _active_conversation.lines.size()
+	):
+		return character_display_speed
+	var line := _active_conversation.lines[_current_line_index]
+	if line == null or line.character_display_speed_override <= 0.0:
+		return character_display_speed
+	return line.character_display_speed_override
 
 
 ## Displays the current speaker and line through the bottom dialogue box.

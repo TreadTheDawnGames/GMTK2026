@@ -1293,7 +1293,34 @@ func _beat_detail_label(beat: CutsceneBeat) -> String:
 			return str(beat.pose) if not beat.pose.is_empty() else ""
 		CutsceneBeat.Kind.STAGE_CUE:
 			return str(beat.cue) if not beat.cue.is_empty() else ""
+		CutsceneBeat.Kind.DIALOGUE:
+			return _dialogue_preview(beat)
 	return ""
+
+
+## Returns the opening words a DIALOGUE beat says, prefixed by its speaker.
+##
+## A row of identical teal boxes reading "DIALOGUE" tells a writer nothing about
+## which one holds which exchange. Showing the words makes the timeline readable
+## as a script; the label is truncated to the box, so a wider beat shows more.
+func _dialogue_preview(beat: CutsceneBeat) -> String:
+	if beat.conversation == null:
+		return "(no conversation)"
+	var lines := beat.conversation.lines
+	if lines.is_empty():
+		return "(empty conversation)"
+	var first := beat.line_range.x
+	if first < 0 or first >= lines.size():
+		first = 0
+	var line: DialogueLine = lines[first]
+	if line == null:
+		return ""
+	var spoken := line.text.strip_edges().replace("\n", " ")
+	if spoken.is_empty():
+		return "(blank line)"
+	if line.speaker_slot.is_empty():
+		return spoken
+	return "%s: %s" % [line.speaker_slot, spoken]
 
 
 func _fit_draw_text(

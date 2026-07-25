@@ -3,7 +3,7 @@
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
 
 [node name="TreasureHunterFirstEncounterStage" instance=ExtResource("1_stage")]
-editor_description = "Story beat 4, depth 2,500: the Treasure Hunter introduces himself, criticizes the player's current tool, and gifts the first improved pickaxe. He comes in briskly because he has something to hand over, and stands closer than the other visitors do so the gift reads as passing between them. His art is drawn looking left, so he stays on the miner's right."
+editor_description = "Story beat 5, depth 4,000: the Treasure Hunter mines in from the side, introduces himself, and gifts the first improved pickaxe. He stands close so the gift reads as passing between them. His art is drawn looking left, so he stays on the miner's right."
 opening_move_seconds = 1.0
 closing_move_seconds = 1.8
 opening_step_height = 9.0
@@ -28,6 +28,6 @@ position = Vector2(496, 0)
 [node name="EditorTerrainPreview" parent="." index="4"]
 editor_description = "Previews treasure_hunter_first at its authored depth."
 encounter_id = &"treasure_hunter_first"
-preview_depth_rows = 2500
+preview_depth_rows = 4000
 
 [editable path="ActorMarkers"]

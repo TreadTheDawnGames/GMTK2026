@@ -1,9 +1,8 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://Scripts/ui/credits_overlay.gd" id="1_controller"]
 [ext_resource type="Resource" path="res://resources/mining/mining_config.tres" id="2_config"]
 [ext_resource type="Resource" path="res://resources/credits/title_credit.tres" id="3_title"]
-[ext_resource type="Resource" path="res://resources/credits/team_credit.tres" id="4_team"]
 [ext_resource type="Resource" path="res://resources/credits/design_credit.tres" id="5_design"]
 [ext_resource type="Resource" path="res://resources/credits/programming_credit.tres" id="6_programming"]
 [ext_resource type="Resource" path="res://resources/credits/art_audio_credit.tres" id="7_art_audio"]
@@ -14,7 +13,7 @@
 z_index = 1
 script = ExtResource("1_controller")
 mining_config = ExtResource("2_config")
-credit_entries = Array[ExtResource("9_entry")]([ExtResource("3_title"), ExtResource("4_team"), ExtResource("5_design"), ExtResource("6_programming"), ExtResource("7_art_audio"), ExtResource("8_thanks")])
+credit_entries = Array[ExtResource("9_entry")]([ExtResource("3_title"), ExtResource("5_design"), ExtResource("6_programming"), ExtResource("7_art_audio"), ExtResource("8_thanks")])
 inscription_slots = [NodePath("Credit01"), NodePath("Credit02"), NodePath("Credit03"), NodePath("Credit04"), NodePath("Credit05"), NodePath("Credit06")]
 
 [node name="Credit01" type="Node2D" parent="."]

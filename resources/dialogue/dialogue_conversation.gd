@@ -1,5 +1,10 @@
+@tool
 class_name DialogueConversation
 extends Resource
+
+## @tool for the same reason DialogueLine is: the cutscene editor lists and edits
+## a conversation's lines from editor context, where a non-tool resource script
+## exposes its values but refuses its methods.
 
 ## Stores an Inspector-authored conversation and validates its lines.
 

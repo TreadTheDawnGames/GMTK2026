@@ -1,6 +1,7 @@
 # Canonical Story Order
 
-Status: Approved by Jared on July 24, 2026, using Zephan's narrative order.
+Status: Current working revision requested July 25, 2026. This supersedes the
+July 24 encounter ordering while the new dialogue is being evaluated.
 
 This document is the source of truth for story order and intended pacing. Dialogue
 wording may still be authored, but agents must not reorder, remove, or replace these
@@ -20,17 +21,17 @@ beats without Jared or Zephan approving the narrative change.
 | Order | Target depth | Target time | Story beat |
 | ---: | ---: | ---: | --- |
 | 1 | 0 | 0:00 | The bus scene starts the game. |
-| 2 | 600 | 0:40 | Cheese Girl introduces herself and says the cheese cafe is straight down. The cafe destination is near depth 14,000; old references to level 80,000 are not canonical. |
+| 2 | 600 | 0:40 | Cheese Girl introduces herself, invites the Miner to her cheese shop, and encourages him to keep digging. The cafe destination is near depth 14,000; old references to level 80,000 are not canonical. |
 | 3 | 1,400 | 1:30 | The player first meets the man with the lantern staff. He cryptically foreshadows the Thief. |
-| 4 | 2,500 | 2:40 | The Treasure Hunter introduces himself, criticizes the player's current tool, and gifts the first improved pickaxe. |
-| 5 | 4,000 | 4:00 | Rotini is introduced on the cave path. Existing `rutini_*` resource names refer to Rotini until a coordinated rename is approved. |
+| 4 | 2,500 | 2:40 | Rotini is introduced on the cave path. Existing `rutini_*` resource names refer to Rotini until a coordinated rename is approved. |
+| 5 | 4,000 | 4:00 | The Treasure Hunter mines in from the side, introduces himself, and gifts the first improved pickaxe. |
 | 6 | 5,600 | 5:30 | The lantern-staff man returns and gives a clearer warning about the Thief. |
 | 7 | 7,400 | 7:15 | The Treasure Hunter finds his treasure and gifts the player another pickaxe because he no longer needs it. This is a second, distinct gift. |
 | 8 | 9,200 | 9:00 | Quibble is introduced while heading to the cafe for coffee. He gives the player coffee that makes the player faster. Existing `coffee_cat_*` resources refer to Quibble. |
 | 9 | 11,200 | 11:00 | The player tells Rotini that the cheese cafe is straight down. Rotini's rat colony joins the player and mines downward with them. |
 | 10 | 14,000 | 14:00 | The player reaches the cafe/end gathering. Cheese Girl, the Treasure Hunter, Rotini and the rats, and Quibble are together and happy. The lantern-staff man foreshadows the importance of time management. |
 | 11 | 15,000 | 15:00 | Credits begin while the player remains able to dig. Continuing through the credits is intentional. |
-| 12 | 15,200 | Post-credits | The lantern-staff man tells the player that the end has been reached and only miles of stone remain between the player and the Thief. |
+| 12 | 15,200 | Post-credits | The lantern-staff man remarks on how long the player has been digging and says only a zillion more swings remain before the Thief. |
 | 13 | 100,000 | Long-term objective | The player finally reaches the Thief. The exact reveal and dialogue remain intentionally unspecified here. |
 
 ## Implementation Contract

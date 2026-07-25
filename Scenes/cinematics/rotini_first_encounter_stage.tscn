@@ -3,7 +3,7 @@
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
 
 [node name="RotiniFirstEncounterStage" instance=ExtResource("1_stage")]
-editor_description = "Story beat 5, depth 4,000: Rotini is introduced on the cave path. He is a rat and reads much smaller than the miner, so he comes in quickly and stands close; at the other visitors' spacing he would be a speck at the edge of the frame. His art is drawn looking left, so he stays on the miner's right. The rutini_* resource names refer to Rotini until a coordinated rename is approved."
+editor_description = "Story beat 4, depth 2,500: Rotini is introduced on the cave path. He is a rat and reads much smaller than the miner, so he comes in quickly and stands close; at the other visitors' spacing he would be a speck at the edge of the frame. His art is drawn looking left, so he stays on the miner's right. The rutini_* resource names refer to Rotini until a coordinated rename is approved."
 opening_move_seconds = 0.9
 closing_move_seconds = 1.4
 opening_step_height = 3.0
@@ -28,6 +28,6 @@ position = Vector2(432, 0)
 [node name="EditorTerrainPreview" parent="." index="4"]
 editor_description = "Previews rutini_first at its authored depth."
 encounter_id = &"rutini_first"
-preview_depth_rows = 4000
+preview_depth_rows = 2500
 
 [editable path="ActorMarkers"]

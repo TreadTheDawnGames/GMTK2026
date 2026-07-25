@@ -7,12 +7,12 @@
 [sub_resource type="Resource" id="Line_end"]
 script = ExtResource("3_line")
 speaker_slot = &"cloak_lantern"
-text = "You have reached the end."
+text = "Yo chud, you been digging a long time."
 
 [sub_resource type="Resource" id="Line_stone"]
 script = ExtResource("3_line")
 speaker_slot = &"cloak_lantern"
-text = "Only miles of stone remain between you and the Thief."
+text = "Only a zillion more swings until you reach The Thief."
 
 [sub_resource type="Resource" id="Participant_miner"]
 script = ExtResource("2_participant")
