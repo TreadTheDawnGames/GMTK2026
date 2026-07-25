@@ -42,7 +42,7 @@ position = Vector2(-392, -28)
 
 [node name="LanternStaff" parent="PropMarkers" index="0" unique_id=2096771290 instance=ExtResource("6_staff")]
 editor_description = "Standing in the floor at the dead centre of the shaft, 95 rows below the room - far under the bottom of the cutscene frame, so nothing of it is visible while he is still talking. The miner mines straight down past the shaft afterwards and meets it on the way by. Placed here rather than spawned: an encounter stage lives for the whole run, so the staff is simply already there when the player arrives."
-position = Vector2(-445, 764)
+position = Vector2(-488, 764)
 scale = Vector2(0.2462, 0.2462)
 
 [node name="EditorTerrainPreview" parent="." index="4"]
