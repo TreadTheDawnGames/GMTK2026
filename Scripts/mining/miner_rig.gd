@@ -92,6 +92,11 @@ signal swing_finished
 ## than off the tween finishing: a fall that is cancelled halfway must not leave
 ## him falling forever on solid ground.
 @export var falling_miner_texture: Texture2D
+## Drawn where he lands, sprawled on the room's floor, before he gets up. Null
+## skips the sprawl and returns him straight to idle.
+@export var landed_miner_texture: Texture2D
+## How long he stays down before getting up.
+@export_range(0.0, 2.0, 0.05) var landing_sprawl_seconds: float = 0.45
 @export var impact_point: Marker2D
 @export var stand_in_hammer_head: Line2D
 @export var final_hammer_head_sprite: Sprite2D
@@ -357,6 +362,47 @@ func get_rest_draw_order() -> int:
 	return surface_draw_order if _is_on_surface else buried_draw_order
 
 
+## Drops him into a cutscene room: falling on the way down, sprawled where he
+## lands, then up on his feet.
+##
+## The pose is driven from the encounter's own lifecycle rather than from a
+## movement tween, because he does not actually travel. The camera holds him at
+## the mining face and scrolls the terrain past, so "falling" is a thing the
+## world does around a stationary sprite, and there is no motion to hang a pose
+## on. Cutscene entry is the only place in the run that knows a fall happened.
+func show_cutscene_fall() -> void:
+	if falling_miner_texture == null:
+		return
+	animation_player.stop()
+	_set_miner_texture(falling_miner_texture)
+
+
+## Lands him on his face and picks him up again. Safe to call when no fall pose
+## was ever shown; it simply returns him to idle.
+func show_cutscene_landing() -> void:
+	if landed_miner_texture == null:
+		_play_idle()
+		return
+	animation_player.stop()
+	_set_miner_texture(landed_miner_texture)
+	if landing_sprawl_seconds <= 0.0:
+		_play_idle()
+		return
+	# process_always, because the cutscene frame pauses the tree while it opens
+	# and a plain timer would leave him face down for the whole conversation.
+	var sprawl_timer := get_tree().create_timer(
+		landing_sprawl_seconds,
+		true,
+		false,
+		true
+	)
+	await sprawl_timer.timeout
+	# Only if nothing else has claimed his presentation in the meantime: a
+	# cancelled encounter restores its own pose and must not be overwritten.
+	if not _cinematic_override_active:
+		_play_idle()
+
+
 ## Frames him for an authored cutscene, in front of the foreground stratum.
 ## Every path that restores draw order already routes through
 ## get_rest_draw_order, so a shot that borrows his presentation mid-cutscene
@@ -538,9 +584,6 @@ func fall_cinematic_foot_to(
 	reset_speech_motion()
 	if _cinematic_tween != null and _cinematic_tween.is_valid():
 		_cinematic_tween.kill()
-	if falling_miner_texture != null:
-		animation_player.stop()
-		_set_miner_texture(falling_miner_texture)
 	var foot_delta: Vector2 = (
 		screen_position - get_cinematic_foot_screen_position()
 	)

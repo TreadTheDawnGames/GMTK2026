@@ -5,6 +5,7 @@
 [ext_resource type="Texture2D" uid="uid://cpy531sdh8q1o" path="res://Assets/Characters/miner_impact.png" id="5_impact_miner"]
 [ext_resource type="Texture2D" uid="uid://b7itm01ip56lo" path="res://Assets/Characters/miner_wound_up.png" id="6_wind_up_miner"]
 [ext_resource type="Texture2D" path="res://Assets/Characters/miner_falling.png" id="7_falling_miner"]
+[ext_resource type="Texture2D" path="res://Assets/Characters/miner_falling_floor.png" id="8_landed_miner"]
 [ext_resource type="Script" path="res://Scripts/dialogue/speech_reaction.gd" id="7_speech"]
 
 [sub_resource type="Animation" id="Animation_reset"]
@@ -498,6 +499,7 @@ idle_miner_texture = ExtResource("2_6q48d")
 wind_up_miner_texture = ExtResource("6_wind_up_miner")
 impact_miner_texture = ExtResource("5_impact_miner")
 falling_miner_texture = ExtResource("7_falling_miner")
+landed_miner_texture = ExtResource("8_landed_miner")
 impact_point = NodePath("VisualRoot/DrawnImpactPoint")
 stand_in_hammer_head = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/StandInToolHead")
 final_hammer_head_sprite = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/PickaxeHeadSprite")

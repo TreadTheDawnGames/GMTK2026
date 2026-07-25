@@ -183,6 +183,10 @@ func _schedule_next_encounter() -> bool:
 	if not cinematic_flow.try_begin(FLOW_OWNER):
 		return false
 	_pending_encounter_index = _next_encounter_index
+	# He is on his way down into the room from this moment. The pose holds until
+	# the landing promotes the encounter, which is the only thing that knows he
+	# has arrived.
+	miner_rig.show_cutscene_fall()
 	_try_activate_pending_encounter()
 	return true
 
@@ -206,6 +210,9 @@ func _activate_pending_encounter() -> void:
 		stage.position = encounter_anchor
 		if stage.conversation_tracks_miner:
 			_align_actor_markers_to_miner(stage)
+	# He has hit the room's floor. Sprawl, then get up, while the frame opens
+	# around him.
+	miner_rig.show_cutscene_landing()
 	cinematic_flow.focus(FLOW_OWNER)
 	_begin_active_encounter.call_deferred()
 
