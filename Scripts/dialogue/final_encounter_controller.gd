@@ -8,7 +8,9 @@ extends CanvasLayer
 ## - Returning to title resets the global run before the scene changes.
 ## The invariant is that reaching the thief always has a visible endpoint.
 
-const MAIN_MENU_SCENE := "res://Scenes/menu/main_menu.tscn"
+# The menu is an overlay inside the opening scene, so returning to the title
+# means reloading that scene rather than opening a menu scene of its own.
+const TITLE_SCENE := "res://Scenes/mining/mining_proof.tscn"
 
 @export var final_encounter_id: StringName = &"thief_finale"
 @export var dialogue_director: DialogueDirector
@@ -51,4 +53,4 @@ func _on_return_to_title_pressed() -> void:
 	if run_state != null:
 		run_state.reset_run()
 	get_tree().paused = false
-	get_tree().change_scene_to_file(MAIN_MENU_SCENE)
+	get_tree().change_scene_to_file(TITLE_SCENE)

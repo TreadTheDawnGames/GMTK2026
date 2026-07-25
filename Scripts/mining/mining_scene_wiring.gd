@@ -23,6 +23,17 @@ extends Node
 @export var coffee_speed_boost: CoffeeSpeedBoost
 @export var rat_colony_followers: RatColonyFollowers
 
+@export_category("Opening")
+## The menu is an overlay on this scene, so starting a run is one signal
+## crossing from the interface to the opening sequence rather than a scene load.
+@export var main_menu: GameMainMenu
+@export var run_intro_controller: RunIntroController
+
+@export_category("Escalation")
+@export var combo_director: ComboDirector
+@export var music_director: MusicDirector
+@export var combo_tier_punch: ComboTierPunch
+
 @export_category("Landing Impact")
 ## Dirt thrown from the soles when the miner lands on an authored encounter
 ## floor. Read as a cell count by the shared hit particles, so raising it
@@ -48,6 +59,10 @@ extends Node
 
 ## Establishes every signal that crosses a mining subsystem boundary.
 func _ready() -> void:
+	_connect_once(
+		main_menu.start_requested,
+		run_intro_controller.begin_run
+	)
 	_connect_once(
 		_game_state.depth_changed,
 		credits_overlay._on_depth_changed
@@ -174,6 +189,56 @@ func _ready() -> void:
 	_connect_once(
 		mining_controller.impact_resolved,
 		combo_vignette.play_at_impact
+	)
+	# One escalation model feeds every presenter below, so the music, the
+	# camera punch, and the mix all agree on which step the run is on.
+	_connect_once(
+		mining_controller.mine_resolved,
+		combo_director._on_mine_resolved
+	)
+	_connect_once(
+		timing_window.streak_ended,
+		combo_director._on_streak_ended
+	)
+	_connect_once(
+		pickaxe_progression.upgrade_granted,
+		combo_director._on_upgrade_granted
+	)
+	_connect_once(
+		coffee_speed_boost.boost_awarded,
+		combo_director._on_coffee_boost_awarded
+	)
+	_connect_once(
+		encounter_controller.rat_colony_support_requested,
+		combo_director._on_rat_colony_support_requested
+	)
+	_connect_once(
+		_game_state.run_reset,
+		combo_director._on_run_reset
+	)
+	_connect_once(
+		combo_director.intensity_changed,
+		music_director._on_intensity_changed
+	)
+	_connect_once(
+		combo_director.combo_tier_changed,
+		music_director._on_combo_tier_changed
+	)
+	_connect_once(
+		combo_director.streak_lost,
+		music_director._on_streak_lost
+	)
+	_connect_once(
+		_game_state.run_reset,
+		music_director._on_run_reset
+	)
+	_connect_once(
+		combo_director.combo_tier_changed,
+		combo_tier_punch._on_combo_tier_changed
+	)
+	_connect_once(
+		_game_state.run_reset,
+		combo_tier_punch._on_run_reset
 	)
 	# A lost streak gives the darkened frame straight back instead of letting it
 	# decay, so the release reads as part of losing the combo.

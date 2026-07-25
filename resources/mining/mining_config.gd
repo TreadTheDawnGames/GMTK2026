@@ -1,4 +1,4 @@
-@tool
+﻿@tool
 class_name MiningConfig
 extends Resource
 
@@ -21,7 +21,13 @@ const MAX_PLAYABLE_DEPTH: int = 2_000_000_000
 
 @export_category("Terrain")
 ## Covers the 1152px canvas while the autonomous path pans 24 cells sideways.
-@export_range(16, 512, 1) var terrain_width_cells: int = 192
+## Gameplay needs about 192. The rest is headroom for the opening's wide title
+## framing, which pulls the camera back until it can see roughly 2880 px of
+## world: anything narrower puts the terrain's own left and right edges in shot
+## as hard cuts against the sky. Every streamed chunk's mask is this wide, so
+## lowering it back toward 192 is the first thing to try if the web export runs
+## short of per-hit budget.
+@export_range(16, 512, 1) var terrain_width_cells: int = 384
 @export_range(16, 256, 1) var chunk_height_cells: int = 64
 ## Sets the world-space size of one gameplay terrain cell.
 @export_range(1, 32, 1) var terrain_cell_world_size: int = 8
@@ -88,6 +94,12 @@ const MAX_PLAYABLE_DEPTH: int = 2_000_000_000
 @export_category("Effects")
 ## Treats this combo as full strength for animation and hit feedback.
 @export_range(1, 100, 1) var maximum_effect_combo: int = 20
+## Combos that promote the run into its next escalation step. One music layer,
+## one camera punch, and one gauge division exist per entry, so this array's
+## length is how many steps the whole run escalates through. Kept here beside
+## maximum_effect_combo and recovery_combo_threshold so the presentation systems
+## and the timing bar read the same thresholds instead of each authoring a set.
+@export var combo_tier_thresholds: Array[int] = [5, 10, 16]
 ## Caps cumulative pickaxe deltas so ten collected tools remain tunable.
 @export_range(1.0, 10.0, 0.1) var maximum_stack_power_multiplier: float = 2.0
 @export_range(1.0, 10.0, 0.1) var maximum_stack_width_multiplier: float = 2.0

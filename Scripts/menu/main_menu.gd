@@ -1,9 +1,16 @@
 class_name GameMainMenu
 extends Control
 
-## Presents the opening menu and enters the current mining scene.
+## How it works:
+## - The menu is an overlay inside the live mining scene, not a scene of its
+##   own, so the world behind it is the game already staged at the surface.
+## - Start therefore never loads or changes a scene. It clears the run, fades
+##   the interface off the shot, and emits start_requested for the opening
+##   sequence to act on. The world underneath is never interrupted.
+## - Owned state: the staged reveal's completion and the one-shot start guard.
+## The invariant is that this node only ever writes to its own interface.
 
-@export_file("*.tscn") var game_scene_path: String
+signal start_requested
 
 @export_category("References")
 @export var title_group: CanvasItem
@@ -15,23 +22,20 @@ extends Control
 @export var exit_confirmation: ConfirmationDialog
 @export var status_label: Label
 @export var options_scene: PackedScene
-@export var start_fade_overlay: ColorRect
 
 @export_category("Intro")
 @export_range(0.0, 3.0, 0.1) var section_fade_seconds: float = 0.8
 
 @export_category("Start Transition")
-## The menu fades into black here; the mining scene starts fully covered and
-## splits that same black apart from the middle, so the handover reads as one
-## continuous shot.
-@export_range(0.0, 3.0, 0.05) var start_fade_seconds: float = 0.25
+## The interface leaves the shot over this long. The world behind it is already
+## the game, so nothing fades to black: only the menu goes, and the bus drives
+## into the frame it leaves behind.
+@export_range(0.0, 3.0, 0.05) var start_fade_seconds: float = 0.35
 
 var _intro_tween: Tween
 var _start_tween: Tween
 var _intro_complete: bool = false
 var _is_starting: bool = false
-var _game_scene_load_requested: bool = false
-var _loaded_game_scene: PackedScene
 
 
 ## Connects menu actions and starts the staged interface reveal.
@@ -56,42 +60,9 @@ func _ready() -> void:
 	subtitle_group.modulate.a = 0.0
 	button_group.modulate.a = 0.0
 	start_button.disabled = true
-	if start_fade_overlay != null:
-		start_fade_overlay.modulate.a = 0.0
-		start_fade_overlay.hide()
 	if OS.has_feature("web"):
 		exit_button.hide()
 	_play_intro()
-	_request_game_scene_load.call_deferred()
-
-
-## Polls the menu-time load without blocking a rendered frame.
-func _process(_delta: float) -> void:
-	if not _game_scene_load_requested or _loaded_game_scene != null:
-		return
-	var load_status := ResourceLoader.load_threaded_get_status(game_scene_path)
-	if load_status == ResourceLoader.THREAD_LOAD_LOADED:
-		_loaded_game_scene = (
-			ResourceLoader.load_threaded_get(game_scene_path) as PackedScene
-		)
-		set_process(false)
-	elif (
-		load_status == ResourceLoader.THREAD_LOAD_FAILED
-		or load_status == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE
-	):
-		_game_scene_load_requested = false
-		set_process(false)
-
-
-## Warms the large gameplay scene while the player is reading the menu.
-func _request_game_scene_load() -> void:
-	if game_scene_path.is_empty() or _game_scene_load_requested:
-		return
-	var request_error := ResourceLoader.load_threaded_request(game_scene_path)
-	if request_error != OK:
-		return
-	_game_scene_load_requested = true
-	set_process(true)
 
 
 ## Lets any deliberate input skip the remaining menu reveal.
@@ -141,7 +112,7 @@ func _finish_intro() -> void:
 	start_button.grab_focus()
 
 
-## Fades the menu into black, then hands that black to the mining scene.
+## Clears the run, takes the interface off the shot, and asks for the opening.
 func _on_start_button_pressed() -> void:
 	if _is_starting:
 		return
@@ -155,57 +126,33 @@ func _on_start_button_pressed() -> void:
 	var run_state := RunState.get_global(self)
 	if run_state != null:
 		run_state.reset_run()
-	await _fade_to_black()
-	await _open_game_scene()
+	# The shot is asked for first and the interface leaves over the top of it,
+	# so the bus is already driving in while the buttons dissolve. Fading out
+	# first and asking afterwards leaves a beat of empty world in between,
+	# which is the join that reads as two separate moments instead of one.
+	start_requested.emit()
+	# Nothing here owns the shot from this point, so it stops taking input as
+	# well as clicks even while it is still visible.
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	set_process_unhandled_input(false)
+	await _fade_interface_out()
+	queue_free()
 
 
-## Covers the menu so the mining scene can open out of the same black.
-func _fade_to_black() -> void:
-	if start_fade_overlay == null or start_fade_seconds <= 0.0:
+## Takes every menu element off the live shot without touching the world.
+func _fade_interface_out() -> void:
+	if start_fade_seconds <= 0.0:
+		modulate.a = 0.0
 		return
-	start_fade_overlay.modulate.a = 0.0
-	start_fade_overlay.show()
 	_start_tween = create_tween()
 	_start_tween.tween_property(
-		start_fade_overlay,
+		self,
 		"modulate:a",
-		1.0,
+		0.0,
 		start_fade_seconds
 	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	await _start_tween.finished
 
-
-## Replaces the menu with the mining game.
-func _open_game_scene() -> void:
-	var run_state := RunState.get_global(self)
-	if run_state != null:
-		run_state.reset_run()
-	while _game_scene_load_requested and _loaded_game_scene == null:
-		var load_status := ResourceLoader.load_threaded_get_status(
-			game_scene_path
-		)
-		if load_status != ResourceLoader.THREAD_LOAD_IN_PROGRESS:
-			break
-		await get_tree().process_frame
-	var change_error := ERR_CANT_OPEN
-	if _loaded_game_scene != null:
-		change_error = get_tree().change_scene_to_packed(_loaded_game_scene)
-	else:
-		change_error = get_tree().change_scene_to_file(game_scene_path)
-	if change_error == OK:
-		return
-	_is_starting = false
-	start_button.disabled = false
-	options_button.disabled = false
-	exit_button.disabled = false
-	if start_fade_overlay != null:
-		start_fade_overlay.modulate.a = 0.0
-		start_fade_overlay.hide()
-	status_label.text = "The game scene could not be opened."
-	push_error(
-		"Main menu could not open '%s': error %d."
-		% [game_scene_path, change_error]
-	)
 
 ## Opens the authored settings screen over the menu.
 func _on_options_pressed() -> void:

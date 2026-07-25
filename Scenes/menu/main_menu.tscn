@@ -4,7 +4,8 @@
 [ext_resource type="Theme" uid="uid://cy302o2vx18ng" path="res://resources/themes/Menus.tres" id="1_ufr4i"]
 [ext_resource type="PackedScene" uid="uid://ce2kgb3fjtjut" path="res://Scenes/Options.tscn" id="3_uffod"]
 
-[node name="MainMenu" type="Control" unique_id=633825169 node_paths=PackedStringArray("title_group", "subtitle_group", "button_group", "start_button", "options_button", "exit_button", "exit_confirmation", "status_label", "start_fade_overlay")]
+[node name="MainMenu" type="Control" unique_id=633825169 node_paths=PackedStringArray("title_group", "subtitle_group", "button_group", "start_button", "options_button", "exit_button", "exit_confirmation", "status_label")]
+editor_description = "Overlay for the live mining scene, not a scene of its own: the world behind it is the game staged at the surface, so there is deliberately no background rect here. Every element sits inside the cinematic letterbox, which is already closed while the menu is up. mouse_filter stays at Stop on this root so the shot underneath cannot be clicked."
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -13,7 +14,6 @@ grow_horizontal = 2
 grow_vertical = 2
 theme = ExtResource("1_ufr4i")
 script = ExtResource("1_menu")
-game_scene_path = "res://Scenes/mining/mining_proof.tscn"
 title_group = NodePath("MenuLayout/Title")
 subtitle_group = NodePath("MenuLayout/Subtitle")
 button_group = NodePath("MenuLayout/ButtonCenter/Buttons")
@@ -23,34 +23,27 @@ exit_button = NodePath("MenuLayout/ButtonCenter/Buttons/ExitButton")
 exit_confirmation = NodePath("ExitConfirmation")
 status_label = NodePath("MenuLayout/ButtonCenter/Buttons/Status")
 options_scene = ExtResource("3_uffod")
-start_fade_overlay = NodePath("StartFadeOverlay")
 section_fade_seconds = 0.0
 
-[node name="Background" type="ColorRect" parent="." unique_id=1064397230]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-color = Color(0.075, 0.095, 0.13, 1)
-
 [node name="MenuLayout" type="VBoxContainer" parent="." unique_id=642881323]
+editor_description = "Inset clear of the letterbox. CinematicFrame's bars cover the first and last 0.14 of the viewport (about 91 px each at 648), so the top and bottom offsets keep every element inside the visible band while the menu is up."
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 24.0
-offset_top = 24.0
+offset_top = 104.0
 offset_right = -24.0
-offset_bottom = -16.0
+offset_bottom = -104.0
 grow_horizontal = 2
 grow_vertical = 2
 
 [node name="Title" type="Label" parent="MenuLayout" unique_id=1468976124]
+editor_description = "Outlined because it now reads against a lit sunset instead of a flat dark rect."
 custom_minimum_size = Vector2(0, 67)
 layout_mode = 2
+theme_override_colors/font_outline_color = Color(0.06, 0.04, 0.07, 0.85)
+theme_override_constants/outline_size = 10
 theme_override_font_sizes/font_size = 48
 text = "Digger's Remorse"
 horizontal_alignment = 1
@@ -59,18 +52,23 @@ vertical_alignment = 1
 [node name="Subtitle" type="Label" parent="MenuLayout" unique_id=1785152362]
 custom_minimum_size = Vector2(0, 34)
 layout_mode = 2
+theme_override_colors/font_outline_color = Color(0.06, 0.04, 0.07, 0.85)
+theme_override_constants/outline_size = 8
 theme_override_font_sizes/font_size = 24
 text = "Keep Digging."
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="ButtonCenter" type="CenterContainer" parent="MenuLayout" unique_id=1279497793]
+[node name="ButtonCenter" type="VBoxContainer" parent="MenuLayout" unique_id=1279497793]
+editor_description = "Bottom-aligned rather than centred. The shot behind the menu is composed around the bus stop at the middle of the frame, and centred buttons sit straight on top of it. Pushed to the bottom of the letterboxed band they read against the dirt and leave the stop clear."
 layout_mode = 2
 size_flags_vertical = 3
+alignment = 2
 
 [node name="Buttons" type="VBoxContainer" parent="MenuLayout/ButtonCenter" unique_id=778454366]
 custom_minimum_size = Vector2(160, 0)
 layout_mode = 2
+size_flags_horizontal = 4
 theme_override_constants/separation = 16
 
 [node name="StartButton" type="Button" parent="MenuLayout/ButtonCenter/Buttons" unique_id=600240877]
@@ -101,25 +99,15 @@ anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = -120.0
-offset_top = -34.0
+offset_top = -125.0
 offset_right = -12.0
-offset_bottom = -10.0
+offset_bottom = -101.0
 grow_horizontal = 0
 grow_vertical = 0
+theme_override_colors/font_outline_color = Color(0.06, 0.04, 0.07, 0.85)
+theme_override_constants/outline_size = 6
 text = "JAM BUILD"
 horizontal_alignment = 2
-
-[node name="StartFadeOverlay" type="ColorRect" parent="." unique_id=884301776]
-editor_description = "Covers the menu on Start. The mining scene opens fully covered by the same black and splits it apart from the middle, so keep this color matched to CinematicFrame's bars."
-visible = false
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-color = Color(0.008, 0.006, 0.008, 1)
 
 [node name="ExitConfirmation" type="ConfirmationDialog" parent="." unique_id=129160021]
 oversampling_override = 1.0

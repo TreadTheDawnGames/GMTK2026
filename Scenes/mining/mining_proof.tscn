@@ -42,6 +42,18 @@
 [ext_resource type="PackedScene" path="res://Scenes/mining/impact_spark.tscn" id="63_impact_spark"]
 [ext_resource type="PackedScene" path="res://Scenes/mining/combo_impact_vignette.tscn" id="64_combo_vignette"]
 [ext_resource type="Script" path="res://Scripts/timing_windows/timing_bar_feedback.gd" id="65_bar_feedback"]
+[ext_resource type="Script" path="res://Scripts/mining/combo_director.gd" id="66_combo_director"]
+[ext_resource type="Script" path="res://Scripts/mining/music_director.gd" id="67_music_director"]
+[ext_resource type="Script" path="res://Scripts/mining/combo_tier_punch.gd" id="68_tier_punch"]
+[ext_resource type="AudioStream" path="res://Assets/Audio/Music/Tracks/Intensity 1 DEV.wav" id="69_intensity_1"]
+[ext_resource type="AudioStream" path="res://Assets/Audio/Music/Tracks/Intensity 2 DEV.wav" id="70_intensity_2"]
+[ext_resource type="AudioStream" path="res://Assets/Audio/Music/Tracks/Intensity 3 DEV.wav" id="71_intensity_3"]
+[ext_resource type="AudioStream" path="res://Assets/Audio/Music/Tracks/Intensity 4 DEV.wav" id="72_intensity_4"]
+[ext_resource type="AudioStream" path="res://Assets/Audio/Music/Fills/Fill 1 DEV.wav" id="73_fill_1"]
+[ext_resource type="AudioStream" path="res://Assets/Audio/Music/Fills/Filll 2 DEV.wav" id="74_fill_2"]
+[ext_resource type="AudioStream" path="res://Assets/Audio/Music/Fills/Fill 3 DEV.wav" id="75_fill_3"]
+[ext_resource type="Script" path="res://Scripts/cinematics/opening_shot_camera.gd" id="76_opening_camera"]
+[ext_resource type="PackedScene" uid="uid://2pjknhxlb7ux" path="res://Scenes/menu/main_menu.tscn" id="77_main_menu"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_surface_sky"]
 resource_local_to_scene = true
@@ -125,7 +137,7 @@ mouse_filter = 2
 
 [node name="Systems" type="Node" parent="MiningScene" unique_id=1573949011]
 
-[node name="SceneWiring" type="Node" parent="MiningScene/Systems" unique_id=1434760342 node_paths=PackedStringArray("mining_controller", "timing_bridge", "view_controller", "terrain_manager", "terrain_renderer", "miner_rig", "hit_particles", "gem_outcrop_field", "impact_smoke", "impact_spark", "combo_vignette", "dig_number_presenter", "impact_shake", "pickaxe_progression", "cinematic_flow", "run_timeline", "coffee_speed_boost", "rat_colony_followers", "hud", "playtime_reveal", "timing_window", "timing_bar_feedback", "depth_review_control", "encounter_controller", "dialogue_director", "final_encounter_controller", "credits_overlay")]
+[node name="SceneWiring" type="Node" parent="MiningScene/Systems" unique_id=1434760342 node_paths=PackedStringArray("mining_controller", "timing_bridge", "view_controller", "terrain_manager", "terrain_renderer", "miner_rig", "hit_particles", "gem_outcrop_field", "impact_smoke", "impact_spark", "combo_vignette", "dig_number_presenter", "impact_shake", "pickaxe_progression", "cinematic_flow", "run_timeline", "coffee_speed_boost", "rat_colony_followers", "main_menu", "run_intro_controller", "combo_director", "music_director", "combo_tier_punch", "hud", "playtime_reveal", "timing_window", "timing_bar_feedback", "depth_review_control", "encounter_controller", "dialogue_director", "final_encounter_controller", "credits_overlay")]
 script = ExtResource("25_wiring")
 mining_controller = NodePath("../MiningController")
 timing_bridge = NodePath("../TimingBridge")
@@ -145,6 +157,11 @@ cinematic_flow = NodePath("../CinematicFlow")
 run_timeline = NodePath("../RunTimeline")
 coffee_speed_boost = NodePath("../CoffeeSpeedBoost")
 rat_colony_followers = NodePath("../../RatColonyFollowers")
+main_menu = NodePath("../../../MainMenuLayer/MainMenu")
+run_intro_controller = NodePath("../RunIntroController")
+combo_director = NodePath("../ComboDirector")
+music_director = NodePath("../MusicDirector")
+combo_tier_punch = NodePath("../ComboTierPunch")
 hud = NodePath("../../HUD")
 playtime_reveal = NodePath("../../HUD/PlaytimeReveal")
 timing_window = NodePath("../../HUD/TimingWindow")
@@ -167,6 +184,12 @@ terrain_manager = NodePath("../../TerrainManager")
 [node name="ImpactShake" type="Node" parent="MiningScene/Systems" unique_id=1191832147 node_paths=PackedStringArray("camera")]
 script = ExtResource("21_impact_shake")
 camera = NodePath("../../ImpactCamera")
+
+[node name="OpeningShotCamera" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("camera", "arrival_sequence")]
+editor_description = "Owns the shared camera's zoom for the title shot only. It holds the wide menu framing, then closes onto the arriving bus and hands the camera back at exactly zoom 1, which is the framing every authored gameplay coordinate is measured against. menu_zoom cannot go far below 0.75: terrain is 1536 px wide against a 1152 px viewport, so a wider shot pulls the world's own left and right edges into frame."
+script = ExtResource("76_opening_camera")
+camera = NodePath("../../ImpactCamera")
+arrival_sequence = NodePath("../../ArrivalIntro")
 
 [node name="MiningController" type="Node" parent="MiningScene/Systems" unique_id=1389910536 node_paths=PackedStringArray("terrain_manager", "view_controller")]
 script = ExtResource("5_controller")
@@ -192,6 +215,20 @@ process_mode = 3
 script = ExtResource("57_run_timeline")
 cinematic_flow = NodePath("../CinematicFlow")
 
+[node name="ComboDirector" type="Node" parent="MiningScene/Systems"]
+script = ExtResource("66_combo_director")
+config = ExtResource("1_config")
+
+[node name="MusicDirector" type="Node" parent="MiningScene/Systems"]
+script = ExtResource("67_music_director")
+layer_streams = Array[AudioStream]([ExtResource("69_intensity_1"), ExtResource("70_intensity_2"), ExtResource("71_intensity_3"), ExtResource("72_intensity_4")])
+fill_streams = Array[AudioStream]([ExtResource("73_fill_1"), ExtResource("74_fill_2"), ExtResource("75_fill_3")])
+
+[node name="ComboTierPunch" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("camera", "combo_director")]
+script = ExtResource("68_tier_punch")
+camera = NodePath("../../ImpactCamera")
+combo_director = NodePath("../ComboDirector")
+
 [node name="CoffeeSpeedBoost" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("miner_rig")]
 script = ExtResource("61_coffee")
 miner_rig = NodePath("../../MinerRig")
@@ -208,22 +245,25 @@ miner_rig = NodePath("../../MinerRig")
 cinematic_flow = NodePath("../CinematicFlow")
 terrain_renderer = NodePath("../../TerrainLayerRenderer")
 
-[node name="SurfacePresentation" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("terrain_manager", "sky_rect", "sunlight_wash_rect")]
+[node name="SurfacePresentation" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("terrain_manager", "sky_rect", "sunlight_wash_rect", "camera")]
 script = ExtResource("52_surface_presentation")
 terrain_manager = NodePath("../../TerrainManager")
 config = ExtResource("1_config")
 sky_rect = NodePath("../../SurfaceSky")
 sunlight_wash_rect = NodePath("../../SunlightWash")
+camera = NodePath("../../ImpactCamera")
 
-[node name="RunIntroController" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("dialogue_director", "arrival_sequence", "attendant_presenter", "miner_rig", "cinematic_flow")]
+[node name="RunIntroController" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("dialogue_director", "arrival_sequence", "attendant_presenter", "miner_rig", "cinematic_flow", "opening_camera")]
+editor_description = "Stages the surface at boot and holds it as the menu's background. Nothing plays until MainMenu asks, so the world behind the title is the game itself rather than a separate scene."
 process_mode = 3
 script = ExtResource("42_intro_controller")
-attendant_appearance = ExtResource("44_intro_appearance")
 dialogue_director = NodePath("../../../DialogueDirector")
 arrival_sequence = NodePath("../../ArrivalIntro")
 attendant_presenter = NodePath("../../ArrivalIntro/Attendant")
 miner_rig = NodePath("../../MinerRig")
 cinematic_flow = NodePath("../CinematicFlow")
+opening_camera = NodePath("../OpeningShotCamera")
+attendant_appearance = ExtResource("44_intro_appearance")
 
 [node name="HUD" type="CanvasLayer" parent="MiningScene" unique_id=557922213 node_paths=PackedStringArray("depth_label", "bottom_eta_label", "fps_label")]
 script = ExtResource("6_hud")
@@ -319,6 +359,13 @@ script = ExtResource("22_playtime_reveal")
 
 [node name="FinalEncounter" parent="." node_paths=PackedStringArray("dialogue_director") instance=ExtResource("50_final_encounter")]
 dialogue_director = NodePath("../DialogueDirector")
+
+[node name="MainMenuLayer" type="CanvasLayer" parent="."]
+editor_description = "Holds the title interface over the live shot. Layer 25 puts it above DialogueDirector's letterbox at 20, so the menu is never clipped by the bars it sits inside. The menu frees itself once it hands the run over, so nothing here survives into gameplay."
+process_mode = 3
+layer = 25
+
+[node name="MainMenu" parent="MainMenuLayer" instance=ExtResource("77_main_menu")]
 
 [node name="DigNumberPresenter" type="CanvasLayer" parent="." unique_id=483995659 node_paths=PackedStringArray("timing_window", "player_visual") groups=["dig_number_presenter"]]
 process_mode = 3

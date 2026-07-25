@@ -8,9 +8,16 @@ extends Node2D
 ## One lobe is one drawn dust puff: mining_smoke.gdshader gives each quad a
 ## hard inked silhouette and flat tone bands, so a cloud reads as overlapping
 ## drawn puffs in the terrain palette rather than as stacked soft blobs.
+## Every lobe carries its own countdown and thins out faster once it stops
+## moving, so dust always leaves the shaft instead of parking under an overhang.
 ## The invariant is that the lobe count never exceeds the active platform cap.
 ## Jam justification: simulation and rendering share one small lobe dataset and
 ## one consumer; keep this local unless a second smoke presenter is introduced.
+
+## Below this travel speed a puff counts as trapped rather than drifting.
+const STUCK_TRAVEL_SPEED: float = 6.0
+## Grace period before a wedged puff starts thinning out early.
+const STUCK_TRIGGER_SECONDS: float = 0.35
 
 class SmokeLobe:
 	var terrain_position: Vector2
@@ -22,14 +29,16 @@ class SmokeLobe:
 	var display_right_radius: float
 	var shape_seed: float
 	var shape_phase: float
+	## Own countdown: a fresh strike never revives dust already hanging around.
+	var total_lifetime: float
+	var remaining_lifetime: float
+	var stuck_seconds: float
 
 
 class SmokeCloud:
-	## The owner caps this array, feeds the nearest lobe when full, and clears
-	## the entire collection when its refreshed lifetime expires.
+	## The owner caps this array, feeds the nearest lobe when full, and drops
+	## each lobe as its own countdown expires; the cloud dies with its last one.
 	var lobes: Array[SmokeLobe] = []
-	var total_lifetime: float
-	var remaining_lifetime: float
 	var pressure: float
 
 
@@ -40,7 +49,9 @@ class SmokeCloud:
 @export var smoke_mesh: MultiMeshInstance2D
 
 @export_category("Cloud")
-@export_range(0.1, 12.0, 0.1) var cloud_lifetime_seconds: float = 6.0
+## Life of one puff, not of the cloud. Each puff counts down from its own birth,
+## so continuous mining stacks fresh dust instead of holding older dust alive.
+@export_range(0.1, 12.0, 0.1) var lobe_lifetime_seconds: float = 6.0
 @export_range(1.0, 100.0, 1.0) var starting_radius: float = 24.0
 @export_range(16.0, 300.0, 1.0) var maximum_radius: float = 96.0
 @export_range(1.0, 20.0, 0.5) var radius_per_sqrt_cell: float = 3.0
@@ -81,6 +92,15 @@ class SmokeCloud:
 @export_range(0.0, 16.0, 0.5) var wall_clearance: float = 1.0
 @export_range(0.0, 500.0, 5.0) var entrance_pull_acceleration: float = 45.0
 @export_range(0.0, 200.0, 1.0) var top_consumption_margin: float = 16.0
+## Sideways crawl a puff gains while a ceiling blocks its rise, so it spreads
+## along the rock toward the open side instead of parking under the overhang.
+@export_range(0.0, 500.0, 5.0) var ceiling_spread_acceleration: float = 90.0
+## Bounds that crawl so a puff under an overhang reads as spreading gas rather
+## than as wind. An impact push may still carry a puff faster than this.
+@export_range(0.0, 300.0, 5.0) var maximum_ceiling_spread_speed: float = 70.0
+## How much faster a trapped puff burns through its life. Nothing the collision
+## solver cannot free stays visible for a full lifetime.
+@export_range(1.0, 8.0, 0.5) var stuck_dissipation_multiplier: float = 3.0
 
 var _cloud: SmokeCloud
 var _random := RandomNumberGenerator.new()
@@ -155,6 +175,11 @@ func play_at_impact(
 		lobe.display_left_radius = starting_radius
 		lobe.display_right_radius = starting_radius
 		lobe.shape_seed = _random.randf_range(0.0, TAU)
+		lobe.total_lifetime = lobe_lifetime_seconds * _random.randf_range(
+			0.75,
+			1.0
+		)
+		lobe.remaining_lifetime = lobe.total_lifetime
 		_cloud.lobes.append(lobe)
 	else:
 		# At the web-safe cap, feed the nearest existing volume instead of
@@ -168,9 +193,10 @@ func play_at_impact(
 			maximum_radius
 		)
 		nearest_lobe.velocity += launch_velocity * 0.45
+		# Only the puff that actually received this strike's dust is refreshed.
+		nearest_lobe.remaining_lifetime = nearest_lobe.total_lifetime
+		nearest_lobe.stuck_seconds = 0.0
 
-	_cloud.total_lifetime = cloud_lifetime_seconds
-	_cloud.remaining_lifetime = cloud_lifetime_seconds
 	_cloud.pressure = clampf(
 		_cloud.pressure
 			+ pressure_per_hit
@@ -217,11 +243,6 @@ func _process(delta: float) -> void:
 	if _cloud == null:
 		set_process(false)
 		return
-	_cloud.remaining_lifetime -= delta
-	if _cloud.remaining_lifetime <= 0.0:
-		_clear_cloud()
-		return
-
 	_cloud.pressure = move_toward(
 		_cloud.pressure,
 		0.0,
@@ -229,64 +250,95 @@ func _process(delta: float) -> void:
 	)
 	_apply_bonding(delta)
 	var drag_multiplier := exp(-air_drag * delta)
-	for lobe in _cloud.lobes:
-		lobe.current_radius = move_toward(
-			lobe.current_radius,
-			lobe.target_radius,
-			growth_speed * delta
-		)
-		var open_horizontal_radii := _get_open_horizontal_radii(
-			lobe.terrain_position,
-			minf(
-				lobe.current_radius * horizontal_fill_scale,
-				maximum_horizontal_radius
-			)
-		)
-		lobe.display_left_radius = open_horizontal_radii.x
-		lobe.display_right_radius = open_horizontal_radii.y
-		lobe.display_radius = minf(
-			lobe.display_left_radius,
-			lobe.display_right_radius
-		)
-		lobe.shape_phase += delta * (0.45 + _cloud.pressure * 0.8)
-		lobe.velocity *= drag_multiplier
-		lobe.velocity.y = minf(lobe.velocity.y, 0.0)
-		lobe.velocity.y -= upward_buoyancy * delta
-		lobe.velocity.y = maxf(
-			lobe.velocity.y,
-			-maximum_rise_speed
-		)
-		if lobe.velocity.y < 0.0:
-			var entrance_center_x := (
-				float(terrain_manager.config.terrain_width_cells)
-				* float(terrain_manager.config.terrain_cell_world_size)
-				* 0.5
-			)
-			lobe.velocity.x += signf(
-				entrance_center_x - lobe.terrain_position.x
-			) * entrance_pull_acceleration * delta
-		_move_lobe(
-			lobe,
-			minf(
-				lobe.display_radius * 0.55,
-				maximum_collision_radius
-			),
-			delta
-		)
-
-	if not (
+	# The camera is detached during review, so a screen-space top is not a valid
+	# escape signal there; those puffs leave on their own countdown instead.
+	var is_view_detached := (
 		view_controller != null
 		and view_controller.is_reviewing()
-	):
-		for lobe_index in range(_cloud.lobes.size() - 1, -1, -1):
-			if _has_lobe_cleared_normal_view_top(
-				_cloud.lobes[lobe_index]
-			):
-				_cloud.lobes.remove_at(lobe_index)
+	)
+	for lobe_index in range(_cloud.lobes.size() - 1, -1, -1):
+		var lobe := _cloud.lobes[lobe_index]
+		_advance_lobe(lobe, drag_multiplier, delta)
+		if lobe.remaining_lifetime <= 0.0:
+			_cloud.lobes.remove_at(lobe_index)
+			continue
+		if (
+			not is_view_detached
+			and _has_lobe_cleared_normal_view_top(lobe)
+		):
+			_cloud.lobes.remove_at(lobe_index)
 	if _cloud.lobes.is_empty():
 		_clear_cloud()
 		return
 	_sync_render_instances()
+
+
+## Grows, lifts, moves, and ages one puff for this frame.
+func _advance_lobe(
+	lobe: SmokeLobe,
+	drag_multiplier: float,
+	delta: float
+) -> void:
+	var previous_position := lobe.terrain_position
+	lobe.current_radius = move_toward(
+		lobe.current_radius,
+		lobe.target_radius,
+		growth_speed * delta
+	)
+	var open_horizontal_radii := _get_open_horizontal_radii(
+		lobe.terrain_position,
+		minf(
+			lobe.current_radius * horizontal_fill_scale,
+			maximum_horizontal_radius
+		)
+	)
+	lobe.display_left_radius = open_horizontal_radii.x
+	lobe.display_right_radius = open_horizontal_radii.y
+	lobe.display_radius = minf(
+		lobe.display_left_radius,
+		lobe.display_right_radius
+	)
+	lobe.shape_phase += delta * (0.45 + _cloud.pressure * 0.8)
+	lobe.velocity *= drag_multiplier
+	lobe.velocity.y = minf(lobe.velocity.y, 0.0)
+	lobe.velocity.y -= upward_buoyancy * delta
+	lobe.velocity.y = maxf(
+		lobe.velocity.y,
+		-maximum_rise_speed
+	)
+	if lobe.velocity.y < 0.0:
+		var entrance_center_x := (
+			float(terrain_manager.config.terrain_width_cells)
+			* float(terrain_manager.config.terrain_cell_world_size)
+			* 0.5
+		)
+		lobe.velocity.x += signf(
+			entrance_center_x - lobe.terrain_position.x
+		) * entrance_pull_acceleration * delta
+	_move_lobe(
+		lobe,
+		minf(
+			lobe.display_radius * 0.55,
+			maximum_collision_radius
+		),
+		delta
+	)
+
+	# A puff the solver cannot free is in a pocket no amount of buoyancy will
+	# open, so it thins out early rather than hanging in the shaft where a
+	# review scroll would show it long after the strike that made it.
+	var stuck_travel := STUCK_TRAVEL_SPEED * delta
+	if (
+		lobe.terrain_position.distance_squared_to(previous_position)
+		< stuck_travel * stuck_travel
+	):
+		lobe.stuck_seconds += delta
+	else:
+		lobe.stuck_seconds = 0.0
+	var dissipation := delta
+	if lobe.stuck_seconds >= STUCK_TRIGGER_SECONDS:
+		dissipation *= stuck_dissipation_multiplier
+	lobe.remaining_lifetime -= dissipation
 
 
 ## Sends the bounded smoke supports to one shared GPU draw call.
@@ -302,18 +354,18 @@ func _sync_render_instances() -> void:
 		smoke_multimesh.instance_count
 	)
 	smoke_multimesh.visible_instance_count = visible_count
-	var life_ratio := clampf(
-		_cloud.remaining_lifetime / _cloud.total_lifetime,
-		0.0,
-		1.0
-	)
-	var body_alpha := body_opacity * clampf(
-		life_ratio / maxf(fade_portion, 0.05),
-		0.0,
-		1.0
-	)
 	for lobe_index in range(visible_count):
 		var lobe := _cloud.lobes[lobe_index]
+		var life_ratio := clampf(
+			lobe.remaining_lifetime / maxf(lobe.total_lifetime, 0.001),
+			0.0,
+			1.0
+		)
+		var body_alpha := body_opacity * clampf(
+			life_ratio / maxf(fade_portion, 0.05),
+			0.0,
+			1.0
+		)
 		var screen_position := (
 			terrain_manager.terrain_to_screen_position(
 				lobe.terrain_position
@@ -405,6 +457,21 @@ func _get_open_horizontal_radii(
 		maxf(left_radius, minimum_radius),
 		maxf(right_radius, minimum_radius)
 	)
+
+
+## Points a ceiling-blocked puff at its roomier side using this frame's samples.
+## Single caller by design: it only means anything while _move_lobe is resolving
+## a blocked rise, and it costs no extra terrain queries.
+func _get_open_side_direction(lobe: SmokeLobe) -> float:
+	var open_difference := (
+		lobe.display_right_radius
+		- lobe.display_left_radius
+	)
+	if absf(open_difference) > 0.001:
+		return signf(open_difference)
+	# A perfectly symmetric pocket picks a stable side from the puff's own seed,
+	# so neighbouring puffs drift apart instead of stacking on one line.
+	return 1.0 if lobe.shape_seed < PI else -1.0
 
 
 ## Pulls stretched neighboring supports together without collapsing spacing.
@@ -509,6 +576,11 @@ func _move_lobe(
 	):
 		lobe.terrain_position = next_position
 		return
+	if terrain_manager.is_solid_at_terrain_position(current_position):
+		# The puff is already inside rock, so every axis reads as blocked and
+		# nothing below would ever release it. Let it travel out of the wall.
+		lobe.terrain_position = next_position
+		return
 
 	var vertical_position := Vector2(
 		current_position.x,
@@ -521,8 +593,21 @@ func _move_lobe(
 	):
 		current_position.y = vertical_position.y
 	else:
+		# Gas that meets a ceiling spreads along it instead of stopping: it
+		# crawls toward whichever side has more open tunnel and keeps hunting
+		# for the way up and out.
 		lobe.velocity.y = 0.0
-		lobe.velocity.x *= wall_slide_factor
+		var spread_direction := _get_open_side_direction(lobe)
+		if (
+			absf(lobe.velocity.x) < maximum_ceiling_spread_speed
+			or not is_equal_approx(
+				signf(lobe.velocity.x),
+				spread_direction
+			)
+		):
+			lobe.velocity.x += (
+				spread_direction * ceiling_spread_acceleration * delta
+			)
 
 	var horizontal_position := Vector2(
 		next_position.x,
