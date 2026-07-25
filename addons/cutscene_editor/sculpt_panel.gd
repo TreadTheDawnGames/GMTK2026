@@ -169,6 +169,21 @@ func step_focused_layer(direction: int) -> void:
 	_on_layer_selected(next_index)
 
 
+## Arms a tool by index, for the number-key shortcuts. Out-of-range indexes are
+## ignored rather than clamped: pressing 9 should do nothing, not silently pick
+## the last tool.
+func select_operation(operation_index: int) -> void:
+	if operation_index < 0 or operation_index >= OPERATIONS.size():
+		return
+	_on_operation_pressed(operation_index)
+
+
+## Swaps between carve and fill, the pair a designer alternates constantly.
+## From any other tool it arms carve, so the key always has a defined result.
+func toggle_carve_fill() -> void:
+	select_operation(1 if _operation_index == 0 else 0)
+
+
 ## Reports whether viewport clicks should sculpt instead of select.
 func is_armed() -> bool:
 	return _is_armed and _context != null and _context.can_sculpt()
