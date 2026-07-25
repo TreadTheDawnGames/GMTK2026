@@ -111,7 +111,7 @@ func play_opening() -> void:
 	var movement := _presenter.move_grounded_to(
 		conversation_marker.global_position,
 		opening_move_seconds,
-		_floor_sampler,
+		_sample_level_floor.bind(_presenter.global_position.y),
 		false,
 		opening_step_height
 	)
@@ -150,7 +150,7 @@ func play_closing() -> void:
 	var movement := _presenter.move_grounded_to(
 		target_marker.global_position,
 		closing_move_seconds,
-		_floor_sampler,
+		_sample_level_floor.bind(_presenter.global_position.y),
 		hide_actor_after_closing
 	)
 	var animation_name := _play_named_animation(closing_animation)
@@ -231,6 +231,20 @@ func validate_stage() -> String:
 	if opening_move_seconds <= 0.0 or closing_move_seconds <= 0.0:
 		return "Character encounter stage motion durations must be positive."
 	return ""
+
+
+## Samples the injected floor but refuses ground that falls away below where the
+## walk set out from. The miner arrives by breaking a crater through the room's
+## floor, and the shared sampler reports the bottom of that crater as support,
+## so an actor crossing it walks down into the hole and climbs back out. Rising
+## ground is still followed; only falling ground is refused.
+func _sample_level_floor(screen_x: float, walk_floor_y: float) -> float:
+	if not _floor_sampler.is_valid():
+		return NAN
+	var sampled_y := float(_floor_sampler.call(screen_x))
+	if is_nan(sampled_y):
+		return sampled_y
+	return minf(sampled_y, walk_floor_y)
 
 
 func _play_named_animation(animation_name: StringName) -> StringName:
