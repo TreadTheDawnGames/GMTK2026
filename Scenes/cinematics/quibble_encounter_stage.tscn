@@ -4,5 +4,10 @@
 [ext_resource type="Script" path="res://Scripts/cinematics/quibble_encounter_stage.gd" id="2_quibble"]
 
 [node name="QuibbleEncounterStage" instance=ExtResource("1_stage")]
+editor_description = "Quibble's caffeine routine: a fixed sprite jitter plus a coffee loop every seven seconds. He is a runtime CharacterPresenter, so this scene authors only the stage; the terrain behind it is the editor preview."
 script = ExtResource("2_quibble")
 hide_actor_after_closing = true
+
+[node name="EditorTerrainPreview" parent="." index="4"]
+editor_description = "Previews coffee_cat_first_encounter's own chamber at depth 9200."
+preview_depth_rows = 9200

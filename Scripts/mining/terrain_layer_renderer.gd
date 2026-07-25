@@ -3,14 +3,12 @@ class_name TerrainLayerRenderer
 extends Node2D
 
 ## Streams layered terrain art and reveals organic openings at mining impacts.
-## @tool exists so a cutscene scene can show the terrain it actually plays
-## against while it is being authored. Editor work is opt-in per instance via
+## @tool lets authored encounter scenes preview the production terrain. Editor
+## work is opt-in per instance via
 ## preview_in_editor, so opening the mining scene costs nothing. There is no
 ## second renderer and no redrawn approximation: the editor runs this code.
 ## Visual cutouts intentionally retain one colored backdrop over logical holes.
 ## Normal hits stop at orange; big hits may expose the solid brown back layer.
-## A cinematic tunnel temporarily changes only presentation masks while gameplay
-## is gated. F3 continues to show the unchanged logical cells during that mismatch.
 ## Chamber antialiasing may differ by less than one logical cell at a side edge;
 ## layer one may sit up to the profile's authored reveal distance below a room's
 ## logical floor while layer two stays aligned to support. Neither mismatch
@@ -45,24 +43,11 @@ class ImpactStamp:
 	## Seeds this hit's per-stratum orientation and size jitter. Kept on the
 	## stamp so a chunk streamed back in redraws the exact same rims.
 	var variation_hash: int = 0
-	## A layer-cutscene hit may expose extra authored passes through these masks.
-	var cinematic_traversal_layer_count: int = 0
-
 
 class ResizedStampImages:
 	var erase_mask: Image
 	var transparent_source: Image
 	var fracture_source: Image
-
-
-class CinematicLayerSnapshot:
-	var mask_image: Image
-
-
-class CinematicImpactPreparationSnapshot:
-	var derived_stamp: ImpactStamp
-	var foreground_opening_rect: Rect2
-	var layer_masks: Dictionary[Vector2i, Image] = {}
 
 
 const LAYER_SHADER: Shader = preload(
@@ -100,22 +85,6 @@ const FRACTURE_SUPPORT_VALUE_THRESHOLD: float = 0.9
 @export_range(1, 16, 1) var chamber_circle_max_radius_cells: int = 8
 @export_range(0.0, 8.0, 0.5) var chamber_circle_jitter_cells: float = 3.0
 
-@export_category("Cinematic Tunnel")
-## Overlaps a bounded number of existing organic masks into one horizontal room.
-@export_range(2, 12, 1) var cinematic_tunnel_stamp_count: int = 5
-## Expands every reserved rim symmetrically around the miner's full silhouette.
-@export_range(0.0, 192.0, 1.0) var cinematic_traversal_side_clearance: float = 96.0
-## Raises the visible break so the miner lands at its lower center, not midway up.
-@export_range(-160.0, 0.0, 1.0) var cinematic_entrance_center_offset_y: float = -96.0
-## Bounds temporary image copies to visible chunks intersecting the authored room.
-@export_range(1, 8, 1) var cinematic_snapshot_chunk_limit: int = 4
-## Bounds direct wall mutations; prior indents are never replayed per strike.
-@export_range(1, 32, 1) var cinematic_tunnel_indent_limit: int = 32
-## Keeps three overlapping rat lanes bounded on the GL Compatibility web target.
-@export_range(1, 32, 1) var web_cinematic_tunnel_indent_limit: int = 24
-## Prevents one contact from allocating an oversized transformed mask.
-@export_range(8.0, 256.0, 1.0) var cinematic_tunnel_indent_max_diameter: float = 96.0
-
 @export_category("Editor Preview")
 ## Streams terrain inside the editor for this instance only. The mining scene
 ## leaves it off so opening it stays instant; cutscene previews turn it on.
@@ -148,35 +117,9 @@ var _loaded_first_chunk: int = -1
 var _loaded_last_chunk: int = -1
 var _latest_foreground_opening_rect := Rect2()
 var _latest_impact_stamp: ImpactStamp
-# Holds exactly one qualifying real hit between trigger and cinematic cleanup.
-var _reserved_cinematic_impact_stamp: ImpactStamp
-# Separate from the reserved hit so the real impact and its replay history are
-# immutable. A committed expansion remains the latest presentation stamp until
-# normal mining replaces it, allowing traversal queries to share one source.
-var _cinematic_impact_stamp: ImpactStamp
-# Created only for the one combo-qualified entrance, never on the normal hit
-# path. Growth is bounded by cinematic_snapshot_chunk_limit times gameplay
-# layers, then cleared on visual commit or pending-flow rollback.
-var _cinematic_impact_preparation: CinematicImpactPreparationSnapshot
 var _latest_support_world_position := Vector2(NAN, NAN)
 var _show_logical_overlay: bool = false
 var _active_impact_combo: int = 0
-var _cinematic_transition_active: bool = false
-var _cinematic_hidden_layer_count: int = 0
-var _cinematic_deep_palette: PackedColorArray = PackedColorArray()
-var _cinematic_layer_tween: Tween
-# Growth is bounded by cinematic_snapshot_chunk_limit. Each entry owns one
-# packed luminance/fracture and alpha/mask image, pruned on restore or unload.
-var _cinematic_tunnel_snapshots: Dictionary[int, CinematicLayerSnapshot] = {}
-var _cinematic_tunnel_layer_index: int = -1
-var _cinematic_tunnel_world_rect := Rect2()
-# Replay growth is bounded to one passage plus 12 authored room stamps and is
-# cleared on restore. These visual-only openings may fully differ from logical
-# cells during the cutscene; F3 renders the accepted mismatch for visual audit.
-var _cinematic_tunnel_openings: Array[Rect2] = []
-# One integer is sufficient: each indent mutates the live snapshot-owned image
-# once, so growth is capped and no list is replayed after later strikes.
-var _cinematic_tunnel_indent_count: int = 0
 
 
 ## Connects terrain events and loads the initial visible strata.
@@ -216,6 +159,8 @@ func _ready() -> void:
 		or profile.layer_dirt_variance_strengths.size() != layer_count
 		or profile.layer_rock_densities.size() != layer_count
 		or profile.layer_rock_detail_strengths.size() != layer_count
+		or profile.layer_rock_body_colors.size() != layer_count
+		or profile.layer_rock_outline_colors.size() != layer_count
 	):
 		push_error(
 			"TerrainLayerRenderer texture arrays must match Layer Tints."
@@ -258,7 +203,6 @@ func _on_terrain_damaged(
 		impact_origin_cell.x
 	)
 	_latest_impact_stamp = stamp
-	_cinematic_impact_stamp = null
 	_latest_foreground_opening_rect = _get_layer_opening_rect(stamp, 0)
 	_apply_impact_stamps([stamp])
 	if _show_logical_overlay:
@@ -444,9 +388,7 @@ func _load_chunk(chunk_index: int) -> void:
 		profile.get_gameplay_layer_count() - 1
 	)
 	for layer_index in range(layer_count):
-		# Gameplay's fourth backdrop and later cinematic strata begin intact.
-		# Every intermediate layer still gets an independent full-size copy so
-		# traversal and temporary rooms can punch its own mask and fractures.
+		# The fourth gameplay stratum begins intact as the tunnel back wall.
 		var uses_backdrop_source := (
 			profile.keep_back_layer_solid
 			and layer_index >= first_backdrop_source_layer
@@ -510,14 +452,7 @@ func _load_chunk(chunk_index: int) -> void:
 		chunk.root.add_child(sprite)
 		chunk.layer_sprites.append(sprite)
 		chunk.mask_textures.append(mask_texture)
-		if _cinematic_transition_active:
-			_apply_cinematic_presentation_to_layer(
-				sprite,
-				layer_index
-			)
 	_active_chunks[chunk_index] = chunk
-	if _cinematic_tunnel_layer_index >= 0:
-		_apply_cinematic_tunnel_to_chunk(chunk_index)
 
 
 ## Removes rendered chunk nodes while retaining their impact records.
@@ -528,9 +463,6 @@ func _unload_chunk(chunk_index: int) -> void:
 	# until the frame ends and can exhaust memory before Godot flushes it.
 	chunk.root.free()
 	_active_chunks.erase(chunk_index)
-	# Gameplay state can rebuild an unloaded chunk. Its temporary presentation
-	# snapshot is therefore no longer needed and must not retain image memory.
-	_cinematic_tunnel_snapshots.erase(chunk_index)
 
 
 ## Builds one layer's undamaged terrain before applying organic openings.
@@ -911,7 +843,7 @@ func _get_layer_stamp_variation(
 	stamp: ImpactStamp,
 	layer_index: int
 ) -> Vector4i:
-	if layer_index <= 0 or stamp.cinematic_traversal_layer_count > 0:
+	if layer_index <= 0:
 		return Vector4i(
 			1 if stamp.flip_x else 0,
 			1 if stamp.flip_y else 0,
@@ -950,20 +882,12 @@ func _apply_impact_stamp(
 	stamp: ImpactStamp
 ) -> int:
 	var gameplay_layer_count := profile.get_gameplay_layer_count()
-	var layer_count := maxi(
-		gameplay_layer_count,
-		mini(
-			stamp.cinematic_traversal_layer_count,
-			profile.get_layer_count() - 1
-		)
-	)
+	var layer_count := gameplay_layer_count
 	var changed_layers := 0
 	for layer_index in range(layer_count):
 		if (
 			profile.keep_back_layer_solid
 			and layer_index == gameplay_layer_count - 1
-			and layer_index
-				>= stamp.cinematic_traversal_layer_count
 		):
 			continue
 		var is_layer_covering_backdrop := (
@@ -1045,24 +969,14 @@ func _get_layer_opening_rect(
 		* layer_size_jitter
 		* profile.get_layer_impact_scale(layer_index)
 	)
-	var layer_offset := (
-		Vector2.ZERO
-		if stamp.cinematic_traversal_layer_count > 0
-		else profile.get_layer_impact_offset(layer_index)
-	)
+	var layer_offset := profile.get_layer_impact_offset(layer_index)
 	if stamp.flip_x:
 		layer_offset.x *= -1.0
 	if stamp.flip_y:
 		layer_offset.y *= -1.0
 	var opening_center := stamp.center + layer_offset
-	# Ordinary mining stamps expand far enough to cover every damaged cell.
-	# A cinematic stamp has already drawn that exact hit; its centered opening
-	# is instead sized for traversal. Reusing off-center damage corners here
-	# would turn high-combo entrances into viewport-sized cavities.
-	if (
-		stamp.cinematic_traversal_layer_count <= 0
-		and stamp.damage_bounds.has_area()
-	):
+	# Mining stamps expand far enough to cover every damaged cell.
+	if stamp.damage_bounds.has_area():
 		var damage_end := stamp.damage_bounds.end
 		var damage_corners := PackedVector2Array([
 			stamp.damage_bounds.position,
@@ -1108,744 +1022,6 @@ func get_latest_foreground_opening_screen_rect() -> Rect2:
 	)
 
 
-## Reserves the trigger's exact real impact before another queued hit can land.
-func reserve_latest_impact_for_cinematic() -> bool:
-	if (
-		_latest_impact_stamp == null
-		or _reserved_cinematic_impact_stamp != null
-		or _cinematic_impact_preparation != null
-	):
-		return false
-	_reserved_cinematic_impact_stamp = _latest_impact_stamp
-	return true
-
-
-## Rolls back an uncommitted expansion, then releases the exact real impact.
-func release_reserved_cinematic_impact() -> void:
-	_rollback_prepared_cinematic_impact()
-	_reserved_cinematic_impact_stamp = null
-
-
-## Persists the derived expansion beside the untouched real impact for replay.
-func commit_reserved_cinematic_impact() -> bool:
-	if (
-		_reserved_cinematic_impact_stamp == null
-		or _cinematic_impact_preparation == null
-		or _cinematic_impact_preparation.derived_stamp == null
-	):
-		return false
-	_register_impact_stamp(_cinematic_impact_preparation.derived_stamp)
-	_cinematic_impact_preparation = null
-	return true
-
-
-## Derives a centered expansion from the reserved real hit's organic styling.
-## This runs once per cutscene entrance and leaves the deepest profile layer
-## solid as the backing foundation. The real stamp and its history never move.
-func prepare_reserved_impact_for_cinematic_traversal(
-	required_layer_count: int,
-	miner_terrain_position: Vector2
-) -> bool:
-	if (
-		_reserved_cinematic_impact_stamp == null
-		or _cinematic_impact_preparation != null
-		or required_layer_count <= 0
-		or required_layer_count >= profile.get_layer_count()
-		or is_nan(miner_terrain_position.x)
-		or is_nan(miner_terrain_position.y)
-		or is_inf(miner_terrain_position.x)
-		or is_inf(miner_terrain_position.y)
-	):
-		return false
-	var reserved_stamp := _reserved_cinematic_impact_stamp
-	var cinematic_stamp := ImpactStamp.new()
-	cinematic_stamp.center = (
-		miner_terrain_position
-		+ Vector2(0.0, cinematic_entrance_center_offset_y)
-	)
-	cinematic_stamp.damage_bounds = Rect2()
-	cinematic_stamp.narrow_path_points = PackedVector2Array()
-	cinematic_stamp.narrow_path_radius_scale = (
-		reserved_stamp.narrow_path_radius_scale
-	)
-	cinematic_stamp.narrow_path_two_layer_fraction = (
-		reserved_stamp.narrow_path_two_layer_fraction
-	)
-	cinematic_stamp.flip_x = reserved_stamp.flip_x
-	cinematic_stamp.flip_y = reserved_stamp.flip_y
-	cinematic_stamp.rotation_quarters = reserved_stamp.rotation_quarters
-	cinematic_stamp.size_variation = reserved_stamp.size_variation
-
-	# The exact hit remains present in the mask. Add only the minimum
-	# centered clearance needed for the miner to cross each deeper silhouette;
-	# combo damage must not inflate this presentation opening to viewport size.
-	var minimum_traversal_scale := 1.0
-	for layer_index in range(required_layer_count):
-		minimum_traversal_scale = minf(
-			minimum_traversal_scale,
-			maxf(
-				absf(profile.get_layer_impact_scale(layer_index)),
-				0.05
-			)
-		)
-	var required_core_radius := maxf(
-		cinematic_traversal_side_clearance / minimum_traversal_scale
-			- float(profile.core_hole_padding),
-		0.0
-	)
-	cinematic_stamp.core_radius = maxf(
-		reserved_stamp.core_radius,
-		required_core_radius
-	)
-	cinematic_stamp.use_big_hole = true
-	cinematic_stamp.cinematic_traversal_layer_count = maxi(
-		reserved_stamp.cinematic_traversal_layer_count,
-		required_layer_count
-	)
-	var affected_chunk_indices := _get_stamp_chunk_indices(cinematic_stamp)
-	if affected_chunk_indices.size() > cinematic_snapshot_chunk_limit:
-		return false
-	var preparation := CinematicImpactPreparationSnapshot.new()
-	preparation.derived_stamp = cinematic_stamp
-	preparation.foreground_opening_rect = _latest_foreground_opening_rect
-	var changed_layer_count := maxi(
-		profile.get_gameplay_layer_count(),
-		mini(
-			required_layer_count,
-			profile.get_layer_count() - 1
-		)
-	)
-	for chunk_index in affected_chunk_indices:
-		if not _active_chunks.has(chunk_index):
-			continue
-		var chunk: TerrainChunkVisual = _active_chunks[chunk_index]
-		for layer_index in range(
-			mini(changed_layer_count, chunk.mask_images.size())
-		):
-			preparation.layer_masks[Vector2i(
-				chunk_index,
-				layer_index
-			)] = chunk.mask_images[layer_index].duplicate()
-	_cinematic_impact_preparation = preparation
-	_cinematic_impact_stamp = cinematic_stamp
-	_latest_foreground_opening_rect = _get_layer_opening_rect(
-		cinematic_stamp,
-		0
-	)
-	for chunk_index in affected_chunk_indices:
-		if not _active_chunks.has(chunk_index):
-			continue
-		var chunk: TerrainChunkVisual = _active_chunks[chunk_index]
-		var changed_layers := _apply_impact_stamp(
-			chunk,
-			chunk_index,
-			cinematic_stamp
-		)
-		_upload_chunk_masks(chunk, changed_layers)
-	_clear_temporary_stamp_cache()
-	return true
-
-
-## Removes only the derived expansion when pending presentation cancels.
-func _rollback_prepared_cinematic_impact() -> void:
-	if _cinematic_impact_preparation == null:
-		return
-	var preparation := _cinematic_impact_preparation
-	var changed_layers_by_chunk: Dictionary[int, int] = {}
-	for snapshot_key: Vector2i in preparation.layer_masks:
-		var chunk_index := snapshot_key.x
-		var layer_index := snapshot_key.y
-		if not _active_chunks.has(chunk_index):
-			continue
-		var chunk: TerrainChunkVisual = _active_chunks[chunk_index]
-		if layer_index < 0 or layer_index >= chunk.mask_images.size():
-			continue
-		chunk.mask_images[layer_index] = (
-			preparation.layer_masks[snapshot_key]
-		)
-		changed_layers_by_chunk[chunk_index] = (
-			changed_layers_by_chunk.get(chunk_index, 0)
-			| (1 << layer_index)
-		)
-	for chunk_index: int in changed_layers_by_chunk:
-		_upload_chunk_masks(
-			_active_chunks[chunk_index],
-			changed_layers_by_chunk[chunk_index]
-		)
-	_latest_foreground_opening_rect = preparation.foreground_opening_rect
-	_cinematic_impact_stamp = null
-	_cinematic_impact_preparation = null
-	_clear_temporary_stamp_cache()
-
-
-## Reports how many real impact rims may be crossed before the solid back wall.
-func get_cinematic_passable_layer_count() -> int:
-	if profile == null:
-		return 0
-	return maxi(
-		profile.get_layer_count()
-			- (1 if profile.keep_back_layer_solid else 0),
-		0
-	)
-
-
-## Finds the real exposed rim at the retained impact's exact centerline.
-func get_latest_opening_layer_foot_screen_position(
-	layer_index: int
-) -> Vector2:
-	if (
-		not _latest_foreground_opening_rect.has_area()
-		or terrain_manager == null
-		or profile == null
-		or layer_index < 0
-		or layer_index >= get_cinematic_passable_layer_count()
-	):
-		return Vector2(NAN, NAN)
-	var opening_screen_rect := (
-		get_latest_foreground_opening_screen_rect()
-	)
-	var cell_size := float(
-		terrain_manager.config.terrain_cell_world_size
-	)
-	var active_stamp: ImpactStamp = (
-		_cinematic_impact_stamp
-		if _cinematic_impact_stamp != null
-		else _latest_impact_stamp
-	)
-	if active_stamp == null:
-		return Vector2(NAN, NAN)
-	var layer_opening_rect := _get_layer_opening_rect(
-		active_stamp,
-		layer_index
-	)
-	# Begin at this stratum's lower cavity lip. Large combo impacts can extend
-	# beyond the bounded support scan when every layer starts at the foreground
-	# opening's center, even though valid support is already exposed.
-	var opening_lip_world_row := maxi(
-		floori(
-			layer_opening_rect.end.y
-			/ maxf(cell_size, 1.0)
-		),
-		0
-	)
-	var screen_x := opening_screen_rect.get_center().x
-	var support_y := get_layer_opening_floor_support_screen_y(
-		screen_x,
-		opening_lip_world_row,
-		layer_index
-	)
-	if not is_nan(support_y):
-		return Vector2(screen_x, support_y)
-	return Vector2(NAN, NAN)
-
-
-## Reserves the streamed strata for a visual-only depth promotion.
-func begin_cinematic_strata_transition(
-	deep_palette: PackedColorArray
-) -> bool:
-	if (
-		_cinematic_transition_active
-		or profile == null
-		or profile.get_layer_count() <= 0
-	):
-		return false
-	_cinematic_transition_active = true
-	_cinematic_hidden_layer_count = 0
-	_cinematic_deep_palette = deep_palette.duplicate()
-	_apply_cinematic_presentation_to_all_chunks()
-	return true
-
-
-## Reveals the tunnel stratum at once after gameplay completed the real fall.
-func promote_cinematic_strata_through(layer_index: int) -> bool:
-	if (
-		not _cinematic_transition_active
-		or layer_index < _cinematic_hidden_layer_count
-		or layer_index >= get_cinematic_passable_layer_count()
-	):
-		return false
-	if (
-		_cinematic_layer_tween != null
-		and _cinematic_layer_tween.is_valid()
-	):
-		_cinematic_layer_tween.kill()
-	_cinematic_layer_tween = null
-	_cinematic_hidden_layer_count = layer_index + 1
-	_apply_cinematic_presentation_to_all_chunks()
-	return true
-
-
-## Opens the centered reversible passage held behind every traversal rim.
-func open_cinematic_traversal_passage(
-	screen_rect: Rect2,
-	source_layer_index: int
-) -> bool:
-	if (
-		not _cinematic_transition_active
-		or _cinematic_tunnel_layer_index >= 0
-		or not _cinematic_tunnel_snapshots.is_empty()
-		or screen_rect.size.x <= 0.0
-		or screen_rect.size.y <= 0.0
-		or source_layer_index < profile.get_gameplay_layer_count()
-		or source_layer_index >= profile.get_layer_count() - 1
-	):
-		return false
-	var world_rect := _screen_rect_to_terrain_rect(screen_rect)
-	var opening_rects: Array[Rect2] = [world_rect]
-	return _open_cinematic_tunnel_region(
-		source_layer_index,
-		world_rect,
-		opening_rects
-	)
-
-
-## Expands the traversal passage into the promoted cutscene destination room.
-func open_cinematic_cutscene_room(screen_rect: Rect2) -> bool:
-	if (
-		not _cinematic_transition_active
-		or screen_rect.size.x <= 0.0
-		or screen_rect.size.y <= 0.0
-	):
-		return false
-	var source_layer_index := _cinematic_hidden_layer_count
-	if (
-		source_layer_index < profile.get_gameplay_layer_count() - 1
-		or source_layer_index >= profile.get_layer_count() - 1
-		or _get_hole_mask_data(source_layer_index, true) == null
-	):
-		return false
-	var world_rect := _screen_rect_to_terrain_rect(screen_rect)
-	var opening_rects: Array[Rect2] = (
-		_build_cinematic_tunnel_openings(world_rect)
-	)
-	return _open_cinematic_tunnel_region(
-		source_layer_index,
-		world_rect,
-		opening_rects
-	)
-
-
-## Punches one bounded, reversible contact into the promoted tunnel wall.
-func punch_cinematic_tunnel_indent(
-	screen_position: Vector2,
-	diameter: float
-) -> bool:
-	if (
-		_cinematic_tunnel_layer_index < 0
-		or not _cinematic_transition_active
-		or is_nan(screen_position.x)
-		or is_nan(screen_position.y)
-		or is_nan(diameter)
-		or diameter <= 0.0
-	):
-		return false
-	var indent_limit := cinematic_tunnel_indent_limit
-	if OS.has_feature("web"):
-		indent_limit = mini(
-			indent_limit,
-			web_cinematic_tunnel_indent_limit
-		)
-	if _cinematic_tunnel_indent_count >= indent_limit:
-		return false
-	var bounded_diameter := clampf(
-		diameter,
-		8.0,
-		cinematic_tunnel_indent_max_diameter
-	)
-	var indent_screen_rect := Rect2(
-		screen_position - Vector2.ONE * bounded_diameter * 0.5,
-		Vector2.ONE * bounded_diameter
-	)
-	var indent_world_rect := _screen_rect_to_terrain_rect(
-		indent_screen_rect
-	)
-	var mask_data := _get_hole_mask_data(
-		_cinematic_tunnel_layer_index,
-		false
-	)
-	if mask_data == null:
-		return false
-
-	var affected_chunks: Array[int] = []
-	var required_snapshot_count := 0
-	var padded_world_rect := indent_world_rect.grow(
-		bounded_diameter * 0.5
-	)
-	var chunk_world_size := _get_chunk_world_size()
-	for chunk_index: int in _active_chunks:
-		var chunk_world_rect := Rect2(
-			Vector2(0.0, float(chunk_index) * chunk_world_size.y),
-			chunk_world_size
-		)
-		if not chunk_world_rect.intersects(padded_world_rect):
-			continue
-		affected_chunks.append(chunk_index)
-		if not _cinematic_tunnel_snapshots.has(chunk_index):
-			required_snapshot_count += 1
-	if (
-		affected_chunks.is_empty()
-		or _cinematic_tunnel_snapshots.size()
-			+ required_snapshot_count
-			> cinematic_snapshot_chunk_limit
-	):
-		return false
-
-	var changed := false
-	for chunk_index in affected_chunks:
-		if not _ensure_cinematic_tunnel_snapshot(chunk_index):
-			continue
-		var chunk: TerrainChunkVisual = _active_chunks[chunk_index]
-		var chunk_changed := _punch_hole(
-			chunk.mask_images[_cinematic_tunnel_layer_index],
-			chunk_index,
-			indent_world_rect,
-			mask_data,
-			_cinematic_tunnel_indent_count % 2 == 1,
-			_cinematic_tunnel_indent_count % 3 == 2,
-			posmod(_cinematic_tunnel_indent_count, 4)
-		)
-		if not chunk_changed:
-			continue
-		changed = true
-		_upload_chunk_masks(
-			chunk,
-			1 << _cinematic_tunnel_layer_index
-		)
-	_clear_temporary_stamp_cache()
-	if changed:
-		_cinematic_tunnel_indent_count += 1
-	return changed
-
-
-## Samples the actual temporary cutscene-room floor for actor grounding.
-func get_cinematic_cutscene_floor_screen_y(screen_x: float) -> float:
-	if (
-		_cinematic_tunnel_layer_index < 0
-		or not _cinematic_tunnel_world_rect.has_area()
-	):
-		return NAN
-	var cell_size := float(
-		terrain_manager.config.terrain_cell_world_size
-	)
-	var landing_world_row := maxi(
-		floori(_cinematic_tunnel_world_rect.end.y / cell_size),
-		0
-	)
-	return get_layer_opening_floor_support_screen_y(
-		screen_x,
-		landing_world_row,
-		_cinematic_tunnel_layer_index
-	)
-
-
-## Converts authored screen-space framing into the renderer's terrain space.
-func _screen_rect_to_terrain_rect(screen_rect: Rect2) -> Rect2:
-	var config: MiningConfig = terrain_manager.config
-	var cell_size := float(config.terrain_cell_world_size)
-	var terrain_left := (
-		config.terrain_screen_center_x - _current_view_x * cell_size
-	)
-	return Rect2(
-		Vector2(
-			screen_rect.position.x - terrain_left,
-			_current_view_y * cell_size
-				+ screen_rect.position.y
-				- config.mining_face_screen_y
-		),
-		screen_rect.size
-	)
-
-
-## Mutates one bounded region while retaining the first exact layer snapshots.
-func _open_cinematic_tunnel_region(
-	source_layer_index: int,
-	world_rect: Rect2,
-	opening_rects: Array[Rect2]
-) -> bool:
-	if (
-		not _cinematic_transition_active
-		or not world_rect.has_area()
-		or opening_rects.is_empty()
-		or source_layer_index < 0
-		or source_layer_index >= profile.get_layer_count()
-		or (
-			_cinematic_tunnel_layer_index >= 0
-			and _cinematic_tunnel_layer_index != source_layer_index
-		)
-		or _get_hole_mask_data(source_layer_index, true) == null
-	):
-		return false
-
-	var affected_chunks: Array[int] = []
-	var required_snapshot_count := 0
-	var padded_world_rect := world_rect.grow(world_rect.size.y * 0.5)
-	var chunk_world_size := _get_chunk_world_size()
-	for chunk_index: int in _active_chunks:
-		var chunk_world_rect := Rect2(
-			Vector2(0.0, float(chunk_index) * chunk_world_size.y),
-			chunk_world_size
-		)
-		if not chunk_world_rect.intersects(padded_world_rect):
-			continue
-		affected_chunks.append(chunk_index)
-		if not _cinematic_tunnel_snapshots.has(chunk_index):
-			required_snapshot_count += 1
-	if (
-		affected_chunks.is_empty()
-		or _cinematic_tunnel_snapshots.size()
-			+ required_snapshot_count
-			> cinematic_snapshot_chunk_limit
-	):
-		return false
-
-	var previous_layer_index := _cinematic_tunnel_layer_index
-	if previous_layer_index < 0:
-		_cinematic_tunnel_layer_index = source_layer_index
-		_cinematic_tunnel_indent_count = 0
-	var new_snapshot_chunks: Array[int] = []
-	for chunk_index in affected_chunks:
-		if _cinematic_tunnel_snapshots.has(chunk_index):
-			continue
-		if not _ensure_cinematic_tunnel_snapshot(chunk_index):
-			for new_chunk_index in new_snapshot_chunks:
-				_cinematic_tunnel_snapshots.erase(new_chunk_index)
-			_cinematic_tunnel_layer_index = previous_layer_index
-			return false
-		new_snapshot_chunks.append(chunk_index)
-
-	var changed := false
-	var variation_index_offset := _cinematic_tunnel_openings.size()
-	for chunk_index in affected_chunks:
-		var chunk_changed := _apply_cinematic_openings_to_chunk(
-			chunk_index,
-			opening_rects,
-			variation_index_offset
-		)
-		if (
-			not chunk_changed
-			and new_snapshot_chunks.has(chunk_index)
-		):
-			_cinematic_tunnel_snapshots.erase(chunk_index)
-		changed = chunk_changed or changed
-	_clear_temporary_stamp_cache()
-	if not changed:
-		_cinematic_tunnel_layer_index = previous_layer_index
-		return false
-
-	var replay_openings: Array[Rect2] = (
-		_cinematic_tunnel_openings.duplicate()
-	)
-	replay_openings.append_array(opening_rects)
-	_cinematic_tunnel_world_rect = world_rect
-	_cinematic_tunnel_openings = replay_openings
-	return true
-
-
-## Builds an Inspector-sized, organic horizontal opening from existing masks.
-func _build_cinematic_tunnel_openings(
-	world_rect: Rect2
-) -> Array[Rect2]:
-	var openings: Array[Rect2] = []
-	var diameter := world_rect.size.y
-	var radius := diameter * 0.5
-	var first_center_x := world_rect.position.x + radius
-	var last_center_x := world_rect.end.x - radius
-	if first_center_x > last_center_x:
-		first_center_x = world_rect.get_center().x
-		last_center_x = first_center_x
-	var stamp_count := clampi(cinematic_tunnel_stamp_count, 2, 12)
-	for stamp_index in range(stamp_count):
-		var progress := (
-			0.5
-			if stamp_count == 1
-			else float(stamp_index) / float(stamp_count - 1)
-		)
-		var center := Vector2(
-			lerpf(first_center_x, last_center_x, progress),
-			world_rect.get_center().y
-		)
-		openings.append(
-			Rect2(
-				center - Vector2.ONE * radius,
-				Vector2.ONE * diameter
-			)
-		)
-	return openings
-
-
-## Snapshots and punches one streamed chunk using the shared terrain mask path.
-func _apply_cinematic_tunnel_to_chunk(chunk_index: int) -> bool:
-	var snapshot_already_existed := (
-		_cinematic_tunnel_snapshots.has(chunk_index)
-	)
-	if not _ensure_cinematic_tunnel_snapshot(chunk_index):
-		return false
-	var changed := _apply_cinematic_openings_to_chunk(
-		chunk_index,
-		_cinematic_tunnel_openings
-	)
-	if not changed and not snapshot_already_existed:
-		_cinematic_tunnel_snapshots.erase(chunk_index)
-	_clear_temporary_stamp_cache()
-	return changed
-
-
-## Applies supplied organic openings without replacing an earlier snapshot.
-func _apply_cinematic_openings_to_chunk(
-	chunk_index: int,
-	opening_rects: Array[Rect2],
-	variation_index_offset: int = 0
-) -> bool:
-	if (
-		not _active_chunks.has(chunk_index)
-		or _cinematic_tunnel_layer_index < 0
-		or _cinematic_tunnel_layer_index >= profile.get_layer_count()
-		or opening_rects.is_empty()
-	):
-		return false
-	var chunk: TerrainChunkVisual = _active_chunks[chunk_index]
-	if _cinematic_tunnel_layer_index >= chunk.mask_images.size():
-		return false
-
-	var mask_data := _get_hole_mask_data(
-		_cinematic_tunnel_layer_index,
-		true
-	)
-	if mask_data == null:
-		return false
-	var changed := false
-	for opening_index in range(opening_rects.size()):
-		var variation_index := variation_index_offset + opening_index
-		changed = (
-			_punch_hole(
-				chunk.mask_images[_cinematic_tunnel_layer_index],
-				chunk_index,
-				opening_rects[opening_index],
-				mask_data,
-				variation_index % 2 == 1,
-				variation_index % 3 == 2,
-				posmod(variation_index, 4)
-			)
-			or changed
-		)
-	if not changed:
-		return false
-	_upload_chunk_masks(
-		chunk,
-		1 << _cinematic_tunnel_layer_index
-	)
-	return true
-
-
-## Captures one layer exactly once before any temporary tunnel mutation.
-func _ensure_cinematic_tunnel_snapshot(chunk_index: int) -> bool:
-	if _cinematic_tunnel_snapshots.has(chunk_index):
-		return true
-	if (
-		not _active_chunks.has(chunk_index)
-		or _cinematic_tunnel_snapshots.size()
-			>= cinematic_snapshot_chunk_limit
-	):
-		return false
-	var chunk: TerrainChunkVisual = _active_chunks[chunk_index]
-	if (
-		_cinematic_tunnel_layer_index < 0
-		or _cinematic_tunnel_layer_index >= chunk.mask_images.size()
-	):
-		return false
-	var snapshot := CinematicLayerSnapshot.new()
-	snapshot.mask_image = chunk.mask_images[
-		_cinematic_tunnel_layer_index
-	].duplicate()
-	_cinematic_tunnel_snapshots[chunk_index] = snapshot
-	return true
-
-
-## Restores every temporary mask exactly; logical terrain was never mutated.
-func _restore_cinematic_tunnel_masks() -> void:
-	var layer_index := _cinematic_tunnel_layer_index
-	for chunk_index: int in _cinematic_tunnel_snapshots:
-		if not _active_chunks.has(chunk_index):
-			continue
-		var chunk: TerrainChunkVisual = _active_chunks[chunk_index]
-		if (
-			layer_index < 0
-			or layer_index >= chunk.mask_images.size()
-		):
-			continue
-		var snapshot: CinematicLayerSnapshot = (
-			_cinematic_tunnel_snapshots[chunk_index]
-		)
-		chunk.mask_images[layer_index] = snapshot.mask_image
-		_upload_chunk_masks(chunk, 1 << layer_index)
-	_cinematic_tunnel_snapshots.clear()
-	_cinematic_tunnel_layer_index = -1
-	_cinematic_tunnel_world_rect = Rect2()
-	_cinematic_tunnel_openings.clear()
-	_cinematic_tunnel_indent_count = 0
-	_clear_temporary_stamp_cache()
-
-
-## Fades the original strata back under the closing authored tunnel.
-func restore_cinematic_strata(duration: float) -> Tween:
-	if not _cinematic_transition_active:
-		return null
-	if (
-		_cinematic_layer_tween != null
-		and _cinematic_layer_tween.is_valid()
-	):
-		_cinematic_layer_tween.kill()
-	_cinematic_layer_tween = create_tween()
-	_cinematic_layer_tween.set_pause_mode(
-		Tween.TWEEN_PAUSE_PROCESS
-	)
-	_cinematic_layer_tween.set_parallel(true)
-	var has_sprite := false
-	for chunk: TerrainChunkVisual in _active_chunks.values():
-		for layer_index in range(chunk.layer_sprites.size()):
-			var sprite := chunk.layer_sprites[layer_index]
-			_restore_authored_layer_presentation(
-				sprite,
-				layer_index
-			)
-			has_sprite = true
-			_cinematic_layer_tween.tween_property(
-				sprite,
-				"modulate:a",
-				1.0,
-				maxf(duration, 0.01)
-			).set_trans(Tween.TRANS_SINE).set_ease(
-				Tween.EASE_IN_OUT
-			)
-	if not has_sprite:
-		_cinematic_layer_tween.tween_interval(maxf(duration, 0.01))
-	_cinematic_layer_tween.chain().tween_callback(
-		_finish_cinematic_strata_restore
-	)
-	return _cinematic_layer_tween
-
-
-## Immediately restores every terrain visual after an interrupted sequence.
-func cancel_cinematic_strata_transition() -> void:
-	if not _cinematic_transition_active:
-		return
-	if (
-		_cinematic_layer_tween != null
-		and _cinematic_layer_tween.is_valid()
-	):
-		_cinematic_layer_tween.kill()
-	for chunk: TerrainChunkVisual in _active_chunks.values():
-		for layer_index in range(chunk.layer_sprites.size()):
-			var sprite := chunk.layer_sprites[layer_index]
-			_restore_authored_layer_presentation(
-				sprite,
-				layer_index
-			)
-			sprite.modulate = Color.WHITE
-	_restore_cinematic_tunnel_masks()
-	_finish_cinematic_strata_restore()
-
-
 ## Finds the bottom lip where one layer's organic opening becomes solid again.
 func get_layer_opening_floor_support_screen_y(
 	screen_x: float,
@@ -1853,12 +1029,7 @@ func get_layer_opening_floor_support_screen_y(
 	layer_index: int
 ) -> float:
 	if (
-		# The derived entrance is presentation-only until the cinematic owns
-		# the miner. Returning no visual support keeps the physical landing on
-		# its already-authored grounding instead of seating it on a temporary
-		# oversized rim. Traversal queries begin only after commit.
-		_cinematic_impact_preparation != null
-		or layer_index < 0
+		layer_index < 0
 		or layer_index >= profile.get_layer_count()
 		or profile.mask_pixels_per_cell <= 0
 	):
@@ -2021,80 +1192,6 @@ func get_layer_opening_floor_support_screen_y(
 			- _current_view_y * cell_size
 		)
 	return NAN
-
-
-## Applies current hidden-layer and deep-palette state to loaded chunks.
-func _apply_cinematic_presentation_to_all_chunks() -> void:
-	for chunk: TerrainChunkVisual in _active_chunks.values():
-		for layer_index in range(chunk.layer_sprites.size()):
-			_apply_cinematic_presentation_to_layer(
-				chunk.layer_sprites[layer_index],
-				layer_index
-			)
-
-
-## Makes remaining back strata act as the new front-to-back stack.
-func _apply_cinematic_presentation_to_layer(
-	sprite: Sprite2D,
-	source_layer_index: int
-) -> void:
-	if source_layer_index < _cinematic_hidden_layer_count:
-		sprite.modulate.a = 0.0
-		return
-	var promoted_index := (
-		source_layer_index - _cinematic_hidden_layer_count
-	)
-	sprite.modulate.a = 1.0
-	sprite.z_index = profile.get_layer_z_index(promoted_index)
-	if sprite.material is ShaderMaterial:
-		var material := sprite.material as ShaderMaterial
-		material.set_shader_parameter(
-			&"layer_tint",
-			_get_cinematic_promoted_tint(
-				promoted_index,
-				source_layer_index
-			)
-		)
-
-
-## Chooses an authored deeper tint while retaining profile fallback colors.
-func _get_cinematic_promoted_tint(
-	promoted_index: int,
-	source_layer_index: int
-) -> Color:
-	# The normal four-layer tunnel must not recolor just because cinematic
-	# ownership began. Only strata behind gameplay's authored stack receive the
-	# deeper palette once they are promoted into the encounter room.
-	if source_layer_index < profile.get_gameplay_layer_count():
-		return profile.layer_tints[source_layer_index]
-	if promoted_index < _cinematic_deep_palette.size():
-		return _cinematic_deep_palette[promoted_index]
-	return profile.layer_tints[
-		clampi(source_layer_index, 0, profile.layer_tints.size() - 1)
-	]
-
-
-## Restores one streamed sprite's normal profile-owned tint and order.
-func _restore_authored_layer_presentation(
-	sprite: Sprite2D,
-	layer_index: int
-) -> void:
-	sprite.z_index = profile.get_layer_z_index(layer_index)
-	if sprite.material is ShaderMaterial:
-		var material := sprite.material as ShaderMaterial
-		material.set_shader_parameter(
-			&"layer_tint",
-			profile.layer_tints[layer_index]
-		)
-
-
-## Releases cinematic terrain ownership after a complete restore.
-func _finish_cinematic_strata_restore() -> void:
-	_restore_cinematic_tunnel_masks()
-	_cinematic_transition_active = false
-	_cinematic_hidden_layer_count = 0
-	_cinematic_deep_palette = PackedColorArray()
-	_cinematic_layer_tween = null
 
 
 ## Toggles a visual audit of logical openings with one debug keypress.
@@ -3052,6 +2149,53 @@ func _create_layer_material(
 	material.set_shader_parameter(
 		&"rock_detail_strength",
 		profile.layer_rock_detail_strengths[layer_index]
+	)
+	# Drawn rock scatter. One atlas is shared by every stratum; the palette and
+	# density change per layer so surface stones read tan and bedrock reads dark.
+	material.set_shader_parameter(&"rock_texture", profile.rock_texture)
+	material.set_shader_parameter(
+		&"use_rock_texture",
+		profile.rock_texture != null
+	)
+	material.set_shader_parameter(
+		&"rock_atlas_count",
+		profile.rock_atlas_count
+	)
+	material.set_shader_parameter(
+		&"rock_body_color",
+		profile.get_rock_body_color(layer_index)
+	)
+	material.set_shader_parameter(
+		&"rock_outline_color",
+		profile.get_rock_outline_color(layer_index)
+	)
+	material.set_shader_parameter(
+		&"rock_cluster_world_px",
+		profile.rock_cluster_world_px
+	)
+	material.set_shader_parameter(
+		&"rock_cluster_coverage",
+		profile.rock_cluster_coverage
+	)
+	material.set_shader_parameter(
+		&"rock_loner_scale",
+		profile.rock_loner_scale
+	)
+	material.set_shader_parameter(
+		&"rock_depth_ramp_world_px",
+		profile.rock_depth_ramp_world_px
+	)
+	material.set_shader_parameter(
+		&"rock_depth_ramp_gain",
+		profile.rock_depth_ramp_gain
+	)
+	material.set_shader_parameter(
+		&"use_rock_shadows",
+		profile.rock_shadows_enabled
+	)
+	material.set_shader_parameter(
+		&"rock_shadow_strength",
+		profile.rock_shadow_strength
 	)
 	material.set_shader_parameter(
 		&"fracture_shade_color",

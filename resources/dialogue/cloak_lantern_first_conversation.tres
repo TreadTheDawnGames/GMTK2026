@@ -14,10 +14,10 @@ script = ExtResource("2_participant")
 slot = &"cloak_lantern"
 display_name = "Lantern Keeper"
 
-[sub_resource type="Resource" id="Line_return"]
+[sub_resource type="Resource" id="Line_notice"]
 script = ExtResource("3_line")
 speaker_slot = &"cloak_lantern"
-text = "You kept digging. Then hear my warning clearly."
+text = "Another light descending into the dark..."
 
 [sub_resource type="Resource" id="Line_miner"]
 script = ExtResource("3_line")
@@ -27,15 +27,10 @@ text = "..."
 [sub_resource type="Resource" id="Line_thief"]
 script = ExtResource("3_line")
 speaker_slot = &"cloak_lantern"
-text = "The Thief is not a tale. The Thief waits far below."
-
-[sub_resource type="Resource" id="Line_warning"]
-script = ExtResource("3_line")
-speaker_slot = &"cloak_lantern"
-text = "Be certain before you keep digging."
+text = "If you seek the Thief, remember: not everything below wishes to be found."
 
 [resource]
 script = ExtResource("1_conversation")
-conversation_id = &"cloak_lantern_warning"
+conversation_id = &"cloak_lantern_first"
 participants = Array[ExtResource("2_participant")]([SubResource("Participant_miner"), SubResource("Participant_cloak_lantern")])
-lines = Array[ExtResource("3_line")]([SubResource("Line_return"), SubResource("Line_miner"), SubResource("Line_thief"), SubResource("Line_warning")])
+lines = Array[ExtResource("3_line")]([SubResource("Line_notice"), SubResource("Line_miner"), SubResource("Line_thief")])

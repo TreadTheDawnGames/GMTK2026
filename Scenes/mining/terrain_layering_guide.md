@@ -21,23 +21,61 @@ the pattern.
 
 ## Strata dirt texture
 
-Every stratum adds flat mottled dirt, sparse rounded rock inclusions, and deeper
+Every stratum adds flat mottled dirt, drawn rock clusters, and deeper
 sediment lines that stay continuous between streamed chunks. The default profile
 moves from broad surface variance through tighter, denser compacted rock to a
 dark back wall. Tune each layer's scale, detail color, variance, rock density,
 and rock strength in the `Strata Dirt Texture` section of the layer profile.
 Keep every array the same size as `Layer Tints`.
 
-The shader is one simple stack: a shared world-space dirt mottle, one rounded
-and independently rotated rock candidate per detail cell, then world-aligned
-sediment lines that fade in with depth. Surface and subsoil stay dirt-led, layer
-three deliberately spikes to dense fine gravel, and layer four returns to sparse
-coarse bedrock. The shared mottle and bedding scales make those different
-textures line up across exposed rims instead of restarting at each layer.
+The shader is one simple stack: a shared world-space dirt mottle, world-aligned
+sediment lines that fade in with depth, then the drawn rock scatter over the top.
+The shared mottle and bedding scales make those different textures line up across
+exposed rims instead of restarting at each layer.
 
 This is presentation-only, loop-free shader work: it creates no per-hit
 allocations and does not change terrain cells, depth, or collision. Disable the
 profile toggle to compare against the original flat strata.
+
+## Drawn rock clusters
+
+The rocks are hand-drawn art, not a procedural shape. `Assets/Terrain/drawn_rocks.png`
+is a horizontal atlas of 13 square cells, one rock each, centered inside
+transparent padding so a cell can be sampled without reaching its neighbor. Set
+`Rock Atlas Count` to match the number of cells if the sheet is ever redrawn.
+
+Placement runs three scatter passes over each stratum, near to far, and
+composites them back to front. Each pass owns a scaled and rotated copy of the
+layer's rock grid, so a pile is a mix of sizes rather than one repeated stone,
+and the passes behind the front one give up contrast into the dirt so a cluster
+has a front and a back. The near pass also prints its own displaced silhouette
+underneath itself as a contact shadow, which is what seats a pile on the ground
+instead of on top of it. Turn `Rock Shadows Enabled` off to buy that texture read
+back on the web build; it is the fourth and last one per pixel.
+
+Where rocks appear is a shared world-space cluster field, so all three passes fire
+in the same patches:
+
+- `Rock Cluster World Px` is how big a drift is, and `Rock Cluster Coverage` is
+  how much of the terrain the drifts cover. Coverage near 1.0 loses the
+  clustering entirely — the bare dirt between drifts is what makes a pile read
+  as a pile.
+- `Rock Loner Scale` is the presence multiplier outside every drift, which is
+  what leaves the occasional stone in otherwise clean dirt.
+- `Layer Rock Densities` climbs with each stratum and `Rock Depth Ramp World Px`
+  and `Rock Depth Ramp Gain` climb with distance below the ground line, so
+  topsoil stays readable and the deep run becomes visibly stonier.
+- `Layer Rock Body Colors` and `Layer Rock Outline Colors` keep the grayscale art
+  inside each stratum's palette: the drawn fill value shades the body tone and
+  the inked outline takes the layer's line color.
+
+Two invariants hold the placement together. A rock's rotated footprint always
+stays inside its own grid cell, which is why one atlas read per pass is enough
+and why a stone is never cut in half at a cell edge. And the cluster field is
+asked at a cell's center rather than at the fragment, so every pixel of one rock
+agrees about whether that rock exists. Rows of each grid are slid sideways by
+their own random amount and rock size is biased toward the small end — both exist
+only to stop the underlying lattice from being visible.
 
 ## Author hole masks
 
@@ -95,57 +133,25 @@ depth. Press F3 to overlay the logical openings when checking visual parity.
 Chunks outside the camera range are released. Their impact records remain and
 are replayed when the player returns to that depth.
 
-## Rat-cave entry points
+## Rat-colony encounter stage
 
-`Scenes/cinematics/layer_breakthrough_sequence.tscn` keeps follower entrances
-under `DestinationStage/ActorMarkers/RatEntryPoints`. Followers cycle those
-direct children in scene order. `OpenSideEntry` is the existing left opening;
-the three ceiling markers each punch one reversible small indent through the
-production terrain mask at the actor's existing strike-contact frame and reuse
-it for later followers. That same contact emits the shared impact event, keeping
-the mask change, smoke, particles, and shake synchronized.
+`Scenes/cinematics/rat_colony_encounter_stage.tscn` inherits the same
+`CharacterEncounterStage` used by every depth encounter. Rotini waits beside
+the miner, and the stage streams a bounded set of `rat_miner.tscn` actors
+across the already-open production chamber. It owns no terrain renderer,
+backdrop, collision, or extra stratum.
 
-`Scenes/cinematics/layer_cutscene_environment.tscn` owns the reusable tunnel
-stage. The normal gameplay fall is the entrance; the scene contains no
-synthetic walk or scripted-fall transition. Source indices `0..3` remain
-gameplay strata. Source index `4` and every deeper layer belong to the
-extensible cutscene destination/background stack.
+`resources/cinematics/rat_appearance_*.tres` pairs each follower color's idle
+and strike art. Strike contacts emit the inherited
+`presentation_strike_requested` signal, so `mining_scene_wiring.gd` reuses
+the normal dirt particles, smoke, and shake. Live followers are capped at seven
+(five on web), removed on exit, and all remaining followers are freed when the
+encounter closes or cancels.
 
-`PassageBounds` controls the opening held behind the miner before dialogue.
-Runtime centers its local `TopLeft`/`BottomRight` markers on the miner focus.
-`DestinationStage/TunnelBounds` expands that same reversible source-4
-snapshot after landing. `StageFloor`,
-`ActorMarkers`, and `ActionMarkers` are then grounded from the production mask.
-At least one deeper source layer must remain untouched as the visible backing.
-
-Place each breach marker at the center of the intended opening. Its
-`Behind Start Offset` must put the whole actor on the solid side, while its
-`Inside Offset` must put the actor root wholly inside the horizontal cave. The
-two offsets should form a readable path through the marker. Actors use the
-authored draw order between the promoted foreground and its backing until they
-reach the inside endpoint; only then do they join a front or back mining lane.
-For the current actor rig, `Behind Start Offset` `(-48, -18)` aligns its
-`StrikeAnchor` exactly with the marker while the foreground still occludes it.
-
-Set `Requires Breach` to false only for a route that is already visibly open.
-The shipped four markers spend three of the renderer's bounded cinematic-indent
-budget. Adding another breach requires rechecking that web exports still have
-enough indent capacity for every right-wall exit lane.
-
-`resources/cinematics/rat_appearance_*.tres` pairs every mouse color's idle and
-strike PNG so the sequence cannot mix colors during a hit. `Rat Appearances` on
-the breakthrough sequence cycles brown, grey, red, and white by spawn index.
-The actor switches to the paired strike frame during its existing contact clip;
-motion, terrain damage, and effects still use the shared choreography. Mouse
-imports are capped at 512 pixels because their authored canvases are much larger
-than their on-screen size, keeping web texture memory bounded.
-
-The tunnel stage does not retint source indices `0..3` while gameplay is
-visible. After the real fall, they are hidden together behind the focused iris.
-Only source index `4` and deeper cutscene strata receive `Deep Layer Palette`
-colors in the destination room. Add new encounter depth behind index `4`; do
-not increase the gameplay layer count unless gameplay gains another real
-terrain stratum.
+All encounter chambers use exactly the four gameplay strata. The fourth is the
+normal back wall; there is no promoted destination layer, deep palette, or
+temporary room mask. F3 continues to render logical cells over the visual masks
+for parity checks.
 
 ## Mining camera styles
 
@@ -229,15 +235,16 @@ reconstructs the same silhouette instead of rerolling it.
 The encounter's `Depth From Surface` is the room's solid floor. Terrain opens
 the configured chamber rows directly above it, but leaves the ceiling above
 that chamber mineable. A normal hit breaks through that ceiling, the miner
-falls through the authored opening, and only the landing on that floor starts
-the cutscene. Elapsed run time never moves or starts an encounter.
+falls through the authored opening, and crossing the ceiling threshold captures
+the cutscene even when a large combo skips beyond the floor. Elapsed run time
+never moves or starts an encounter.
 
 New tunnel cutscenes do not need terrain code. Duplicate a
 `DepthCharacterEncounter` resource, set its depth and story resources, and add
 it to the ordered `Encounters` array in
 `resources/encounters/depth_encounter_config.tres`. An optional
 `CharacterEncounterStage` adds custom movement and line cues; without one, the
-same physical landing opens the conversation directly.
+same ceiling crossing opens the conversation directly.
 
 ## Review earlier terrain
 

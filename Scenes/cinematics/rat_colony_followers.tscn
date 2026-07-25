@@ -1,0 +1,40 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://Scripts/cinematics/rat_colony_followers.gd" id="1_followers"]
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/rat_miner.tscn" id="2_rat"]
+[ext_resource type="Script" path="res://Scripts/cinematics/cinematic_rat_appearance.gd" id="3_appearance"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_brown.tres" id="4_brown"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_grey.tres" id="5_grey"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_white.tres" id="6_white"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_red.tres" id="7_red"]
+
+[node name="RatColonyFollowers" type="Node2D" node_paths=PackedStringArray("followers")]
+editor_description = "Persistent, presentation-only colony activated after Rotini's second encounter. Assign Follow Target to the production MinerRig when instanced."
+process_mode = 3
+z_index = 2
+script = ExtResource("1_followers")
+followers = Array[NodePath]([NodePath("Formation/RatLeftFar"), NodePath("Formation/RatLeftNear"), NodePath("Formation/RatRightNear"), NodePath("Formation/RatRightFar"), NodePath("Formation/RatRear")])
+rat_appearances = Array[ExtResource("3_appearance")]([ExtResource("4_brown"), ExtResource("5_grey"), ExtResource("6_white"), ExtResource("7_red")])
+
+[node name="Formation" type="Node2D" parent="."]
+editor_description = "Fixed five-actor growth bound. Runtime hides the rear pair on web builds."
+
+[node name="RatLeftFar" parent="Formation" instance=ExtResource("2_rat")]
+position = Vector2(-126, 40)
+z_index = 1
+
+[node name="RatLeftNear" parent="Formation" instance=ExtResource("2_rat")]
+position = Vector2(-76, 48)
+z_index = 3
+
+[node name="RatRightNear" parent="Formation" instance=ExtResource("2_rat")]
+position = Vector2(78, 48)
+z_index = 3
+
+[node name="RatRightFar" parent="Formation" instance=ExtResource("2_rat")]
+position = Vector2(128, 40)
+z_index = 1
+
+[node name="RatRear" parent="Formation" instance=ExtResource("2_rat")]
+position = Vector2(-20, 24)
+z_index = 0

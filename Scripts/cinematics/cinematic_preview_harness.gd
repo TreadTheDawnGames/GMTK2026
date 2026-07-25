@@ -13,12 +13,6 @@ extends Node
 
 const MINING_SCENE := preload("res://Scenes/mining/mining_proof.tscn")
 
-## Rows below the surface to drop the miner before firing a deep beat, so the
-## terrain around it has streamed exactly as it would in a real run.
-@export_range(0, 100_000, 10) var deep_beat_depth_rows: int = 400
-## Combo forced onto the breakthrough controller so the next hit qualifies.
-@export_range(1, 100, 1) var forced_breakthrough_combo: int = 1
-
 var _game_root: Node
 var _status: Label
 var _active_beat: StringName = &"intro"
@@ -37,7 +31,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_1:
 			_restart_with_beat(&"intro")
 		KEY_2:
-			_restart_with_beat(&"breakthrough")
+			_restart_with_beat(&"rat_colony")
 		KEY_3:
 			_restart_with_beat(&"encounter")
 		KEY_R:
@@ -71,9 +65,9 @@ func _restart_with_beat(beat: StringName) -> void:
 	match beat:
 		&"intro":
 			_set_status("Beat: surface arrival (playing)")
-		&"breakthrough":
+		&"rat_colony":
 			await _skip_run_intro()
-			await _play_breakthrough()
+			await _play_rat_colony_encounter()
 		&"encounter":
 			await _skip_run_intro()
 			await _play_depth_encounter()
@@ -121,41 +115,66 @@ func _skip_run_intro() -> void:
 	)
 
 
-## Arms the breakthrough and drives one qualifying hit through the real
-## controller, so the beat is entered exactly as gameplay would enter it.
-func _play_breakthrough() -> void:
-	var controller := _game_root.get_node_or_null(
-		"MiningScene/Systems/LayerBreakthroughController"
-	) as LayerBreakthroughController
-	var mining_controller := _game_root.get_node_or_null(
-		"MiningScene/Systems/MiningController"
-	) as MiningController
-	if controller == null or mining_controller == null:
-		_set_status("Could not find the breakthrough systems.")
+## Selects Rotini's colony resource, then crosses its real ceiling threshold.
+func _play_rat_colony_encounter() -> void:
+	var encounter := _get_encounter_controller()
+	if encounter == null:
+		_set_status("Could not find the encounter controller.")
 		return
-	_set_status("Beat: layer breakthrough (arming)")
-	controller.minimum_combo = forced_breakthrough_combo
-	_descend_to(deep_beat_depth_rows)
+	var encounter_index := _find_encounter_index(encounter, &"rutini_second")
+	if encounter_index < 0:
+		_set_status("Could not find Rotini's colony encounter.")
+		return
+	encounter._next_encounter_index = encounter_index
+	_set_status("Beat: rat colony tunnel (crossing ceiling)")
+	_descend_to(_get_encounter_ceiling(encounter, encounter_index))
 	await get_tree().process_frame
-	mining_controller.resolve_attempt(true, forced_breakthrough_combo, 1)
 	_set_status(
-		"Beat: layer breakthrough (playing) - R replays, 1 intro, 3 encounter"
+		"Beat: rat colony tunnel (playing) - R replays, 1 intro, 3 encounter"
 	)
 
 
 ## Drops the run to the first authored depth encounter and lets it fire.
 func _play_depth_encounter() -> void:
-	var encounter := _game_root.get_node_or_null(
-		"MiningScene/Systems/UpgradeEncounterController"
-	) as DepthEncounterController
+	var encounter := _get_encounter_controller()
 	if encounter == null:
 		_set_status("Could not find the encounter controller.")
 		return
 	_set_status("Beat: depth encounter (descending)")
-	_descend_to(deep_beat_depth_rows)
+	_descend_to(_get_encounter_ceiling(encounter, 0))
 	await get_tree().process_frame
 	_set_status(
-		"Beat: depth encounter (playing) - R replays, 1 intro, 2 breakthrough"
+		"Beat: depth encounter (playing) - R replays, 1 intro, 2 rat colony"
+	)
+
+
+func _get_encounter_controller() -> DepthEncounterController:
+	return _game_root.get_node_or_null(
+		"MiningScene/Systems/UpgradeEncounterController"
+	) as DepthEncounterController
+
+
+func _find_encounter_index(
+	controller: DepthEncounterController,
+	encounter_id: StringName
+) -> int:
+	for encounter_index in range(
+		controller.encounter_config.encounters.size()
+	):
+		var encounter := controller.encounter_config.encounters[encounter_index]
+		if encounter != null and encounter.encounter_id == encounter_id:
+			return encounter_index
+	return -1
+
+
+func _get_encounter_ceiling(
+	controller: DepthEncounterController,
+	encounter_index: int
+) -> int:
+	var encounter := controller.encounter_config.encounters[encounter_index]
+	return controller.encounter_config.get_encounter_ceiling_depth(
+		encounter,
+		controller.mining_config.total_run_depth
 	)
 
 
@@ -191,4 +210,4 @@ func _build_status_label() -> void:
 
 func _set_status(message: String) -> void:
 	if _status != null:
-		_status.text = "%s\n[1] intro  [2] breakthrough  [3] encounter  [R] replay  [Esc] quit" % message
+		_status.text = "%s\n[1] intro  [2] rat colony  [3] encounter  [R] replay  [Esc] quit" % message

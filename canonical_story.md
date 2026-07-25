@@ -38,8 +38,9 @@ beats without Jared or Zephan approving the narrative change.
 The target depths are the initial authored values, not permission to add time-based
 fallbacks. Playtests may tune depths to keep an ordinary run near 15 minutes, but
 must preserve the sequence. Any terrain refactor must retain a way to reserve the
-next encounter floor, mark the breakthrough hit, open its tunnel, and start the
-cutscene only after the player physically enters or lands in that tunnel.
+next encounter floor, open its tunnel, and capture the player when their mined
+depth crosses the tunnel ceiling. The comparison must tolerate one large hit
+skipping past the ceiling or floor; no exact impact target is required.
 
 The screenshots supplied by Jared establish story beats, not final dialogue.
 Placeholder language for the lantern-staff man and the Thief must not be invented

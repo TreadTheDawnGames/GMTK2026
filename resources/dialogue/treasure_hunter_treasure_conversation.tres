@@ -37,7 +37,7 @@ text = "I hope you find what you're looking for!"
 [sub_resource type="Resource" id="Line_pickaxe"]
 script = ExtResource("3_line")
 speaker_slot = &"treasure_hunter"
-text = "Here, I won't be needing this old pickaxe anymore. You take it."
+text = "Here, I don't need this pickaxe anymore. You take it—it'll help with your journey."
 
 [resource]
 script = ExtResource("1_conversation")

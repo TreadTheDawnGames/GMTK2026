@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="DialogueConversation" load_steps=13 format=3]
+[gd_resource type="Resource" script_class="DialogueConversation" load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
 [ext_resource type="Script" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
@@ -12,45 +12,36 @@ display_name = "Miner"
 [sub_resource type="Resource" id="Participant_rutini"]
 script = ExtResource("2_participant")
 slot = &"rutini"
-display_name = "Rutini the Rat"
+display_name = "Rotini"
 
-[sub_resource type="Resource" id="Line_why"]
+[sub_resource type="Resource" id="Line_again"]
 script = ExtResource("3_line")
 speaker_slot = &"rutini"
-text = "Sniffle, sniffle... Wow, why are you here?"
+text = "You again! Did you find a way through?"
 
 [sub_resource type="Resource" id="Line_miner_one"]
 script = ExtResource("3_line")
 speaker_slot = &"miner"
 text = "..."
 
-[sub_resource type="Resource" id="Line_mining"]
+[sub_resource type="Resource" id="Line_cafe"]
 script = ExtResource("3_line")
 speaker_slot = &"rutini"
-text = "Sniffle, sniffle... I've been mining for days. I can't get enough."
+text = "The Cheese Cafe is straight down? That's exactly where we're trying to go!"
 
-[sub_resource type="Resource" id="Line_thief"]
+[sub_resource type="Resource" id="Line_colony"]
 script = ExtResource("3_line")
 speaker_slot = &"rutini"
-text = "Are you headed to meet the Thief?"
-
-[sub_resource type="Resource" id="Line_miner_two"]
-script = ExtResource("3_line")
-speaker_slot = &"miner"
-text = "..."
-
-[sub_resource type="Resource" id="Line_party"]
-script = ExtResource("3_line")
-speaker_slot = &"rutini"
-text = "I've heard stories, but I'm headed another 10,000 to a party. Sniffle, sniffle."
+text = "Colony, we're joining the Miner! We'll mine straight down together."
 
 [sub_resource type="Resource" id="Line_later"]
 script = ExtResource("3_line")
 speaker_slot = &"rutini"
-text = "Well, catch you later! Keep the pickaxe the crew left behind."
+stage_cue = &"begin_colony_mining"
+text = "All paws ready! Let's dig!"
 
 [resource]
 script = ExtResource("1_conversation")
 conversation_id = &"rutini_second"
 participants = Array[ExtResource("2_participant")]([SubResource("Participant_miner"), SubResource("Participant_rutini")])
-lines = Array[ExtResource("3_line")]([SubResource("Line_why"), SubResource("Line_miner_one"), SubResource("Line_mining"), SubResource("Line_thief"), SubResource("Line_miner_two"), SubResource("Line_party"), SubResource("Line_later")])
+lines = Array[ExtResource("3_line")]([SubResource("Line_again"), SubResource("Line_miner_one"), SubResource("Line_cafe"), SubResource("Line_colony"), SubResource("Line_later")])

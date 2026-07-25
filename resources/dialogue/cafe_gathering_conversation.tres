@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="DialogueConversation" load_steps=17 format=3]
+[gd_resource type="Resource" script_class="DialogueConversation" load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
 [ext_resource type="Script" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
@@ -22,17 +22,12 @@ display_name = "Treasure Hunter"
 [sub_resource type="Resource" id="Participant_rutini"]
 script = ExtResource("2_participant")
 slot = &"rutini"
-display_name = "Rutini the Rat"
-
-[sub_resource type="Resource" id="Participant_moody_teen"]
-script = ExtResource("2_participant")
-slot = &"moody_teen"
-display_name = "Moody Teen"
+display_name = "Rotini"
 
 [sub_resource type="Resource" id="Participant_coffee_cat"]
 script = ExtResource("2_participant")
 slot = &"coffee_cat"
-display_name = "COFFEE CAT"
+display_name = "Quibble"
 
 [sub_resource type="Resource" id="Participant_cloak_lantern"]
 script = ExtResource("2_participant")
@@ -42,37 +37,28 @@ display_name = "Lantern Keeper"
 [sub_resource type="Resource" id="Line_cheese"]
 script = ExtResource("3_line")
 speaker_slot = &"cheese_girl"
-text = "The shop will have to wait. I'm heading back up."
+text = "You made it! Welcome to the Cheese Cafe!"
 
 [sub_resource type="Resource" id="Line_treasure"]
 script = ExtResource("3_line")
 speaker_slot = &"treasure_hunter"
-text = "I found what I came for. I'm finally going home."
+text = "Treasure found, friends gathered, and cheese on the table. What a day!"
 
 [sub_resource type="Resource" id="Line_rutini"]
 script = ExtResource("3_line")
 speaker_slot = &"rutini"
-text = "Come on, crew! Last rat out buys the cheese!"
-
-[sub_resource type="Resource" id="Line_teen"]
-script = ExtResource("3_line")
-speaker_slot = &"moody_teen"
-text = "..."
+text = "The whole colony made it! Digging together got us straight here."
 
 [sub_resource type="Resource" id="Line_coffee"]
 script = ExtResource("3_line")
 speaker_slot = &"coffee_cat"
-text = "ONE LAST COFFEE!!!"
+speaker_pose = &"hold_cup"
+text = "CAFE COFFEE!!! Best reward for a fast trip down!"
 
 [sub_resource type="Resource" id="Line_cloak"]
 script = ExtResource("3_line")
 speaker_slot = &"cloak_lantern"
-text = "I'm the last one. Keep digging and you won't meet anyone else."
-
-[sub_resource type="Resource" id="Line_miles"]
-script = ExtResource("3_line")
-speaker_slot = &"cloak_lantern"
-text = "Only miles of stone remain between you and the Thief. I can't stop you, but it is a fool's errand."
+text = "Enjoy this moment. On the road ahead, manage your time carefully. How you spend it matters."
 
 [sub_resource type="Resource" id="Line_miner"]
 script = ExtResource("3_line")
@@ -81,6 +67,6 @@ text = "..."
 
 [resource]
 script = ExtResource("1_conversation")
-conversation_id = &"cast_farewell"
-participants = Array[ExtResource("2_participant")]([SubResource("Participant_miner"), SubResource("Participant_cheese_girl"), SubResource("Participant_treasure_hunter"), SubResource("Participant_rutini"), SubResource("Participant_moody_teen"), SubResource("Participant_coffee_cat"), SubResource("Participant_cloak_lantern")])
-lines = Array[ExtResource("3_line")]([SubResource("Line_cheese"), SubResource("Line_treasure"), SubResource("Line_rutini"), SubResource("Line_teen"), SubResource("Line_coffee"), SubResource("Line_cloak"), SubResource("Line_miles"), SubResource("Line_miner")])
+conversation_id = &"cafe_gathering"
+participants = Array[ExtResource("2_participant")]([SubResource("Participant_miner"), SubResource("Participant_cheese_girl"), SubResource("Participant_treasure_hunter"), SubResource("Participant_rutini"), SubResource("Participant_coffee_cat"), SubResource("Participant_cloak_lantern")])
+lines = Array[ExtResource("3_line")]([SubResource("Line_cheese"), SubResource("Line_treasure"), SubResource("Line_rutini"), SubResource("Line_coffee"), SubResource("Line_cloak"), SubResource("Line_miner")])

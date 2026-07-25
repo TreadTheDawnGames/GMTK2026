@@ -225,6 +225,14 @@ func get_landing_foot_screen_x() -> float:
 	return landing_foot_anchor.global_position.x
 
 
+## Returns the authored sole position, so landing feedback spawns at his feet
+## rather than at the rig origin somewhere up his body.
+func get_landing_foot_screen_position() -> Vector2:
+	if not is_instance_valid(landing_foot_anchor):
+		return global_position
+	return landing_foot_anchor.global_position
+
+
 ## Reserves the visual root for a cutscene without moving gameplay position.
 func begin_cinematic_visual_override() -> bool:
 	if _cinematic_override_active or not is_instance_valid(visual_root):

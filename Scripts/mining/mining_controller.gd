@@ -335,6 +335,20 @@ func resolve_impact(
 			impact_cell_x
 		)
 	)
+	if terrain_manager.encounter_config != null:
+		var crossed_floor_depth := (
+			terrain_manager.encounter_config
+			.get_first_crossed_encounter_floor_depth(
+				fall_cell.y - config.initial_surface_row,
+				new_mining_position.y - config.initial_surface_row,
+				config.total_run_depth
+			)
+		)
+		if crossed_floor_depth >= 0:
+			new_mining_position.y = mini(
+				new_mining_position.y,
+				config.initial_surface_row + crossed_floor_depth
+			)
 	var new_mining_y: int = new_mining_position.y
 	var depth_gained := maxi(new_mining_y - _game_state.mining_y, 0)
 	_game_state.record_success(

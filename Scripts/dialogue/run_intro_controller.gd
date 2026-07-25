@@ -6,7 +6,7 @@ extends Node
 ## - The scene starts under the menu's black; the letterbox splits it apart from
 ##   the middle, and only then does the bus drive into frame.
 ## - The authored arrival sequence steps the miner off the bus, then pulls the
-##   bus away while he walks over; the attendant speaks once it is clear.
+##   bus away while he walks over and settles into the mining stance.
 ## - Only the letterbox and HUD change when control returns; the stop, its
 ##   attendant, and the dressed ground all stay standing behind the miner.
 ## - Every failure path still reveals the shot, so a black screen is never final.
@@ -16,9 +16,7 @@ const FLOW_OWNER: StringName = &"run_intro"
 const MINER_SPEAKER_SLOT: StringName = &"miner"
 
 @export_category("Content")
-@export var conversation: DialogueConversation
 @export var attendant_appearance: CharacterAppearance
-@export var attendant_speaker_slot: StringName = &"old_miner"
 
 @export_category("Animation")
 ## Held after the blackout splits open, before the bus enters, so the player
@@ -58,7 +56,7 @@ func _ready() -> void:
 	_play_intro.call_deferred()
 
 
-## Opens the inherited blackout, plays the arrival, then starts the conversation.
+## Opens the inherited blackout and plays the canonical bus-only arrival.
 func _play_intro() -> void:
 	dialogue_director.reveal_cinematic_frame_from_blackout()
 	await dialogue_director.wait_until_blackout_revealed()
@@ -74,46 +72,6 @@ func _play_intro() -> void:
 	await arrival_sequence.play_arrival()
 	if not _is_intro_active:
 		return
-	# The frame is held open so the bus can still leave after the last line.
-	if dialogue_director.start_conversation(conversation, true):
-		return
-	push_error("The run intro conversation could not start.")
-	_finish_intro()
-
-
-## Bounces whichever visible surface speaker owns the presented line.
-func _on_dialogue_line_presented(
-	conversation_id: StringName,
-	_line_index: int,
-	speaker_slot: StringName,
-	speaker_pose: StringName
-) -> void:
-	if (
-		not _is_intro_active
-		or conversation_id != conversation.conversation_id
-	):
-		return
-	_reset_speech_reactions()
-	if speaker_slot == attendant_speaker_slot:
-		if (
-			not speaker_pose.is_empty()
-			and attendant_presenter.has_pose(speaker_pose)
-		):
-			attendant_presenter.play_pose(speaker_pose)
-		attendant_presenter.react_to_presented_line()
-	elif speaker_slot == MINER_SPEAKER_SLOT:
-		miner_rig.react_to_presented_line()
-
-
-## Drops the letterbox and hands control back. The bus already left on arrival,
-## and the stop itself stays standing behind the miner.
-func _on_conversation_finished(conversation_id: StringName) -> void:
-	if (
-		not _is_intro_active
-		or conversation_id != conversation.conversation_id
-	):
-		return
-	_reset_speech_reactions()
 	# End the shot with the miner planting into his dig stance while the
 	# letterbox is still on. Gameplay draw order goes back on that same beat, so
 	# the foreground stratum closing over his legs reads as him settling in
@@ -155,8 +113,7 @@ func _reset_speech_reactions() -> void:
 
 func _has_complete_references() -> bool:
 	return (
-		conversation != null
-		and attendant_appearance != null
+		attendant_appearance != null
 		and dialogue_director != null
 		and arrival_sequence != null
 		and attendant_presenter != null

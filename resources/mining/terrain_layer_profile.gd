@@ -14,10 +14,8 @@ extends Resource
 	Color("d9a066"),
 	Color("df7126"),
 	Color("8f563b"),
-	Color("30282c"),
-	Color("242027"),
 ])
-## Keeps ordinary impacts on the original strata; later layers are cinematic.
+## Every authored stratum belongs to normal gameplay and encounter tunnels.
 @export_range(1, 16, 1) var gameplay_layer_count: int = 4
 ## Supplies optional seamless artwork for each stratum.
 @export var layer_fill_textures: Array[Texture2D] = []
@@ -27,8 +25,6 @@ extends Resource
 	0,
 	-1,
 	-2,
-	-3,
-	-4,
 ])
 ## Sets mask detail independently from gameplay-cell and screen size.
 @export_range(1, 8, 1) var mask_pixels_per_cell: int = 4
@@ -43,40 +39,74 @@ extends Resource
 	48.0,
 	32.0,
 	72.0,
-	56.0,
-	64.0,
 ])
 @export var layer_dirt_detail_colors: PackedColorArray = PackedColorArray([
 	Color(0.25, 0.19, 0.15, 0.69),
 	Color(0.20, 0.15, 0.11, 0.66),
 	Color(0.15, 0.11, 0.09, 0.66),
 	Color(0.09, 0.07, 0.07, 0.82),
-	Color(0.08, 0.06, 0.07, 0.84),
-	Color(0.06, 0.045, 0.055, 0.86),
 ])
 @export var layer_dirt_variance_strengths: PackedFloat32Array = PackedFloat32Array([
 	0.16,
 	0.15,
 	0.14,
 	0.10,
-	0.12,
-	0.10,
 ])
+## Probability that one scatter cell holds a rock inside a cluster, before the
+## depth ramp. Deeper strata carry more, so an exposed rim shows the ground
+## getting stonier the further back it goes.
 @export var layer_rock_densities: PackedFloat32Array = PackedFloat32Array([
-	0.12,
-	0.22,
-	0.45,
-	0.14,
-	0.28,
-	0.22,
+	0.13,
+	0.26,
+	0.44,
+	0.58,
 ])
 @export var layer_rock_detail_strengths: PackedFloat32Array = PackedFloat32Array([
 	0.45,
 	0.50,
 	0.55,
 	0.40,
-	0.52,
-	0.48,
+])
+
+@export_category("Drawn Rocks")
+## Horizontal atlas of hand-drawn rocks, one per square cell, each centered
+## inside transparent padding so the shader can sample a cell without reaching
+## its neighbor. Clearing this leaves the strata as dirt and bedding only.
+@export var rock_texture: Texture2D
+@export_range(1, 64, 1) var rock_atlas_count: int = 13
+## World period of the field that decides where clusters sit, and how much of the
+## terrain those clusters cover. The bare dirt between drifts is what makes a
+## pile read as a pile, so coverage near 1.0 loses the clustering entirely.
+@export_range(32.0, 512.0, 1.0) var rock_cluster_world_px: float = 176.0
+@export_range(0.0, 1.0, 0.01) var rock_cluster_coverage: float = 0.5
+## Presence multiplier for a scatter cell outside every cluster, which is what
+## leaves the occasional loner in otherwise clean dirt.
+@export_range(0.0, 1.0, 0.01) var rock_loner_scale: float = 0.15
+## Rock presence also climbs with distance below the original ground line, so
+## topsoil stays readable and the deep run becomes visibly stonier. The ramp
+## reaches its full gain this far below the surface.
+@export_range(64.0, 20_000.0, 10.0) var rock_depth_ramp_world_px: float = 2600.0
+@export_range(1.0, 6.0, 0.1) var rock_depth_ramp_gain: float = 2.4
+## Prints each near rock's own displaced silhouette underneath it, so a cluster
+## sits on the dirt instead of on top of it. This is the shader's fourth and last
+## atlas read per pixel; turn it off to buy that sample back on the web build.
+@export var rock_shadows_enabled: bool = true
+@export_range(0.0, 1.0, 0.01) var rock_shadow_strength: float = 0.45
+## Stone body tone per stratum, before the drawn fill value and the overhead
+## light shade it. Surface rocks stay in the tan palette and bedrock goes dark.
+@export var layer_rock_body_colors: PackedColorArray = PackedColorArray([
+	Color(0.60, 0.55, 0.48),
+	Color(0.47, 0.42, 0.37),
+	Color(0.35, 0.31, 0.28),
+	Color(0.24, 0.22, 0.21),
+])
+## Ink tone per stratum for the drawn outline, matching the darker line the
+## characters are drawn inside.
+@export var layer_rock_outline_colors: PackedColorArray = PackedColorArray([
+	Color(0.13, 0.10, 0.08),
+	Color(0.10, 0.08, 0.07),
+	Color(0.07, 0.06, 0.05),
+	Color(0.05, 0.04, 0.04),
 ])
 
 ## Flat shading bands the dirt variation is quantised into, matching the hard
@@ -132,8 +162,6 @@ extends Resource
 	Vector2.ZERO,
 	Vector2.ZERO,
 	Vector2.ZERO,
-	Vector2.ZERO,
-	Vector2.ZERO,
 ])
 ## Shrinks each deeper silhouette to read as one fracture traveling inward.
 @export var layer_impact_scales: PackedFloat32Array = PackedFloat32Array([
@@ -141,8 +169,6 @@ extends Resource
 	0.95,
 	0.80,
 	0.70,
-	0.64,
-	0.58,
 ])
 ## Keeps the deepest stratum as a solid back wall behind mined openings.
 @export var keep_back_layer_solid: bool = true
@@ -181,8 +207,6 @@ extends Resource
 	Color("d9a066"),
 	Color("df7126"),
 	Color("8f563b"),
-	Color("392e46"),
-	Color("242027"),
 ])
 
 
@@ -204,6 +228,26 @@ func get_fill_texture(layer_index: int) -> Texture2D:
 	):
 		return null
 	return layer_fill_textures[layer_index]
+
+
+## Returns one stratum's drawn-rock body tone.
+func get_rock_body_color(layer_index: int) -> Color:
+	if (
+		layer_index < 0
+		or layer_index >= layer_rock_body_colors.size()
+	):
+		return Color(0.44, 0.37, 0.31)
+	return layer_rock_body_colors[layer_index]
+
+
+## Returns one stratum's drawn-rock outline tone.
+func get_rock_outline_color(layer_index: int) -> Color:
+	if (
+		layer_index < 0
+		or layer_index >= layer_rock_outline_colors.size()
+	):
+		return Color(0.10, 0.08, 0.07)
+	return layer_rock_outline_colors[layer_index]
 
 
 ## Returns one layer's draw order relative to the miner.

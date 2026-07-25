@@ -1,8 +1,7 @@
 # Cinematic Authoring Guide
 
-The mining scene has three concrete cinematic forms: the surface arrival that
-opens every run, framed character conversations, and the one-time layer
-breakthrough. Story text remains in `DialogueConversation` resources. Movement,
+The mining scene has two cinematic forms: the surface arrival that opens every
+run and framed character conversations inside authored terrain tunnels. Story text remains in `DialogueConversation` resources. Movement,
 layer timing, rat count, and stage composition remain editable in Godot scenes.
 
 ## Surface arrival (run intro)
@@ -130,8 +129,9 @@ that; neither is part of the game.
 
 ### Seeing the terrain in the editor
 
-Open `layer_cutscene_environment.tscn` or `arrival_intro.tscn` and the real
-terrain is already there. There is no drawn approximation to drift: the
+Open `character_encounter_stage.tscn`, any scene that inherits it such as
+`rat_colony_encounter_stage.tscn`, or `arrival_intro.tscn`, and the real terrain
+is already there. There is no drawn approximation to drift: the
 `EditorTerrainPreview` branch holds a production `TerrainManager` and
 `TerrainLayerRenderer`, so the editor runs the same renderer, shader, profile
 colours and hole masks the game runs. If the terrain looks wrong in the editor,
@@ -141,31 +141,47 @@ it is wrong in the game.
 through `Preview In Editor`. Only these preview instances set it, so opening
 the mining scene stays instant.
 
+The preview lives on the **base** encounter stage, so every concrete stage
+inherits it. Its node is offset by `(-576, -260)` to put the terrain's mining
+face on the stage's own origin, which is where the stage sits at runtime — so a
+marker authored at `y = 0` is on the dig line.
+
 On `EditorTerrainPreview`:
 
-- `Preview Depth Rows` is how far below the surface this cutscene plays. The
-  breakthrough stage uses 400, the arrival uses 0 so it sits on the surface
-  with its grass and crust.
-- `Preview Combo` is the combo the test hits resolve at. Above the renderer's
-  `Deepest Layer Combo Threshold` the openings expose the deep backdrop, which
-  is what a breakthrough-qualifying hit does.
+- `Preview Depth Rows` is how far below the surface the preview sits.
+- `Preview Combo` is the combo used by its test impacts.
+
+### Changing the look and watching it update
+
+Edit `default_terrain_layer_profile.tres` in the Inspector — strata tints, dirt
+detail, rock density, grass, crust, fracture strength — and the previewed rock
+recolours immediately. The preview listens to the profile's and the config's
+`changed` signal, so any authored value is a live one. Editing
+`terrain_layer.gdshader` and saving reloads it the same way.
+
+These are the real production resources, so what you tune in the editor is what
+ships. There is no preview-only copy to keep in sync.
 
 ### Breaking the terrain in the editor
 
-Every `Marker2D` under `EditorTerrainPreview/TestImpacts` is dug with a real
-`dig_tunnel` call against real cells — not a hole drawn to look like one. Drag
-one and the opening follows it live; duplicate it for more openings; delete it
-and the rock heals. Moving a marker rebuilds from intact terrain, so openings
-never pile up behind you.
+Two ways, and both dig through the production `TerrainManager` against real
+cells — never a hole drawn to look like one.
 
-The whole branch sits at `z_index -100` and **frees itself the moment the game
-runs**, so no second terrain stack ever reaches a player. That is asserted by
-`local_tests/verify_cutscene_terrain_preview.gd`. Nothing may read from it at
-runtime; it owns no state.
+**Click.** Enable the addon's **Dig Terrain** toggle in the 2D viewport toolbar
+(it appears only in a scene that has a preview). Left-click the rock to dig;
+**Alt-click** an opening to heal it. Each click adds or removes an authored
+`Marker2D`, so the dug state shows in the Scene dock and saves with the scene.
+Switch the toggle off to get normal selection and dragging back.
 
-Run `local_tests/capture_cutscene_terrain_preview.gd` with
-`--rendering-driver opengl3` to render the preview to PNG and check it by eye
-without opening a Godot window.
+**Drag.** Every `Marker2D` under `EditorTerrainPreview/TestImpacts` is an
+opening. Drag one and it follows live; duplicate it for more; delete it and the
+rock heals. Moving a marker rebuilds from intact terrain, so openings never pile
+up behind you.
+
+The whole branch sits at `z_index -100` and **frees itself before a running game
+can pay for it** — in `_enter_tree`, because Godot readies children first and by
+`_ready` its terrain stack would already have streamed a full chunk set. Nothing
+may read from it at runtime; it owns no state.
 
 ### Playing one beat in isolation
 
@@ -173,12 +189,12 @@ Open `Scenes/cinematics/cinematic_preview.tscn` and run it (F6). It boots the
 real mining scene and jumps straight to a beat, so a sequence can be watched end
 to end without playing up to its trigger:
 
-- `1` surface arrival, `2` layer breakthrough, `3` depth encounter
+- `1` surface arrival, `2` rat colony tunnel, `3` first depth encounter
 - `R` replays the current beat from a freshly rebuilt scene
 - `Esc` quits
 
-It only drives triggers — it arms the real controller and feeds it a qualifying
-hit rather than faking a sequence's internals. That is deliberate: if a beat
+It only drives triggers — it crosses the selected encounter's real ceiling
+threshold rather than faking a sequence's internals. That is deliberate: if a beat
 misbehaves in the preview it misbehaves in the game, so the harness can never
 give a false pass.
 
@@ -189,8 +205,7 @@ dialogue box. Dialogue advancement and story resources remain independent from
 the box presentation.
 
 Every visible speaker needs a `SpeechReaction` targeting only their visual
-root. The miner keeps a separate `CinematicFocusAnchor` for the breakthrough
-iris; dialogue no longer draws or registers speaker anchors. Do not connect
+root. Dialogue does not draw or register speaker anchors. Do not connect
 dialogue signals in the scene editor; cross-system routes belong in
 `Scripts/mining/mining_scene_wiring.gd`.
 
@@ -200,98 +215,27 @@ owner of timing-window visibility, queued-swing gating, and encounter-camera
 focus. A sequence must claim it before starting and release the same named
 owner only after its last visual has restored.
 
-## Layer breakthrough
+## In-world tunnel encounters
 
-Open `Scenes/cinematics/layer_cutscene_environment.tscn` for the reusable
-tunnel stage. Open
-`Scenes/cinematics/layer_breakthrough_sequence.tscn` only for the concrete
-mouse encounter layered on top of that environment.
+Every depth cutscene is a `DepthCharacterEncounter` in the ordered encounter
+config. Its depth is the solid chamber floor; the shared chamber height derives
+its ceiling. `DepthEncounterController` captures the encounter as soon as the
+run crosses that ceiling. Compare with `>=`, never equality: a large combo may
+skip the ceiling and floor in one hit and must still transition.
 
-- The qualifying hit's regular terrain stamp is the entry point between the
-  first layers. Cinematic expansion recenters that retained stamp behind the
-  miner horizontally, raises its visible mask so the miner reads at bottom
-  center, and adds symmetric side clearance; it does not draw a second portal.
-- `LayerCutsceneEnvironment` owns reversible miner/terrain presentation,
-  stage opening, floor grounding, and restoration. It emits
-  `stage_ready`, `restored`, or `failed`; the concrete sequence still owns
-  story beats, actors, and dialogue.
-- A concrete coordinator calls `prepare_entrance_impact()` synchronously when
-  the qualifying hit resolves. This expands and reserves that exact stamp
-  before letterboxing; cancelling before landing restores its original mask,
-  geometry, and chunk history.
-- On physical landing the coordinator calls `prepare_environment()`. This
-  commits the already-prepared opening without stamping again. After the
-  discovery beat, `open_environment_stage()` promotes the destination
-  immediately behind the focused iris. Finish with
-  `restore_environment()` or interrupt with `cancel_environment()`.
-- The normal gameplay fall is the only entrance motion. The environment has no
-  walk-through-layers mode, scripted second fall, or per-layer pass nodes.
-- Source indices `0..3` remain gameplay strata. Source index `4` is promoted
-  as the first cutscene destination, and one deeper stratum stays untouched as
-  the visible backing.
-- `PassageBounds/TopLeft` and `BottomRight` author the centered reversible
-  source-4 passage. Runtime moves the `PassageBounds` root to the miner focus;
-  the default local bounds are `(-96,-96)` through `(96,96)`.
-- `DestinationStage/TunnelBounds` sizes the temporary room.
-  `TerrainLayerRenderer` expands the prepared passage into that room with the
-  same production-mask snapshots; the environment contains no replacement
-  terrain artwork or collision.
-- `DestinationStage/StageFloor` authors the miner's stage x position; runtime
-  samples and assigns y from the production mask, then places the already-landed
-  miner there without another tween. Add concrete actor positions
-  beneath `DestinationStage/ActorMarkers` and interaction targets beneath
-  `DestinationStage/ActionMarkers` so the reusable environment grounds them
-  with the stage.
-- Concrete choreography should query `get_cutscene_room_screen_rect()` or
-  `get_stage_motion_bounds()` and use `ground_stage_marker()` for additional
-  authored markers. Do not duplicate terrain-floor sampling in an actor
-  controller.
-- `stage_ready` emits only after the room has expanded, marker roots have been
-  grounded, and the miner reaches `DestinationStage/StageFloor`. The concrete
-  sequence then waits for the iris to open before its lead actor enters. The
-  miner response focuses the same iris for restoration; control returns only
-  after it opens and the bars leave.
-- `RatSpawnAnchor` and `RatExitAnchor` author the offscreen entrance and exit.
-  Only the exit marker's x coordinate is used; keep it beyond the right
-  viewport edge so the complete mouse mines out of frame before cleanup.
-  Repeated `MiningTargets` author distinct wall indents; each target controls
-  its floor offset, jump height, front/behind plane, and strike count. A target
-  with `Jump Height` of zero is reachable on foot, so a mouse that has just
-  landed runs to it instead of arcing — that is what makes `LowFrontIndent` the
-  lane that reads as "hit the ground and ran off".
-- `RatEntryPoints` are the cave's ways in, cycled in child order. `OpenSideEntry`
-  needs no breach: mice simply run in along the floor from off the left edge.
-  The three `*BackWallBreach` markers are holes struck through the backing wall
-  at staggered heights; a mouse pops out of the hole it just opened and falls to
-  the floor on a real parabola (`Wall Pop Rise` is only how far it rises first —
-  the descent always accelerates), then holds a landing squash for
-  `Land Recovery Seconds` before its owner sends it anywhere.
+The chamber is carved by `TerrainManager` and rendered by the normal
+`TerrainLayerRenderer`. There are exactly four gameplay strata. Encounter
+stages may add actors, props, movement, and line cues, but they must not add a
+second terrain renderer, custom room artwork, promoted layers, or collision.
 
-Live follower cap, web cap, spawn spacing, run durations, strike cadence,
-indent size, draw planes, exit time, and response pause are Inspector
-properties on the sequence root. Spawning starts with the rat warning,
-continues through the miner response, and repeats as actors leave; finishing
-the response stops new spawns and lets every live rat mine fully offscreen
-before restoration. `Lead Rat Appearance` is Rutini's own paired art and is
-deliberately held out of `Rat Appearances`, which cycles the three follower
-colors by spawn index, so the speaking lead never shares a color with the crowd.
-`Follower Spawn Interval` paces arrivals into a trickle; short values let the
-cast fill to its cap in one burst and then re-burst as a group exits together. Each resource keeps its idle and hit PNG together, while the actor
-rig retains movement and strike anchors. `ActorSpriteView` remains an optional
-future sprite-sheet seam; leaving its pose set empty preserves the paired PNG
-behavior used by the shipped mice.
-The lead rat's warning and miner's response are separate resources under
-`resources/dialogue/`, so text changes do not require script edits.
+Use `Scenes/cinematics/character_encounter_stage.tscn` for ordinary cast
+movement. Rotini's colony uses
+`Scenes/cinematics/rat_colony_encounter_stage.tscn`: the waiting presenter is
+the lead rat beside the miner, while a bounded stream of reusable mouse actors
+runs, mines, and exits through the same tunnel. Their strike contacts use
+`presentation_strike_requested`, which the central mining wiring routes to the
+normal dirt particles, smoke, and shake.
 
-The breakthrough is presentation-only. Never move `MinerRig`'s gameplay root,
-change `RunState`, or add a second collision model for the deeper tunnel.
-Cancellation must restore promoted terrain layers, the miner visual root,
-camera focus, letterbox state, and the timing/swing gate.
-
-The only trigger is a hit at or above `Minimum Combo` whose resulting run depth
-has reached at least `Minimum Run Depth` rows (combo 8 and depth 400 in the
-shipped scene). The layer controller is intentionally the first
-`depth_changed` subscriber in `mining_scene_wiring.gd`, so it can prepare the
-qualifying hit before a regular encounter claims the flow. There is no
-alternate depth-only trigger: missing the combo leaves regular depth encounters
-unchanged.
+A stage must release every transient actor on closing and cancellation.
+`MiningCinematicFlow` remains the sole owner of mining input, HUD visibility,
+and camera focus.

@@ -35,8 +35,7 @@ extends Node2D
 	set(value):
 		preview_depth_rows = value
 		_request_rebuild()
-## Combo the test hits resolve at. Above the renderer's threshold this exposes
-## the deep backdrop, which is what a breakthrough-qualifying hit does.
+## Combo the test hits resolve at through the normal four-layer reveal policy.
 @export_range(1, 100, 1) var preview_combo: int = 8:
 	set(value):
 		preview_combo = value
@@ -50,14 +49,26 @@ var _tracked_impact_positions: PackedVector2Array = PackedVector2Array()
 var _rebuild_countdown: float = -1.0
 
 
-## Builds the preview in the editor and disappears entirely in a running game.
+## Disappears before a running game can pay for it. This has to happen in
+## _enter_tree, not _ready: Godot readies children first, so by the preview's
+## own _ready its TerrainManager and TerrainLayerRenderer have already streamed
+## a full chunk set the player will never see. Freeing them here is the only
+## moment that second terrain stack can be stopped from existing at all.
+func _enter_tree() -> void:
+	if Engine.is_editor_hint() or not remove_in_running_game:
+		return
+	for child in get_children():
+		remove_child(child)
+		child.free()
+	queue_free()
+
+
+## Builds the preview in the editor.
 func _ready() -> void:
 	if not Engine.is_editor_hint() and remove_in_running_game:
-		# A second terrain stack must never reach the player. Freeing beats
-		# hiding: it also drops the chunk images this would otherwise retain.
-		queue_free()
 		return
 	set_process(true)
+	_watch_authored_resources()
 	build_preview.call_deferred()
 
 
@@ -105,6 +116,64 @@ func _request_rebuild() -> void:
 	if not Engine.is_editor_hint() or not is_inside_tree():
 		return
 	_rebuild_countdown = _REBUILD_DELAY_SECONDS
+
+
+## Rebuilds whenever the authored look changes, so editing a stratum tint, a
+## rock density, or the grass in the Inspector recolours the rock immediately
+## instead of after a reload. Resource emits `changed` on every such edit.
+func _watch_authored_resources() -> void:
+	for resource: Resource in [
+		terrain_renderer.profile if is_instance_valid(terrain_renderer) else null,
+		terrain_manager.config if is_instance_valid(terrain_manager) else null,
+	]:
+		if resource != null and not resource.changed.is_connected(_request_rebuild):
+			resource.changed.connect(_request_rebuild)
+
+
+## Digs one real hit at a world position and keeps it, so a click in the editor
+## viewport leaves an opening that survives the next rebuild. The marker is
+## added under test_impacts_root and owned by the edited scene, which is what
+## makes the dug state save with the cutscene instead of vanishing on reload.
+func dig_at_world_position(world_position: Vector2) -> bool:
+	if not get_preview_error().is_empty():
+		return false
+	if not is_instance_valid(test_impacts_root):
+		return false
+	var marker := Marker2D.new()
+	marker.name = "Impact"
+	test_impacts_root.add_child(marker)
+	marker.global_position = world_position
+	# Without an owner the editor neither shows the marker nor saves it.
+	var scene_root := get_tree().edited_scene_root
+	marker.owner = scene_root if scene_root != null else owner
+	build_preview()
+	return true
+
+
+## Removes the authored impact nearest a world position, so a click can heal
+## rock as well as break it. Returns false when nothing is close enough.
+func heal_nearest_impact(
+	world_position: Vector2,
+	radius: float
+) -> bool:
+	if not is_instance_valid(test_impacts_root):
+		return false
+	var closest: Marker2D
+	var closest_distance := radius
+	for child in test_impacts_root.get_children():
+		var marker := child as Marker2D
+		if marker == null:
+			continue
+		var distance := marker.global_position.distance_to(world_position)
+		if distance <= closest_distance:
+			closest_distance = distance
+			closest = marker
+	if closest == null:
+		return false
+	test_impacts_root.remove_child(closest)
+	closest.queue_free()
+	build_preview()
+	return true
 
 
 ## Restreams intact terrain at the authored depth, then breaks it again at

@@ -2,15 +2,14 @@
 
 [ext_resource type="Script" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
 [ext_resource type="Resource" path="res://resources/encounters/cloak_lantern_character_appearance.tres" id="2_appearance"]
-[ext_resource type="Resource" path="res://resources/dialogue/cast_farewell_conversation.tres" id="3_dialogue"]
+[ext_resource type="Resource" path="res://resources/dialogue/cafe_gathering_conversation.tres" id="3_dialogue"]
 
 [resource]
 script = ExtResource("1_encounter")
-encounter_id = &"cast_farewell"
+encounter_id = &"cafe_gathering"
 actor_id = &"cloak_lantern"
-is_farewell = true
-depth_from_surface = 84000
+gathers_cast = true
+depth_from_surface = 14000
 appearance = ExtResource("2_appearance")
 conversation = ExtResource("3_dialogue")
 speaker_slot = &"cloak_lantern"
-opens_right_exit = true

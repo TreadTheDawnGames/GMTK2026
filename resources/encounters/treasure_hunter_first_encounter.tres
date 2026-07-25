@@ -10,7 +10,7 @@
 script = ExtResource("1_encounter")
 encounter_id = &"treasure_hunter_first"
 actor_id = &"treasure_hunter"
-depth_from_surface = 6000
+depth_from_surface = 2500
 appearance = ExtResource("2_appearance")
 conversation = ExtResource("3_dialogue")
 stage_scene = ExtResource("5_stage")

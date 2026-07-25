@@ -55,15 +55,18 @@ Each `DepthCharacterEncounter` assigns:
 - an optional `CharacterEncounterStage` scene;
 - the character's participant slot for speech animation;
 - an optional pickaxe reward appended to the cumulative run stack.
+- canonical story-effect flags for Quibble's coffee speed boost, Rotini's
+  colony support, the cafe cast gathering, and the post-credit gate.
 
-Pickaxe gifts never replace earlier tools. Every owned definition continues
+The Treasure Hunter's two distinct pickaxe gifts never replace earlier tools.
+Every owned definition continues
 to contribute mining modifiers and special effects. The newest gift controls
 only the visible tool tint. Each definition also authors a combo threshold
 and target-scene collection; reaching that combo adds one extra target from
 that pickaxe until the streak ends.
 
 Enable `Occurs At Run Bottom` only for the thief. That places the encounter at
-zero remaining depth for any configured run length. The thief uses
+zero remaining depth for the authored 100,000-depth run. The thief uses
 `thief_encrypted_dialogue.tres`. Its empty ciphertext keeps the ending
 unwritten until the story is ready.
 
@@ -77,26 +80,35 @@ the thief is speaking. The command overwrites only the encrypted resource;
 plain text is never written to a project file. Reopen the editor after running
 it so Godot reloads the ciphertext.
 
-The current authored order keeps every reward before the late solo descent:
+The approved canonical story order is:
 
-- Cheese Girl at 1,000;
-- Treasure Hunter's first visit at 6,000;
-- Rutini's first visit at 11,000;
-- Treasure Hunter's second visit at 16,000;
-- Moody Teen at 25,000;
-- Rutini's second visit at 35,000;
-- Treasure Hunter's discovery at 47,000;
-- COFFEE CAT at 61,000;
-- Cloak/Lantern warning at 76,000;
-- the full cast farewell at 84,000;
-- the thief at 100,000, which is zero remaining depth.
+- the bus opening at depth 0;
+- Cheese Girl at 600, pointing straight down to the cafe near 14,000;
+- the lantern-staff man's cryptic first warning at 1,400;
+- the Treasure Hunter's introduction and first improved pickaxe at 2,500;
+- Rotini's introduction at 4,000;
+- the lantern-staff man's clearer Thief warning at 5,600;
+- the Treasure Hunter's discovery and second distinct pickaxe at 7,400;
+- Quibble's cafe-bound introduction and coffee speed boost at 9,200;
+- Rotini's colony joining the downward dig at 11,200;
+- the happy cafe gathering and time-management foreshadowing at 14,000;
+- gameplay credits beginning at 15,000 while digging remains enabled;
+- the post-credit lantern message at 15,200;
+- the intentionally unwritten Thief encounter at 100,000.
+
+The `rutini_*` and `coffee_cat_*` filenames and stable actor IDs are legacy
+resource aliases for Rotini and Quibble. Their player-facing names are
+canonical. Moody Teen and the extra Treasure Hunter visit remain inactive
+legacy resources and must not be added to the schedule without narrative
+approval.
 
 To add a cutscene, duplicate one encounter `.tres`, assign its depth,
 conversation, appearance, and optional stage, then insert it into `Encounters`
 in strictly increasing depth order. That one entry makes terrain carve the
-tunnel above its floor and makes the matching landing start the cutscene.
+tunnel above its floor and makes crossing its ceiling start the cutscene.
+Threshold crossing uses `>=`, so one large hit cannot skip an encounter.
 Reusing an `Actor Id` and appearance keeps a returning character visually
-consistent while allowing a new conversation and reward.
+consistent while allowing a new conversation or approved reward.
 
 `Chamber Height Rows` controls the open fall immediately above each floor.
 `Chamber Width Cells` controls the centered opening between the side walls.
@@ -108,11 +120,13 @@ fall through the newly opened chamber and land on its authored floor before
 framing, stage motion, or dialogue begins. Finishing a conversation stacks its
 reward and advances the single ordered schedule.
 
-Character chambers are intentionally only 24 terrain rows tall. The farewell
-is marked explicitly with `Is Farewell`; it is not inferred from array position
-or depth. `Farewell Actor Ids` controls the named group order, and the right
-wall remains open until those actors walk offscreen. The final thief stays
-at the authored bottom depth after that departure.
+Character chambers are intentionally only 24 terrain rows tall. The cafe is
+marked explicitly with `Gathers Cast`; it is not inferred from array position
+or depth. `Gathering Actor Ids` controls the named group order: Cheese Girl,
+the Treasure Hunter, Rotini, Quibble, and the lantern-staff man. The encounter
+is a happy gathering, not a departure, so it does not open a right-side exit.
+The 15,200 lantern encounter uses `Requires Credits Complete`, ensuring its
+post-credit message cannot begin until the gameplay credits finish.
 
 ## Author encounter stages
 
@@ -142,16 +156,16 @@ The miner is intentionally silent. Any line authored with the stable `miner`
 slot is presented as `...`; keep the resource text as `...` as well so the
 Inspector communicates the same story rule.
 
-A future silent-teen beat should remain concrete story state: after 50
-completed conversations with that teen, select the authored first-spoken-line
-conversation. Do not add a generic condition language for that single case.
-
 `DialogueDirector` presents every conversation through the in-universe bottom
 dialogue box. Top and bottom cinematic bars frame all conversations and may be
 kept open between linked dialogue and movement beats.
 
 During dialogue the gameplay tree pauses, while the dialogue overlay and dirt
 particles continue processing.
+
+Credits are the exception to cutscene pausing: they begin at depth 15,000 as
+an overlay while the miner remains controllable. The 15,200 encounter waits
+for that overlay to complete even if the player reaches its depth early.
 
 Gameplay depth is separate from screen pixels. Each descended terrain row adds
 one depth, so changing terrain or character art size does not move
