@@ -311,7 +311,7 @@ func _on_bake_pressed() -> void:
 		return
 	CutsceneSculptBaker.bake_procedural_chamber(
 		_context.sculpt,
-		_context.preview.encounter_config,
+		_context.preview.get_encounter_config(),
 		_context.encounter,
 		_context.preview.terrain_manager.config
 	)
@@ -349,7 +349,7 @@ func _on_create_pressed() -> void:
 	var sculpt := CutsceneTerrainSculpt.new()
 	CutsceneSculptBaker.bake_procedural_chamber(
 		sculpt,
-		_context.preview.encounter_config,
+		_context.preview.get_encounter_config(),
 		_context.encounter,
 		_context.preview.terrain_manager.config
 	)
@@ -376,7 +376,7 @@ func _on_create_pressed() -> void:
 ## room, so a designer picking one can see what is authored and what is not.
 func _sync_encounter_selector() -> void:
 	var encounter_config: DepthEncounterConfig = (
-		_context.preview.encounter_config
+		_context.preview.get_encounter_config()
 	)
 	_encounter_selector.clear()
 	if encounter_config == null:

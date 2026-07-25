@@ -1,3 +1,4 @@
+@tool
 class_name DepthCharacterEncounter
 extends Resource
 
@@ -8,6 +9,8 @@ extends Resource
 ## - stage_scene optionally adds actor movement, props, and line-driven cues.
 ## - occurs_at_run_bottom pins the final encounter to any configured run length.
 ## - The invariant is that large hits cannot skip an encounter threshold.
+## @tool because the cutscene editor resolves encounter depth and authored room
+## data in editor context; non-tool resources become placeholder instances.
 
 @export var encounter_id: StringName
 ## Stable story identity; repeated visits reuse the same presenter.

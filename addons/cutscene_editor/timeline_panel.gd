@@ -1093,7 +1093,7 @@ func _ruler_tick_step() -> float:
 	var exponent := floorf(log(target_seconds) / log(10.0))
 	var base := pow(10.0, exponent)
 	for multiplier in [1.0, 2.0, 5.0, 10.0]:
-		var candidate := base * multiplier
+		var candidate: float = base * float(multiplier)
 		if candidate >= target_seconds:
 			return candidate
 	return base * 10.0

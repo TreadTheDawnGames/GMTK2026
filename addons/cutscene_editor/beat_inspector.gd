@@ -52,7 +52,7 @@ func get_visible_fields_for_kind(kind: int) -> PackedStringArray:
 	])
 	if _kind_uses_actor(kind):
 		fields.append(str(FIELD_ACTOR))
-	m match kind:
+	match kind:
 		CutsceneBeat.Kind.MOVE:
 			fields.append(str(FIELD_TARGET_MARKER))
 			fields.append(str(FIELD_TARGET_OFFSET))
@@ -219,7 +219,7 @@ func _add_actor_field() -> void:
 		option.select(selected_index)
 	row.add_child(option)
 	if not option.item_selected.is_connected(_on_actor_changed):
-		option.item_selected.connect(_on_actor_changed.bind(property_name_to_string(FIELD_ACTOR)))
+		option.item_selected.connect(_on_actor_changed.bind(FIELD_ACTOR))
 
 
 func _add_marker_field() -> void:
@@ -400,7 +400,7 @@ func _on_check_changed(value: bool, property_name: StringName) -> void:
 	_commit_property(property_name, value, "Edit %s" % property_name)
 
 
-func _on_actor_changed(index: int, _property_name: String) -> void:
+func _on_actor_changed(index: int, _property_name: StringName) -> void:
 	if _selected_beat == null:
 		return
 	var option := _find_control(String(FIELD_ACTOR)) as OptionButton
@@ -463,7 +463,9 @@ func _on_line_start_changed(index: int, end_option: OptionButton) -> void:
 		return
 	start_value = int(start_option.get_item_metadata(index))
 	var end_value := int(end_option.get_item_metadata(end_option.selected))
-	if end_value < 0 or end_value < start_value:
+	if start_value < 0:
+		end_value = -1
+	elif end_value < 0 or end_value < start_value:
 		end_value = start_value
 	_commit_line_range(Vector2i(start_value, end_value))
 
@@ -476,7 +478,9 @@ func _on_line_end_changed(index: int, start_option: OptionButton) -> void:
 		return
 	var end_value := int(end_option.get_item_metadata(index))
 	var start_value := int(start_option.get_item_metadata(start_option.selected))
-	if end_value >= 0 and start_value >= 0 and end_value < start_value:
+	if end_value < 0:
+		start_value = -1
+	elif start_value < 0 or end_value < start_value:
 		start_value = end_value
 	_commit_line_range(Vector2i(start_value, end_value))
 
@@ -571,7 +575,3 @@ func _kind_uses_actor(kind: int) -> bool:
 		CutsceneBeat.Kind.SHOW,
 		CutsceneBeat.Kind.HIDE,
 	]
-
-
-func property_name_to_string(property_name: StringName) -> String:
-	return String(property_name)

@@ -316,14 +316,13 @@ func _on_remove_actor_pressed() -> void:
 
 
 func _get_selected_actor_preview() -> CutsceneActorPreview:
+	var selection = EditorInterface.get_selection()
+	if selection != null:
+		for selected: Node in selection.get_selected_nodes():
+			if selected is CutsceneActorPreview:
+				return selected
 	if is_instance_valid(_selected_preview):
 		return _selected_preview
-	var selection = EditorInterface.get_selection()
-	if selection == null:
-		return null
-	for selected: Node in selection.get_selected_nodes():
-		if selected is CutsceneActorPreview:
-			return selected
 	return null
 
 
