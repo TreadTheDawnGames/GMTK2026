@@ -25,9 +25,10 @@ class TerrainChunkVisual:
 	## owns no image and no texture, so streaming untouched rock allocates
 	## nothing; the bit is cleared the moment a stamp needs to write into it.
 	var shared_layers: int = 0
-	## A layer that just left any shared base must create private GPU tiles on
-	## its next publish. This bit prevents an update from mutating its sibling.
-	var needs_private_texture: int = 0
+	## One tile bitmask per stratum. A layer leaving a shared base detaches each
+	## GPU tile lazily when that tile is first changed; pending bits must remain
+	## until their own tile publishes or a later hit could carve a sibling.
+	var needs_private_texture_tiles: PackedInt32Array = PackedInt32Array()
 
 
 class HoleMaskData:
@@ -122,6 +123,9 @@ const CHUNK_VISUAL_POOL_LIMIT: int = 4
 # existing buffers instead of allocating multi-megabyte images at the boundary.
 const CHUNK_MASK_IMAGE_POOL_LIMIT: int = 4
 const CHUNK_MASK_TEXTURE_POOL_LIMIT: int = 12
+# Four authored samples per cell retain edge_smoothing at one quarter-cell
+# precision while bounding cached room memory independently of shipped density.
+const SCULPT_CACHE_PIXELS_PER_CELL: int = 4
 # Deferred web raster work is capped and pooled. The 192 slots cover the
 # configured fully-stacked hit (currently under 150 jobs). If mining ever fills
 # them, the oldest single layer completes before another is accepted, so memory
@@ -205,8 +209,9 @@ var _pristine_mask_size := Vector2i.ZERO
 # duplicate the neighboring CPU columns so shader filtering stays continuous at
 # all tile seams; memory is bounded by one tiled copy of a chunk mask.
 var _mask_upload_images: Array[Image] = []
-# One authored room rasterized at mask resolution, keyed by its sculpt and
-# indexed by stratum plus one, where index zero is the shared logical shape.
+# One authored room rasterized at at most four samples per cell, keyed by its
+# sculpt and indexed by stratum plus one. The cache is bounded by the authored
+# sculpt count and layer count, not the shipped 16-pixel terrain density.
 var _sculpt_mask_images: Dictionary[CutsceneTerrainSculpt, Array] = {}
 # Historical stamps are retained so review mode can rebuild old terrain.
 # Growth is bounded by the configured run and accepted hit count; only the
@@ -1418,6 +1423,8 @@ func _create_chunk_visual(layer_count: int) -> TerrainChunkVisual:
 	var chunk_world_size := _get_chunk_world_size()
 	chunk.dirty_mask_tiles.resize(layer_count)
 	chunk.dirty_mask_tiles.fill(ALL_MASK_TILES_DIRTY)
+	chunk.needs_private_texture_tiles.resize(layer_count)
+	chunk.needs_private_texture_tiles.fill(0)
 	chunk.layer_revisions.resize(layer_count)
 	chunk.layer_revisions.fill(0)
 	for layer_index in range(layer_count):
@@ -1501,7 +1508,7 @@ func _share_intact_masks(
 		chunk.dirty_mask_tiles[layer_index] = 0
 		chunk.layer_revisions[layer_index] = 0
 	chunk.shared_layers = (1 << layer_count) - 1
-	chunk.needs_private_texture = 0
+	chunk.needs_private_texture_tiles.fill(0)
 
 
 ## Builds this chunk's own strata for chambers, rooms, and the run's edges.
@@ -1588,7 +1595,7 @@ func _build_chunk_masks(
 					| (1 << previous_layer_index)
 				)
 				break
-	chunk.needs_private_texture = 0
+	chunk.needs_private_texture_tiles.fill(0)
 
 
 ## Gives one stratum an image of its own before a stamp writes into it.
@@ -1602,7 +1609,9 @@ func _make_layer_writable(
 		chunk.mask_images[layer_index].duplicate()
 	)
 	chunk.shared_layers &= ~(1 << layer_index)
-	chunk.needs_private_texture |= 1 << layer_index
+	chunk.needs_private_texture_tiles[layer_index] = (
+		ALL_MASK_TILES_DIRTY
+	)
 
 
 ## Publishes every distinct stratum mask once. Copy-on-write siblings bind the
@@ -1752,21 +1761,23 @@ func _publish_layer_texture(
 	if dirty_tiles == 0:
 		return
 	var texture_tiles: Array = chunk.mask_texture_tiles[layer_index]
-	var requires_private_tiles := (
-		chunk.needs_private_texture & (1 << layer_index) != 0
+	var private_tile_bits := (
+		chunk.needs_private_texture_tiles[layer_index]
 	)
-	if requires_private_tiles:
+	if dirty_tiles & private_tile_bits != 0:
 		texture_tiles = texture_tiles.duplicate()
 	for tile_index in range(MASK_HORIZONTAL_TILE_COUNT):
-		if dirty_tiles & (1 << tile_index) == 0:
+		var tile_bit := 1 << tile_index
+		if dirty_tiles & tile_bit == 0:
 			continue
+		var requires_private_tile := private_tile_bits & tile_bit != 0
 		_prepare_mask_upload_tile(mask_image, tile_index)
 		var upload_image := _mask_upload_images[tile_index]
 		var mask_texture: ImageTexture = texture_tiles[tile_index]
 		if (
 			mask_texture == null
 			or mask_texture == _pristine_mask_texture
-			or requires_private_tiles
+			or requires_private_tile
 			or Vector2i(mask_texture.get_size())
 				!= upload_image.get_size()
 		):
@@ -1790,10 +1801,10 @@ func _publish_layer_texture(
 			texture_tiles[tile_index] = reusable_texture
 		else:
 			mask_texture.update(upload_image)
+		chunk.needs_private_texture_tiles[layer_index] &= ~tile_bit
 	chunk.mask_texture_tiles[layer_index] = texture_tiles
 	_set_sprite_mask_textures(sprite, texture_tiles)
 	chunk.dirty_mask_tiles[layer_index] = 0
-	chunk.needs_private_texture &= ~(1 << layer_index)
 
 
 ## Binds one layer's fixed tile set to its single full-width sprite.
@@ -2014,7 +2025,7 @@ func _release_chunk_masks(chunk: TerrainChunkVisual) -> void:
 		chunk.dirty_mask_tiles[layer_index] = 0
 		chunk.layer_revisions[layer_index] = 0
 	chunk.shared_layers = (1 << chunk.mask_images.size()) - 1
-	chunk.needs_private_texture = 0
+	chunk.needs_private_texture_tiles.fill(0)
 
 
 ## Frees every retired chunk, so a profile or room edit cannot hand stale
@@ -2037,11 +2048,13 @@ func _build_chunk_base_mask(
 	sculpt_layer_index: int = -1
 ) -> Image:
 	var config := terrain_manager.config
-	# Sculpt caches retain one authored sample per logical cell. Expand only the
-	# active chunk; the shader's linear sampling reconstructs the same threshold
-	# contour without keeping every full-room layer at gameplay density.
+	# Sculpt caches retain enough authored samples for edge_smoothing, then only
+	# the active chunk expands to shipped density. Ordinary rock stays on the
+	# direct full-density path and pays no conversion.
 	var mask_cell_size := (
-		1 if chunk_contains_sculpt else profile.mask_pixels_per_cell
+		_get_sculpt_cache_pixels_per_cell()
+		if chunk_contains_sculpt
+		else profile.mask_pixels_per_cell
 	)
 	var mask_size := _get_chunk_mask_size()
 	var chunk_start_row := chunk_index * config.chunk_height_cells
@@ -2194,31 +2207,44 @@ func _build_chunk_base_mask(
 				Image.FORMAT_LA8
 			)
 		expanded_image.fill(SOLID_MASK_COLOR)
-		var expansion := profile.mask_pixels_per_cell
-		# The one-sample sculpt cache is binary; shader filtering reconstructs
-		# its continuous edge. Clear only contiguous opening runs from an
-		# already-solid mask so room streaming neither resizes nor repaints the
-		# majority of each chunk's intact rock.
+		var expansion: int = (
+			profile.mask_pixels_per_cell / mask_cell_size
+		)
+		# Copy equal-alpha runs as rectangles. This preserves partial authored
+		# edge_smoothing samples while avoiding a full multi-megabyte Image.resize;
+		# the vast solid interior is skipped and open interiors become one run.
 		for source_y in range(image.get_height()):
-			var opening_run_start := -1
-			for source_x in range(image.get_width() + 1):
-				var is_opening := (
-					source_x < image.get_width()
-					and image.get_pixel(source_x, source_y).a <= 0.5
-				)
-				if is_opening and opening_run_start < 0:
-					opening_run_start = source_x
-				elif not is_opening and opening_run_start >= 0:
-					expanded_image.fill_rect(
-						Rect2i(
-							opening_run_start * expansion,
-							source_y * expansion,
-							(source_x - opening_run_start) * expansion,
-							expansion
-						),
-						EMPTY_MASK_COLOR
+			var run_start := 0
+			var run_alpha := roundi(
+				image.get_pixel(0, source_y).a * 255.0
+			)
+			for source_x in range(1, image.get_width() + 1):
+				var alpha := (
+					-1
+					if source_x == image.get_width()
+					else roundi(
+						image.get_pixel(source_x, source_y).a * 255.0
 					)
-					opening_run_start = -1
+				)
+				if alpha != run_alpha:
+					if run_alpha < 255:
+						var run_value := float(run_alpha) / 255.0
+						expanded_image.fill_rect(
+							Rect2i(
+								run_start * expansion,
+								source_y * expansion,
+								(source_x - run_start) * expansion,
+								expansion
+							),
+							Color(
+								1.0,
+								1.0,
+								1.0,
+								run_value
+							)
+						)
+					run_start = source_x
+					run_alpha = alpha
 		image = expanded_image
 	return image
 
@@ -2325,18 +2351,16 @@ func _get_sculpt_mask_image(
 	return room_mask
 
 
-## Draws one authored room once, at mask resolution.
+## Draws one authored room once at a density bounded independently of gameplay.
 ##
-## The room is written at one pixel per cell and then upscaled: Godot's bilinear
-## filter samples the same cell centers a hand-written rim sampler would, so the
-## visible contour is the sub-cell one, produced in a single pass instead of per
-## mask pixel. Luminance stays full across the room because the shader reads it
-## as crack ink; only alpha carries the shape the room was carved into.
+## Four samples per cell retain a sub-cell bilinear rim and make edge_smoothing
+## effective. Chunk expansion copies equal-alpha runs, so sharp 16-pixel terrain
+## does not multiply either cached room memory or full-room resize work.
 func _rasterize_sculpt_mask(
 	sculpt: CutsceneTerrainSculpt,
 	sculpt_layer_index: int
 ) -> Image:
-	var mask_cell_size := 1
+	var mask_cell_size := _get_sculpt_cache_pixels_per_cell()
 	var grid := sculpt.grid_size
 	if grid.x <= 0 or grid.y <= 0 or mask_cell_size <= 0:
 		return null
@@ -2384,6 +2408,20 @@ func _rasterize_sculpt_mask(
 	if sculpt.edge_smoothing > 0.0 and sculpt.edge_smoothing < 1.0:
 		_harden_sculpt_mask_rims(room_mask, sculpt, sculpt_layer_index)
 	return room_mask
+
+
+## Chooses the highest bounded sculpt density that divides the shipped mask.
+## Both room caching and chunk expansion use this contract, so no resample can
+## shift a room edge differently between native and web builds.
+func _get_sculpt_cache_pixels_per_cell() -> int:
+	var gameplay_density := maxi(profile.mask_pixels_per_cell, 1)
+	var cache_density := mini(
+		SCULPT_CACHE_PIXELS_PER_CELL,
+		gameplay_density
+	)
+	while gameplay_density % cache_density != 0:
+		cache_density -= 1
+	return cache_density
 
 
 ## Pulls a partly smoothed room's rim back toward the cells it was painted on.
