@@ -74,7 +74,7 @@ const FRACTURE_SUPPORT_VALUE_THRESHOLD: float = 0.9
 
 @export_category("Web Performance")
 ## Limits reusable resized masks so repeated hit sizes avoid image allocations.
-@export_range(0, 48, 1) var resized_stamp_cache_limit: int = 12
+@export_range(0, 48, 1) var resized_stamp_cache_limit: int = 48
 ## Oversized combo openings are one-off and must not occupy the reusable cache.
 @export_range(1, 1_048_576, 1) var resized_stamp_cache_max_pixels: int = 65_536
 
