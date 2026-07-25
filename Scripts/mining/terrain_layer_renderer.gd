@@ -416,7 +416,6 @@ func _prepare_sculpt_masks() -> void:
 	for placement in terrain_manager.get_sculpt_placements():
 		_get_sculpt_mask_image(placement.sculpt, -1)
 		_get_sculpt_logical_mask_image(placement.sculpt, -1)
-		_get_sculpt_mask_runs(placement.sculpt, -1)
 		if not placement.sculpt.has_layer_masks():
 			continue
 		for layer_index in range(profile.get_gameplay_layer_count()):
@@ -425,7 +424,6 @@ func _prepare_sculpt_masks() -> void:
 				placement.sculpt,
 				layer_index
 			)
-			_get_sculpt_mask_runs(placement.sculpt, layer_index)
 
 
 ## Captures the combo used by synchronous damage stamps for one resolved hit.
@@ -2481,19 +2479,20 @@ func _get_sculpt_mask_runs(
 	var room_mask := _get_sculpt_mask_image(sculpt, sculpt_layer_index)
 	if room_mask == null:
 		return []
+	var mask_width := room_mask.get_width()
+	var mask_data := room_mask.get_data()
 	var mask_runs: Array[PackedInt32Array] = []
 	mask_runs.resize(room_mask.get_height())
 	for mask_y in range(room_mask.get_height()):
 		var row_runs := PackedInt32Array()
 		var run_start := 0
-		var run_alpha := roundi(room_mask.get_pixel(0, mask_y).a * 255.0)
-		for mask_x in range(1, room_mask.get_width() + 1):
+		var row_byte_start := mask_y * mask_width * 2
+		var run_alpha := mask_data[row_byte_start + 1]
+		for mask_x in range(1, mask_width + 1):
 			var alpha := (
 				-1
-				if mask_x == room_mask.get_width()
-				else roundi(
-					room_mask.get_pixel(mask_x, mask_y).a * 255.0
-				)
+				if mask_x == mask_width
+				else mask_data[row_byte_start + mask_x * 2 + 1]
 			)
 			if alpha == run_alpha:
 				continue
