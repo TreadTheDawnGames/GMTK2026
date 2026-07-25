@@ -110,9 +110,17 @@ var _tinted_styles: Dictionary[StyleBox, StyleBox] = {}
 var _drawn_combo: int = -1
 var _drawn_is_recovering: bool = false
 
+@onready var combo_bar: NotchedProgressBar = %ComboBar
 
 ## Prepares the additive canvas and starts the idle state watch.
 func _ready() -> void:
+	combo_bar.set_maximum(_combo_ceiling())
+	combo_bar.add_tick(_recovery_threshold()-1)
+	timing_window.recovery_window.pressed.connect(_on_timing_pressed)
+	#combo_bar.add_ticks(_tier_thresholds())
+	#print("tiers: ", _tier_thresholds())
+	
+	
 	_random.randomize()
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# Additive, so every mark and fill lights the bar's art up rather than
@@ -158,6 +166,8 @@ func _on_timing_pressed(
 	)
 	_marks.append(mark)
 	queue_redraw()
+	
+	combo_bar.value = float(_current_combo()) if success else 0.0
 
 
 ## Ages the marks, and redraws whenever anything visible actually changed.
@@ -196,8 +206,8 @@ func _draw() -> void:
 	# it is the streak being fought for, not the bar you are currently hitting.
 	# It is placed against the drawn art rather than the Control rect, so it
 	# clears the frame's expand margins and stays outside the box.
-	_draw_charge(_drawn_frame_rect(main_bar))
-	_draw_recovery_frame(main_bar)
+	#_draw_charge(_drawn_frame_rect(main_bar))
+	#_draw_recovery_frame(main_bar)
 
 	# Only a miss marks the track itself. A success used to strike a bright
 	# column at the slider, which sat exactly where the slider was and cost you
@@ -334,7 +344,7 @@ func _draw_recovery_frame(main_bar: SliderTimingWindow) -> void:
 	if not _is_recovering():
 		return
 	var recovery_bar := timing_window.recovery_window
-	var frame_style := _frame_style_of(main_bar)
+	var frame_style := _frame_style_of(timing_window.recovery_window)
 	if frame_style == null:
 		return
 	var tint := recovery_color

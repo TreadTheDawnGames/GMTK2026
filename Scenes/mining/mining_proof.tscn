@@ -23,6 +23,7 @@
 [ext_resource type="Script" uid="uid://d3fjog3we4ugh" path="res://Scripts/mining/terrain_layer_renderer.gd" id="32_layer_renderer"]
 [ext_resource type="Resource" uid="uid://rsxn5lxga40a" path="res://resources/mining/default_terrain_layer_profile.tres" id="33_layer_profile"]
 [ext_resource type="PackedScene" path="res://Scenes/dialogue/character_presenter.tscn" id="34_character_presenter"]
+[ext_resource type="PackedScene" uid="uid://cskhmu30pdsc0" path="res://Scenes/mining/timing_bar_feedback.tscn" id="38_nh27f"]
 [ext_resource type="Script" uid="uid://cxysje4e2miht" path="res://Scripts/ui/depth_review_control.gd" id="39_depth_review"]
 [ext_resource type="PackedScene" path="res://Scenes/mining/mining_impact_smoke.tscn" id="40_impact_smoke"]
 [ext_resource type="Script" uid="uid://vrpny10f1lau" path="res://Scripts/dialogue/run_intro_controller.gd" id="42_intro_controller"]
@@ -32,7 +33,7 @@
 [ext_resource type="Script" uid="uid://3d6grhip1htq" path="res://Scripts/mining/surface_presentation.gd" id="52_surface_presentation"]
 [ext_resource type="Shader" uid="uid://dwpswe2x8kjye" path="res://Shaders/surface_sky.gdshader" id="53_surface_sky"]
 [ext_resource type="Shader" uid="uid://6u22qy01ne0" path="res://Shaders/sunlight_wash.gdshader" id="55_sunlight_wash"]
-[ext_resource type="PackedScene" uid="uid://b4cudxpsminnk" path="res://Scenes/cinematics/arrival_intro.tscn" id="56_arrival_intro"]
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/arrival_intro.tscn" id="56_arrival_intro"]
 [ext_resource type="Script" uid="uid://c7imq1ddw5h5m" path="res://Scripts/mining/run_timeline.gd" id="57_run_timeline"]
 [ext_resource type="Script" uid="uid://vm58e0gjcupp" path="res://Scripts/mining/gem_outcrop_field.gd" id="58_gem_field"]
 [ext_resource type="Texture2D" uid="uid://ding6yepfwaw4" path="res://Assets/Props/gem_crystals.png" id="59_gem_crystals"]
@@ -41,7 +42,6 @@
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/rat_colony_followers.tscn" id="62_rat_followers"]
 [ext_resource type="PackedScene" path="res://Scenes/mining/impact_spark.tscn" id="63_impact_spark"]
 [ext_resource type="PackedScene" path="res://Scenes/mining/combo_impact_vignette.tscn" id="64_combo_vignette"]
-[ext_resource type="Script" uid="uid://cbglue1xcd6io" path="res://Scripts/timing_windows/timing_bar_feedback.gd" id="65_bar_feedback"]
 [ext_resource type="Script" uid="uid://cs0c0hu8nwb2k" path="res://Scripts/mining/combo_director.gd" id="66_combo_director"]
 [ext_resource type="Script" uid="uid://bxi3n23isgchd" path="res://Scripts/mining/combo_tier_punch.gd" id="68_tier_punch"]
 [ext_resource type="Script" uid="uid://tux2aybei38t" path="res://Scripts/cinematics/opening_shot_camera.gd" id="76_opening_camera"]
@@ -307,16 +307,7 @@ options_scene = ExtResource("22_a0hll")
 
 [node name="TimingWindow" parent="MiningScene/HUD" unique_id=1764051259 instance=ExtResource("8_timing_window")]
 
-[node name="TimingBarFeedback" type="Control" parent="MiningScene/HUD" unique_id=721233836 node_paths=PackedStringArray("timing_window")]
-editor_description = "Read-only impact feedback drawn over the timing bar. It reads the active bar's rect and slider position and never writes to the bar, so Caspian's timing scene keeps its own behaviour."
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-script = ExtResource("65_bar_feedback")
+[node name="TimingBarFeedback" parent="MiningScene/HUD" unique_id=73798020 node_paths=PackedStringArray("timing_window") instance=ExtResource("38_nh27f")]
 timing_window = NodePath("../TimingWindow")
 
 [node name="DepthReviewControl" type="Control" parent="MiningScene/HUD" unique_id=1329828240 node_paths=PackedStringArray("return_button", "timing_window", "mining_controller")]

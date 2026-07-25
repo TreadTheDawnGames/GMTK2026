@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://cetf3kqgdyqbm"]
+
+[ext_resource type="Script" uid="uid://c5rvmkaorxynb" path="res://addons/conductor/condcutor.gd" id="1_8eade"]
+
+[node name="Conductor" type="AudioStreamPlayer" unique_id=1600563475]
+process_mode = 3
+bus = &"Music"
+script = ExtResource("1_8eade")

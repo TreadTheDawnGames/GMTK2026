@@ -1,0 +1,37 @@
+[gd_scene format=3 uid="uid://cskhmu30pdsc0"]
+
+[ext_resource type="Script" uid="uid://cbglue1xcd6io" path="res://Scripts/timing_windows/timing_bar_feedback.gd" id="1_6gxlb"]
+[ext_resource type="Theme" uid="uid://cy302o2vx18ng" path="res://resources/themes/Menus.tres" id="2_s3nbr"]
+[ext_resource type="Script" uid="uid://ctrhhhxdwisf3" path="res://Scenes/mining/progress_bar_with_ticks.gd" id="3_ww2cc"]
+[ext_resource type="Texture2D" uid="uid://b6nvo3wn7diuf" path="res://Assets/UI/Kenney/minimap_icon_star_yellow.png" id="4_k32d5"]
+
+[node name="TimingBarFeedback" type="Control" unique_id=73798020]
+editor_description = "Read-only impact feedback drawn over the timing bar. It reads the active bar's rect and slider position and never writes to the bar, so Caspian's timing scene keeps its own behaviour."
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_6gxlb")
+
+[node name="ProgressBar" type="ProgressBar" parent="." unique_id=1721321369]
+layout_mode = 1
+anchors_preset = 14
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = 326.0
+offset_top = 286.0
+offset_right = -186.0
+offset_bottom = 302.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("2_s3nbr")
+max_value = 20.0
+step = 1.0
+show_percentage = false
+script = ExtResource("3_ww2cc")
+ticks = Array[int]([2, 3])
+tick_sprite = ExtResource("4_k32d5")

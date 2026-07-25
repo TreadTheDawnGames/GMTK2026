@@ -10,6 +10,7 @@
 [ext_resource type="AudioStream" uid="uid://77vudy25abmn" path="res://Assets/Audio/Music/Fills/Fill 3 DEV.wav" id="8_h6ha5"]
 
 [node name="MusicManager" type="Node" unique_id=1863380187]
+process_mode = 3
 script = ExtResource("1_a0ngj")
 tracks = Array[AudioStream]([ExtResource("2_libwa"), ExtResource("3_f6o2p"), ExtResource("4_qe7b2"), ExtResource("5_fxo4j")])
 fills = Array[AudioStream]([ExtResource("6_rv6of"), ExtResource("7_0kwba"), ExtResource("8_h6ha5")])

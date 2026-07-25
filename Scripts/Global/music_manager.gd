@@ -17,10 +17,8 @@ var fill_playing : bool = false
 func _ready():
 	Conductor.set_song(tracks[0], 120, 4)
 	Conductor.play()
-	Conductor.beat.connect(func(a): print(get_beats_remaining()))
 	Conductor.finished.connect(_transition_to)
 	Conductor.beat.connect(_play_fill)
-	print(get_total_beats())
 	
 func get_total_beats() -> float:
 	var beat_count = Conductor.stream.get_length() / Conductor.sec_per_beat
@@ -28,12 +26,6 @@ func get_total_beats() -> float:
 
 func get_beats_remaining() -> int:
 	return floor(get_total_beats() - Conductor.current_beat)
-
-func _process(delta:float)->void:
-	if Input.is_action_just_pressed("aim_right"):
-		music_intensity = wrap(music_intensity+1, 0, 3)
-		print("intensity: ", music_intensity)
-	pass
 
 func _transition_to():
 	Conductor.last_reported_beat = -1
@@ -45,7 +37,6 @@ func _transition_to():
 func _play_fill(_beat_number):
 	if get_beats_remaining() <= 2 and current_intensity != music_intensity and not fill_playing:
 		fill_playing = true
-		print("beat reamains")
 		track_1.stream = fills.pick_random()
 		track_1.play()
 		await track_1.finished
@@ -57,8 +48,10 @@ func set_current_intensity(intensity : int):
 func _on_intensity_changed(intensity : int, previous_intensity):
 	set_current_intensity(intensity)
 	pass
+
 func _on_combo_tier_changed(tier: int, previous_tier: int):
 	pass
+
 func _on_streak_lost(previous_combo : int, previous_tier : int):
 	set_current_intensity(0)
 	pass

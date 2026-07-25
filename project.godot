@@ -19,8 +19,8 @@ config/icon="res://icon.svg"
 
 GameState="*res://Scenes/globals/game_state.tscn"
 AudioHandler="*res://Scenes/globals/audio_handler.tscn"
-Conductor="*uid://c5rvmkaorxynb"
 MusicManager="*uid://qi6w5ueftd0u"
+Conductor="*uid://cetf3kqgdyqbm"
 
 [display]
 
