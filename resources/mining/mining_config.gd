@@ -28,10 +28,10 @@ const MAX_PLAYABLE_DEPTH: int = 2_000_000_000
 ## lowering it back toward 192 is the first thing to try if the web export runs
 ## short of per-hit budget.
 @export_range(16, 512, 1) var terrain_width_cells: int = 384
-# Twenty-four rows keep active sculpt expansion and high-density uploads below
+# Twenty-two rows keep active sculpt expansion and high-density uploads below
 # the atomic web limit. Publication is queued by immutable layer group, so the
 # smaller streaming unit does not lower the 16-pixel world-space fidelity.
-@export_range(16, 256, 1) var chunk_height_cells: int = 24
+@export_range(16, 256, 1) var chunk_height_cells: int = 22
 ## Sets the world-space size of one gameplay terrain cell.
 @export_range(1, 32, 1) var terrain_cell_world_size: int = 8
 @export_range(1, 512, 1) var initial_surface_row: int = 38

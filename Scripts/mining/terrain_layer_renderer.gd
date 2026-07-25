@@ -2180,11 +2180,46 @@ func _build_chunk_base_mask(
 			mask_cell_size
 		)
 	if raster_size != mask_size:
-		image.resize(
-			mask_size.x,
-			mask_size.y,
-			Image.INTERPOLATE_NEAREST
-		)
+		var expanded_image: Image
+		while not _chunk_mask_image_pool.is_empty():
+			var pooled_image: Image = _chunk_mask_image_pool.pop_back()
+			if pooled_image.get_size() == mask_size:
+				expanded_image = pooled_image
+				break
+		if expanded_image == null:
+			expanded_image = Image.create(
+				mask_size.x,
+				mask_size.y,
+				false,
+				Image.FORMAT_LA8
+			)
+		expanded_image.fill(SOLID_MASK_COLOR)
+		var expansion := profile.mask_pixels_per_cell
+		# The one-sample sculpt cache is binary; shader filtering reconstructs
+		# its continuous edge. Clear only contiguous opening runs from an
+		# already-solid mask so room streaming neither resizes nor repaints the
+		# majority of each chunk's intact rock.
+		for source_y in range(image.get_height()):
+			var opening_run_start := -1
+			for source_x in range(image.get_width() + 1):
+				var is_opening := (
+					source_x < image.get_width()
+					and image.get_pixel(source_x, source_y).a <= 0.5
+				)
+				if is_opening and opening_run_start < 0:
+					opening_run_start = source_x
+				elif not is_opening and opening_run_start >= 0:
+					expanded_image.fill_rect(
+						Rect2i(
+							opening_run_start * expansion,
+							source_y * expansion,
+							(source_x - opening_run_start) * expansion,
+							expansion
+						),
+						EMPTY_MASK_COLOR
+					)
+					opening_run_start = -1
+		image = expanded_image
 	return image
 
 
