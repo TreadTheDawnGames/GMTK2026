@@ -1,14 +1,23 @@
 class_name DepthEncounterController
 extends Node
 
-## Runs the authored character encounters in their listed depth order.
+## How it works:
+## - Each encounter resource places one mineable chamber at an authored depth.
+## - Crossing its ceiling captures the interaction even when one hit skips rows.
+## - Stable actor IDs reuse presenters across visits and the cafe gathering.
+## - Optional encounter stages own reversible movement and named line cues.
+## - MiningCinematicFlow gates input while this controller owns an interaction.
+## - Adding a cutscene means adding its resource to the ordered config array.
+## - The final thief remains pinned to the configured bottom depth.
+## - The invariant is that no hit can skip an authored tunnel threshold.
 
 signal final_encounter_reached(encounter_id: StringName)
-signal departure_choice_requested
-## Requests completed camera catch-up before the dialogue overlay appears.
-signal encounter_camera_focus_requested
-## Releases encounter framing when mining input becomes available again.
-signal encounter_camera_released
+signal coffee_speed_boost_requested
+signal rat_colony_support_requested
+signal character_stage_strike_requested(screen_position: Vector2)
+
+const FLOW_OWNER: StringName = &"depth_encounter"
+const MINER_SPEAKER_SLOT: StringName = &"miner"
 
 @export_category("Schedule")
 @export var encounter_config: DepthEncounterConfig
@@ -16,23 +25,26 @@ signal encounter_camera_released
 
 @export_category("Character Placement")
 @export_range(-64, 64, 1) var horizontal_offset_cells: int = 22
-@export_range(1.0, 5.0, 0.1) var departure_walk_seconds: float = 1.2
-@export_range(1, 256, 1) var departure_walk_cells: int = 48
-
 @export_category("References")
 @export var dialogue_director: DialogueDirector
-@export var timing_window: TimingWindowTask
 @export var character_scene: PackedScene
 @export var character_parent: Node2D
 @export var pickaxe_progression: PickaxeProgression
-@export var mining_controller: MiningController
+@export var miner_rig: MinerRig
+@export var cinematic_flow: MiningCinematicFlow
+@export var terrain_renderer: TerrainLayerRenderer
 
 var _presenters: Array[CharacterPresenter] = []
+var _presenters_by_actor_id: Dictionary[StringName, CharacterPresenter] = {}
+var _speaker_slots_by_actor_id: Dictionary[StringName, StringName] = {}
+var _encounter_positions: Array[Vector2] = []
+var _stages: Array[CharacterEncounterStage] = []
+var _active_stage: CharacterEncounterStage
 var _next_encounter_index: int = 0
 var _pending_encounter_index: int = -1
 var _active_encounter_index: int = -1
 var _is_initialized: bool = false
-var _is_waiting_for_departure_choice: bool = false
+var _credits_have_completed: bool = false
 var _active_conversation: DialogueConversation
 @onready var _game_state: RunState = RunState.get_global(self)
 
@@ -44,37 +56,75 @@ func _ready() -> void:
 	_is_initialized = true
 
 
-## Pauses mining when the player reaches the next authored floor.
+## Captures the next cutscene when mining crosses its authored tunnel ceiling.
 func _on_depth_changed(depth: int) -> void:
-	if (
-		not _is_initialized
-		or _is_waiting_for_departure_choice
-		or _active_encounter_index >= 0
-		or _pending_encounter_index >= 0
-		or _next_encounter_index >= encounter_config.encounters.size()
-	):
+	if not _can_schedule_next_encounter():
 		return
 	var encounter := encounter_config.encounters[_next_encounter_index]
-	if depth < encounter.resolve_depth(mining_config.total_run_depth):
+	var ceiling_depth := encounter_config.get_encounter_ceiling_depth(
+		encounter,
+		mining_config.total_run_depth
+	)
+	if depth < ceiling_depth:
 		return
+	if _schedule_next_encounter():
+		_activate_pending_encounter()
 
+
+func _can_schedule_next_encounter() -> bool:
+	return (
+		_is_initialized
+		and _active_encounter_index < 0
+		and _pending_encounter_index < 0
+		and _next_encounter_index < encounter_config.encounters.size()
+		and (
+			not encounter_config.encounters[
+				_next_encounter_index
+			].requires_credits_complete
+			or _credits_have_completed
+		)
+	)
+
+
+## Releases the post-credit story floor and retries a depth already reached.
+func _on_credits_completed() -> void:
+	_credits_have_completed = true
+	if _game_state != null:
+		_on_depth_changed(_game_state.depth)
+
+
+## Restores only the run-scoped credits prerequisite.
+func _on_run_reset() -> void:
+	_credits_have_completed = false
+
+
+func _schedule_next_encounter() -> bool:
+	if not _can_schedule_next_encounter():
+		return false
+	if not cinematic_flow.try_begin(FLOW_OWNER):
+		return false
 	_pending_encounter_index = _next_encounter_index
-	timing_window.process_mode = Node.PROCESS_MODE_DISABLED
-	mining_controller.set_swing_queue_paused(true)
+	return true
 
 
-## Starts the pending encounter only after the miner lands on its floor.
-func _on_landing_reached(_mining_y: int) -> void:
-	if _pending_encounter_index < 0 or _active_encounter_index >= 0:
-		return
-	_activate_pending_encounter()
-
-
-## Promotes one pending floor into the active dialogue sequence.
+## Promotes one crossed ceiling into the active in-world tunnel sequence.
 func _activate_pending_encounter() -> void:
+	if (
+		_pending_encounter_index < 0
+		or not cinematic_flow.is_owned_by(FLOW_OWNER)
+	):
+		return
 	_active_encounter_index = _pending_encounter_index
 	_pending_encounter_index = -1
-	encounter_camera_focus_requested.emit()
+	var presenter := _presenters[_active_encounter_index]
+	var encounter := encounter_config.encounters[_active_encounter_index]
+	presenter.apply_appearance(encounter.appearance)
+	var encounter_anchor := _encounter_positions[_active_encounter_index]
+	presenter.position = encounter_anchor
+	var stage := _stages[_active_encounter_index]
+	if stage != null:
+		stage.position = encounter_anchor
+	cinematic_flow.focus(FLOW_OWNER)
 	_begin_active_encounter.call_deferred()
 
 
@@ -92,11 +142,12 @@ func _on_view_position_changed(view_cell_position: Vector2) -> void:
 	)
 
 
-## Bounces the active character while one of their lines is presented.
+## Bounces whichever visible chamber speaker owns the presented line.
 func _on_dialogue_line_presented(
 	conversation_id: StringName,
-	_line_index: int,
-	speaker_slot: StringName
+	line_index: int,
+	speaker_slot: StringName,
+	speaker_pose: StringName
 ) -> void:
 	if _active_encounter_index < 0:
 		return
@@ -106,31 +157,71 @@ func _on_dialogue_line_presented(
 		or conversation_id != _active_conversation.conversation_id
 	):
 		return
-	for presenter in _presenters:
-		presenter.reset_speech_motion()
-	if _is_departure_encounter(_active_encounter_index):
-		for presenter_index in range(_active_encounter_index):
+	if (
+		_active_stage != null
+		and line_index >= 0
+		and line_index < _active_conversation.lines.size()
+	):
+		var line := _active_conversation.lines[line_index]
+		if line != null and not line.stage_cue.is_empty():
+			_active_stage.play_cue(line.stage_cue, line_index)
+	_reset_speech_reactions()
+	if speaker_slot == MINER_SPEAKER_SLOT:
+		miner_rig.react_to_presented_line()
+		return
+	if _is_gathering_encounter(_active_encounter_index):
+		for actor_id in encounter_config.gathering_actor_ids:
 			if (
-				encounter_config.encounters[
-					presenter_index
-				].speaker_slot == speaker_slot
+				_speaker_slots_by_actor_id.get(actor_id, &"")
+					== speaker_slot
+				and _presenters_by_actor_id.has(actor_id)
 			):
-				_presenters[presenter_index].react_to_presented_line()
+				var presenter := _presenters_by_actor_id[actor_id]
+				if (
+					not speaker_pose.is_empty()
+					and presenter.has_pose(speaker_pose)
+				):
+					presenter.play_pose(speaker_pose)
+				presenter.react_to_presented_line()
 				return
 	elif speaker_slot == encounter.speaker_slot:
-		_presenters[
-			_active_encounter_index
-		].react_to_presented_line()
+		var presenter := _presenters[_active_encounter_index]
+		if (
+			not speaker_pose.is_empty()
+			and presenter.has_pose(speaker_pose)
+		):
+			presenter.play_pose(speaker_pose)
+		presenter.react_to_presented_line()
 
 
 ## Opens dialogue or stops at the unwritten thief endpoint.
 func _begin_active_encounter() -> void:
 	var encounter := encounter_config.encounters[_active_encounter_index]
 	var presenter := _presenters[_active_encounter_index]
-	presenter.reset_speech_motion()
-	if _is_departure_encounter(_active_encounter_index):
-		_gather_departing_characters()
-	timing_window.hide()
+	_reset_speech_reactions()
+	if _is_gathering_encounter(_active_encounter_index):
+		_gather_cafe_characters()
+	_active_stage = _stages[_active_encounter_index]
+	if _active_stage != null:
+		dialogue_director.open_cinematic_frame()
+		await dialogue_director.wait_until_frame_open()
+		if _active_encounter_index < 0:
+			return
+		var floor_sampler := (
+			terrain_renderer
+			.get_layer_opening_floor_support_screen_y
+			.bind(_game_state.mining_y, 1)
+		)
+		if not _active_stage.prepare(presenter, floor_sampler):
+			push_error(
+				"Encounter '%s' could not prepare its stage."
+				% encounter.encounter_id
+			)
+			_fail_active_encounter()
+			return
+		await _active_stage.play_opening()
+		if _active_encounter_index < 0:
+			return
 	_active_conversation = encounter.conversation
 	if (
 		encounter.encrypted_conversation != null
@@ -140,56 +231,81 @@ func _begin_active_encounter() -> void:
 			encounter.encrypted_conversation.decrypt_conversation()
 		)
 	if encounter.occurs_at_run_bottom and _active_conversation == null:
+		dialogue_director.open_cinematic_frame()
 		final_encounter_reached.emit(encounter.encounter_id)
 		return
 	if (
 		_active_conversation != null
-		and dialogue_director.start_conversation(_active_conversation)
+		and dialogue_director.start_conversation(
+			_active_conversation,
+			_is_gathering_encounter(_active_encounter_index)
+				or _active_stage != null
+				or encounter.occurs_at_run_bottom
+		)
 	):
 		return
 	push_error(
 		"Encounter '%s' could not start dialogue." % encounter.encounter_id
 	)
-	presenter.reset_speech_motion()
-	_active_conversation = null
 	if encounter.occurs_at_run_bottom:
+		dialogue_director.open_cinematic_frame()
 		final_encounter_reached.emit(encounter.encounter_id)
 		return
-	_next_encounter_index = _active_encounter_index + 1
-	_active_encounter_index = -1
-	_restore_timing_window()
+	_fail_active_encounter()
 
 
-## Reports whether this conversation is the cast's final shared stop.
-func _is_departure_encounter(encounter_index: int) -> bool:
-	var next_index := encounter_index + 1
+## Reports whether this conversation is the cast's shared cafe stop.
+func _is_gathering_encounter(encounter_index: int) -> bool:
 	return (
-		next_index < encounter_config.encounters.size()
-		and encounter_config.encounters[next_index].occurs_at_run_bottom
+		encounter_index >= 0
+		and encounter_index < encounter_config.encounters.size()
+		and encounter_config.encounters[encounter_index].gathers_cast
 	)
 
 
-## Places the four named characters together for their departure warning.
-func _gather_departing_characters() -> void:
-	var departure_y := _presenters[_active_encounter_index].position.y
-	var center_cell_x := mining_config.terrain_width_cells / 2
-	var group_x_cells: Array[int] = [
-		center_cell_x - 32,
-		center_cell_x - 16,
-		center_cell_x + 16,
-		center_cell_x + 32,
-	]
-	for presenter_index in range(
-		mini(_active_encounter_index, group_x_cells.size())
-	):
-		var presenter := _presenters[presenter_index]
+## Places the authored stable identities together for the cafe celebration.
+func _gather_cafe_characters() -> void:
+	var gathering_y := _presenters[_active_encounter_index].position.y
+	var actor_count := encounter_config.gathering_actor_ids.size()
+	var edge_margin_cells := clampi(
+		absi(horizontal_offset_cells) / 2,
+		4,
+		maxi(mining_config.terrain_width_cells / 4, 4)
+	)
+	var minimum_cell_x := float(edge_margin_cells)
+	var maximum_cell_x := float(
+		maxi(
+			mining_config.terrain_width_cells - 1 - edge_margin_cells,
+			edge_margin_cells
+		)
+	)
+	var spacing_cells := (
+		0.0
+		if actor_count <= 1
+		else minf(
+			16.0,
+			(maximum_cell_x - minimum_cell_x)
+				/ float(actor_count - 1)
+		)
+	)
+	var group_span_cells := spacing_cells * float(maxi(actor_count - 1, 0))
+	var group_start_cell_x := clampf(
+		float(mining_config.terrain_width_cells) * 0.5
+			- group_span_cells * 0.5,
+		minimum_cell_x,
+		maxf(maximum_cell_x - group_span_cells, minimum_cell_x)
+	)
+	for actor_index in range(actor_count):
+		var actor_id := encounter_config.gathering_actor_ids[actor_index]
+		if not _presenters_by_actor_id.has(actor_id):
+			continue
+		var presenter := _presenters_by_actor_id[actor_id]
 		presenter.position = Vector2(
-			float(group_x_cells[presenter_index])
+			(group_start_cell_x + float(actor_index) * spacing_cells)
 				* float(mining_config.terrain_cell_world_size),
-			departure_y
+			gathering_y
 		)
 		presenter.show()
-	_presenters[_active_encounter_index].hide()
 
 
 ## Grants the authored reward and advances to the next listed encounter.
@@ -213,42 +329,21 @@ func _on_conversation_finished(conversation_id: StringName) -> void:
 			"Encounter '%s' could not grant pickaxe '%s'."
 			% [conversation_id, encounter.pickaxe_reward.id]
 		)
-	_presenters[_active_encounter_index].reset_speech_motion()
+	if encounter.grants_coffee_speed_boost:
+		coffee_speed_boost_requested.emit()
+	_reset_speech_reactions()
 	_active_conversation = null
 	if encounter.occurs_at_run_bottom:
 		final_encounter_reached.emit(encounter.encounter_id)
 		return
+	if _active_stage != null:
+		await _active_stage.play_closing()
+		_active_stage = null
+		dialogue_director.close_cinematic_frame()
+		await dialogue_director.wait_until_frame_closed()
 
 	_next_encounter_index = _active_encounter_index + 1
 	_active_encounter_index = -1
-	if (
-		_next_encounter_index < encounter_config.encounters.size()
-		and encounter_config.encounters[
-			_next_encounter_index
-		].occurs_at_run_bottom
-	):
-		_is_waiting_for_departure_choice = true
-		departure_choice_requested.emit()
-		return
-	_restore_mining_after_buffer()
-
-
-## Walks the departing cast through the open right wall, then resumes mining.
-func continue_after_departure() -> void:
-	if not _is_waiting_for_departure_choice:
-		return
-	_is_waiting_for_departure_choice = false
-	var departure_distance := (
-		float(departure_walk_cells)
-		* float(mining_config.terrain_cell_world_size)
-	)
-	for presenter_index in range(
-		mini(_next_encounter_index, 4)
-	):
-		_presenters[presenter_index].depart_right(
-			departure_distance,
-			departure_walk_seconds
-		)
 	_restore_mining_after_buffer()
 
 
@@ -260,11 +355,11 @@ func _restore_mining_after_buffer() -> void:
 			true
 		)
 		restore_timer.timeout.connect(
-			_restore_timing_window,
+			_finish_cinematic_flow,
 			CONNECT_ONE_SHOT
 		)
 		return
-	_restore_timing_window()
+	_finish_cinematic_flow()
 
 
 ## Instantiates the small fixed roster and rejects broken authored entries.
@@ -273,11 +368,12 @@ func _prepare_authored_characters() -> bool:
 		encounter_config == null
 		or mining_config == null
 		or dialogue_director == null
-		or timing_window == null
 		or character_scene == null
 		or character_parent == null
 		or pickaxe_progression == null
-		or mining_controller == null
+		or miner_rig == null
+		or cinematic_flow == null
+		or terrain_renderer == null
 	):
 		push_error("Character encounter references are incomplete.")
 		return false
@@ -287,9 +383,14 @@ func _prepare_authored_characters() -> bool:
 
 	var previous_depth := -1
 	var bottom_encounters := 0
+	var gathering_encounters := 0
 	for encounter_index in range(encounter_config.encounters.size()):
 		var encounter := encounter_config.encounters[encounter_index]
-		if encounter == null or encounter.appearance == null:
+		if (
+			encounter == null
+			or encounter.appearance == null
+			or encounter.actor_id.is_empty()
+		):
 			push_error(
 				"Character encounter %d is incomplete."
 				% (encounter_index + 1)
@@ -321,20 +422,22 @@ func _prepare_authored_characters() -> bool:
 				)
 				return false
 			bottom_encounters += 1
+		elif encounter.gathers_cast:
+			gathering_encounters += 1
 		previous_depth = encounter_depth
 	if bottom_encounters != 1:
 		push_error("Exactly one encounter must be at zero remaining depth.")
 		return false
+	if gathering_encounters != 1:
+		push_error("Exactly one depth-authored cafe gathering is required.")
+		return false
+	if encounter_config.gathering_actor_ids.is_empty():
+		push_error("The cafe gathering requires an identity-aware cast roster.")
+		return false
 
 	var cell_size := float(mining_config.terrain_cell_world_size)
 	for encounter in encounter_config.encounters:
-		var presenter := character_scene.instantiate() as CharacterPresenter
-		if presenter == null:
-			push_error("Character presenter could not be instantiated.")
-			return false
-		character_parent.add_child(presenter)
-		presenter.apply_appearance(encounter.appearance)
-		presenter.position = Vector2(
+		var encounter_position := Vector2(
 			(
 				float(mining_config.terrain_width_cells) * 0.5
 				+ float(horizontal_offset_cells)
@@ -344,7 +447,60 @@ func _prepare_authored_characters() -> bool:
 				+ encounter.resolve_depth(mining_config.total_run_depth)
 			) * cell_size
 		)
+		_encounter_positions.append(encounter_position)
+		var presenter: CharacterPresenter = (
+			_presenters_by_actor_id.get(encounter.actor_id)
+		)
+		if presenter == null:
+			presenter = character_scene.instantiate() as CharacterPresenter
+			if presenter == null:
+				push_error("Character presenter could not be instantiated.")
+				return false
+			character_parent.add_child(presenter)
+			presenter.apply_appearance(encounter.appearance)
+			presenter.position = encounter_position
+			_presenters_by_actor_id[encounter.actor_id] = presenter
+			_speaker_slots_by_actor_id[encounter.actor_id] = (
+				encounter.speaker_slot
+			)
 		_presenters.append(presenter)
+		var stage: CharacterEncounterStage
+		if encounter.stage_scene != null:
+			stage = (
+				encounter.stage_scene.instantiate()
+				as CharacterEncounterStage
+			)
+			if stage == null:
+				push_error(
+					"Encounter '%s' stage is not a CharacterEncounterStage."
+					% encounter.encounter_id
+				)
+				return false
+			character_parent.add_child(stage)
+			stage.position = encounter_position
+			_connect_once(
+				stage.presentation_strike_requested,
+				_on_character_stage_strike_requested
+			)
+			if encounter.starts_rat_colony_support:
+				if not stage is RatColonyEncounterStage:
+					push_error(
+						"Encounter '%s' requires a rat colony stage."
+							% encounter.encounter_id
+					)
+					return false
+				_connect_once(
+					(stage as RatColonyEncounterStage)
+						.persistent_colony_requested,
+					_on_persistent_colony_requested
+				)
+		_stages.append(stage)
+	for actor_id in encounter_config.gathering_actor_ids:
+		if not _presenters_by_actor_id.has(actor_id):
+			push_error(
+				"Gathering actor '%s' has no authored encounter." % actor_id
+			)
+			return false
 	_on_view_position_changed(Vector2(
 		float(mining_config.terrain_width_cells) * 0.5,
 		float(mining_config.initial_surface_row)
@@ -352,9 +508,54 @@ func _prepare_authored_characters() -> bool:
 	return true
 
 
-## Makes the timing bar usable after a completed character conversation.
-func _restore_timing_window() -> void:
-	encounter_camera_released.emit()
-	mining_controller.set_swing_queue_paused(false)
-	timing_window.process_mode = Node.PROCESS_MODE_INHERIT
-	timing_window.show()
+## Reports whether the fixed-depth schedule already owns this mining beat.
+func has_pending_or_active_interaction() -> bool:
+	return (
+		_pending_encounter_index >= 0
+		or _active_encounter_index >= 0
+		or cinematic_flow.is_owned_by(FLOW_OWNER)
+	)
+
+
+## Releases only this encounter's named ownership of mining and camera state.
+func _finish_cinematic_flow() -> void:
+	_reset_speech_reactions()
+	cinematic_flow.finish(FLOW_OWNER)
+
+
+func _reset_speech_reactions() -> void:
+	for presenter in _presenters_by_actor_id.values():
+		presenter.reset_speech_motion()
+	miner_rig.reset_speech_motion()
+
+
+## Relays a stage-local action through the cross-system wiring boundary.
+func _on_character_stage_strike_requested(
+	screen_position: Vector2
+) -> void:
+	character_stage_strike_requested.emit(screen_position)
+
+
+## Relays the clean stage transition through the cross-system wiring boundary.
+func _on_persistent_colony_requested() -> void:
+	rat_colony_support_requested.emit()
+
+
+## Restores reversible stage state and skips malformed authored dialogue.
+func _fail_active_encounter() -> void:
+	if _active_stage != null:
+		_active_stage.cancel_and_restore()
+		_active_stage = null
+	dialogue_director.close_cinematic_frame()
+	await dialogue_director.wait_until_frame_closed()
+	_reset_speech_reactions()
+	_active_conversation = null
+	if _active_encounter_index >= 0:
+		_next_encounter_index = _active_encounter_index + 1
+	_active_encounter_index = -1
+	_finish_cinematic_flow()
+
+
+func _connect_once(source_signal: Signal, target: Callable) -> void:
+	if not source_signal.is_connected(target):
+		source_signal.connect(target)

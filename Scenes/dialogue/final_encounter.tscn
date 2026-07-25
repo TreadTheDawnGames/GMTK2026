@@ -1,0 +1,51 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/dialogue/final_encounter_controller.gd" id="1_controller"]
+
+[node name="FinalEncounter" type="CanvasLayer" node_paths=PackedStringArray("ending_root", "return_to_title_button")]
+process_mode = 3
+layer = 25
+script = ExtResource("1_controller")
+ending_root = NodePath("EndingRoot")
+return_to_title_button = NodePath("EndingRoot/Center/Content/ReturnToTitleButton")
+
+[node name="EndingRoot" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="Center" type="CenterContainer" parent="EndingRoot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Content" type="VBoxContainer" parent="EndingRoot/Center"]
+custom_minimum_size = Vector2(520, 0)
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="Title" type="Label" parent="EndingRoot/Center/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 36
+text = "THE THIEF"
+horizontal_alignment = 1
+
+[node name="Message" type="Label" parent="EndingRoot/Center/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "You found the Thief at the bottom of the mine."
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="ReturnToTitleButton" type="Button" parent="EndingRoot/Center/Content"]
+custom_minimum_size = Vector2(220, 58)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "Return to title"

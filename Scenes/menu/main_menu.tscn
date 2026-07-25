@@ -4,7 +4,7 @@
 [ext_resource type="Theme" uid="uid://cy302o2vx18ng" path="res://resources/themes/Menus.tres" id="1_ufr4i"]
 [ext_resource type="PackedScene" uid="uid://ce2kgb3fjtjut" path="res://Scenes/Options.tscn" id="3_uffod"]
 
-[node name="MainMenu" type="Control" unique_id=633825169 node_paths=PackedStringArray("title_group", "subtitle_group", "button_group", "start_button", "options_button", "exit_button", "exit_confirmation", "status_label")]
+[node name="MainMenu" type="Control" unique_id=633825169 node_paths=PackedStringArray("title_group", "subtitle_group", "button_group", "start_button", "options_button", "exit_button", "exit_confirmation", "status_label", "start_fade_overlay")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -23,6 +23,7 @@ exit_button = NodePath("MenuLayout/ButtonCenter/Buttons/ExitButton")
 exit_confirmation = NodePath("ExitConfirmation")
 status_label = NodePath("MenuLayout/ButtonCenter/Buttons/Status")
 options_scene = ExtResource("3_uffod")
+start_fade_overlay = NodePath("StartFadeOverlay")
 section_fade_seconds = 0.0
 
 [node name="Background" type="ColorRect" parent="." unique_id=1064397230]
@@ -107,6 +108,18 @@ grow_horizontal = 0
 grow_vertical = 0
 text = "JAM BUILD"
 horizontal_alignment = 2
+
+[node name="StartFadeOverlay" type="ColorRect" parent="." unique_id=884301776]
+editor_description = "Covers the menu on Start. The mining scene opens fully covered by the same black and splits it apart from the middle, so keep this color matched to CinematicFrame's bars."
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.008, 0.006, 0.008, 1)
 
 [node name="ExitConfirmation" type="ConfirmationDialog" parent="." unique_id=129160021]
 oversampling_override = 1.0

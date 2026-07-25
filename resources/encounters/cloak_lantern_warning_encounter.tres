@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="DepthCharacterEncounter" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
+[ext_resource type="Resource" path="res://resources/encounters/cloak_lantern_character_appearance.tres" id="2_appearance"]
+[ext_resource type="Resource" path="res://resources/dialogue/cloak_lantern_warning_conversation.tres" id="3_dialogue"]
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="5_stage"]
+
+[resource]
+script = ExtResource("1_encounter")
+encounter_id = &"cloak_lantern_warning"
+actor_id = &"cloak_lantern"
+depth_from_surface = 5600
+appearance = ExtResource("2_appearance")
+conversation = ExtResource("3_dialogue")
+stage_scene = ExtResource("5_stage")
+speaker_slot = &"cloak_lantern"

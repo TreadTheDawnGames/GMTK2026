@@ -9,6 +9,7 @@ signal pressed(success: bool, hit_direction: int, combo : int)
 
 @onready var slider: Panel = %Slider
 @onready var backing: Control = %Backing
+@onready var _game_state: RunState = RunState.get_global(self)
 
 
 @export var speed: float = 500.0
@@ -224,7 +225,11 @@ func _process(delta: float) -> void:
 	)
 	if hit_left_edge or hit_right_edge:
 		direction *= -1
-		if not GameState.save_game.mute_bounce:
+		if (
+			_game_state == null
+			or _game_state.save_game == null
+			or not _game_state.save_game.mute_bounce
+		):
 			AudioHandler.play_sound(AudioLibrary.BOUNCE)
 		if one_shot:
 			pressed.emit(false, 0, consecutive_hits)

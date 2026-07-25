@@ -22,7 +22,7 @@ buses/default_bus_layout="uid://ct33mw21k8ao4"
 [autoload]
 
 GameState="*res://Scenes/globals/game_state.tscn"
-AudioHandler="*uid://b2mhajhoyn0n2"
+AudioHandler="*res://Scenes/globals/audio_handler.tscn"
 
 [autoload]
 
@@ -38,7 +38,7 @@ window/vsync/vsync_mode=0
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/godot_audio_manager/plugin.cfg")
+enabled=PackedStringArray("res://addons/cutscene_terrain_tools/plugin.cfg")
 
 [input]
 
@@ -59,10 +59,6 @@ aim_right={
 ]
 }
 
-[internationalization]
-
-locale/translations=PackedStringArray("res://addons/maaacks_menus_template/base/translations/menus_translations.en.translation", "res://addons/maaacks_menus_template/base/translations/menus_translations.fr.translation")
-
 [maaacks_menus_template]
 
 disable_install_audio_busses=true
@@ -79,3 +75,4 @@ textures/canvas_textures/default_texture_filter=0
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+environment/defaults/default_clear_color=Color(0.008, 0.006, 0.008, 1)

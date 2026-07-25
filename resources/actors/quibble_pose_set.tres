@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="ActorPoseSet" load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://resources/actors/actor_pose.gd" id="1_pose"]
+[ext_resource type="Script" path="res://resources/actors/actor_pose_set.gd" id="2_pose_set"]
+[ext_resource type="Texture2D" path="res://Assets/Characters/quibble/quibble_cup_out.png" id="3_idle"]
+[ext_resource type="Texture2D" path="res://Assets/Characters/quibble/quibble_hold_cup.png" id="4_hold"]
+[ext_resource type="Texture2D" path="res://Assets/Characters/quibble/quibble_drink.png" id="5_drink"]
+
+[sub_resource type="Resource" id="ActorPose_idle"]
+script = ExtResource("1_pose")
+pose_name = &"idle"
+texture = ExtResource("3_idle")
+
+[sub_resource type="Resource" id="ActorPose_hold"]
+script = ExtResource("1_pose")
+pose_name = &"hold_cup"
+texture = ExtResource("4_hold")
+
+[sub_resource type="Resource" id="ActorPose_drink"]
+script = ExtResource("1_pose")
+pose_name = &"drink"
+texture = ExtResource("5_drink")
+
+[resource]
+script = ExtResource("2_pose_set")
+poses = Array[ExtResource("1_pose")]([SubResource("ActorPose_idle"), SubResource("ActorPose_hold"), SubResource("ActorPose_drink")])

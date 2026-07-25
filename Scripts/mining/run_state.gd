@@ -36,14 +36,20 @@ static func get_global(context: Node) -> RunState:
 ## Starts a new run when the node loads.
 func _ready() -> void:
 	save_game = SaveGame.load_savegame()
-	reset_run()
-	Conductor.set_song(preload("uid://dcpd5v4iqgnoc"), 295, 4)
-	Conductor.play()
-	#Conductor.beat.connect(print.bind())
+	# Loading the autoload initializes runtime counters without erasing saved
+	# map presentation. An explicit New Run still clears that presentation.
+	reset_run(false)
 
 
 ## Resets depth, combo, and hit counts.
-func reset_run() -> void:
+func reset_run(clear_saved_run: bool = true) -> void:
+	if (
+		clear_saved_run
+		and save_game != null
+		and not save_game.gem_outcrops.is_empty()
+	):
+		save_game.gem_outcrops.clear()
+		save_game.write_savegame()
 	depth = 0
 	mining_x = config.terrain_width_cells / 2
 	mining_y = config.initial_surface_row

@@ -1,0 +1,47 @@
+[gd_resource type="Resource" script_class="DialogueConversation" load_steps=11 format=3]
+
+[ext_resource type="Script" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
+[ext_resource type="Script" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
+[ext_resource type="Script" path="res://resources/dialogue/dialogue_line.gd" id="3_line"]
+
+[sub_resource type="Resource" id="Participant_miner"]
+script = ExtResource("2_participant")
+slot = &"miner"
+display_name = "Miner"
+
+[sub_resource type="Resource" id="Participant_rutini"]
+script = ExtResource("2_participant")
+slot = &"rutini"
+display_name = "Rotini"
+
+[sub_resource type="Resource" id="Line_again"]
+script = ExtResource("3_line")
+speaker_slot = &"rutini"
+text = "You again! Did you find a way through?"
+
+[sub_resource type="Resource" id="Line_miner_one"]
+script = ExtResource("3_line")
+speaker_slot = &"miner"
+text = "..."
+
+[sub_resource type="Resource" id="Line_cafe"]
+script = ExtResource("3_line")
+speaker_slot = &"rutini"
+text = "The Cheese Cafe is straight down? That's exactly where we're trying to go!"
+
+[sub_resource type="Resource" id="Line_colony"]
+script = ExtResource("3_line")
+speaker_slot = &"rutini"
+text = "Colony, we're joining the Miner! We'll mine straight down together."
+
+[sub_resource type="Resource" id="Line_later"]
+script = ExtResource("3_line")
+speaker_slot = &"rutini"
+stage_cue = &"begin_colony_mining"
+text = "All paws ready! Let's dig!"
+
+[resource]
+script = ExtResource("1_conversation")
+conversation_id = &"rutini_second"
+participants = Array[ExtResource("2_participant")]([SubResource("Participant_miner"), SubResource("Participant_rutini")])
+lines = Array[ExtResource("3_line")]([SubResource("Line_again"), SubResource("Line_miner_one"), SubResource("Line_cafe"), SubResource("Line_colony"), SubResource("Line_later")])

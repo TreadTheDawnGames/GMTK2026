@@ -1,0 +1,40 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_base"]
+[ext_resource type="Script" path="res://Scripts/cinematics/rat_colony_encounter_stage.gd" id="2_stage"]
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/rat_miner.tscn" id="3_rat"]
+[ext_resource type="Script" path="res://Scripts/cinematics/cinematic_rat_appearance.gd" id="4_appearance"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_brown.tres" id="5_brown"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_grey.tres" id="6_grey"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_white.tres" id="7_white"]
+
+[node name="RatColonyEncounterStage" node_paths=PackedStringArray("rat_container") instance=ExtResource("1_base")]
+editor_description = "Rotini waits beside the miner while a bounded colony runs, mines, and exits through the normal four-layer encounter tunnel."
+script = ExtResource("2_stage")
+rat_scene = ExtResource("3_rat")
+rat_container = NodePath("RatContainer")
+rat_appearances = Array[ExtResource("4_appearance")]([ExtResource("5_brown"), ExtResource("6_grey"), ExtResource("7_white")])
+
+[node name="Entrance" parent="ActorMarkers" index="0"]
+position = Vector2(-420, 0)
+
+[node name="Conversation" parent="ActorMarkers" index="1"]
+position = Vector2(120, 0)
+
+[node name="Work" parent="ActorMarkers" index="2"]
+position = Vector2(390, 0)
+
+[node name="Rest" parent="ActorMarkers" index="3"]
+position = Vector2(120, 0)
+
+[node name="Exit" parent="ActorMarkers" index="4"]
+position = Vector2(700, 0)
+
+[node name="RatContainer" type="Node2D" parent="." index="3"]
+z_index = 7
+
+[node name="EditorTerrainPreview" parent="." index="5"]
+editor_description = "Previews rutini_second_encounter's own chamber at depth 11200."
+preview_depth_rows = 11200
+
+[editable path="ActorMarkers"]

@@ -1,0 +1,117 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://Scripts/ui/credits_overlay.gd" id="1_controller"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_panel"]
+bg_color = Color(0.008, 0.006, 0.008, 0.88)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.72, 0.55, 0.24, 0.92)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[node name="CreditsOverlay" type="CanvasLayer" node_paths=PackedStringArray("overlay_root", "scroll_region", "credits_label")]
+layer = 35
+script = ExtResource("1_controller")
+overlay_root = NodePath("OverlayRoot")
+scroll_region = NodePath("OverlayRoot/CreditsPanel/ScrollRegion")
+credits_label = NodePath("OverlayRoot/CreditsPanel/ScrollRegion/CreditsLabel")
+
+[node name="OverlayRoot" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="CreditsPanel" type="PanelContainer" parent="OverlayRoot"]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -378.0
+offset_top = -292.0
+offset_right = -18.0
+offset_bottom = 292.0
+grow_horizontal = 0
+grow_vertical = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBox_panel")
+
+[node name="ScrollRegion" type="Control" parent="OverlayRoot/CreditsPanel"]
+clip_contents = true
+custom_minimum_size = Vector2(356, 580)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="DepthCaption" type="Label" parent="OverlayRoot/CreditsPanel/ScrollRegion"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 20.0
+offset_top = 14.0
+offset_right = -20.0
+offset_bottom = 42.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.93, 0.77, 0.42, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.8)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 18
+text = "15,000 DEEP  •  KEEP DIGGING"
+horizontal_alignment = 1
+
+[node name="CreditsLabel" type="RichTextLabel" parent="OverlayRoot/CreditsPanel/ScrollRegion"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 26.0
+offset_right = -26.0
+offset_bottom = 500.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_colors/default_color = Color(0.94, 0.94, 0.94, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.9)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/normal_font_size = 20
+theme_override_font_sizes/bold_font_size = 26
+bbcode_enabled = true
+text = "[center][font_size=34][b]WHY ARE YOU HERE?[/b][/font_size]
+
+[color=#eac36b]A GMTK GAME JAM 2026 GAME[/color]
+
+[b]TREAD THE DAWN GAMES[/b]
+
+[font_size=18]JARED
+CASPIAN
+ZEPHAN[/font_size]
+
+
+[b]GAME DESIGN[/b]
+TREAD THE DAWN GAMES
+
+[b]PROGRAMMING[/b]
+TREAD THE DAWN GAMES
+
+[b]ART & AUDIO[/b]
+TREAD THE DAWN GAMES
+
+
+[color=#eac36b][b]THANK YOU FOR PLAYING[/b][/color]
+
+THE END IS BEHIND YOU.
+
+[font_size=28][b]KEEP DIGGING.[/b][/font_size][/center]"
+fit_content = true
+scroll_active = false

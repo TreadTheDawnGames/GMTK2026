@@ -1,8 +1,12 @@
+@tool
 class_name MiningConfig
 extends Resource
 
 ## Shared, inspector-editable tuning for terrain, descent, and hit feedback.
 ## One descended terrain row equals one gameplay depth.
+## @tool so the editor terrain preview can call get_bottom_surface_row(): a
+## non-tool resource loads as a placeholder inside a tool script and throws on
+## any method call.
 
 enum MiningCameraStyle {
 	SMOOTH_FOLLOW,

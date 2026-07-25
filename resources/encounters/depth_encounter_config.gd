@@ -18,6 +18,8 @@ extends Resource
 @export_category("Flow")
 ## Waits before the timing bar accepts input after dialogue.
 @export_range(0.0, 5.0, 0.1) var post_dialogue_buffer_seconds: float = 0.5
+## Stable identities gathered at the cafe in this authored order.
+@export var gathering_actor_ids: Array[StringName] = []
 
 
 ## Reports whether a terrain row belongs to any encounter chamber.
@@ -31,6 +33,43 @@ func is_chamber_row(depth: int, total_run_depth: int) -> bool:
 		if rows_until_floor > 0 and rows_until_floor <= chamber_height_rows:
 			return true
 	return false
+
+
+## Returns the first open row of an encounter tunnel.
+## A hit may skip every row between this ceiling and the floor, so flow
+## controllers compare against this threshold rather than one exact impact.
+func get_encounter_ceiling_depth(
+	encounter: DepthCharacterEncounter,
+	total_run_depth: int
+) -> int:
+	if encounter == null:
+		return -1
+	return maxi(
+		encounter.resolve_depth(total_run_depth) - chamber_height_rows,
+		0
+	)
+
+
+## Returns the first encounter floor whose ceiling a proposed fall crosses.
+## Mining uses this to stop an oversized hit at the room instead of letting its
+## already-calculated landing target skip below the cutscene presentation.
+func get_first_crossed_encounter_floor_depth(
+	start_depth: int,
+	end_depth: int,
+	total_run_depth: int
+) -> int:
+	if end_depth <= start_depth:
+		return -1
+	for encounter in encounters:
+		if encounter == null:
+			continue
+		var ceiling_depth := get_encounter_ceiling_depth(
+			encounter,
+			total_run_depth
+		)
+		if start_depth < ceiling_depth and end_depth >= ceiling_depth:
+			return encounter.resolve_depth(total_run_depth)
+	return -1
 
 
 ## Returns shared logic/visual chamber bounds for one gameplay depth row.

@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="CharacterAppearance" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://resources/encounters/character_appearance.gd" id="1_appearance"]
+[ext_resource type="Texture2D" path="res://resources/actors/cheese_girl_idle_texture.tres" id="2_texture"]
+
+[resource]
+script = ExtResource("1_appearance")
+texture = ExtResource("2_texture")
+sprite_scale = Vector2(0.24, 0.24)
+sprite_offset = Vector2(75, -33)

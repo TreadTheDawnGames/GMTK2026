@@ -4,6 +4,7 @@
 [ext_resource type="Texture2D" uid="uid://bq8qwl3xn5qny" path="res://Assets/Characters/miner_idle-Pickaxe.png" id="2_6q48d"]
 [ext_resource type="Texture2D" uid="uid://cpy531sdh8q1o" path="res://Assets/Characters/miner_impact.png" id="5_impact_miner"]
 [ext_resource type="Texture2D" uid="uid://b7itm01ip56lo" path="res://Assets/Characters/miner_wound_up.png" id="6_wind_up_miner"]
+[ext_resource type="Script" path="res://Scripts/dialogue/speech_reaction.gd" id="7_speech"]
 
 [sub_resource type="Animation" id="Animation_reset"]
 resource_name = "RESET"
@@ -484,7 +485,7 @@ _data = {
 &"wind_up": SubResource("Animation_wind_up")
 }
 
-[node name="MinerRig" type="Node2D" unique_id=1134346491 node_paths=PackedStringArray("animation_player", "visual_root", "drawn_miner_sprite", "landing_foot_anchor", "impact_point", "stand_in_hammer_head", "final_hammer_head_sprite", "impact_audio_player")]
+[node name="MinerRig" type="Node2D" unique_id=1134346491 node_paths=PackedStringArray("animation_player", "visual_root", "drawn_miner_sprite", "landing_foot_anchor", "impact_point", "stand_in_hammer_head", "final_hammer_head_sprite", "impact_audio_player", "speech_reaction")]
 editor_description = "Presentation-only character rig. Keep this root fixed so the player stays centered. Animate VisualRoot and its pivots instead."
 position = Vector2(576, 202)
 script = ExtResource("1_rig")
@@ -499,18 +500,29 @@ impact_point = NodePath("VisualRoot/DrawnImpactPoint")
 stand_in_hammer_head = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/StandInToolHead")
 final_hammer_head_sprite = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/PickaxeHeadSprite")
 impact_audio_player = NodePath("")
+speech_reaction = NodePath("SpeechReaction")
 
 [node name="VisualRoot" type="Node2D" parent="." unique_id=465234156]
 editor_description = "Animate this for whole-character bounce, squash, recoil, and small fall offsets. Do not use it to calculate mining progress."
 
 [node name="DrawnMinerSprite" type="Sprite2D" parent="VisualRoot" unique_id=611169088]
+texture_filter = 4
 position = Vector2(0, -16)
-scale = Vector2(0.22, 0.22)
+scale = Vector2(0.44, 0.44)
 texture = ExtResource("2_6q48d")
 
 [node name="LandingFootAnchor" type="Marker2D" parent="VisualRoot" unique_id=410620658]
 editor_description = "Authored underside of the idle miner's soles. Landings align this point to visible terrain support."
 position = Vector2(0, 52)
+
+[node name="CinematicFocusAnchor" type="Marker2D" parent="VisualRoot"]
+editor_description = "Shared body center for the tracked iris and retained entrance."
+position = Vector2(0, 18)
+
+[node name="SpeechReaction" type="Node" parent="." node_paths=PackedStringArray("visual_root")]
+process_mode = 3
+script = ExtResource("7_speech")
+visual_root = NodePath("../VisualRoot")
 
 [node name="DrawnImpactPoint" type="Marker2D" parent="VisualRoot" unique_id=614521976]
 editor_description = "Contact point for the drawn miner's ground-strike frame."

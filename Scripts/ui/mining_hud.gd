@@ -6,26 +6,24 @@ extends CanvasLayer
 @export var depth_label: Label
 @export var bottom_eta_label: Label
 @export var fps_label: Label
-@export var options_scene : PackedScene
-#Ref to open options so we don't open multiple options
-var open_options : Control
+@export var options_scene: PackedScene
 @export_range(0.1, 2.0, 0.1) var eta_refresh_seconds: float = 0.25
 
 @onready var _game_state: RunState = RunState.get_global(self)
-var _elapsed_run_seconds: float = 0.0
+var _elapsed_run_seconds: int = 0
 var _eta_refresh_remaining: float = 0.0
+var _open_options: Control
 
 
-## Displays the starting state and counts total time spent in the run.
+## Displays the starting state before the shared run timeline begins.
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_update_remaining_depth(_game_state.remaining_depth)
 	_update_bottom_eta()
 
 
-## Refreshes the pace estimate without rebuilding UI every rendered frame.
+## Refreshes the FPS display and pace estimate at a bounded cadence.
 func _process(delta: float) -> void:
-	_elapsed_run_seconds += delta
 	_eta_refresh_remaining -= delta
 	if _eta_refresh_remaining > 0.0:
 		return
@@ -40,10 +38,9 @@ func _on_depth_changed(_depth: int) -> void:
 	_update_bottom_eta()
 
 
-## Clears elapsed pace data when a new run begins.
-func _on_run_reset() -> void:
-	_elapsed_run_seconds = 0.0
-	_eta_refresh_remaining = 0.0
+## Consumes the canonical controllable-run clock for pace projection.
+func _on_run_time_changed(elapsed_seconds: int) -> void:
+	_elapsed_run_seconds = maxi(elapsed_seconds, 0)
 	_update_remaining_depth(_game_state.remaining_depth)
 	_update_bottom_eta()
 
@@ -97,12 +94,16 @@ func _format_number(value: int) -> String:
 	return digits + result
 
 func _input(event: InputEvent) -> void:
-	if event is InputEventKey:
-		var keyvent : InputEventKey = event as InputEventKey
-		if not keyvent.pressed:
-			return
-		if keyvent.keycode == Key.KEY_ESCAPE and not open_options:
-			open_options = options_scene.instantiate()
-			add_child(open_options)
-		elif open_options:
-			open_options._on_back_button_pressed()
+	if not event is InputEventKey:
+		return
+	var key_event := event as InputEventKey
+	if not key_event.pressed or key_event.echo:
+		return
+	if (
+		key_event.keycode == Key.KEY_ESCAPE
+		and not is_instance_valid(_open_options)
+	):
+		_open_options = options_scene.instantiate()
+		add_child(_open_options)
+	elif is_instance_valid(_open_options):
+		_open_options._on_back_button_pressed()

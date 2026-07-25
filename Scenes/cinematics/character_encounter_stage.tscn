@@ -1,0 +1,92 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://Scripts/cinematics/character_encounter_stage.gd" id="1_stage"]
+[ext_resource type="Script" path="res://Scripts/cinematics/cinematic_terrain_preview.gd" id="2_preview"]
+[ext_resource type="Resource" uid="uid://dhlm43rg16rkw" path="res://resources/mining/mining_config.tres" id="3_config"]
+[ext_resource type="Resource" path="res://resources/mining/default_terrain_layer_profile.tres" id="4_profile"]
+[ext_resource type="Script" uid="uid://b38bkkdjcto5g" path="res://Scripts/mining/terrain_manager.gd" id="5_terrain_manager"]
+[ext_resource type="Script" uid="uid://d3fjog3we4ugh" path="res://Scripts/mining/terrain_layer_renderer.gd" id="6_terrain_renderer"]
+
+[sub_resource type="Animation" id="Animation_reset"]
+resource_name = "RESET"
+
+[sub_resource type="Animation" id="Animation_opening"]
+resource_name = "opening"
+length = 0.01
+
+[sub_resource type="Animation" id="Animation_closing"]
+resource_name = "closing"
+length = 0.01
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_stage"]
+_data = {
+&"RESET": SubResource("Animation_reset"),
+&"closing": SubResource("Animation_closing"),
+&"opening": SubResource("Animation_opening")
+}
+
+[node name="CharacterEncounterStage" type="Node2D" node_paths=PackedStringArray("actor_markers_root", "prop_markers_root", "action_markers_root", "entrance_marker", "conversation_marker", "work_marker", "rest_marker", "exit_marker", "animation_player")]
+editor_description = "Reusable encounter stage facade. Inherit this scene, move the named markers, add props/effects under their roots, and author AnimationPlayer clips whose names match DialogueLine Stage Cue values."
+process_mode = 3
+script = ExtResource("1_stage")
+actor_markers_root = NodePath("ActorMarkers")
+prop_markers_root = NodePath("PropMarkers")
+action_markers_root = NodePath("ActionMarkers")
+entrance_marker = NodePath("ActorMarkers/Entrance")
+conversation_marker = NodePath("ActorMarkers/Conversation")
+work_marker = NodePath("ActorMarkers/Work")
+rest_marker = NodePath("ActorMarkers/Rest")
+exit_marker = NodePath("ActorMarkers/Exit")
+animation_player = NodePath("AnimationPlayer")
+
+[node name="ActorMarkers" type="Node2D" parent="."]
+editor_description = "Human-named actor travel and persistence markers."
+
+[node name="Entrance" type="Marker2D" parent="ActorMarkers"]
+position = Vector2(-320, 0)
+
+[node name="Conversation" type="Marker2D" parent="ActorMarkers"]
+
+[node name="Work" type="Marker2D" parent="ActorMarkers"]
+position = Vector2(160, 0)
+
+[node name="Rest" type="Marker2D" parent="ActorMarkers"]
+
+[node name="Exit" type="Marker2D" parent="ActorMarkers"]
+position = Vector2(640, 0)
+
+[node name="PropMarkers" type="Node2D" parent="."]
+editor_description = "Concrete stages add named prop anchors such as Discovery, Handoff, or Collection."
+
+[node name="ActionMarkers" type="Node2D" parent="."]
+editor_description = "Concrete stages add named action anchors such as WallStrike or EffectOrigin."
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+libraries/ = SubResource("AnimationLibrary_stage")
+
+[node name="EditorTerrainPreview" type="Node2D" parent="." node_paths=PackedStringArray("terrain_manager", "terrain_renderer", "test_impacts_root")]
+z_index = -100
+position = Vector2(-576, -260)
+editor_description = "Editor-only. Runs the production TerrainManager and TerrainLayerRenderer so every inheriting stage is authored inside the real encounter chamber instead of an empty canvas. The offset puts the terrain's mining face on this stage's origin, which is where the stage sits at runtime, so a marker at y = 0 is on the dig line. Set Preview Depth Rows to this stage's own encounter depth. It frees itself in a running game and nothing reads from it."
+script = ExtResource("2_preview")
+terrain_manager = NodePath("TerrainManager")
+terrain_renderer = NodePath("TerrainLayerRenderer")
+test_impacts_root = NodePath("TestImpacts")
+preview_depth_rows = 600
+preview_combo = 8
+
+[node name="TerrainManager" type="Node" parent="EditorTerrainPreview"]
+script = ExtResource("5_terrain_manager")
+config = ExtResource("3_config")
+
+[node name="TerrainLayerRenderer" type="Node2D" parent="EditorTerrainPreview" node_paths=PackedStringArray("terrain_manager")]
+script = ExtResource("6_terrain_renderer")
+terrain_manager = NodePath("../TerrainManager")
+profile = ExtResource("4_profile")
+preview_in_editor = true
+
+[node name="TestImpacts" type="Node2D" parent="EditorTerrainPreview"]
+editor_description = "Each Marker2D here is dug with a real hit. Drag one to move the opening, or use the Dig Terrain toggle in the 2D toolbar to click new ones in."
+
+[node name="EntryImpact" type="Marker2D" parent="EditorTerrainPreview/TestImpacts"]
+position = Vector2(576, 260)

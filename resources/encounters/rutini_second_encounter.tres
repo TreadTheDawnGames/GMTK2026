@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="DepthCharacterEncounter" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
+[ext_resource type="Resource" path="res://resources/encounters/rutini_character_appearance.tres" id="2_appearance"]
+[ext_resource type="Resource" path="res://resources/dialogue/rutini_second_conversation.tres" id="3_dialogue"]
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/rat_colony_encounter_stage.tscn" id="5_stage"]
+
+[resource]
+script = ExtResource("1_encounter")
+encounter_id = &"rutini_second"
+actor_id = &"rutini"
+depth_from_surface = 11200
+appearance = ExtResource("2_appearance")
+conversation = ExtResource("3_dialogue")
+stage_scene = ExtResource("5_stage")
+speaker_slot = &"rutini"
+starts_rat_colony_support = true

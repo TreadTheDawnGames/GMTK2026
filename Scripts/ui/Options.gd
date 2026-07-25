@@ -6,26 +6,27 @@ extends Control
 @onready var master_volume: VolumeControl = %MasterVolume
 @onready var music: VolumeControl = %Music
 @onready var sfx: VolumeControl = %SFX
+@onready var _game_state: RunState = RunState.get_global(self)
 # Called when the node enters the scene tree for the first time.
 
-func _ready():
+func _ready() -> void:
 	get_tree().paused = true
 	tab_container.current_tab = 0
-	mute_bounce.set_pressed_no_signal(GameState.save_game.mute_bounce)
-	v_sync_options.selected = GameState.save_game.vsync_mode
+	mute_bounce.set_pressed_no_signal(_game_state.save_game.mute_bounce)
+	v_sync_options.selected = _game_state.save_game.vsync_mode
 	
-	master_volume.set_bus_volume(GameState.save_game.master_volume)
-	music.set_bus_volume(GameState.save_game.sfx_volume)
-	sfx.set_bus_volume(GameState.save_game.music_volume)
+	master_volume.set_bus_volume(_game_state.save_game.master_volume)
+	music.set_bus_volume(_game_state.save_game.sfx_volume)
+	sfx.set_bus_volume(_game_state.save_game.music_volume)
 
 # Called when Back button is pressed
 func _on_back_button_pressed() -> void:
-	GameState.save_game.mute_bounce = mute_bounce.button_pressed
-	GameState.save_game.vsync_mode = v_sync_options.selected
-	GameState.save_game.master_volume = master_volume.slider.value
-	GameState.save_game.sfx_volume = music.slider.value
-	GameState.save_game.music_volume = sfx.slider.value
-	GameState.save_game.write_savegame()
+	_game_state.save_game.mute_bounce = mute_bounce.button_pressed
+	_game_state.save_game.vsync_mode = v_sync_options.selected
+	_game_state.save_game.master_volume = master_volume.slider.value
+	_game_state.save_game.sfx_volume = music.slider.value
+	_game_state.save_game.music_volume = sfx.slider.value
+	_game_state.save_game.write_savegame()
 	
 	# Return to main menu
 	queue_free()

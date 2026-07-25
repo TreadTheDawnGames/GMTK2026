@@ -2,113 +2,87 @@ class_name RunIntroController
 extends Node
 
 ## How it works:
-## - Scene readiness immediately gates mining and hides the timing bar.
-## - A stand-in guide slides onto the surface before dialogue begins.
-## - Existing dialogue signals drive guide speech motion and completion.
-## - The guide exits before timing input and swing queuing resume.
+## - Scene readiness gates mining and hides the timing bar before anything moves.
+## - The scene starts under the menu's black; the letterbox splits it apart from
+##   the middle, and only then does the bus drive into frame.
+## - The authored arrival sequence steps the miner off the bus, then pulls the
+##   bus away while he walks over and settles into the mining stance.
+## - Only the letterbox and HUD change when control returns; the stop, its
+##   attendant, and the dressed ground all stay standing behind the miner.
+## - Every failure path still reveals the shot, so a black screen is never final.
 ## The invariant is that mining stays unavailable for the entire intro.
 
+const FLOW_OWNER: StringName = &"run_intro"
+const MINER_SPEAKER_SLOT: StringName = &"miner"
+
 @export_category("Content")
-@export var conversation: DialogueConversation
-@export var guide_appearance: CharacterAppearance
-@export var guide_speaker_slot: StringName = &"lookout"
+@export var attendant_appearance: CharacterAppearance
 
 @export_category("Animation")
-@export_range(0.05, 3.0, 0.05) var entrance_seconds: float = 0.35
-@export_range(0.0, 600.0, 1.0) var entrance_distance_px: float = 220.0
-@export_range(0.05, 3.0, 0.05) var departure_seconds: float = 0.35
-@export_range(0.0, 600.0, 1.0) var departure_distance_px: float = 260.0
+## Held after the blackout splits open, before the bus enters, so the player
+## reads the empty stop first.
+@export_range(0.0, 3.0, 0.05) var hold_after_reveal_seconds: float = 0.35
+## The closing beat: how long the miner takes to plant into his dig stance.
+## Long enough to read as a deliberate settle rather than a snap.
+@export_range(0.0, 2.0, 0.05) var miner_restore_seconds: float = 0.45
 
 @export_category("References")
 @export var dialogue_director: DialogueDirector
-@export var guide_presenter: CharacterPresenter
-@export var timing_window: TimingWindowTask
-@export var mining_controller: MiningController
+@export var arrival_sequence: ArrivalIntroSequence
+@export var attendant_presenter: CharacterPresenter
+@export var miner_rig: MinerRig
+@export var cinematic_flow: MiningCinematicFlow
 
 var _is_intro_active: bool = false
-var _guide_rest_position: Vector2
 
 
-## Prepares the surface meeting before any mining input can be consumed.
+## Stages the surface meeting before any mining input can be consumed.
 func _ready() -> void:
-	if (
-		conversation == null
-		or guide_appearance == null
-		or dialogue_director == null
-		or guide_presenter == null
-		or timing_window == null
-		or mining_controller == null
-	):
+	if not _has_complete_references():
 		push_error("Run intro references are incomplete.")
+		_reveal_frame_safely()
+		return
+	attendant_presenter.apply_appearance(attendant_appearance)
+	if not cinematic_flow.try_begin(FLOW_OWNER):
+		push_error("Run intro could not acquire the cinematic flow.")
+		_reveal_frame_safely()
+		return
+	if not arrival_sequence.begin():
+		push_error("Run intro could not stage the arrival.")
+		cinematic_flow.cancel(FLOW_OWNER)
+		_reveal_frame_safely()
 		return
 	_is_intro_active = true
-	_set_mining_available(false)
-	_guide_rest_position = guide_presenter.position
-	guide_presenter.apply_appearance(guide_appearance)
-	guide_presenter.position = (
-		_guide_rest_position + Vector2.RIGHT * entrance_distance_px
-	)
-	guide_presenter.modulate.a = 0.0
-	guide_presenter.show()
 	_play_intro.call_deferred()
 
 
-## Slides the guide into the authored meeting position, then opens dialogue.
+## Opens the inherited blackout and plays the canonical bus-only arrival.
 func _play_intro() -> void:
-	var entrance_tween := create_tween()
-	entrance_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	entrance_tween.set_parallel(true)
-	entrance_tween.tween_property(
-		guide_presenter,
-		"position",
-		_guide_rest_position,
-		entrance_seconds
-	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	entrance_tween.tween_property(
-		guide_presenter,
-		"modulate:a",
-		1.0,
-		entrance_seconds
-	)
-	await entrance_tween.finished
-	if (
-		_is_intro_active
-		and dialogue_director.start_conversation(conversation)
-	):
+	dialogue_director.reveal_cinematic_frame_from_blackout()
+	await dialogue_director.wait_until_blackout_revealed()
+	if not _is_intro_active:
 		return
-	push_error("The run intro conversation could not start.")
-	_finish_intro()
-
-
-## Animates only the guide's authored lines during this conversation.
-func _on_dialogue_line_presented(
-	conversation_id: StringName,
-	_line_index: int,
-	speaker_slot: StringName
-) -> void:
-	if (
-		not _is_intro_active
-		or conversation_id != conversation.conversation_id
-	):
+	if hold_after_reveal_seconds > 0.0:
+		await get_tree().create_timer(
+			hold_after_reveal_seconds,
+			true
+		).timeout
+	if not _is_intro_active:
 		return
-	guide_presenter.reset_speech_motion()
-	if speaker_slot == guide_speaker_slot:
-		guide_presenter.react_to_presented_line()
-
-
-## Sends the guide away after the miner accepts the objective.
-func _on_conversation_finished(conversation_id: StringName) -> void:
-	if (
-		not _is_intro_active
-		or conversation_id != conversation.conversation_id
-	):
+	await arrival_sequence.play_arrival()
+	if not _is_intro_active:
 		return
-	guide_presenter.reset_speech_motion()
-	guide_presenter.depart_right(
-		departure_distance_px,
-		departure_seconds
-	)
-	await get_tree().create_timer(departure_seconds, true).timeout
+	# End the shot with the miner planting into his dig stance while the
+	# letterbox is still on. Gameplay draw order goes back on that same beat, so
+	# the foreground stratum closing over his legs reads as him settling in
+	# rather than as a clip the instant the frame opens up.
+	await arrival_sequence.finish(miner_restore_seconds)
+	if not _is_intro_active:
+		return
+	dialogue_director.close_cinematic_frame()
+	await dialogue_director.wait_until_frame_closed()
+	if not _is_intro_active:
+		return
 	_finish_intro()
 
 
@@ -117,19 +91,32 @@ func _finish_intro() -> void:
 	if not _is_intro_active:
 		return
 	_is_intro_active = false
-	guide_presenter.hide()
-	_set_mining_available(true)
+	_reset_speech_reactions()
+	await arrival_sequence.finish(miner_restore_seconds)
+	# Hand the miner's grounding back to the mining side explicitly, so the
+	# cinematic's captured rest can never survive as a stale vertical offset.
+	miner_rig.show_intact_floor_grounding()
+	cinematic_flow.finish(FLOW_OWNER)
 
 
-## Applies the shared input gate without changing timing-bar state.
-func _set_mining_available(is_available: bool) -> void:
-	mining_controller.set_swing_queue_paused(not is_available)
-	timing_window.process_mode = (
-		Node.PROCESS_MODE_INHERIT
-		if is_available
-		else Node.PROCESS_MODE_DISABLED
+## Guarantees the player never inherits an unopened blackout from the menu.
+func _reveal_frame_safely() -> void:
+	if dialogue_director != null:
+		dialogue_director.reveal_cinematic_frame_from_blackout(true)
+		dialogue_director.close_cinematic_frame()
+
+
+func _reset_speech_reactions() -> void:
+	attendant_presenter.reset_speech_motion()
+	miner_rig.reset_speech_motion()
+
+
+func _has_complete_references() -> bool:
+	return (
+		attendant_appearance != null
+		and dialogue_director != null
+		and arrival_sequence != null
+		and attendant_presenter != null
+		and miner_rig != null
+		and cinematic_flow != null
 	)
-	if is_available:
-		timing_window.show()
-	else:
-		timing_window.hide()

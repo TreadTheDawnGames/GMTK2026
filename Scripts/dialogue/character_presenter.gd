@@ -1,17 +1,22 @@
 class_name CharacterPresenter
 extends Node2D
 
-## Displays a configured character and adds motion while they are speaking.
+## Displays CharacterAppearance unchanged unless an optional pose can play.
+## Speech motion remains independent from the visible texture and sheet frame.
+
+const SpeechReactionType = preload(
+	"res://Scripts/dialogue/speech_reaction.gd"
+)
+const GroundWalkType = preload(
+	"res://Scripts/cinematics/ground_walk.gd"
+)
 
 @export_category("References")
 @export var character_sprite: Sprite2D
-
-@export_category("Speech Motion")
-@export_range(1.0, 30.0, 1.0) var bounce_height: float = 7.0
-@export_range(0.04, 0.5, 0.01) var bounce_duration: float = 0.14
+@export var actor_sprite_view: ActorSpriteView
+@export var speech_reaction: SpeechReactionType
 
 var _base_sprite_position: Vector2
-var _bounce_tween: Tween
 var _departure_tween: Tween
 
 
@@ -19,10 +24,12 @@ var _departure_tween: Tween
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_base_sprite_position = character_sprite.position
+	speech_reaction.capture_rest_position()
 
 
 ## Applies the authored sprite configuration for one named character.
 func apply_appearance(appearance: CharacterAppearance) -> void:
+	speech_reaction.reset_speech_motion()
 	if appearance == null:
 		hide()
 		return
@@ -35,48 +42,94 @@ func apply_appearance(appearance: CharacterAppearance) -> void:
 	character_sprite.modulate = appearance.tint
 	character_sprite.flip_h = appearance.flip_h
 	_base_sprite_position = character_sprite.position
-	reset_speech_motion()
+	speech_reaction.capture_rest_position()
+	if actor_sprite_view != null:
+		actor_sprite_view.pose_set = appearance.pose_set
+		actor_sprite_view.play_pose(&"idle")
 
 
 ## Resets bounce timing before a new character conversation begins.
 func reset_speech_motion() -> void:
-	if _bounce_tween != null and _bounce_tween.is_valid():
-		_bounce_tween.kill()
-	_bounce_tween = null
+	speech_reaction.reset_speech_motion()
 	character_sprite.position = _base_sprite_position
+	if actor_sprite_view != null:
+		actor_sprite_view.play_pose(&"idle")
 
 
 ## Bounces until another speaker or the conversation takes over.
 func react_to_presented_line() -> void:
-	reset_speech_motion()
-	var half_duration := bounce_duration * 0.5
-	_bounce_tween = create_tween()
-	_bounce_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	_bounce_tween.tween_property(
-		character_sprite,
-		"position",
-		_base_sprite_position + Vector2.UP * bounce_height,
-		half_duration
-	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	_bounce_tween.tween_property(
-		character_sprite,
-		"position",
-		_base_sprite_position,
-		half_duration
-	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	speech_reaction.react_to_presented_line()
 
 
-## Walks this character out through the chamber's authored right opening.
-func depart_right(distance: float, duration: float) -> void:
+## Reports whether this presenter can display an optional dialogue pose.
+func has_pose(pose_name: StringName) -> bool:
+	return (
+		actor_sprite_view != null
+		and actor_sprite_view.has_pose(pose_name)
+	)
+
+
+## Displays an optional dialogue pose without changing speech motion.
+func play_pose(pose_name: StringName) -> bool:
+	return (
+		actor_sprite_view != null
+		and actor_sprite_view.play_pose(pose_name)
+	)
+
+
+## Faces the visible character along its current travel direction.
+func set_facing_direction(direction: int) -> void:
+	if not is_instance_valid(character_sprite) or direction == 0:
+		return
+	character_sprite.flip_h = direction < 0
+
+
+## Walks to one authored global position over sampled terrain.
+func move_grounded_to(
+	target_position: Vector2,
+	duration: float,
+	floor_sampler: Callable,
+	hide_on_finish: bool = false
+) -> Tween:
 	reset_speech_motion()
+	cancel_grounded_motion()
+	var start_position := global_position
+	var horizontal_direction := signf(target_position.x - start_position.x)
+	if not is_zero_approx(horizontal_direction):
+		set_facing_direction(1 if horizontal_direction > 0.0 else -1)
+	var ground_path := GroundWalkType.build_path(
+		start_position,
+		target_position,
+		floor_sampler,
+		GroundWalkType.DEFAULT_STRIDE_PIXELS
+	)
+	_departure_tween = GroundWalkType.walk_along(
+		self,
+		ground_path,
+		duration,
+		GroundWalkType.DEFAULT_STEP_HEIGHT
+	)
+	if _departure_tween != null and hide_on_finish:
+		_departure_tween.tween_callback(hide)
+	return _departure_tween
+
+
+## Stops presentation travel without changing the actor's current position.
+func cancel_grounded_motion() -> void:
 	if _departure_tween != null and _departure_tween.is_valid():
 		_departure_tween.kill()
-	_departure_tween = create_tween()
-	_departure_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	_departure_tween.tween_property(
-		self,
-		"position:x",
-		position.x + maxf(distance, 0.0),
-		maxf(duration, 0.01)
-	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	_departure_tween.tween_callback(hide)
+	_departure_tween = null
+
+
+## Walks right and returns the pause-safe tween used to await the exit.
+func depart_right(
+	distance: float,
+	duration: float,
+	floor_sampler: Callable
+) -> Tween:
+	return move_grounded_to(
+		global_position + Vector2.RIGHT * maxf(distance, 0.0),
+		duration,
+		floor_sampler,
+		true
+	)

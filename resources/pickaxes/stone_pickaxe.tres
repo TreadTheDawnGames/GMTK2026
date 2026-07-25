@@ -7,11 +7,10 @@
 script = ExtResource("1")
 id = &"stone_pickaxe"
 display_name = "Stone Pickaxe"
-description = "A faster stone tool whose impacts send branching lightning into the ground."
+description = "A faster stone tool that hits with extra force."
 power_multiplier = 1.05
 swing_speed_multiplier = 1.1
 debris_multiplier = 1.1
-special_effect = 3
 hammer_head_color = Color(0.68, 0.7, 0.72, 1)
 target_unlock_combo = 10
 target_scenes = Array[PackedScene]([ExtResource("3_target")])
