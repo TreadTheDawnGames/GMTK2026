@@ -384,6 +384,13 @@ func _build_controls() -> void:
 		action_row, "Open all", _on_clear_all_pressed,
 		"Empties the room, leaving only the guarded floor."
 	)
+	_add_action(
+		action_row, "Exit tunnel", _on_exit_tunnel_pressed,
+		"Cuts the shared walk-off corridor from the room's right wall out "
+		+ "through its right edge, level with the floor, so a character can "
+		+ "leave the frame at the end of the scene. Press it again after "
+		+ "reshaping the wall and the mouth is recut to match."
+	)
 
 	_status_label = Label.new()
 	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -585,6 +592,14 @@ func _on_bake_pressed() -> void:
 		_context.encounter,
 		_context.preview.terrain_manager.config
 	)
+	_context.notify_authored_data_changed()
+	refresh()
+
+
+func _on_exit_tunnel_pressed() -> void:
+	if _context == null or _context.sculpt == null:
+		return
+	CutsceneSculptBaker.carve_right_exit_tunnel(_context.sculpt)
 	_context.notify_authored_data_changed()
 	refresh()
 
