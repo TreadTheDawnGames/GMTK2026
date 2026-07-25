@@ -97,6 +97,16 @@ class ChunkTexturePublishWork:
 	var layer_indices: PackedInt32Array
 
 
+class SculptRunPreparation:
+	var sculpt: CutsceneTerrainSculpt
+	var layer_index: int
+	var room_mask: Image
+	var mask_data: PackedByteArray
+	var mask_runs: Array[PackedInt32Array] = []
+	var next_row: int = 0
+	var finished: bool = false
+
+
 const TerrainStampImageCache = preload(
 	"res://Scripts/mining/terrain_stamp_image_cache.gd"
 )
@@ -258,6 +268,11 @@ var _impact_work_pool: Array[ImpactRasterWork] = []
 var _pending_chunk_texture_publishes: Array[ChunkTexturePublishWork] = []
 var _pending_chunk_texture_publish_head: int = 0
 var _chunk_texture_publish_pool: Array[ChunkTexturePublishWork] = []
+# Authored room run caches advance one source row at a time after scene boot.
+# Growth is bounded by authored sculpt count x visible layer count; completed
+# work moves into the equally bounded immutable _sculpt_mask_runs cache.
+var _pending_sculpt_run_preparations: Array[SculptRunPreparation] = []
+var _pending_sculpt_run_preparation_head: int = 0
 var _defer_impact_rasterization: bool = false
 # Five timing targets produce at most five candidates, each with one transform
 # per writable gameplay stratum. A new target batch replaces this bounded queue;
@@ -356,10 +371,15 @@ func _process(_delta: float) -> void:
 		_pending_chunk_texture_publish_head
 		< _pending_chunk_texture_publishes.size()
 	)
+	var has_sculpt_run_preparation := (
+		_pending_sculpt_run_preparation_head
+		< _pending_sculpt_run_preparations.size()
+	)
 	if (
 		not has_preparation
 		and not has_impact_work
 		and not has_chunk_texture_publish
+		and not has_sculpt_run_preparation
 	):
 		return
 	var frame_started_at: int = Time.get_ticks_usec()
@@ -407,6 +427,28 @@ func _process(_delta: float) -> void:
 		):
 			break
 	_compact_pending_stamp_preparation()
+	# Authored rooms are far below the starting surface, so their immutable row
+	# caches consume only terrain time left after visible and predictive work.
+	while (
+		_pending_sculpt_run_preparation_head
+		< _pending_sculpt_run_preparations.size()
+	):
+		var sculpt_preparation := _pending_sculpt_run_preparations[
+			_pending_sculpt_run_preparation_head
+		]
+		if _advance_sculpt_run_preparation(sculpt_preparation):
+			_pending_sculpt_run_preparation_head += 1
+		if (
+			Time.get_ticks_usec() - frame_started_at
+			>= frame_budget_usec
+		):
+			break
+	if (
+		_pending_sculpt_run_preparation_head
+		>= _pending_sculpt_run_preparations.size()
+	):
+		_pending_sculpt_run_preparations.clear()
+		_pending_sculpt_run_preparation_head = 0
 
 
 ## Rasterizes every authored room before the run starts. Reaching one mid-run
@@ -416,11 +458,16 @@ func _prepare_sculpt_masks() -> void:
 	for placement in terrain_manager.get_sculpt_placements():
 		_get_sculpt_mask_image(placement.sculpt, -1)
 		_get_sculpt_logical_mask_image(placement.sculpt, -1)
+		_queue_sculpt_run_preparation(placement.sculpt, -1)
 		if not placement.sculpt.has_layer_masks():
 			continue
 		for layer_index in range(profile.get_gameplay_layer_count()):
 			_get_sculpt_mask_image(placement.sculpt, layer_index)
 			_get_sculpt_logical_mask_image(
+				placement.sculpt,
+				layer_index
+			)
+			_queue_sculpt_run_preparation(
 				placement.sculpt,
 				layer_index
 			)
@@ -1247,6 +1294,8 @@ func rebuild_all_chunks() -> void:
 	_sculpt_mask_images.clear()
 	_sculpt_logical_mask_images.clear()
 	_sculpt_mask_runs.clear()
+	_pending_sculpt_run_preparations.clear()
+	_pending_sculpt_run_preparation_head = 0
 	_latest_impact_stamp = null
 	_latest_foreground_opening_rect = Rect2()
 	_loaded_first_chunk = -1
