@@ -223,7 +223,7 @@ var _resized_stamp_cache: Dictionary:
 	get:
 		return _stamp_image_cache.entries
 # Two sequential LA8 scratch bands replace per-band Image.get_region
-# allocations. They grow only to one chunk width x the 128-row work ceiling
+# allocations. They grow only to one chunk width x the 192-row work ceiling
 # and every consumed rectangle is overwritten before blending.
 var _fracture_band_scratch: Image
 var _solid_band_scratch: Image

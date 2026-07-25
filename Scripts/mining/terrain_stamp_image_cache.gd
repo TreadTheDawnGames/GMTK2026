@@ -15,6 +15,8 @@ const MAX_RESIZE_PHASE_PIXELS: int = 65_536
 
 class StampImages:
 	var erase_mask: Image
+	# Same-sized stamps share this immutable zero-filled source. It carries no
+	# authored data, so orientation and layer do not require private copies.
 	var transparent_source: Image
 	var fracture_source: Image
 
@@ -54,6 +56,10 @@ var _prepared_entries: Dictionary[Vector4i, StampImages] = {}
 # order. Setting the limit to zero disables both reusable caches.
 var _oriented_sources: Dictionary[Vector2i, OrientedSources] = {}
 var _oriented_source_order: Array[Vector2i] = []
+# At most _entry_limit dimension variants are retained. Sharing immutable blank
+# images removes the former one-full-stamp allocation per predicted layer.
+var _transparent_sources: Dictionary[Vector2i, Image] = {}
+var _transparent_source_order: Array[Vector2i] = []
 var _entry_limit: int = 0
 var _maximum_entry_pixels: int = 1
 
@@ -66,6 +72,8 @@ func reset(entry_limit: int, maximum_entry_pixels: int) -> void:
 	_prepared_entries.clear()
 	_oriented_sources.clear()
 	_oriented_source_order.clear()
+	_transparent_sources.clear()
+	_transparent_source_order.clear()
 	_entry_limit = maxi(entry_limit, 0)
 	_maximum_entry_pixels = maxi(maximum_entry_pixels, 1)
 
@@ -307,14 +315,40 @@ func advance_image_preparation(
 			preparation.phase = 10
 			return false
 		10:
-			preparation.stamp_images.transparent_source = Image.create(
-				preparation.stamp_size.x,
-				preparation.stamp_size.y,
-				false,
-				Image.FORMAT_LA8
+			var transparent_source: Image = _transparent_sources.get(
+				preparation.stamp_size
 			)
-			# Image.create initializes LA8 storage to zero. Exact dimensions are
-			# required because Image.blit_rect_mask validates both full images.
+			if transparent_source == null:
+				transparent_source = Image.create(
+					preparation.stamp_size.x,
+					preparation.stamp_size.y,
+					false,
+					Image.FORMAT_LA8
+				)
+				if _entry_limit > 0:
+					_transparent_sources[preparation.stamp_size] = (
+						transparent_source
+					)
+					_transparent_source_order.append(
+						preparation.stamp_size
+					)
+					while (
+						_transparent_source_order.size()
+						> _entry_limit
+					):
+						_transparent_sources.erase(
+							_transparent_source_order.pop_front()
+						)
+			elif _entry_limit > 0:
+				_transparent_source_order.erase(
+					preparation.stamp_size
+				)
+				_transparent_source_order.append(
+					preparation.stamp_size
+				)
+			preparation.stamp_images.transparent_source = (
+				transparent_source
+			)
 			if preparation.is_speculative:
 				_prepared_entries[preparation.cache_key] = (
 					preparation.stamp_images
