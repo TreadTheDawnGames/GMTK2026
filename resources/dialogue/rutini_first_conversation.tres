@@ -17,12 +17,12 @@ text = "..."
 [sub_resource type="Resource" id="Line_intro"]
 script = ExtResource("3_line")
 speaker_slot = &"rutini"
-text = "I'm Rotini. My colony and I are looking for a good route through these caves."
+text = "I'm Rotini."
 
 [sub_resource type="Resource" id="Line_crew"]
 script = ExtResource("3_line")
 speaker_slot = &"rutini"
-text = "Come on, colony! We'll find our way."
+text = "Come on, boys! We'll find that Cafe eventually!"
 
 [sub_resource type="Resource" id="Participant_miner"]
 script = ExtResource("2_participant")

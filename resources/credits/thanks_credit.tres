@@ -7,5 +7,4 @@ script = ExtResource("1_entry")
 depth_offset = 175
 heading = "THANK YOU FOR PLAYING"
 body = "THE END IS BEHIND YOU.
-
 KEEP DIGGING."

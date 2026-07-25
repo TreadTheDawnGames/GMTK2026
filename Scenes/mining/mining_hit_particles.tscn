@@ -2,6 +2,9 @@
 
 [ext_resource type="Script" path="res://Scripts/mining/mining_hit_particles.gd" id="1_particles"]
 
-[node name="MiningHitParticles" type="Node2D"]
+[node name="MiningHitParticles" type="Node2D" node_paths=PackedStringArray("particle_multimesh")]
 process_mode = 3
 script = ExtResource("1_particles")
+particle_multimesh = NodePath("ParticleMultiMesh")
+
+[node name="ParticleMultiMesh" type="MultiMeshInstance2D" parent="."]

@@ -20,8 +20,8 @@ beats without Jared or Zephan approving the narrative change.
 
 | Order | Target depth | Target time | Story beat |
 | ---: | ---: | ---: | --- |
-| 1 | 0 | 0:00 | The bus scene starts the game. |
-| 2 | 600 | 0:40 | Cheese Girl introduces herself, invites the Miner to her cheese shop, and encourages him to keep digging. The cafe destination is near depth 14,000; old references to level 80,000 are not canonical. |
+| 1 | 0 | 0:00 | A bus drops the Miner at the excavation site. An unattributed voice tells him he already knows the Thief lies below and that only fools find him. |
+| 2 | 300 | 0:40 | Cheese Girl checks on the Miner, invites him to her cheese cafe, and runs away after saying goodbye. |
 | 3 | 1,400 | 1:30 | The player first meets the man with the lantern staff. He cryptically foreshadows the Thief. |
 | 4 | 2,500 | 2:40 | Rotini is introduced on the cave path. Existing `rutini_*` resource names refer to Rotini until a coordinated rename is approved. |
 | 5 | 4,000 | 4:00 | The Treasure Hunter mines in from the side, introduces himself, and gifts the first improved pickaxe. |
@@ -43,6 +43,8 @@ next encounter floor, open its tunnel, and capture the player when their mined
 depth crosses the tunnel ceiling. The comparison must tolerate one large hit
 skipping past the ceiling or floor; no exact impact target is required.
 
-The screenshots supplied by Jared establish story beats, not final dialogue.
-Placeholder language for the lantern-staff man and the Thief must not be invented
-into canon without narrative approval.
+The dialogue revision supplied by Jared on July 25, 2026 is the approved wording
+for the opening and encounters 1 through 10. Do not paraphrase its unusual
+spelling, capitalization, punctuation, or intentionally unattributed opening
+voice without narrative approval. Placeholder language for the Thief must not be
+invented into canon without narrative approval.

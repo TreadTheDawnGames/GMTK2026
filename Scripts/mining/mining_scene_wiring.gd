@@ -3,6 +3,10 @@ extends Node
 
 ## Connects the mining scene's cross-system signals in one searchable place.
 
+## Which terrain stratum the miner's feet are seated against. Zero is the
+## foreground layer: the ground the player sees him standing on.
+const MINER_FLOOR_LAYER_INDEX: int = 0
+
 @export_category("Mining")
 @export var mining_controller: MiningController
 @export var timing_bridge: TimingBridge
@@ -18,6 +22,7 @@ extends Node
 @export var dig_number_presenter: DigNumberPresenter
 @export var impact_shake: ImpactShake
 @export var pickaxe_progression: PickaxeProgression
+@export var encounter_progression: EncounterProgression
 @export var cinematic_flow: MiningCinematicFlow
 @export var run_timeline: RunTimeline
 @export var coffee_speed_boost: CoffeeSpeedBoost
@@ -79,6 +84,10 @@ func _ready() -> void:
 	)
 	_connect_once(
 		_game_state.run_reset,
+		encounter_progression._on_run_reset
+	)
+	_connect_once(
+		_game_state.run_reset,
 		run_timeline._on_run_reset
 	)
 	_connect_once(
@@ -134,8 +143,8 @@ func _ready() -> void:
 		mining_controller.resolve_attempt
 	)
 	_connect_once(
-		pickaxe_progression.target_unlocks_changed,
-		timing_window.set_pickaxe_target_unlocks
+		encounter_controller.encounter_completed,
+		encounter_progression._on_encounter_completed
 	)
 	_connect_once(
 		mining_controller.dig_presentation_started,
@@ -280,6 +289,10 @@ func _ready() -> void:
 		encounter_controller._on_conversation_finished
 	)
 	_connect_once(
+		dialogue_director.conversation_finished,
+		run_intro_controller._on_conversation_finished
+	)
+	_connect_once(
 		dialogue_director.line_presented,
 		encounter_controller._on_dialogue_line_presented
 	)
@@ -407,7 +420,11 @@ func _on_miner_landing_grounding(mining_y: int) -> void:
 		terrain_renderer.get_layer_opening_floor_support_screen_y(
 			miner_rig.get_landing_foot_screen_x(),
 			mining_y,
-			1
+			# Layer one, the same stratum the cast is placed against. This read
+			# layer two from when the profile lowered the foreground over a
+			# chamber floor; with that reveal off, sampling behind the visible
+			# ground seated the miner below the floor he is standing on.
+			MINER_FLOOR_LAYER_INDEX
 		)
 	)
 	miner_rig.seat_landing_foot_at_screen_y(support_screen_y)

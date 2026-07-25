@@ -63,9 +63,10 @@ func get_images(
 		return cached_images
 
 	var stamp_images := StampImages.new()
-	# blit_rect_mask treats every nonzero alpha as a full cut. Nearest-neighbor
-	# keeps the erase channel on the artist's hard silhouette; bilinear filtering
-	# remains correct for the independently blended fracture artwork.
+	# Both channels are inked silhouettes. Nearest-neighbor retains the artist's
+	# hard edge at the shipped six-pixel density and avoids a costly full-image
+	# bilinear pass before every newly sized fracture stamp. The terrain shader
+	# performs the final one-screen-pixel antialiasing at display resolution.
 	stamp_images.erase_mask = _transform_image(
 		erase_mask,
 		stamp_size,
@@ -80,7 +81,7 @@ func get_images(
 		flip_x,
 		flip_y,
 		rotation_quarters,
-		Image.INTERPOLATE_BILINEAR
+		Image.INTERPOLATE_NEAREST
 	)
 	stamp_images.transparent_source = Image.create(
 		stamp_size.x,
@@ -118,16 +119,19 @@ func _transform_image(
 	interpolation: Image.Interpolation
 ) -> Image:
 	var transformed := source.duplicate()
+	var normalized_rotation := posmod(rotation_quarters, 4)
+	var pre_rotation_size := stamp_size
+	if normalized_rotation == 1 or normalized_rotation == 3:
+		pre_rotation_size = Vector2i(stamp_size.y, stamp_size.x)
 	transformed.resize(
-		stamp_size.x,
-		stamp_size.y,
+		pre_rotation_size.x,
+		pre_rotation_size.y,
 		interpolation
 	)
 	if flip_x:
 		transformed.flip_x()
 	if flip_y:
 		transformed.flip_y()
-	var normalized_rotation := posmod(rotation_quarters, 4)
 	if normalized_rotation == 1:
 		transformed.rotate_90(CLOCKWISE)
 	elif normalized_rotation == 2:
@@ -135,10 +139,4 @@ func _transform_image(
 		transformed.flip_y()
 	elif normalized_rotation == 3:
 		transformed.rotate_90(COUNTERCLOCKWISE)
-	if transformed.get_size() != stamp_size:
-		transformed.resize(
-			stamp_size.x,
-			stamp_size.y,
-			interpolation
-		)
 	return transformed

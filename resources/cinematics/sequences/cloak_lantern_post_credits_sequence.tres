@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="CutsceneSequence" format=3]
+[gd_resource type="Resource" script_class="CutsceneSequence" format=3 uid="uid://cr1rnbl25ljjc"]
 
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_beat.gd" id="1_23fys"]
-[ext_resource type="Resource" path="res://resources/dialogue/cloak_lantern_post_credits_conversation.tres" id="2_645qm"]
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_sequence.gd" id="3_727ah"]
+[ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="1_23fys"]
+[ext_resource type="Resource" uid="uid://3j8lrt4pcauc" path="res://resources/dialogue/cloak_lantern_post_credits_conversation.tres" id="2_645qm"]
+[ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="3_727ah"]
 
 [sub_resource type="Resource" id="Resource_ndvu7"]
 script = ExtResource("1_23fys")
@@ -13,47 +13,48 @@ actor = &"cloak_lantern"
 script = ExtResource("1_23fys")
 kind = 0
 actor = &"cloak_lantern"
-duration_seconds = 2.2
+duration_seconds = 2.4
 target_marker = &"Conversation"
+starts_from_authored_point = true
+start_marker = &"Entrance"
 pose = &"walk"
-step_height = 5.0
 
 [sub_resource type="Resource" id="Resource_j7bpi"]
 script = ExtResource("1_23fys")
 kind = 2
 actor = &"cloak_lantern"
-start_seconds = 2.2
+start_seconds = 2.4
 facing = -1
 
 [sub_resource type="Resource" id="Resource_83tlx"]
 script = ExtResource("1_23fys")
 kind = 1
 actor = &"cloak_lantern"
-start_seconds = 2.2
+start_seconds = 2.4
 pose = &"idle"
 
 [sub_resource type="Resource" id="Resource_v6udw"]
 script = ExtResource("1_23fys")
 kind = 5
-start_seconds = 2.4000000000000004
+start_seconds = 4.0
 duration_seconds = 6.0
 conversation = ExtResource("2_645qm")
+notes = "His last appearance and the slowest. Nothing follows him, so nothing about it hurries."
 
 [sub_resource type="Resource" id="Resource_m2qka"]
 script = ExtResource("1_23fys")
 kind = 0
 actor = &"cloak_lantern"
-start_seconds = 8.4
+start_seconds = 10.0
 duration_seconds = 3.2
 target_marker = &"Exit"
 pose = &"walk"
-step_height = 5.0
 
 [sub_resource type="Resource" id="Resource_60cri"]
 script = ExtResource("1_23fys")
 kind = 10
 actor = &"cloak_lantern"
-start_seconds = 11.600000000000001
+start_seconds = 13.2
 
 [resource]
 script = ExtResource("3_727ah")

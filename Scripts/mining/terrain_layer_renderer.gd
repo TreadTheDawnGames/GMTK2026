@@ -48,6 +48,16 @@ class ImpactStamp:
 	## stamp so a chunk streamed back in redraws the exact same rims.
 	var variation_hash: int = 0
 
+
+class ImpactRasterWork:
+	var chunk: TerrainChunkVisual
+	var chunk_index: int
+	var stamp: ImpactStamp
+	var layer_index: int
+	var raster_band_index: int
+	var raster_band_count: int
+
+
 const TerrainStampImageCache = preload(
 	"res://Scripts/mining/terrain_stamp_image_cache.gd"
 )
@@ -69,6 +79,15 @@ const FRACTURE_SUPPORT_VALUE_THRESHOLD: float = 0.9
 # configured materials instead of rebuilding both per crossed chunk boundary.
 # The window is three to five chunks tall, so a handful covers every crossing.
 const CHUNK_VISUAL_POOL_LIMIT: int = 4
+# Deferred web raster work is capped and pooled. The 192 slots cover the
+# configured fully-stacked hit (currently under 150 jobs). If mining ever fills
+# them, the oldest single layer completes before another is accepted, so memory
+# cannot grow with hit count and the renderer never drops an opening.
+const MAX_PENDING_IMPACT_WORK_ITEMS: int = 192
+# The shipped six-pixel mask restores the authored silhouette. Sixty-four-row
+# bands keep its fully-stacked queue under 192 items while preserving a bounded
+# work unit; the deferred benchmark protects the existing 7 ms ceiling.
+const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 64
 @export_category("References")
 @export var terrain_manager: TerrainManager
 @export var profile: TerrainLayerProfile
@@ -78,6 +97,9 @@ const CHUNK_VISUAL_POOL_LIMIT: int = 4
 @export_range(1, 100, 1) var deepest_layer_combo_threshold: int = 7
 
 @export_category("Web Performance")
+## Maximum CPU time spent starting queued mask layers in one rendered frame.
+## A layer already in progress completes atomically so textures never tear.
+@export_range(1.0, 16.0, 0.5) var web_impact_frame_budget_ms: float = 3.0
 ## Limits reusable resized masks so repeated hit sizes avoid image allocations.
 @export_range(0, 48, 1) var resized_stamp_cache_limit: int = 48
 ## Oversized combo openings are one-off and must not occupy the reusable cache.
@@ -137,6 +159,12 @@ var _show_logical_overlay: bool = false
 # One entry per stratum, all 1.0 unless the editor is isolating a layer.
 var _layer_display_opacity: PackedFloat32Array = PackedFloat32Array()
 var _active_impact_combo: int = 0
+# Web hits queue one bounded work item per visible chunk and stratum. Completed
+# items are recycled, so steady-state mining adds no work-object allocations.
+var _pending_impact_work: Array[ImpactRasterWork] = []
+var _pending_impact_work_head: int = 0
+var _impact_work_pool: Array[ImpactRasterWork] = []
+var _defer_impact_rasterization: bool = false
 
 
 ## Connects terrain events and loads the initial visible strata.
@@ -170,6 +198,7 @@ func _ready() -> void:
 			"TerrainLayerRenderer requires terrain_manager and profile."
 		)
 		return
+	_defer_impact_rasterization = OS.has_feature("web")
 	var layer_count: int = profile.get_layer_count()
 	if (
 		profile.layer_dirt_detail_scales_px.size() != layer_count
@@ -200,6 +229,29 @@ func _ready() -> void:
 	_prepare_chamber_transition_stamps()
 	_prepare_sculpt_masks()
 	_on_view_position_changed(terrain_manager.get_view_position())
+
+
+## Spreads browser mask rasterization across rendered frames. Gameplay cells
+## change immediately; only the layered artwork catches up, one atomic stratum
+## at a time, under the configured CPU budget.
+func _process(_delta: float) -> void:
+	if (
+		not _defer_impact_rasterization
+		or _pending_impact_work_head >= _pending_impact_work.size()
+	):
+		return
+	var frame_started_at: int = Time.get_ticks_usec()
+	var frame_budget_usec: int = roundi(
+		web_impact_frame_budget_ms * 1000.0
+	)
+	while _pending_impact_work_head < _pending_impact_work.size():
+		_process_next_pending_impact_work()
+		if (
+			Time.get_ticks_usec() - frame_started_at
+			>= frame_budget_usec
+		):
+			break
+	_compact_pending_impact_work()
 
 
 ## Rasterizes every authored room before the run starts. Reaching one mid-run
@@ -265,6 +317,62 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 	for stamp in stamps:
 		for chunk_index in _register_impact_stamp(stamp):
 			affected_chunk_lookup[chunk_index] = true
+	if _defer_impact_rasterization:
+		var layer_count: int = profile.get_gameplay_layer_count()
+		for chunk_index in affected_chunk_lookup:
+			if not _active_chunks.has(chunk_index):
+				continue
+			var chunk: TerrainChunkVisual = _active_chunks[chunk_index]
+			for stamp in stamps:
+				if chunk_index not in _get_stamp_chunk_indices(stamp):
+					continue
+				for layer_index in range(layer_count):
+					var raster_band_count := 1
+					if stamp.narrow_path_points.is_empty():
+						var opening_rect := _get_layer_opening_rect(
+							stamp,
+							layer_index
+						)
+						var mask_pixels_per_world_unit := (
+							float(profile.mask_pixels_per_cell)
+							/ float(
+								terrain_manager.config.terrain_cell_world_size
+							)
+						)
+						var opening_mask_height := ceili(
+							opening_rect.size.y
+							* mask_pixels_per_world_unit
+						)
+						raster_band_count = maxi(
+							ceili(
+								float(opening_mask_height)
+								/ float(
+									MAX_IMPACT_RASTER_BAND_HEIGHT
+								)
+							),
+							1
+						)
+					for raster_band_index in range(raster_band_count):
+						while (
+							_pending_impact_work.size()
+							- _pending_impact_work_head
+							>= MAX_PENDING_IMPACT_WORK_ITEMS
+						):
+							_process_next_pending_impact_work()
+							_compact_pending_impact_work()
+						var work: ImpactRasterWork = (
+							_impact_work_pool.pop_back()
+							if not _impact_work_pool.is_empty()
+							else ImpactRasterWork.new()
+						)
+						work.chunk = chunk
+						work.chunk_index = chunk_index
+						work.stamp = stamp
+						work.layer_index = layer_index
+						work.raster_band_index = raster_band_index
+						work.raster_band_count = raster_band_count
+						_pending_impact_work.append(work)
+		return
 	for chunk_index in affected_chunk_lookup:
 		if not _active_chunks.has(chunk_index):
 			continue
@@ -282,11 +390,70 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 	_clear_temporary_stamp_cache()
 
 
+## Completes one queued stratum and publishes only that texture. Work targeting
+## a chunk that streamed out is discarded because loading it again replays the
+## registered stamp history.
+func _process_next_pending_impact_work() -> void:
+	if _pending_impact_work_head >= _pending_impact_work.size():
+		return
+	var work := _pending_impact_work[_pending_impact_work_head]
+	_pending_impact_work_head += 1
+	if _active_chunks.get(work.chunk_index) == work.chunk:
+		_apply_impact_stamp_layer(
+			work.chunk,
+			work.chunk_index,
+			work.stamp,
+			work.layer_index,
+			work.raster_band_index,
+			work.raster_band_count
+		)
+		if work.raster_band_index == work.raster_band_count - 1:
+			_publish_layer_texture(work.chunk, work.layer_index)
+	work.chunk = null
+	work.stamp = null
+	work.raster_band_index = 0
+	work.raster_band_count = 1
+	if _impact_work_pool.size() < MAX_PENDING_IMPACT_WORK_ITEMS:
+		_impact_work_pool.append(work)
+
+
+## Prunes completed queue slots and releases temporary oversized stamp images
+## as soon as every pending stratum has consumed them.
+func _compact_pending_impact_work() -> void:
+	if _pending_impact_work_head <= 0:
+		return
+	if _pending_impact_work_head >= _pending_impact_work.size():
+		_pending_impact_work.clear()
+		_pending_impact_work_head = 0
+		_clear_temporary_stamp_cache()
+		return
+	if _pending_impact_work_head < 32:
+		return
+	_pending_impact_work = _pending_impact_work.slice(
+		_pending_impact_work_head
+	)
+	_pending_impact_work_head = 0
+
+
 ## Drops every streamed chunk and its stamp history so the next refresh draws
 ## intact terrain again. The editor preview needs this because moving a test
 ## impact has to un-break the rock the previous position broke.
 func rebuild_all_chunks() -> void:
 	_impact_stamps_by_chunk.clear()
+	for work_index in range(
+		_pending_impact_work_head,
+		_pending_impact_work.size()
+	):
+		var pending_work := _pending_impact_work[work_index]
+		pending_work.chunk = null
+		pending_work.stamp = null
+		pending_work.raster_band_index = 0
+		pending_work.raster_band_count = 1
+		if _impact_work_pool.size() < MAX_PENDING_IMPACT_WORK_ITEMS:
+			_impact_work_pool.append(pending_work)
+	_pending_impact_work.clear()
+	_pending_impact_work_head = 0
+	_clear_temporary_stamp_cache()
 	for chunk_index in _active_chunks.keys():
 		_unload_chunk(chunk_index)
 	# A rebuild is how an authored edit reaches the screen, so nothing built from
@@ -1453,65 +1620,77 @@ func _apply_impact_stamp(
 	stamp: ImpactStamp
 ) -> int:
 	var gameplay_layer_count := profile.get_gameplay_layer_count()
-	var layer_count := gameplay_layer_count
 	var changed_layers := 0
-	for layer_index in range(layer_count):
-		if (
-			profile.keep_back_layer_solid
-			and layer_index == gameplay_layer_count - 1
-		):
-			continue
-		var is_layer_covering_backdrop := (
-			profile.keep_back_layer_solid
-			and layer_index == gameplay_layer_count - 2
-		)
-		# Orange remains the decorative tunnel backdrop below combo seven.
-		# At or above the combo gate, the size threshold still prevents a
-		# physically small secondary path from exposing the brown back wall.
-		if is_layer_covering_backdrop and not stamp.use_big_hole:
-			continue
-		var layer_changed := false
-		_make_layer_writable(chunk, layer_index)
-		if not stamp.narrow_path_points.is_empty():
-			if _punch_narrow_path(
-				chunk.mask_images[layer_index],
-				chunk_index,
-				stamp,
-				layer_index
-			):
-				layer_changed = true
-			if layer_changed:
-				changed_layers |= 1 << layer_index
-			continue
-		var mask_data := _get_hole_mask_data(
-			layer_index,
-			stamp.use_big_hole
-		)
-		if mask_data == null:
-			if layer_changed:
-				changed_layers |= 1 << layer_index
-			continue
-		var opening_rect := _get_layer_opening_rect(
-			stamp,
-			layer_index
-		)
-		var layer_variation := _get_layer_stamp_variation(
-			stamp,
-			layer_index
-		)
-		if _punch_hole(
-			chunk.mask_images[layer_index],
+	for layer_index in range(gameplay_layer_count):
+		if _apply_impact_stamp_layer(
+			chunk,
 			chunk_index,
-			opening_rect,
-			mask_data,
-			layer_variation.x == 1,
-			layer_variation.y == 1,
-			layer_variation.z
+			stamp,
+			layer_index
 		):
-			layer_changed = true
-		if layer_changed:
 			changed_layers |= 1 << layer_index
 	return changed_layers
+
+
+## Punches exactly one stratum so browser builds can amortize a hit without
+## exposing a partially-written texture.
+func _apply_impact_stamp_layer(
+	chunk: TerrainChunkVisual,
+	chunk_index: int,
+	stamp: ImpactStamp,
+	layer_index: int,
+	raster_band_index: int = 0,
+	raster_band_count: int = 1
+) -> bool:
+	var gameplay_layer_count := profile.get_gameplay_layer_count()
+	if (
+		layer_index < 0
+		or layer_index >= gameplay_layer_count
+		or (
+			profile.keep_back_layer_solid
+			and layer_index == gameplay_layer_count - 1
+		)
+	):
+		return false
+	var is_layer_covering_backdrop := (
+		profile.keep_back_layer_solid
+		and layer_index == gameplay_layer_count - 2
+	)
+	# Orange remains the decorative tunnel backdrop below combo seven. At or
+	# above the combo gate, the size threshold still prevents a physically
+	# small secondary path from exposing the brown back wall.
+	if is_layer_covering_backdrop and not stamp.use_big_hole:
+		return false
+	_make_layer_writable(chunk, layer_index)
+	if not stamp.narrow_path_points.is_empty():
+		return _punch_narrow_path(
+			chunk.mask_images[layer_index],
+			chunk_index,
+			stamp,
+			layer_index
+		)
+	var mask_data := _get_hole_mask_data(
+		layer_index,
+		stamp.use_big_hole
+	)
+	if mask_data == null:
+		return false
+	var opening_rect := _get_layer_opening_rect(stamp, layer_index)
+	var layer_variation := _get_layer_stamp_variation(
+		stamp,
+		layer_index
+	)
+	return _punch_hole(
+		chunk.mask_images[layer_index],
+		chunk_index,
+		opening_rect,
+		mask_data,
+		layer_variation.x == 1,
+		layer_variation.y == 1,
+		layer_variation.z,
+		raster_band_index,
+		raster_band_count
+	)
 
 
 ## Returns the organic opening drawn for one ordinary impact layer.
@@ -1996,7 +2175,9 @@ func _punch_hole(
 	mask_data: HoleMaskData,
 	flip_x: bool,
 	flip_y: bool,
-	rotation_quarters: int
+	rotation_quarters: int,
+	raster_band_index: int = 0,
+	raster_band_count: int = 1
 ) -> bool:
 	var source_bounds := _get_oriented_transparent_bounds(
 		mask_data,
@@ -2107,31 +2288,58 @@ func _punch_hole(
 	# pixels that opening already cleared - leaving black cracks floating inside
 	# open rock.
 	#
-	# So blend into a stamp-sized copy of what is already there, then blit that
-	# result back masked by the pre-blend alpha. Strokes darken only rock that is
-	# still solid, and no already-cleared pixel is ever touched. The two copies
-	# are bounded by the stamp, not the chunk, and are freed with the call.
-	var affected_rect := Rect2i(destination_position, source_rect.size)
-	var solid_before_stamp := destination.get_region(affected_rect)
-	var shaded_region := destination.get_region(affected_rect)
-	shaded_region.blend_rect(
-		stamp_images.fracture_source,
-		source_rect,
-		Vector2i.ZERO
+	# Mask the blend with a stamp-sized copy of the pre-impact terrain. Strokes
+	# darken only rock that is still solid, and no already-cleared pixel is ever
+	# touched. This keeps one bounded allocation on the mining hot path instead
+	# of copying the same affected region twice.
+	var affected_rect := Rect2i(
+		destination_position,
+		source_rect.size
+	).intersection(Rect2i(Vector2i.ZERO, destination.get_size()))
+	if not affected_rect.has_area():
+		return false
+	if raster_band_count > 1:
+		var band_height := ceili(
+			float(affected_rect.size.y)
+			/ float(raster_band_count)
+		)
+		var band_top := (
+			affected_rect.position.y
+			+ band_height * raster_band_index
+		)
+		var band_bottom := mini(
+			band_top + band_height,
+			affected_rect.end.y
+		)
+		if band_top >= band_bottom:
+			return false
+		affected_rect = Rect2i(
+			affected_rect.position.x,
+			band_top,
+			affected_rect.size.x,
+			band_bottom - band_top
+		)
+	var clipped_source_rect := Rect2i(
+		source_rect.position + affected_rect.position - destination_position,
+		affected_rect.size
 	)
-	destination.blit_rect_mask(
-		shaded_region,
+	var solid_before_stamp := destination.get_region(affected_rect)
+	var fracture_region := (
+		stamp_images.fracture_source.get_region(clipped_source_rect)
+	)
+	destination.blend_rect_mask(
+		fracture_region,
 		solid_before_stamp,
-		Rect2i(Vector2i.ZERO, source_rect.size),
-		destination_position
+		Rect2i(Vector2i.ZERO, affected_rect.size),
+		affected_rect.position
 	)
 
 	# Only now carve this stamp's own cavity.
 	destination.blit_rect_mask(
 		stamp_images.transparent_source,
 		stamp_images.erase_mask,
-		source_rect,
-		destination_position
+		clipped_source_rect,
+		affected_rect.position
 	)
 	return true
 

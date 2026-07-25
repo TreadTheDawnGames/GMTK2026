@@ -12,7 +12,12 @@ text = "I found it. More treasure than I could ever carry."
 [sub_resource type="Resource" id="Line_found"]
 script = ExtResource("3_line")
 speaker_slot = &"treasure_hunter"
-text = "I spent so long wondering what it would look like."
+text = "Everyone told me I was wasting my time, but it’s not like any of them were even trying."
+
+[sub_resource type="Resource" id="Line_finally"]
+script = ExtResource("3_line")
+speaker_slot = &"treasure_hunter"
+text = "It’s finally mine! I spent so long wondering what it would look like."
 
 [sub_resource type="Resource" id="Line_miner"]
 script = ExtResource("3_line")
@@ -43,4 +48,4 @@ display_name = "Treasure Hunter"
 script = ExtResource("1_conversation")
 conversation_id = &"treasure_hunter_treasure"
 participants = Array[ExtResource("2_participant")]([SubResource("Participant_miner"), SubResource("Participant_treasure_hunter")])
-lines = Array[ExtResource("3_line")]([SubResource("Line_cheer"), SubResource("Line_found"), SubResource("Line_miner"), SubResource("Line_wish"), SubResource("Line_pickaxe")])
+lines = Array[ExtResource("3_line")]([SubResource("Line_cheer"), SubResource("Line_found"), SubResource("Line_finally"), SubResource("Line_miner"), SubResource("Line_wish"), SubResource("Line_pickaxe")])

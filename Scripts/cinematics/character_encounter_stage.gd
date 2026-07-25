@@ -71,8 +71,24 @@ var _is_active: bool = false
 var _active_cue: StringName
 
 
+## Where the harness looks for the cutscene it has been asked to open. Shared
+## with the editor plugin's playtest button, which writes the same file.
+const _PLAYTEST_TARGET_PATH := "res://.cutscene_playtest_target"
+const _PREVIEW_HARNESS_SCENE := "res://Scenes/cinematics/cinematic_preview.tscn"
+
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# Pressing Play on a cutscene should play that cutscene.
+	#
+	# Run on its own a stage is a room with markers in it and no game around it:
+	# no miner, no letterbox, no dialogue, nothing to watch. Handing straight
+	# over to the preview harness is what makes F6 on this scene mean what a
+	# designer expects. Inside the real game this branch never runs, because the
+	# stage is a child of the mining scene rather than the scene being played.
+	if get_tree().current_scene == self:
+		_play_as_standalone_cutscene()
+		return
 	if (
 		is_instance_valid(animation_player)
 		and not animation_player.animation_finished.is_connected(
@@ -82,6 +98,37 @@ func _ready() -> void:
 		animation_player.animation_finished.connect(
 			_on_animation_finished
 		)
+
+
+## Hands this cutscene to the preview harness, which boots the real game and
+## breaks into this encounter's ceiling.
+##
+## The encounter id is read off the editor preview rather than duplicated onto
+## this node, so there is only ever one place a stage says which cutscene it is.
+## The preview frees itself in a running game, but queue_free is deferred, so it
+## is still here to be asked during this frame.
+func _play_as_standalone_cutscene() -> void:
+	var encounter_id := &""
+	var preview := get_node_or_null(NodePath("EditorTerrainPreview"))
+	if preview != null:
+		var authored: Variant = preview.get(&"encounter_id")
+		if authored is StringName:
+			encounter_id = authored
+
+	if String(encounter_id).is_empty():
+		push_warning(
+			"This stage has no Encounter Id on its EditorTerrainPreview, so "
+			+ "playing it alone cannot tell the harness which cutscene to "
+			+ "open. It will start at the surface instead."
+		)
+	var file := FileAccess.open(_PLAYTEST_TARGET_PATH, FileAccess.WRITE)
+	if file != null:
+		file.store_string(String(encounter_id))
+		file.close()
+
+	# Deferred: changing scenes from inside _ready tears down the tree that is
+	# still being built.
+	get_tree().change_scene_to_file.call_deferred(_PREVIEW_HARNESS_SCENE)
 
 
 ## Takes reversible ownership of one presenter for this encounter visit.

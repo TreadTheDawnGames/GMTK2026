@@ -8,6 +8,8 @@ extends RefCounted
 ##   existing chamber-row and horizontal-bound rules.
 ## - Writes open chamber cells and solid cells everywhere else in one batch.
 ## - carve_right_exit_tunnel adds the shared walk-off corridor to any room.
+## - Every completed cut derives visible-only stratum masks: layer two forms
+##   the receding wall rim and the room-selected deep layer closes the backdrop.
 ## - It owns no persistent state and returns after the sculpt has been seeded.
 ## The invariant is that a baked cell uses the same two config queries as
 ## procedural terrain, so an untouched bake has identical logical collision.
@@ -42,6 +44,28 @@ const LEVEL_TUNNEL_ROUGHEN_STRENGTH: float = 0.45
 ## has to clear the roughen radius, or a lump the pass left hanging survives
 ## into the space the cast walks through.
 const LEVEL_TUNNEL_ROOF_JAG_BAND_CELLS: int = 7
+## Tallest lump of rock standing on the tunnel floor, in cells. Three cells is
+## twenty-four world units: still under knee height on the miner, so it reads as
+## broken stone underfoot rather than a step the cast has to climb, but enough
+## of it catches the light to be seen from across the room.
+const LEVEL_TUNNEL_FLOOR_BUMP_CELLS: int = 3
+## How much of the floor carries rock at all.
+##
+## Pushed above the midpoint so most columns have something on them. Centred, the
+## waves spent half their range at zero and the ground came out mostly bare with
+## the occasional lump, which reads as a smooth floor somebody dropped rocks on
+## instead of a rocky floor.
+const LEVEL_TUNNEL_FLOOR_ROCK_BIAS: float = 0.32
+## Four gameplay strata are authored from foreground through backdrop. Keeping
+## this count beside the depth derivation makes the stored masks agree with the
+## renderer profile without coupling collision to either one.
+const VISUAL_STRATUM_COUNT: int = 4
+## Layer index one is the second visible stratum, which is the first plane
+## behind the foreground rim.
+const WALL_CEILING_DEPTH_LAYER_INDEX: int = 1
+## A two-cell band is wide enough to survive mask smoothing and read at gameplay
+## zoom, but narrow enough that it stays a rim instead of becoming the backdrop.
+const WALL_CEILING_DEPTH_CELLS: int = 2
 
 ## Corridor height in terrain cells. Twelve cells is 96 world units, which
 ## clears the tallest authored actor with room to read as a tunnel rather than
@@ -105,6 +129,7 @@ static func bake_procedural_chamber(
 			)
 			sculpt.set_solid_local(local_cell, not is_open)
 	sculpt.end_edit()
+	apply_visual_depth_masks(sculpt)
 
 
 ## Cuts the whole room as one level tunnel running off both edges, with a flat
@@ -212,7 +237,43 @@ static func carve_level_tunnel(
 			continue
 		for local_y in range(ceiling_row, floor_row):
 			sculpt.set_solid_local(Vector2i(local_x, local_y), false)
+
+	# Lay rock along the ground so the floor is a cave floor rather than a ruled
+	# line. The bumps are low and gently varied, because this is the surface the
+	# cast walks along: tall enough to catch the light and read as stone, short
+	# enough that standing on one is standing on the floor.
+	#
+	# Deterministic from the column, not random, so recutting a room twice gives
+	# the same ground and a designer's memory of a scene stays true.
+	for local_x in range(sculpt.grid_size.x):
+		var bump := _get_floor_bump_height(local_x)
+		for local_y in range(floor_row - bump, floor_row):
+			if local_y >= 0:
+				sculpt.set_solid_local(Vector2i(local_x, local_y), true)
 	sculpt.end_edit()
+	apply_visual_depth_masks(sculpt)
+
+
+## Returns how many cells of rock stand on the floor at one column.
+##
+## Three waves of unrelated lengths summed, so the ground neither repeats on a
+## short cycle nor drifts into one long ramp, and the result is clamped to the
+## authored maximum. A column is stone or it is not; there is no half cell.
+##
+## The frequencies deliberately share no whole-number ratio. An earlier pair at
+## 0.21 and 0.63 was exactly three to one, which put an identical lump every
+## thirty columns and read as tiling rather than as rock.
+static func _get_floor_bump_height(local_x: int) -> int:
+	var column := float(local_x)
+	var coarse := sin(column * 0.187)
+	var fine := sin(column * 0.523 + 1.7)
+	var drift := sin(column * 0.079 + 0.4)
+	var combined := (coarse + fine * 0.55 + drift * 0.7) / 2.25
+	var height := roundi(
+		(combined * 0.5 + 0.5 + LEVEL_TUNNEL_FLOOR_ROCK_BIAS)
+		* float(LEVEL_TUNNEL_FLOOR_BUMP_CELLS)
+	)
+	return clampi(height, 0, LEVEL_TUNNEL_FLOOR_BUMP_CELLS)
 
 
 ## Cuts a level walk-off corridor from the room's right wall out through the
@@ -286,6 +347,70 @@ static func carve_right_exit_tunnel(
 		mouth_x,
 		float(floor_row) - mouth_radius - EXIT_TUNNEL_FLOOR_CLEARANCE_CELLS
 	))
+	sculpt.end_edit()
+	apply_visual_depth_masks(sculpt)
+
+
+## Derives the room's visible depth without moving one collision cell.
+##
+## Layer zero follows the logical silhouette and remains the foreground rim.
+## Layer one grows inward only from rock above or beside open air, so the walls
+## and ceiling reveal a narrow second-stratum face while the floor remains the
+## surface the miner actually lands on. Exactly one of layers two and three is
+## then closed into the backdrop selected by the room; the other keeps the
+## logical opening so it cannot hide the selected colour.
+static func apply_visual_depth_masks(sculpt: CutsceneTerrainSculpt) -> void:
+	if sculpt == null:
+		return
+	sculpt.begin_edit()
+	sculpt.ensure_layer_masks(VISUAL_STRATUM_COUNT)
+	for local_y in range(sculpt.grid_size.y):
+		for local_x in range(sculpt.grid_size.x):
+			var local_cell := Vector2i(local_x, local_y)
+			var logical_solid := sculpt.is_solid_local(local_cell)
+			for layer_index in range(VISUAL_STRATUM_COUNT):
+				sculpt.set_layer_solid_local(
+					layer_index,
+					local_cell,
+					logical_solid
+				)
+			if logical_solid:
+				continue
+
+			var draws_wall_or_ceiling_depth := false
+			for offset_y in range(
+				-WALL_CEILING_DEPTH_CELLS,
+				1
+			):
+				for offset_x in range(
+					-WALL_CEILING_DEPTH_CELLS,
+					WALL_CEILING_DEPTH_CELLS + 1
+				):
+					if offset_x == 0 and offset_y == 0:
+						continue
+					if (
+						absi(offset_x) + absi(offset_y)
+						> WALL_CEILING_DEPTH_CELLS
+					):
+						continue
+					if sculpt.is_solid_local(
+						local_cell + Vector2i(offset_x, offset_y)
+					):
+						draws_wall_or_ceiling_depth = true
+						break
+				if draws_wall_or_ceiling_depth:
+					break
+			if draws_wall_or_ceiling_depth:
+				sculpt.set_layer_solid_local(
+					WALL_CEILING_DEPTH_LAYER_INDEX,
+					local_cell,
+					true
+				)
+			sculpt.set_layer_solid_local(
+				sculpt.background_layer_index,
+				local_cell,
+				true
+			)
 	sculpt.end_edit()
 
 

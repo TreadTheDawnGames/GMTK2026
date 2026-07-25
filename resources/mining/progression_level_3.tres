@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="EncounterProgressionLevel" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://resources/mining/encounter_progression_level.gd" id="1_level"]
+[ext_resource type="PackedScene" path="res://Scenes/targets/shrinking_target.tscn" id="2_shrinking"]
+[ext_resource type="PackedScene" path="res://Scenes/targets/chase_target.tscn" id="3_chase"]
+
+[resource]
+script = ExtResource("1_level")
+combo_impact_scale = 1.2
+target_scenes = Array[PackedScene]([ExtResource("2_shrinking"), ExtResource("3_chase")])
+bonus_target_combos = PackedInt32Array(10, 15)

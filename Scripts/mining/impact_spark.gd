@@ -19,6 +19,7 @@ class SparkShard:
 	var length_px: float
 	var width_px: float
 	var color: Color
+	var vertices: PackedVector2Array = PackedVector2Array()
 
 
 class SparkFlash:
@@ -28,6 +29,7 @@ class SparkFlash:
 	var radius_px: float
 	var rotation: float
 	var color: Color
+	var vertices: PackedVector2Array = PackedVector2Array()
 
 
 @export_category("References")
@@ -66,11 +68,17 @@ class SparkFlash:
 ## Bounded per-hit accumulation: a burst that would exceed either budget drops
 ## the oldest marks first, so repeated hits never grow these arrays.
 @export_range(1, 128, 1) var maximum_active_shards: int = 72
-@export_range(1, 64, 1) var web_maximum_active_shards: int = 36
+## Browser bursts keep the full size and palette with fewer simultaneous draw
+## commands; twenty-eight still exceeds the authored maximum of one hit.
+@export_range(1, 64, 1) var web_maximum_active_shards: int = 28
 @export_range(1, 8, 1) var maximum_active_flashes: int = 3
 
 var _shards: Array[SparkShard] = []
 var _flashes: Array[SparkFlash] = []
+# Pools are bounded by the matching active budgets and retain tiny polygon
+# buffers so repeated hits do not allocate presentation records or vertices.
+var _shard_pool: Array[SparkShard] = []
+var _flash_pool: Array[SparkFlash] = []
 var _random := RandomNumberGenerator.new()
 
 
@@ -124,10 +132,16 @@ func play_at_impact(
 		_shards.size() + shard_amount - shard_budget
 	)
 	for _drop_index in range(shards_to_drop):
-		_shards.remove_at(0)
+		var retired_shard: SparkShard = _shards.pop_front()
+		if _shard_pool.size() < shard_budget:
+			_shard_pool.append(retired_shard)
 
 	for _shard_index in range(shard_amount):
-		var shard := SparkShard.new()
+		var shard: SparkShard = (
+			_shard_pool.pop_back()
+			if not _shard_pool.is_empty()
+			else SparkShard.new()
+		)
 		shard.terrain_position = spawn_position
 		shard.direction = cone_center.rotated(
 			_random.randf_range(-half_spread, half_spread)
@@ -144,6 +158,10 @@ func play_at_impact(
 		) * lerpf(1.0, 1.25, strength)
 		shard.width_px = shard_width_px
 		shard.color = _pick_spark_color()
+		shard.vertices.clear()
+		shard.vertices.append(Vector2(shard.length_px, 0.0))
+		shard.vertices.append(Vector2(0.0, shard.width_px * 0.5))
+		shard.vertices.append(Vector2(0.0, -shard.width_px * 0.5))
 		_shards.append(shard)
 	set_process(true)
 	queue_redraw()
@@ -152,8 +170,14 @@ func play_at_impact(
 ## Adds the single struck-rock flash, retiring the oldest if it has to.
 func _add_flash(spawn_position: Vector2, strength: float) -> void:
 	while _flashes.size() >= maxi(maximum_active_flashes, 1):
-		_flashes.remove_at(0)
-	var flash := SparkFlash.new()
+		var retired_flash: SparkFlash = _flashes.pop_front()
+		if _flash_pool.size() < maxi(maximum_active_flashes, 1):
+			_flash_pool.append(retired_flash)
+	var flash: SparkFlash = (
+		_flash_pool.pop_back()
+		if not _flash_pool.is_empty()
+		else SparkFlash.new()
+	)
 	flash.terrain_position = spawn_position
 	flash.total_lifetime = flash_lifetime
 	flash.remaining_lifetime = flash.total_lifetime
@@ -164,6 +188,14 @@ func _add_flash(spawn_position: Vector2, strength: float) -> void:
 	)
 	flash.rotation = _random.randf_range(0.0, TAU)
 	flash.color = spark_core_color
+	flash.vertices.clear()
+	var point_count := maxi(flash_point_count, 3)
+	for vertex_index in range(point_count * 2):
+		var angle := TAU * float(vertex_index) / float(point_count * 2)
+		var vertex_radius := 1.0 if vertex_index % 2 == 0 else 0.38
+		flash.vertices.append(
+			Vector2.RIGHT.rotated(angle) * vertex_radius
+		)
 	_flashes.append(flash)
 
 
@@ -183,7 +215,10 @@ func _process(delta: float) -> void:
 		var shard := _shards[shard_index]
 		shard.remaining_lifetime -= delta
 		if shard.remaining_lifetime <= 0.0:
+			var retired_shard := _shards[shard_index]
 			_shards.remove_at(shard_index)
+			if _shard_pool.size() < maximum_active_shards:
+				_shard_pool.append(retired_shard)
 			continue
 		shard.terrain_position += shard.direction * shard.speed * delta
 		# Sparks bleed speed fast, which is what stops them reading as debris.
@@ -192,7 +227,10 @@ func _process(delta: float) -> void:
 		var flash := _flashes[flash_index]
 		flash.remaining_lifetime -= delta
 		if flash.remaining_lifetime <= 0.0:
+			var retired_flash := _flashes[flash_index]
 			_flashes.remove_at(flash_index)
+			if _flash_pool.size() < maximum_active_flashes:
+				_flash_pool.append(retired_flash)
 	queue_redraw()
 	if _shards.is_empty() and _flashes.is_empty():
 		set_process(false)
@@ -209,12 +247,13 @@ func _draw() -> void:
 			0.0,
 			1.0
 		)
-		_draw_flash_star(
+		var flash_scale := flash.radius_px * life_ratio
+		draw_set_transform(
 			flash_center,
-			flash.radius_px * life_ratio,
 			flash.rotation,
-			flash.color
+			Vector2.ONE * flash_scale
 		)
+		draw_colored_polygon(flash.vertices, flash.color)
 
 	for shard in _shards:
 		var shard_tail := terrain_manager.terrain_to_screen_position(
@@ -228,43 +267,10 @@ func _draw() -> void:
 		var shard_length := shard.length_px * life_ratio
 		if shard_length <= 0.5:
 			continue
-		var shard_head := shard_tail + shard.direction * shard_length
-		var across := shard.direction.orthogonal() * (
-			shard.width_px * 0.5 * life_ratio
+		draw_set_transform(
+			shard_tail,
+			shard.direction.angle(),
+			Vector2.ONE * life_ratio
 		)
-		# A tapered sliver: wide at the tail, closed to a point at the head.
-		draw_colored_polygon(
-			PackedVector2Array([
-				shard_head,
-				shard_tail + across,
-				shard_tail - across
-			]),
-			shard.color
-		)
-
-
-## Draws one hard-edged star, alternating full and half radius per point.
-func _draw_flash_star(
-	center: Vector2,
-	radius: float,
-	rotation_offset: float,
-	color: Color
-) -> void:
-	if radius <= 0.5:
-		return
-	var point_count := maxi(flash_point_count, 3)
-	var vertices := PackedVector2Array()
-	for vertex_index in range(point_count * 2):
-		var angle := (
-			rotation_offset
-			+ TAU * float(vertex_index) / float(point_count * 2)
-		)
-		var vertex_radius := (
-			radius
-			if vertex_index % 2 == 0
-			else radius * 0.38
-		)
-		vertices.append(
-			center + Vector2.RIGHT.rotated(angle) * vertex_radius
-		)
-	draw_colored_polygon(vertices, color)
+		draw_colored_polygon(shard.vertices, shard.color)
+	draw_set_transform(Vector2.ZERO, 0.0)

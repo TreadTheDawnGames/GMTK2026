@@ -129,6 +129,16 @@ func get_miner_screen_offset() -> Vector2:
 	return _last_miner_screen_offset
 
 
+## Returns the cell the view is actually looking at right now, which trails
+## target_view_position while a fall is still travelling.
+##
+## Exposed so a caller can tell "the view has been told where to go" from "the
+## view has got there". Anything that positions against the world during a fall
+## needs the second, because the frame is still moving under it.
+func get_current_view_position() -> Vector2:
+	return _current_miner_position
+
+
 ## Tweens back to the selected smooth or chunked mining framing.
 func release_encounter_focus() -> void:
 	if not _is_encounter_focus_active:

@@ -17,7 +17,12 @@ text = "..."
 [sub_resource type="Resource" id="Line_spare"]
 script = ExtResource("3_line")
 speaker_slot = &"treasure_hunter"
-text = "My man, take this. It'll help."
+text = "My man, take this. It'll help.  But that treasure is MINE!"
+
+[sub_resource type="Resource" id="Line_warning"]
+script = ExtResource("3_line")
+speaker_slot = &"treasure_hunter"
+text = "Don’t take my act of kindness as me yielding the treasure, I’ve been hunting this for years!  I just can’t bear to watch someone try to mine with such a disgraceful piece of equipment."
 
 [sub_resource type="Resource" id="Participant_miner"]
 script = ExtResource("2_participant")
@@ -33,4 +38,4 @@ display_name = "Treasure Hunter"
 script = ExtResource("1_conversation")
 conversation_id = &"treasure_hunter_first"
 participants = Array[ExtResource("2_participant")]([SubResource("Participant_miner"), SubResource("Participant_treasure_hunter")])
-lines = Array[ExtResource("3_line")]([SubResource("Line_meeting"), SubResource("Line_miner"), SubResource("Line_spare")])
+lines = Array[ExtResource("3_line")]([SubResource("Line_meeting"), SubResource("Line_miner"), SubResource("Line_spare"), SubResource("Line_warning")])

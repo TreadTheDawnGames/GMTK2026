@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="CutsceneSequence" format=3]
+[gd_resource type="Resource" script_class="CutsceneSequence" format=3 uid="uid://bls5tpjbahtrq"]
 
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_beat.gd" id="1_nh4gs"]
-[ext_resource type="Resource" path="res://resources/dialogue/cafe_gathering_conversation.tres" id="2_puacd"]
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_sequence.gd" id="3_7coql"]
+[ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="1_nh4gs"]
+[ext_resource type="Resource" uid="uid://btlq5nsfh84a6" path="res://resources/dialogue/cafe_gathering_conversation.tres" id="2_puacd"]
+[ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="3_7coql"]
 
 [sub_resource type="Resource" id="Resource_sys8h"]
 script = ExtResource("1_nh4gs")
@@ -15,8 +15,9 @@ kind = 0
 actor = &"cloak_lantern"
 duration_seconds = 2.0
 target_marker = &"Conversation"
+starts_from_authored_point = true
+start_marker = &"Entrance"
 pose = &"walk"
-step_height = 5.0
 
 [sub_resource type="Resource" id="Resource_qeygh"]
 script = ExtResource("1_nh4gs")
@@ -34,26 +35,27 @@ pose = &"idle"
 
 [sub_resource type="Resource" id="Resource_lef3u"]
 script = ExtResource("1_nh4gs")
-kind = 5
-start_seconds = 2.2
-duration_seconds = 6.0
-conversation = ExtResource("2_puacd")
+kind = 3
+actor = &"cloak_lantern"
+start_seconds = 2.0
+duration_seconds = 0.5
 
 [sub_resource type="Resource" id="Resource_xoc8n"]
 script = ExtResource("1_nh4gs")
-kind = 0
-actor = &"cloak_lantern"
-start_seconds = 8.2
-duration_seconds = 2.4
-target_marker = &"Exit"
-pose = &"walk"
-step_height = 5.0
+kind = 5
+start_seconds = 2.5
+duration_seconds = 6.0
+conversation = ExtResource("2_puacd")
+notes = "The cast is already here; only the lantern-staff man walks in. Nobody hides at the end, because the gathering stays."
 
 [sub_resource type="Resource" id="Resource_bgk7t"]
 script = ExtResource("1_nh4gs")
-kind = 10
+kind = 0
 actor = &"cloak_lantern"
-start_seconds = 10.6
+start_seconds = 8.5
+duration_seconds = 2.4
+target_marker = &"Exit"
+pose = &"walk"
 
 [resource]
 script = ExtResource("3_7coql")

@@ -10,11 +10,15 @@ extends Node
 ##   out of frame with no extra bookkeeping.
 ## - Grass and crust are NOT here. They belong to the foreground stratum in
 ##   terrain_layer.gdshader, so that mining removes them with the ground.
-## - Both rects are resized to whatever the camera can see, and their shader
-##   coordinates are shifted by the rect's own origin. At gameplay zoom that is
-##   the authored full-viewport rect at (0, 0); while the opening shot is still
-##   zoomed out it is the larger area, so daylight never stops short of the
-##   frame edge.
+## - Both rects are resized in world units to whatever the camera can see, so
+##   daylight never stops short of the frame edge. At gameplay zoom that is the
+##   authored full-viewport rect; while the opening shot is still zoomed out it
+##   is a much larger area.
+## - Both shaders nonetheless paint in viewport pixels, so everything published
+##   here is converted into the frame first, and each rect is told how large it
+##   currently draws. That is what holds the sun, the clouds, and the distant
+##   ridges still while the opening shot zooms in: without it the backdrop is
+##   pinned to a rect that is moving and shrinking under it, and it swims.
 ## The invariant is that both rects agree on the horizon and the sun.
 
 # Pixels of backdrop carried past every frame edge, so a fractional zoom can
@@ -32,17 +36,26 @@ const _BACKDROP_OVERSCAN_PX: float = 2.0
 
 @export_category("Sun")
 ## Viewport pixels. Every rect reads this, so the halo in the sky and the warm
-## pool on the ground always sit under the same sun. Keep it clear of the
-## letterbox top bar (the first 91 px) or the intro hides the sun behind it.
-## Authored setting, just past the ground line at y = 262: the disc is mostly
-## behind the horizon, so the light rises from below instead of falling from
-## above. Raising this back above the band turns the shot into midday again.
+## pool on the ground always sit under the same sun. Only x is taken from it:
+## the sun is set against the horizon, not against the frame.
 @export var sun_screen_position: Vector2 = Vector2(676.0, 284.0)
+## How far below the ground line the sun's centre sits, which is the whole of
+## the setting. Only its top sliver and its halo clear the horizon, so the light
+## rises from below instead of falling from above.
+##
+## It is measured from the ground line rather than pinned to a screen row
+## because the ground line is the only thing here that moves: the opening shot
+## zooms, and digging scrolls the surface up out of frame. Pinned to a row, the
+## sun climbed off the horizon and read as a flat disc pasted in the sky the
+## moment either happened. Raising this to zero puts the whole disc above the
+## land and turns the shot back into midday.
+@export_range(-200.0, 200.0, 1.0) var sun_below_horizon_px: float = 24.0
 
 var _sky_material: ShaderMaterial
 var _wash_material: ShaderMaterial
 var _last_surface_screen_y: float = NAN
 var _last_viewport_size: Vector2 = Vector2.ZERO
+var _last_backdrop_screen_size: Vector2 = Vector2.ZERO
 var _last_sun_screen_position: Vector2 = Vector2(NAN, NAN)
 
 
@@ -96,7 +109,7 @@ func get_surface_screen_y() -> float:
 func _publish_all() -> void:
 	_frame_backdrop_rects()
 	_publish_sun_position()
-	_publish_viewport_size()
+	_publish_frame_size()
 	_publish_surface_screen_y()
 
 
@@ -119,17 +132,30 @@ func _frame_backdrop_rects() -> void:
 		rect.size = covered_size
 
 
-## Both shaders read UV against their own rect, so every viewport-space value
-## they are given has to be moved into that rect's frame first.
-func _get_backdrop_origin() -> Vector2:
-	return sky_rect.position
+## The frame the shaders measure in. With no camera the authored rect is the
+## frame, exactly as it was before the rects started following one.
+func _get_screen_size() -> Vector2:
+	if camera == null:
+		return sky_rect.size
+	return get_viewport().get_visible_rect().size
+
+
+## Converts a world point into the viewport pixel it is drawn at. Camera offset
+## is left out for the same reason _frame_backdrop_rects leaves it out: the
+## impact shake moves the whole frame and the backdrop rides along with it.
+func _world_to_screen_position(world_position: Vector2) -> Vector2:
+	if camera == null:
+		return world_position - sky_rect.position
+	return (
+		(world_position - camera.global_position) * camera.zoom
+		+ _get_screen_size() * 0.5
+	)
 
 
 func _publish_surface_screen_y() -> void:
-	var surface_screen_y := (
-		get_surface_screen_y()
-		- _get_backdrop_origin().y
-	)
+	var surface_screen_y := _world_to_screen_position(
+		get_surface_screen_position()
+	).y
 	if (
 		not is_nan(_last_surface_screen_y)
 		and is_equal_approx(surface_screen_y, _last_surface_screen_y)
@@ -139,28 +165,45 @@ func _publish_surface_screen_y() -> void:
 	_set_shared_parameter(&"surface_screen_y", surface_screen_y)
 
 
+## Sets the sun against the ground line, so it stays the same distance behind
+## the horizon at every zoom and at every depth the surface has scrolled to.
 func _publish_sun_position() -> void:
-	var rect_sun_position := sun_screen_position - _get_backdrop_origin()
-	if rect_sun_position.is_equal_approx(_last_sun_screen_position):
+	var sun_position := Vector2(
+		sun_screen_position.x,
+		_world_to_screen_position(get_surface_screen_position()).y
+			+ sun_below_horizon_px
+	)
+	if sun_position.is_equal_approx(_last_sun_screen_position):
 		return
-	_last_sun_screen_position = rect_sun_position
+	_last_sun_screen_position = sun_position
 	# Only the sky and the wash place the sun; the apron is lit by the wash.
 	_sky_material.set_shader_parameter(
 		&"sun_screen_position",
-		rect_sun_position
+		sun_position
 	)
 	_wash_material.set_shader_parameter(
 		&"sun_screen_position",
-		rect_sun_position
+		sun_position
 	)
 
 
-func _publish_viewport_size() -> void:
-	var viewport_size := sky_rect.size
-	if viewport_size.is_equal_approx(_last_viewport_size):
+## The frame both shaders measure in, and how much of it each rect covers. The
+## second is the zoom: the rect is sized in world units, so its on-screen size
+## is what the shaders divide back out to recover viewport pixels.
+func _publish_frame_size() -> void:
+	var screen_size := _get_screen_size()
+	var backdrop_screen_size := sky_rect.size
+	if camera != null:
+		backdrop_screen_size *= camera.zoom
+	if (
+		screen_size.is_equal_approx(_last_viewport_size)
+		and backdrop_screen_size.is_equal_approx(_last_backdrop_screen_size)
+	):
 		return
-	_last_viewport_size = viewport_size
-	_set_shared_parameter(&"viewport_size", viewport_size)
+	_last_viewport_size = screen_size
+	_last_backdrop_screen_size = backdrop_screen_size
+	_set_shared_parameter(&"viewport_size", screen_size)
+	_set_shared_parameter(&"backdrop_screen_size", backdrop_screen_size)
 
 
 ## Pushes one shared uniform to every rect that declares it.

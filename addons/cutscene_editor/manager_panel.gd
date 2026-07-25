@@ -402,27 +402,16 @@ func _populate_item(item: TreeItem, row: Dictionary) -> void:
 	item.set_custom_color(_COLUMN_STATUS, status_color)
 
 
+## Highlights a row and nothing more.
+##
+## This used to repoint the open scene's preview at whichever cutscene was
+## clicked, from back when one shared stage previewed them all. Every cutscene
+## now has its own scene, so that write did real damage: clicking down the
+## overview silently changed the open stage's Encounter Id and left it dirty, so
+## Cheese Girl's scene ended up claiming to be Rotini's. Double-click opens the
+## right scene; single-click selects, and selecting must not edit.
 func _on_row_selected() -> void:
-	if (
-		_is_rebuilding
-		or _context == null
-		or not _context.is_valid()
-	):
-		return
-	var selected: TreeItem = _table.get_selected()
-	if selected == null:
-		return
-	var metadata: Variant = selected.get_metadata(_COLUMN_CUTSCENE)
-	var encounter_id: StringName = StringName(String(metadata))
-	if encounter_id.is_empty():
-		return
-	_context.preview.encounter_id = encounter_id
-	_context.encounter = _context.preview.get_encounter()
-	_context.sculpt = _context.preview.get_sculpt()
-	_context.sequence = (
-		_context.encounter.sequence if _context.encounter != null else null
-	)
-	_context.notify_authored_data_changed()
+	pass
 
 
 ## Opens the double-clicked cutscene's own stage scene, so the overview is how a

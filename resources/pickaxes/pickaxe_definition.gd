@@ -2,8 +2,8 @@ class_name PickaxeDefinition
 extends Resource
 
 ## Describes one collectible pickaxe and the modifiers it adds to the run.
-## Pickaxes never replace earlier rewards: progression combines every owned
-## definition while the newest definition controls the visible tool color.
+## EncounterProgression owns production difficulty; these modifiers preserve
+## isolated legacy previews while the newest owned definition controls color.
 
 enum SpecialEffect {
 	NONE,

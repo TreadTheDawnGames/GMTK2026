@@ -91,6 +91,10 @@ const MAX_PLAYABLE_DEPTH: int = 2_000_000_000
 ## Multiplies recovery speed after each successfully saved streak.
 @export_range(0.1, 5.0, 0.05) var recovery_speed_multiplier: float = 1.2
 
+@export_category("Encounter Progression")
+## Complete levels zero through nine. Encounter ten intentionally has no entry.
+@export var progression_levels: Array[EncounterProgressionLevel] = []
+
 @export_category("Effects")
 ## Treats this combo as full strength for animation and hit feedback.
 @export_range(1, 100, 1) var maximum_effect_combo: int = 20

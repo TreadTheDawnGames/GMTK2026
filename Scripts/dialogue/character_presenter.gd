@@ -26,6 +26,23 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_base_sprite_position = character_sprite.position
 	speech_reaction.capture_rest_position()
+	_ensure_ground_shadow()
+
+
+## Puts a contact shadow under this character.
+##
+## Built here rather than authored into the scene because it is the runtime twin
+## of the one the cutscene editor draws under its stand-ins: without it the
+## editor shows a cast standing on the floor and the game shows the same cast
+## floating in front of it. This node's origin is the character's feet, so the
+## shadow needs no offset.
+func _ensure_ground_shadow() -> void:
+	if get_node_or_null(NodePath("GroundShadow")) != null:
+		return
+	var shadow := ActorGroundShadow.new()
+	shadow.name = &"GroundShadow"
+	shadow.measured_sprite = character_sprite
+	add_child(shadow)
 
 
 ## Applies the authored sprite configuration for one named character.

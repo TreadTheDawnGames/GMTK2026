@@ -6,9 +6,6 @@ extends CanvasLayer
 const CinematicFrameType = preload(
 	"res://Scripts/dialogue/cinematic_frame.gd"
 )
-const SILENT_MINER_SLOT: StringName = &"miner"
-const SILENT_MINER_TEXT := "..."
-
 signal conversation_started(conversation_id: StringName)
 signal line_presented(
 	conversation_id: StringName,
@@ -270,13 +267,8 @@ func _present_current_line() -> void:
 		if line.auto_advance_delay_seconds > 0.0
 		else "Space / Enter / Left Click"
 	)
-	var presented_text := (
-		SILENT_MINER_TEXT
-		if line.speaker_slot == SILENT_MINER_SLOT
-		else line.text
-	)
 	speaker_label.text = display_name
-	body_label.text = presented_text
+	body_label.text = line.text
 	continue_label.text = continue_text
 	_set_visible_character_count(0)
 	_show_next_character(_presentation_token)

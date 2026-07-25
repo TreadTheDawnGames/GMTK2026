@@ -3,7 +3,8 @@ extends Node
 
 ## How it works:
 ## - NPC rewards are appended to one cumulative run stack.
-## - Every owned definition contributes mining modifiers and timing targets.
+## - EncounterProgression owns production mining and timing difficulty.
+## - Definition modifiers remain available to isolated legacy previews.
 ## - The newest reward controls only the visible tool appearance.
 ## - The invariant is that granting an upgrade never disables an older one.
 

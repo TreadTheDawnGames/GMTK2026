@@ -11,6 +11,8 @@ extends Resource
 ##   layer_solid_bits optionally lets each stratum's visible rock differ from
 ##   it, which is what makes strata read as receding rock rather than one
 ##   silhouette stamped four times.
+## - background_layer_index selects which deep visible mask closes the room;
+##   the baker derives that backdrop without changing the logical opening.
 ## - It owns no terrain code. Take the resource away and the encounter falls
 ##   back to the procedural chamber exactly as before.
 ## The invariant is that solid_bits is the only thing collision ever reads;
@@ -87,6 +89,13 @@ const MAXIMUM_GRID_SIZE := Vector2i(512, 512)
 ## Optional per-stratum visible rock, same layout as solid_bits. An empty
 ## array means every stratum follows the logical mask.
 @export_storage var layer_solid_bits: Array[PackedByteArray] = []
+## Which deep stratum closes the room behind its receding layer-two rim. Most
+## rooms use the deepest gameplay layer; a room can move the backdrop forward
+## when its palette needs the next stratum without changing collision.
+@export_range(2, 3, 1) var background_layer_index: int = 3:
+	set(value):
+		background_layer_index = clampi(value, 2, 3)
+		emit_changed()
 
 # A brush stroke touches thousands of cells. Emitting `changed` per cell would
 # rebuild the previewed terrain thousands of times inside one drag, so edits

@@ -1,8 +1,18 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://dq1edo6hktxtb"]
 
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
+[ext_resource type="Script" uid="uid://7qy8qeox17tk" path="res://Scripts/cinematics/cutscene_actor_preview.gd" id="2_hbiw8"]
+[ext_resource type="Resource" path="res://resources/encounters/cloak_lantern_character_appearance.tres" id="3_vk64v"]
+[ext_resource type="Script" uid="uid://bpg6fvsw6y7ai" path="res://resources/encounters/character_appearance.gd" id="4_ml811"]
+[ext_resource type="Texture2D" uid="uid://bq8qwl3xn5qny" path="res://Assets/Characters/miner_idle-Pickaxe.png" id="5_thcas"]
 
-[node name="LanternFirstEncounterStage" instance=ExtResource("1_stage")]
+[sub_resource type="Resource" id="Resource_psbsn"]
+script = ExtResource("4_ml811")
+texture = ExtResource("5_thcas")
+sprite_scale = Vector2(0.44, 0.44)
+sprite_offset = Vector2(0, -68)
+
+[node name="LanternFirstEncounterStage" unique_id=211847311 instance=ExtResource("1_stage")]
 editor_description = "Story beat 3, depth 1,400: the player first meets the man with the lantern staff, who cryptically foreshadows the Thief. He arrives unhurried and leaves the same way, because the shot's job is to plant a warning the player cannot act on yet. His art is drawn looking left, so he holds the conversation on the miner's right; on the left he would deliver the warning with his back turned."
 opening_move_seconds = 1.6
 closing_move_seconds = 2.4
@@ -30,4 +40,18 @@ editor_description = "Previews cloak_lantern_first at its authored depth."
 encounter_id = &"cloak_lantern_first"
 preview_depth_rows = 1400
 
-[editable path="ActorMarkers"]
+[node name="cloak_lantern" type="Node2D" parent="." index="5" unique_id=1905941146]
+z_index = 3
+position = Vector2(264, 0)
+script = ExtResource("2_hbiw8")
+actor_id = &"cloak_lantern"
+appearance = ExtResource("3_vk64v")
+pose = &"walk"
+metadata/_edit_group_ = true
+
+[node name="Miner" type="Node2D" parent="." index="6" unique_id=901033075]
+z_index = 3
+script = ExtResource("2_hbiw8")
+actor_id = &"miner"
+appearance = SubResource("Resource_psbsn")
+metadata/_edit_group_ = true

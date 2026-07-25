@@ -79,15 +79,18 @@ signal dig_number_requested(
 
 @onready var _game_state: RunState = RunState.get_global(self)
 
-# Authored progression contains exactly ten definitions; character grants only
-# replace this bounded snapshot and never grow it per hit.
+# Narrative pickaxe gifts replace this bounded snapshot. Encounter progression
+# overrides their legacy gameplay modifiers during the production run.
 var _active_pickaxes: Array[PickaxeDefinition] = []
+var _progression_level: EncounterProgressionLevel
 var _path_direction: int = 1
 var _pending_swing: SwingRequest
 var _pending_combo_strength: float = 0.0
 var _is_swing_pending: bool = false
 var _has_resolved_pending_impact: bool = false
 var _is_swing_queue_paused: bool = false
+# Each success adds at most its primary request and one authored double hit.
+# Swing completion pops requests; a miss or run reset clears the remainder.
 var _queued_swings: Array[SwingRequest] = []
 
 
@@ -120,25 +123,37 @@ func resolve_attempt(
 	else:
 		_start_swing(primary_swing)
 
-	# Every owned rapid-follow-up pickaxe adds one bonus swing. Bonus swings
-	# retain the complete stack but cannot recursively create more swings.
-	for definition in _active_pickaxes:
-		if (
-			definition == null
-			or definition.special_effect
-				!= PickaxeDefinition.SpecialEffect.RAPID_FOLLOW_UP
-		):
-			continue
+	# Encounter progression owns the production run's double-hit rule. The
+	# pickaxe loop remains only as a fallback for isolated legacy previews.
+	if _progression_level != null and _progression_level.double_hit:
 		_queued_swings.append(SwingRequest.new(
 			safe_combo,
 			_active_pickaxes,
 			hit_direction,
-			definition.follow_up_power_scale,
-			definition.follow_up_width_scale,
-			definition.follow_up_speed_scale,
-			definition.follow_up_debris_scale,
+			1.0,
+			1.0,
+			1.0,
+			1.0,
 			false
 		))
+	elif _progression_level == null:
+		for definition in _active_pickaxes:
+			if (
+				definition == null
+				or definition.special_effect
+					!= PickaxeDefinition.SpecialEffect.RAPID_FOLLOW_UP
+			):
+				continue
+			_queued_swings.append(SwingRequest.new(
+				safe_combo,
+				_active_pickaxes,
+				hit_direction,
+				definition.follow_up_power_scale,
+				definition.follow_up_width_scale,
+				definition.follow_up_speed_scale,
+				definition.follow_up_debris_scale,
+				false
+			))
 
 
 ## Starts one retained success and waits for its animated contact frame.
@@ -188,14 +203,19 @@ func _start_swing(swing: SwingRequest) -> void:
 	)
 	_is_swing_pending = true
 	_has_resolved_pending_impact = false
-	swing_requested.emit(
-		swing.combo,
-		_pending_combo_strength,
-		_stack_multiplier(
+	var authored_animation_speed := (
+		_progression_level.get_mine_animation_speed_multiplier()
+		if _progression_level != null
+		else _stack_multiplier(
 			swing.pickaxes,
 			&"swing_speed_multiplier",
 			config.maximum_stack_swing_speed_multiplier
-		) * swing.speed_scale,
+		)
+	)
+	swing_requested.emit(
+		swing.combo,
+		_pending_combo_strength,
+		authored_animation_speed * swing.speed_scale,
 		swing.path_direction
 	)
 
@@ -217,19 +237,33 @@ func resolve_impact(
 		config.maximum_effect_combo
 	)
 	var combo_steps := maxi(capped_combo - 1, 0)
-	var requested_depth_rows := (
-		config.base_mine_depth_rows
-		+ config.combo_mine_depth_rows_per_step * combo_steps
+	var combo_added_depth := (
+		config.combo_mine_depth_rows_per_step * combo_steps
 	)
+	var requested_depth_rows: int
+	if _progression_level != null:
+		requested_depth_rows = _progression_level.scale_impact(
+			float(config.base_mine_depth_rows),
+			float(combo_added_depth)
+		)
+	else:
+		requested_depth_rows = (
+			config.base_mine_depth_rows + combo_added_depth
+		)
+		requested_depth_rows = maxi(
+			roundi(
+				float(requested_depth_rows)
+				* _stack_multiplier(
+					_pending_swing.pickaxes,
+					&"power_multiplier",
+					config.maximum_stack_power_multiplier
+				)
+			),
+			1
+		)
 	requested_depth_rows = maxi(
 		roundi(
-			float(requested_depth_rows)
-			* _stack_multiplier(
-				_pending_swing.pickaxes,
-				&"power_multiplier",
-				config.maximum_stack_power_multiplier
-			)
-			* _pending_swing.power_scale
+			float(requested_depth_rows) * _pending_swing.power_scale
 		),
 		1
 	)
@@ -276,7 +310,11 @@ func resolve_impact(
 	# A primary hit that opens an encounter chamber has reached its protected
 	# floor even when its requested endpoint lies deeper. Starting an aftershock
 	# from that surface would destroy the floor the miner must land on.
-	if dig_result.cells_removed > 0 and crossed_floor_depth < 0:
+	if (
+		_progression_level == null
+		and dig_result.cells_removed > 0
+		and crossed_floor_depth < 0
+	):
 		for definition in _pending_swing.pickaxes:
 			if (
 				definition == null
@@ -376,15 +414,20 @@ func resolve_impact(
 		_pending_swing.combo,
 		_pending_combo_strength
 	)
+	var debris_multiplier := (
+		1.0
+		if _progression_level != null
+		else _stack_multiplier(
+			_pending_swing.pickaxes,
+			&"debris_multiplier",
+			config.maximum_stack_debris_multiplier
+		)
+	)
 	impact_resolved.emit(
 		impact_screen_position,
 		dig_result.cells_removed,
 		_pending_combo_strength,
-		_stack_multiplier(
-			_pending_swing.pickaxes,
-			&"debris_multiplier",
-			config.maximum_stack_debris_multiplier
-		) * _pending_swing.debris_scale,
+		debris_multiplier * _pending_swing.debris_scale,
 		signi(swing_side) if swing_side != 0 else 1
 	)
 	dig_number_requested.emit(
@@ -424,6 +467,11 @@ func set_active_pickaxes(definitions: Array[PickaxeDefinition]) -> void:
 	_active_pickaxes = definitions.duplicate()
 
 
+## Replaces mining behavior with one complete encounter-authored level.
+func set_progression_level(definition: EncounterProgressionLevel) -> void:
+	_progression_level = definition
+
+
 ## Reports whether the camera may leave without interrupting a strike.
 func can_start_view_review() -> bool:
 	return (
@@ -457,17 +505,31 @@ func _on_run_reset() -> void:
 func _get_requested_half_width_cells(swing: SwingRequest) -> int:
 	var capped_combo := mini(swing.combo, config.maximum_effect_combo)
 	var combo_steps := maxi(capped_combo - 1, 0)
-	var requested_half_width_cells := (
-		config.base_tunnel_half_width_cells
-		+ config.combo_tunnel_half_width_cells_per_step * combo_steps
+	var combo_added_half_width := (
+		config.combo_tunnel_half_width_cells_per_step * combo_steps
 	)
+	var requested_half_width_cells: int
+	if _progression_level != null:
+		requested_half_width_cells = _progression_level.scale_impact(
+			float(config.base_tunnel_half_width_cells),
+			float(combo_added_half_width)
+		)
+	else:
+		requested_half_width_cells = (
+			config.base_tunnel_half_width_cells
+				+ combo_added_half_width
+		)
 	return maxi(
 		roundi(
 			float(requested_half_width_cells)
-			* _stack_multiplier(
-				swing.pickaxes,
-				&"width_multiplier",
-				config.maximum_stack_width_multiplier
+			* (
+				1.0
+				if _progression_level != null
+				else _stack_multiplier(
+					swing.pickaxes,
+					&"width_multiplier",
+					config.maximum_stack_width_multiplier
+				)
 			)
 			* swing.width_scale
 		),

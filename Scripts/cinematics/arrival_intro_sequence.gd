@@ -26,8 +26,6 @@ signal attendant_picked_up
 @export var miner_rig: MinerRig
 @export var bus: Node2D
 @export var bus_sprite: Sprite2D
-## Draws only the leading section above the miner during the exit reveal.
-@export var bus_front_sprite: Sprite2D
 ## Two travel states, drawn per direction. Left to right the door side faces the
 ## camera; right to left you see the far side with the door away. Swapping
 ## between them is a texture change, not a flip — the front must always lead.
@@ -40,9 +38,6 @@ signal attendant_picked_up
 ## sprite offset and wheel-shine UVs.
 @export var stopped_sprite_offset: Vector2 = Vector2(-14.0, -74.0)
 @export var side_left_sprite_offset: Vector2 = Vector2(14.0, -74.0)
-## Texture pixels retained for the leading section. Slightly over half keeps
-## the miner fully hidden until the bus's front passes his centre-screen spot.
-@export_range(1.0, 1024.0, 1.0) var bus_front_region_width_px: float = 560.0
 @export var stopped_wheel_uvs: PackedVector2Array = PackedVector2Array([
 	Vector2(0.390962, 0.568345),
 	Vector2(0.684128, 0.568345),
@@ -67,7 +62,8 @@ signal attendant_picked_up
 ## optional on purpose: without it the opening falls back to a plain timed
 ## zoom rather than refusing to stage.
 @export var bus_rear_edge_anchor: Marker2D
-## Where the miner waits while the parked bus hides him.
+## Where the miner stands once he is off the bus. Only its x is used; his y is
+## the ground line, the same one he mines from.
 @export var miner_drop_off_anchor: Marker2D
 ## Where the returning bus parks to collect the attendant. It stays behind the
 ## stop in draw order, so it reads as pulling up on the road behind the bench.
@@ -84,13 +80,23 @@ signal attendant_picked_up
 ## far side, so this is the pause the doors happen in.
 @export_range(0.0, 3.0, 0.05) var miner_exit_delay_seconds: float = 0.2
 @export_range(0.0, 2.0, 0.05) var hold_before_dialogue_seconds: float = 0.0
-@export_range(0.2, 6.0, 0.05) var bus_departure_seconds: float = 1.5
+## The pull-away is eased in, so this is the length of an accelerating run over
+## the whole 1559 px to the exit anchor, not a constant speed. A cubic ease over
+## 1.5 s left the shot at roughly three times its own average by the end, which
+## is what read as the bus being yanked off screen; a gentler curve over a
+## longer run keeps the trailing edge slow enough to uncover the miner as a
+## wipe rather than a cut.
+@export_range(0.2, 6.0, 0.05) var bus_departure_seconds: float = 2.6
 
 @export_category("Drive Past")
 ## Ambient. A while after control returns the bus runs back the other way,
 ## left to right, without stopping. Pure flavour for a player who scrolls up.
 @export var drive_past_enabled: bool = true
-@export_range(2.0, 600.0, 1.0) var drive_past_delay_seconds: float = 28.0
+## Measured from the moment he is off the road and into his own shaft, not from
+## the moment control is handed over. On a clock alone the pass fired long after
+## he had dug down, by which point the road it runs along has scrolled off the
+## top of the frame and the whole thing happens where nobody can see it.
+@export_range(0.5, 600.0, 0.5) var drive_past_delay_seconds: float = 3.0
 @export_range(0.5, 12.0, 0.1) var drive_past_seconds: float = 3.2
 
 @export_category("Attendant Pickup")
@@ -121,24 +127,39 @@ signal attendant_picked_up
 @export_category("Motion")
 ## Vertical dip as the bus stops, so the arrival lands instead of gliding.
 @export_range(0.0, 32.0, 0.5) var bus_settle_dip_pixels: float = 5.0
-## Keep this below bus_front_draw_order so the parked bus hides him until the wipe.
+## How far the body drops when a wheel crosses the miner's shaft on an ambient
+## pass. The hole is a real thing in the road by then, so a bus that rides over
+## it without noticing reads as driving on a painted backdrop.
+@export_range(0.0, 24.0, 0.5) var bus_hole_bounce_pixels: float = 4.0
+@export_range(0.05, 1.5, 0.05) var bus_hole_bounce_seconds: float = 0.32
+## Keep this below bus_body_draw_order. He waits behind the whole bus and its
+## trailing edge is what uncovers him, so nothing may ever draw him over it.
 @export_range(0, 16, 1) var miner_cinematic_draw_order: int = 4
-## Full bus body behind the miner while he steps out.
-@export_range(0, 16, 1) var bus_body_draw_order: int = 3
-## Cropped leading section above the miner, so the front passes in front of him.
-@export_range(0, 16, 1) var bus_front_draw_order: int = 5
-## Used for the ambient passes. They happen while the player is mining, so the
-## bus runs behind the cast and can never sweep across the miner.
-@export_range(-16, 16, 1) var bus_behind_draw_order: int = 0
+## The whole bus, in front of the cinematic miner. It used to sit behind him
+## with a cropped copy of its own leading section redrawn above him, which put
+## the crop's boundary across his body: the bus covered him until that boundary
+## passed, and from there he was drawn standing on top of the bodywork.
+@export_range(0, 16, 1) var bus_body_draw_order: int = 5
+## Used for the ambient passes. The bus runs in the far lane, so it passes in
+## front of the stop and the man waiting at it, and behind the miner standing
+## further down the road. It used to run behind the stop as well, which put the
+## whole bus on the wrong side of the one building it belongs to.
+@export_range(-16, 16, 1) var bus_behind_draw_order: int = 2
 
 var _is_playing: bool = false
 var _is_pickup_active: bool = false
 var _attendant_was_collected: bool = false
 var _has_driven_past: bool = false
+## The line he stands on: where he gets off the bus, and where play begins.
 var _ground_foot_y: float = 0.0
 var _dig_foot_x: float = 0.0
 var _bus_rest_position: Vector2
 var _prop_tween: Tween
+## Set while an ambient pass is crossing the shot, with one crossing flag per
+## drawn wheel so each finds the miner's shaft on its own.
+var _is_ambient_pass_driving: bool = false
+var _wheel_was_left_of_hole: Array[bool] = [false, false]
+var _bounce_tween: Tween
 var _wheel_material: ShaderMaterial
 var _wheel_radius_pixels: float = 1.0
 var _wheel_spin_phase: float = 0.0
@@ -154,6 +175,7 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	_follow_ground_line()
 	_advance_wheel_spin()
+	_bounce_bus_over_the_hole()
 
 
 ## Caches the wheel material and converts its authored radius into pixels, so
@@ -233,8 +255,6 @@ func begin() -> bool:
 	)
 	_previous_bus_x = bus.position.x
 	bus.z_index = bus_body_draw_order
-	bus_front_sprite.z_index = bus_front_draw_order
-	bus_front_sprite.show()
 	_set_bus_travel_art(-1)
 	station.modulate.a = 1.0
 	attendant.modulate.a = 1.0
@@ -259,9 +279,8 @@ func play_arrival() -> void:
 		).timeout
 	if not _is_playing:
 		return
-	# The parked bus draws over him, so placing him now costs nothing and lets
-	# the departure itself wipe him into view instead of popping him in once
-	# the road is clear. The bus only pulls away once he is off it.
+	# He is off the bus and waiting at the stop before it moves, so the shot has
+	# someone standing there for the departure to pull away from.
 	_place_miner_at_drop_off()
 	_begin_bus_departure()
 	await _await_prop_tween()
@@ -299,7 +318,6 @@ func finish(restore_seconds: float = 0.2) -> void:
 		await restore_tween.finished
 	# The ambient passes run behind the cast from here on, so neither can sweep
 	# across the miner while he is mining.
-	bus_front_sprite.hide()
 	bus.z_index = bus_behind_draw_order
 	_run_ambient_passes()
 
@@ -311,7 +329,6 @@ func abort_and_restore() -> void:
 	_is_playing = false
 	_is_pickup_active = false
 	_kill_prop_tween()
-	bus_front_sprite.hide()
 	miner_rig.show()
 	miner_rig.cancel_cinematic_visual_override()
 
@@ -347,12 +364,110 @@ func _run_ambient_passes() -> void:
 	await _run_attendant_pickup()
 
 
+## Suspends until the miner has dug in and left the road clear. He is on the
+## surface for as long as he is standing on the ground he started from, so this
+## is the same test the rig already answers for its own draw order.
+func _await_miner_below_ground() -> void:
+	while (
+		is_instance_valid(miner_rig)
+		and miner_rig.is_on_surface()
+	):
+		await get_tree().process_frame
+
+
+## Opens a pass over the dug road. Each wheel's side of the shaft is recorded
+## first, so a pass that starts with the hole already behind it never opens on
+## a crossing it did not make.
+func _begin_ambient_pass() -> void:
+	_bus_rest_position.y = bus.position.y
+	for wheel_index: int in range(_wheel_was_left_of_hole.size()):
+		_wheel_was_left_of_hole[wheel_index] = (
+			_get_wheel_local_x(wheel_index) < _get_hole_local_x()
+		)
+	_is_ambient_pass_driving = true
+
+
+## The column he digs down, in this node's own space, which is the one the bus
+## positions are measured in. It is his dig spot rather than where he got off
+## the bus: the shaft is where he stood to mine, not where he stepped down.
+func _get_hole_local_x() -> float:
+	return to_local(Vector2(_dig_foot_x, 0.0)).x
+
+
+func _end_ambient_pass() -> void:
+	_is_ambient_pass_driving = false
+	_kill_bounce_tween()
+
+
+## Jolts the bus as a wheel crosses the shaft the miner opened in the road.
+## Each wheel is tracked separately, so a pass over the hole reads as the front
+## dropping into it and the back following it rather than as one shudder.
+func _bounce_bus_over_the_hole() -> void:
+	if not _is_ambient_pass_driving or bus == null or bus_sprite == null:
+		return
+	var hole_x := _get_hole_local_x()
+	for wheel_index: int in range(_wheel_was_left_of_hole.size()):
+		var is_left_of_hole := _get_wheel_local_x(wheel_index) < hole_x
+		if is_left_of_hole == _wheel_was_left_of_hole[wheel_index]:
+			continue
+		_wheel_was_left_of_hole[wheel_index] = is_left_of_hole
+		_kick_bus_bounce()
+
+
+## Drops the body and lets it come back, once per wheel. It is deliberately
+## shorter than the settle dip the arrival uses: that one is weight coming off
+## the suspension, this one is a wheel finding a hole and leaving it again.
+func _kick_bus_bounce() -> void:
+	if _bounce_tween != null and _bounce_tween.is_valid():
+		_bounce_tween.kill()
+	var rest_y := _bus_rest_position.y
+	_bounce_tween = create_tween()
+	_bounce_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_bounce_tween.tween_property(
+		bus,
+		"position:y",
+		rest_y + bus_hole_bounce_pixels,
+		maxf(bus_hole_bounce_seconds, 0.01) * 0.35
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_bounce_tween.tween_property(
+		bus,
+		"position:y",
+		rest_y,
+		maxf(bus_hole_bounce_seconds, 0.01) * 0.65
+	).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+
+
+## Where one drawn wheel sits along the shot right now, taken from the same
+## authored UVs the wheel shine is placed with, so re-measuring the art moves
+## the bounce with it.
+func _get_wheel_local_x(wheel_index: int) -> float:
+	var wheel_uvs := (
+		side_left_wheel_uvs
+		if bus_sprite.texture == bus_side_left_texture
+		else stopped_wheel_uvs
+	)
+	if wheel_index >= wheel_uvs.size() or bus_sprite.texture == null:
+		return bus.position.x
+	return (
+		bus.position.x
+		+ bus_sprite.position.x
+		+ (wheel_uvs[wheel_index].x - 0.5)
+			* float(bus_sprite.texture.get_width())
+			* bus_sprite.scale.x
+	)
+
+
 ## Sends the bus back left to right without stopping, purely as life on the
 ## surface for a player who scrolls up. It never stops, so it keeps the
 ## door-facing frame the whole way, per the authored direction rule.
 func _run_drive_past() -> void:
 	if not drive_past_enabled or attendant_pickup_stop_anchor == null:
 		return
+	# The road is his until he is off it: driving a bus through the spot he is
+	# standing on reads as it going straight over him. Waiting for the shaft
+	# first is also what keeps the pass in shot, since the road scrolls away
+	# behind him as he descends.
+	await _await_miner_below_ground()
 	await get_tree().create_timer(
 		maxf(drive_past_delay_seconds, 0.01),
 		true
@@ -364,11 +479,13 @@ func _run_drive_past() -> void:
 		bus_stop_anchor.position.y
 	)
 	_previous_bus_x = bus.position.x
+	_begin_ambient_pass()
 	await _drive_bus_to(
 		bus_arrival_anchor.position.x,
 		drive_past_seconds,
 		false
 	)
+	_end_ambient_pass()
 	_has_driven_past = true
 
 
@@ -387,6 +504,7 @@ func _run_attendant_pickup() -> void:
 		maxf(attendant_pickup_delay_seconds, 0.01),
 		true
 	).timeout
+	await _await_miner_below_ground()
 	if not _is_pickup_active or not is_instance_valid(attendant):
 		_is_pickup_active = false
 		return
@@ -398,11 +516,13 @@ func _run_attendant_pickup() -> void:
 		bus_stop_anchor.position.y
 	)
 	_previous_bus_x = bus.position.x
+	_begin_ambient_pass()
 	await _drive_bus_to(
 		attendant_pickup_stop_anchor.position.x,
 		bus_arrival_seconds,
 		true
 	)
+	_end_ambient_pass()
 	if not _is_pickup_active:
 		return
 	await _board_attendant()
@@ -508,40 +628,10 @@ func _apply_bus_art(
 		return
 	bus_sprite.texture = frame
 	bus_sprite.position = sprite_offset
-	_sync_bus_front_sprite(frame, sprite_offset)
 	if _wheel_material == null or wheel_uvs.size() < 2:
 		return
 	_wheel_material.set_shader_parameter(&"wheel_one_uv", wheel_uvs[0])
 	_wheel_material.set_shader_parameter(&"wheel_two_uv", wheel_uvs[1])
-
-
-## Crops and aligns the direction's leading section over the full bus body.
-func _sync_bus_front_sprite(
-	frame: Texture2D,
-	sprite_offset: Vector2
-) -> void:
-	if bus_front_sprite == null:
-		return
-	var texture_size := frame.get_size()
-	var region_width := minf(bus_front_region_width_px, texture_size.x)
-	var region_x := (
-		0.0
-		if frame == bus_side_left_texture
-		else texture_size.x - region_width
-	)
-	var region_center_x := region_x + region_width * 0.5
-	bus_front_sprite.texture = frame
-	bus_front_sprite.region_rect = Rect2(
-		region_x,
-		0.0,
-		region_width,
-		texture_size.y
-	)
-	bus_front_sprite.position = sprite_offset + Vector2(
-		(region_center_x - texture_size.x * 0.5) * bus_sprite.scale.x,
-		0.0
-	)
-	bus_front_sprite.scale = bus_sprite.scale
 
 
 ## Shuts the door and pulls away in one motion, without waiting for it.
@@ -558,7 +648,7 @@ func _begin_bus_departure() -> void:
 		"position:x",
 		bus_exit_anchor.position.x,
 		maxf(bus_departure_seconds, 0.01)
-	).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
 
 ## Suspends until the current prop motion is done, if one is running.
@@ -567,9 +657,10 @@ func _await_prop_tween() -> void:
 		await _prop_tween.finished
 
 
-## Stands the miner at the stop while the parked bus still covers him. He is
-## shown here rather than after the wipe, so the bus's trailing edge uncovers a
-## miner who was already standing there instead of one who pops into being.
+## Stands the miner at the stop the moment the bus has settled: off the bus,
+## just ahead of its front wheel, and behind it. The parked bus covers him
+## there, so showing him now costs nothing and the departure's trailing edge is
+## what uncovers him rather than anything switching on.
 func _place_miner_at_drop_off() -> void:
 	miner_rig.place_cinematic_foot_at(
 		Vector2(
@@ -579,6 +670,14 @@ func _place_miner_at_drop_off() -> void:
 		miner_cinematic_draw_order
 	)
 	miner_rig.show()
+
+
+## Ends the pass's own vertical jolt as well, so an interrupted pass cannot
+## leave the body parked halfway into a bounce.
+func _kill_bounce_tween() -> void:
+	if _bounce_tween != null and _bounce_tween.is_valid():
+		_bounce_tween.kill()
+	_bounce_tween = null
 
 
 func _kill_prop_tween() -> void:
@@ -592,7 +691,6 @@ func _has_complete_references() -> bool:
 		miner_rig != null
 		and bus != null
 		and bus_sprite != null
-		and bus_front_sprite != null
 		and station != null
 		and attendant != null
 		and terrain_renderer != null

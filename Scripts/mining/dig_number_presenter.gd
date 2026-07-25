@@ -24,8 +24,9 @@ const PRESENTER_GROUP: StringName = &"dig_number_presenter"
 @export_category("Performance")
 ## RichText effects and tweens make each active label relatively expensive.
 @export_range(1, 32, 1) var maximum_active_numbers: int = 8
-## Keeps animated RichText work within the itch.io web-export budget.
-@export_range(1, 16, 1) var web_maximum_active_numbers: int = 4
+## Three preserves overlapping rapid hits without letting animated RichText
+## compete with every terrain and debris update on slower browser CPUs.
+@export_range(1, 16, 1) var web_maximum_active_numbers: int = 3
 
 var _random := RandomNumberGenerator.new()
 # Oldest-first references are pruned or retired on every spawn. This array's

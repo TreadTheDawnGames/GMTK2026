@@ -108,6 +108,10 @@ uniform bool use_layer_edge_shading = true;
 uniform float edge_shade_world_pixels = 6.0;
 uniform float edge_shade_strength = 0.45;
 uniform float edge_light_strength = 0.3;
+// A continuous ink band derived from the actual solid/open boundary. It uses
+// the bevel's existing mask taps, so browser masks keep one solid authored
+// outline without another texture sample or dependence on downscaled crack ink.
+uniform float cut_outline_strength = 1.0;
 
 // Authored crack strokes. The renderer prints them into the mask's luminance,
 // but the mask is stored well below world resolution, so a stroke the artist
@@ -815,9 +819,13 @@ void fragment() {
 			foreground_gem_coverage
 		);
 	}
-	// Bevel this stratum against its own opening before the cracks go on, so
-	// the rim shading reads as form and the strokes still sit on top of it.
-	if (use_layer_edge_shading && mask_alpha > 0.0) {
+	// Bevel and ink this stratum from one shared set of boundary samples. The
+	// continuous outline is independent of the optional authored crack spurs,
+	// which can remain irregular without leaving gaps around the actual hole.
+	if (
+		(use_layer_edge_shading || cut_outline_strength > 0.0)
+		&& mask_alpha > 0.0
+	) {
 		vec2 edge_step = vec2(max(edge_shade_world_pixels, 0.5))
 			/ max(chunk_world_size, vec2(1.0));
 		vec4 neighbor_alpha = vec4(
@@ -826,9 +834,28 @@ void fragment() {
 			texture(TEXTURE, UV - vec2(edge_step.x, 0.0)).a,
 			texture(TEXTURE, UV + vec2(edge_step.x, 0.0)).a
 		);
-		surface_color = apply_edge_shading(
+		if (use_layer_edge_shading) {
+			surface_color = apply_edge_shading(
+				surface_color,
+				neighbor_alpha
+			);
+		}
+		// The opening above is already collapsed to one antialiased screen
+		// pixel. Threshold the outline taps as well: blending their low-res
+		// ramp made the ink wide and muddy even though the mined block itself
+		// stayed sharp.
+		vec4 solid_neighbor = step(vec4(0.5), neighbor_alpha);
+		float nearest_solid_neighbor = min(
+			min(solid_neighbor.x, solid_neighbor.y),
+			min(solid_neighbor.z, solid_neighbor.w)
+		);
+		float cut_outline = (
+			1.0 - nearest_solid_neighbor
+		) * step(0.5, mask_alpha);
+		surface_color = mix(
 			surface_color,
-			neighbor_alpha
+			rock_outline_color.rgb,
+			clamp(cut_outline * cut_outline_strength, 0.0, 1.0)
 		);
 	}
 

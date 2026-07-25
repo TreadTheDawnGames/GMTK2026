@@ -7,6 +7,9 @@ render_mode blend_add;
 // - Horizontal falloff from the sun keeps the pool under the sun, not global.
 // - It draws above terrain and characters, so sunlight touches the cast too.
 // - surface_screen_y comes from SurfaceSunlight, so the pool leaves with depth.
+// - Like the sky behind it, every pixel value here is a viewport pixel and the
+//   top of fragment() converts the rect into the frame first. Both rects have
+//   to read the same space or the pool drifts off the sun during the zoom.
 // - Additive blending means alpha is strength; it never darkens anything.
 
 uniform vec4 sunlight_color : source_color = vec4(1.0, 0.63, 0.38, 1.0);
@@ -25,9 +28,12 @@ uniform float lateral_falloff_strength = 0.65;
 uniform vec2 sun_screen_position = vec2(676.0, 284.0);
 uniform float surface_screen_y = 260.0;
 uniform vec2 viewport_size = vec2(1152.0, 648.0);
+// How large this rect currently draws, in those same viewport pixels.
+uniform vec2 backdrop_screen_size = vec2(1152.0, 648.0);
 
 void fragment() {
-	vec2 pixel = UV * viewport_size;
+	// Rect UV to viewport pixels. See surface_sky.gdshader for why.
+	vec2 pixel = (UV - vec2(0.5)) * backdrop_screen_size + viewport_size * 0.5;
 
 	// Underground light decays with depth; the sky keeps a flat thin haze.
 	float depth_below_surface = max(pixel.y - surface_screen_y, 0.0);

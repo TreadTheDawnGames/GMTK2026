@@ -65,7 +65,7 @@ class SmokeCloud:
 ## Native cap; hits at capacity enlarge the nearest existing lobe.
 @export_range(1, 32, 1) var maximum_lobes: int = 20
 ## Lower browser cap bounds per-frame collision samples and MultiMesh writes.
-@export_range(1, 24, 1) var web_maximum_lobes: int = 12
+@export_range(1, 24, 1) var web_maximum_lobes: int = 10
 @export var smoke_color: Color = Color(0.52, 0.40, 0.30)
 ## Dust is drawn as a wispy volume rather than a solid shape, so a single lobe
 ## stays thin and overlapping lobes accumulate into the denser core of a cloud.

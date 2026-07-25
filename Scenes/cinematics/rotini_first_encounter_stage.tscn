@@ -1,8 +1,19 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://dhg2hg2e78ui3"]
 
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
+[ext_resource type="Script" uid="uid://7qy8qeox17tk" path="res://Scripts/cinematics/cutscene_actor_preview.gd" id="3_breov"]
+[ext_resource type="Resource" path="res://resources/encounters/rutini_character_appearance.tres" id="4_f2wmh"]
+[ext_resource type="Texture2D" uid="uid://dosts83enjxty" path="res://Assets/Characters/mice/mouse_brown.png" id="5_cahr7"]
+[ext_resource type="Script" uid="uid://bpg6fvsw6y7ai" path="res://resources/encounters/character_appearance.gd" id="6_ytped"]
+[ext_resource type="Texture2D" uid="uid://bq8qwl3xn5qny" path="res://Assets/Characters/miner_idle-Pickaxe.png" id="7_wh1q7"]
 
-[node name="RotiniFirstEncounterStage" instance=ExtResource("1_stage")]
+[sub_resource type="Resource" id="Resource_c8jes"]
+script = ExtResource("6_ytped")
+texture = ExtResource("7_wh1q7")
+sprite_scale = Vector2(0.44, 0.44)
+sprite_offset = Vector2(0, -68)
+
+[node name="RotiniFirstEncounterStage" unique_id=1625704577 instance=ExtResource("1_stage")]
 editor_description = "Story beat 4, depth 2,500: Rotini is introduced on the cave path. He is a rat and reads much smaller than the miner, so he comes in quickly and stands close; at the other visitors' spacing he would be a speck at the edge of the frame. His art is drawn looking left, so he stays on the miner's right. The rutini_* resource names refer to Rotini until a coordinated rename is approved."
 opening_move_seconds = 0.9
 closing_move_seconds = 1.4
@@ -30,4 +41,19 @@ editor_description = "Previews rutini_first at its authored depth."
 encounter_id = &"rutini_first"
 preview_depth_rows = 2500
 
-[editable path="ActorMarkers"]
+[node name="rutini" type="Node2D" parent="." index="5" unique_id=860305613]
+z_index = 3
+position = Vector2(176, 0)
+script = ExtResource("3_breov")
+actor_id = &"rutini"
+appearance = ExtResource("4_f2wmh")
+pose = &"walk"
+metadata/_edit_group_ = true
+
+[node name="Miner" type="Node2D" parent="." index="6" unique_id=1652212560]
+z_index = 3
+script = ExtResource("3_breov")
+actor_id = &"miner"
+appearance = SubResource("Resource_c8jes")
+metadata/_edit_group_ = true
+

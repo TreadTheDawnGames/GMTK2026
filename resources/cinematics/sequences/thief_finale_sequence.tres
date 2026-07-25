@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="CutsceneSequence" format=3]
+[gd_resource type="Resource" script_class="CutsceneSequence" format=3 uid="uid://56sdbabxhel0"]
 
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_beat.gd" id="1_5p4la"]
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_sequence.gd" id="2_cj0l1"]
+[ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="1_5p4la"]
+[ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="2_cj0l1"]
 
 [sub_resource type="Resource" id="Resource_1si7t"]
 script = ExtResource("1_5p4la")
@@ -12,36 +12,40 @@ actor = &"thief"
 script = ExtResource("1_5p4la")
 kind = 0
 actor = &"thief"
-duration_seconds = 2.4
+duration_seconds = 2.6
 target_marker = &"Conversation"
+starts_from_authored_point = true
+start_marker = &"Entrance"
 pose = &"walk"
 
 [sub_resource type="Resource" id="Resource_t0b1r"]
 script = ExtResource("1_5p4la")
 kind = 2
 actor = &"thief"
-start_seconds = 2.4
+start_seconds = 2.6
 facing = -1
 
 [sub_resource type="Resource" id="Resource_378ld"]
 script = ExtResource("1_5p4la")
 kind = 1
 actor = &"thief"
-start_seconds = 2.4
+start_seconds = 2.6
 pose = &"idle"
 
 [sub_resource type="Resource" id="Resource_fymss"]
 script = ExtResource("1_5p4la")
-start_seconds = 2.6
+start_seconds = 4.6
 duration_seconds = 6.0
-notes = "Placeholder hold. This encounter has no authored conversation yet; replace this beat with a DIALOGUE one once it does."
+notes = "The arrival the whole run points at. Long approach, long silence, no bounce. Dialogue is deliberately unauthored.
+
+No conversation is authored yet; replace this hold with a DIALOGUE beat once there is one."
 
 [sub_resource type="Resource" id="Resource_qbstf"]
 script = ExtResource("1_5p4la")
 kind = 0
 actor = &"thief"
-start_seconds = 8.6
-duration_seconds = 2.4
+start_seconds = 10.6
+duration_seconds = 2.6
 target_marker = &"Exit"
 pose = &"walk"
 
@@ -49,7 +53,7 @@ pose = &"walk"
 script = ExtResource("1_5p4la")
 kind = 10
 actor = &"thief"
-start_seconds = 11.0
+start_seconds = 13.2
 
 [resource]
 script = ExtResource("2_cj0l1")

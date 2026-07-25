@@ -28,6 +28,9 @@ var stored_combo : int = 0
 	PlayerAudioHandler.get_global(self)
 )
 var _target_unlocks: Array[PickaxeDefinition] = []
+var _progression_target_scenes: Array[PackedScene] = []
+var _progression_bonus_target_combos := PackedInt32Array()
+var _uses_encounter_progression: bool = false
 
 ## Connects both timing bars to the combo flow.
 func _ready() -> void:
@@ -72,6 +75,24 @@ func set_pickaxe_target_unlocks(
 	_target_unlocks = definitions.duplicate()
 	if is_node_ready():
 		_apply_pickaxe_target_unlocks()
+
+
+## Applies the timing portion of one complete encounter-progression level.
+func set_progression_target_rules(
+	target_scenes: Array[PackedScene],
+	slider_speed: float,
+	starting_target_count: int,
+	bonus_target_combos: PackedInt32Array
+) -> void:
+	if target_scenes.is_empty():
+		push_warning("Encounter progression requires timing target scenes.")
+		return
+	_uses_encounter_progression = true
+	_progression_target_scenes = target_scenes.duplicate()
+	_progression_bonus_target_combos = bonus_target_combos.duplicate()
+	mining_window.speed = slider_speed
+	mining_window.set_starting_target_count(starting_target_count)
+	mining_window.set_target_pool(_progression_target_scenes)
 
 
 ## Rebuilds only the zero-combo target baseline after the bar is ready.
@@ -120,25 +141,34 @@ func _mining_window_pressed(
 			)
 
 		var unlocked_target_scenes: Array[PackedScene] = []
-		for definition in _target_unlocks:
-			if (
-				definition == null
-				or definition.target_unlock_combo != combo
-				or definition.target_scenes.is_empty()
-			):
-				continue
-			for target_scene: PackedScene in definition.target_scenes:
+		if (
+			_uses_encounter_progression
+			and combo in _progression_bonus_target_combos
+		):
+			unlocked_target_scenes = (
+				_progression_target_scenes.duplicate()
+			)
+		elif not _uses_encounter_progression:
+			for definition in _target_unlocks:
 				if (
-					target_scene != null
-					and target_scene not in unlocked_target_scenes
+					definition == null
+					or definition.target_unlock_combo != combo
+					or definition.target_scenes.is_empty()
 				):
-					unlocked_target_scenes.append(target_scene)
+					continue
+				for target_scene: PackedScene in definition.target_scenes:
+					if (
+						target_scene != null
+						and target_scene not in unlocked_target_scenes
+					):
+						unlocked_target_scenes.append(target_scene)
 		if not unlocked_target_scenes.is_empty():
 			mining_window.add_target_from_pool.call_deferred(
 				unlocked_target_scenes
 			)
 		if (
-			unlocked_target_scenes.is_empty()
+			not _uses_encounter_progression
+			and unlocked_target_scenes.is_empty()
 			and _target_unlocks.is_empty()
 			and combo
 				% mining_config.combo_hits_for_additional_target == 0

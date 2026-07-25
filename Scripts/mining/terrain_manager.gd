@@ -109,7 +109,6 @@ func dig_tunnel(
 		safe_target_cell_x - start_cell.x
 	)
 	var tunnel_row_count := tunnel_end_row - start_cell.y
-	var sculpt_placements := get_sculpt_placements()
 	for row_index in range(tunnel_row_count):
 		var cell_y := start_cell.y + row_index
 		var path_center_x: int = _get_tunnel_center_x(
@@ -133,7 +132,6 @@ func dig_tunnel(
 			cell_y,
 			left_cell_x,
 			right_cell_x,
-			sculpt_placements,
 			destroyed_cells
 		)
 
@@ -153,7 +151,6 @@ func _destroy_tunnel_row(
 	cell_y: int,
 	left_cell_x: int,
 	right_cell_x: int,
-	sculpt_placements: Array[SculptPlacement],
 	destroyed_cells: Array[Vector2i]
 ) -> int:
 	var safe_left_x := maxi(left_cell_x, 0)
@@ -180,6 +177,10 @@ func _destroy_tunnel_row(
 
 	var chunk_index := _world_to_chunk_index(cell_y)
 	var local_y := cell_y - chunk_index * config.chunk_height_cells
+	# Encounter rooms never overlap vertically. Resolve the row's one possible
+	# sculpt once rather than scanning every authored room for every destroyed
+	# cell; a fully stacked hit can otherwise repeat that search ~100,000 times.
+	var row_sculpt := get_sculpt_placement_for_row(cell_y)
 	# dig_tunnel already proved the row center mineable, so this creates at most
 	# one bounded mask per newly visited chunk, never one allocation per cell.
 	var mask := _get_or_create_mask(chunk_index)
@@ -188,17 +189,14 @@ func _destroy_tunnel_row(
 		var cell := Vector2i(cell_x, cell_y)
 		var is_inside_sculpt_opening := false
 		var has_authored_sculpt_cell := false
-		for placement in sculpt_placements:
-			if not placement.world_rect.has_point(cell):
-				continue
+		if row_sculpt != null and row_sculpt.world_rect.has_point(cell):
 			has_authored_sculpt_cell = true
-			is_inside_sculpt_opening = not placement.sculpt.is_solid_local(
-				placement.sculpt.world_to_local(
+			is_inside_sculpt_opening = not row_sculpt.sculpt.is_solid_local(
+				row_sculpt.sculpt.world_to_local(
 					cell,
-					placement.anchor_cell
+					row_sculpt.anchor_cell
 				)
 			)
-			break
 		if is_inside_sculpt_opening:
 			continue
 		if (

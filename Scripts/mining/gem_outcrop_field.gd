@@ -390,14 +390,21 @@ func _place_in_exposed_stratum(
 func _get_floor_row_cells(
 	destroyed_cells: Array[Vector2i]
 ) -> Array[Vector2i]:
-	var bottom_row := destroyed_cells[0].y
-	for cell in destroyed_cells:
-		bottom_row = maxi(bottom_row, cell.y)
+	# TerrainManager emits tunnel cells in row-major order. Walk back only over
+	# the final row so a rare gem roll on an 8,900-cell stacked hit does not
+	# rescan the entire opening twice inside the hit frame.
+	var bottom_row: int = destroyed_cells.back().y
+	var floor_start_index := destroyed_cells.size() - 1
+	while (
+		floor_start_index > 0
+		and destroyed_cells[floor_start_index - 1].y == bottom_row
+	):
+		floor_start_index -= 1
 	var floor_cells: Array[Vector2i] = []
-	for cell in destroyed_cells:
+	for cell_index in range(floor_start_index, destroyed_cells.size()):
+		var cell := destroyed_cells[cell_index]
 		if (
-			cell.y == bottom_row
-			and terrain_manager.is_solid_cell(cell + Vector2i.DOWN)
+			terrain_manager.is_solid_cell(cell + Vector2i.DOWN)
 		):
 			floor_cells.append(cell)
 	return floor_cells

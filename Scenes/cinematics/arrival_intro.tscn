@@ -91,14 +91,13 @@ shader_parameter/bounce_height = 0.28
 shader_parameter/haze_color = Color(1, 0.55, 0.3, 1)
 shader_parameter/haze_strength = 0.06
 
-[node name="ArrivalIntro" type="Node2D" unique_id=1350024243 node_paths=PackedStringArray("bus", "bus_sprite", "bus_front_sprite", "station", "attendant", "bus_arrival_anchor", "bus_stop_anchor", "bus_exit_anchor", "door_step_anchor", "bus_rear_edge_anchor", "miner_drop_off_anchor", "attendant_pickup_stop_anchor")]
+[node name="ArrivalIntro" type="Node2D" unique_id=1350024243 node_paths=PackedStringArray("bus", "bus_sprite", "station", "attendant", "bus_arrival_anchor", "bus_stop_anchor", "bus_exit_anchor", "door_step_anchor", "bus_rear_edge_anchor", "miner_drop_off_anchor", "attendant_pickup_stop_anchor")]
 process_mode = 3
 process_priority = 100
 editor_description = "Surface arrival staging. Every prop is authored around the original terrain surface centre at (576, 262). Process priority 100 re-anchors that terrain point on both axes after each view update, while the shared Camera2D gives terrain and stop identical shake. The letterbox top bar covers the first 91 px: keep every prop's art below that. Assign miner_rig and surface_presentation from the mining scene."
 script = ExtResource("1_arrival")
 bus = NodePath("Bus")
 bus_sprite = NodePath("Bus/BusSprite")
-bus_front_sprite = NodePath("Bus/BusFrontOccluder")
 bus_side_right_texture = ExtResource("3_bus")
 bus_side_left_texture = ExtResource("10_bus_left")
 station = NodePath("Station")
@@ -108,7 +107,7 @@ bus_stop_anchor = NodePath("BusStopAnchor")
 bus_exit_anchor = NodePath("BusExitAnchor")
 door_step_anchor = NodePath("Bus/DoorStepAnchor")
 bus_rear_edge_anchor = NodePath("Bus/RearEdgeAnchor")
-miner_drop_off_anchor = NodePath("MinerDropOffAnchor")
+miner_drop_off_anchor = NodePath("Bus/MinerDropOffAnchor")
 attendant_pickup_stop_anchor = NodePath("AttendantPickupStopAnchor")
 
 [node name="BusArrivalAnchor" type="Marker2D" parent="." unique_id=1314320869]
@@ -116,8 +115,8 @@ editor_description = "Offscreen RIGHT. Only the x coordinate is used; keep the w
 position = Vector2(2450, 262)
 
 [node name="BusStopAnchor" type="Marker2D" parent="." unique_id=2041891707]
-editor_description = "Where the bus parks with its left-facing front at viewport centre. Both coordinates are used: x is the bus root, y is the ground line the suspension dip returns to. Parked here the bus spans about 576-1142, putting its leftmost/front edge directly over the miner at x 576."
-position = Vector2(859, 262)
+editor_description = "Where the bus parks, and with it where the miner gets out: he steps off at the front wheel, which sits 167 px ahead of the root. Both coordinates are used: x is the bus root, y is the ground line the suspension dip returns to. It is set so that wheel pulls up at x 600, inside the stop but clear to the right of the drawn bench at 477-567, so he is not put down on top of the man already waiting there. Parked here the bus spans about 484-1050, covering the right of the shelter and the centre-screen mining point at 576, which is what keeps him out of sight until the bus goes. The rear edge at 1050 stays inside the 1152 frame, which is what the opening shot closes against."
+position = Vector2(767, 262)
 
 [node name="AttendantPickupStopAnchor" type="Marker2D" parent="." unique_id=914022260]
 editor_description = "Where the returning bus parks to collect the attendant. Only x is used. Placed so the bus door lines up with the stop while the bus stays behind it in draw order, reading as the road behind the bench. Clearing this anchor disables the pickup without breaking the intro."
@@ -127,9 +126,6 @@ position = Vector2(332, 262)
 editor_description = "Offscreen LEFT. Only the x coordinate is used. The bus draws in FRONT of the cast, so sliding away left uncovers the miner from behind its trailing edge."
 position = Vector2(-700, 262)
 
-[node name="MinerDropOffAnchor" type="Marker2D" parent="." unique_id=2110078351]
-editor_description = "Where the miner is standing when the bus pulls away: the fixed centre-screen mining point, immediately right of the bench reader and directly at the stopped bus's left-facing front edge. The miner is already at the place where play begins."
-position = Vector2(576, 262)
 
 [node name="SurfaceBackdrop" type="Node2D" parent="." unique_id=1170740603]
 editor_description = "The field the stop is standing in. Two bands of the same drawn grass, both sunk far enough below the ground line that terrain layer one covers everything except the tops clearing the horizon, which is exactly what you see of a field that runs away from you. Depth comes from three things together: how much of each band clears the line, how much haze its material mixes in, and the sky ridges behind them. Negative z keeps both behind the terrain, so digging removes the ground in front of them and they scroll away with the surface."
@@ -164,25 +160,12 @@ z_index = 5
 position = Vector2(1500, 262)
 
 [node name="BusSprite" type="Sprite2D" parent="Bus" unique_id=1886361131]
-editor_description = "rim_strength is 0 on purpose: a lit contour around the bus read as an outline pasted on the shot rather than as sunlight, so the bus takes only the twilight shade and the ground bounce. The stop still uses its rim. Full drawn bus body. During the miner exit this sits behind him; BusFrontOccluder redraws only the leading section above him so he emerges from the front instead of being uncovered by the rear. Placement is measured from the art: wheels bottom out at texture y=1002. Each travel frame carries its own sprite offset and wheel-shine UVs, applied together in _apply_bus_art. The import is capped at 1024 px; this compensated scale preserves the original footprint."
+editor_description = "rim_strength is 0 on purpose: a lit contour around the bus read as an outline pasted on the shot rather than as sunlight, so the bus takes only the twilight shade and the ground bounce. The stop still uses its rim. Full drawn bus body. During the miner exit this sits in front of him for its whole length, so the trailing edge is what uncovers him. Placement is measured from the art: wheels bottom out at texture y=1002. Each travel frame carries its own sprite offset and wheel-shine UVs, applied together in _apply_bus_art. The import is capped at 1024 px; this compensated scale preserves the original footprint."
 texture_filter = 4
 material = SubResource("ShaderMaterial_bus_wheels")
 position = Vector2(-14, -74)
 scale = Vector2(0.955625, 0.955625)
 texture = ExtResource("3_bus")
-
-[node name="BusFrontOccluder" type="Sprite2D" parent="Bus" unique_id=2082180730]
-editor_description = "Runtime-aligned crop of the bus's leading section. It is absolute z 5 above the cinematic miner while the full BusSprite remains below him, then hides before ambient bus passes. It shares BusSprite's material on purpose: same texture, same UV space, so one copy of the sunset light and the wheel shine covers both and the crop can never be lit differently from the body it overlaps."
-visible = false
-z_index = 5
-z_as_relative = false
-texture_filter = 4
-material = SubResource("ShaderMaterial_bus_wheels")
-position = Vector2(207.6, -74)
-scale = Vector2(0.955625, 0.955625)
-texture = ExtResource("3_bus")
-region_enabled = true
-region_rect = Rect2(464, 0, 560, 768)
 
 [node name="FrontEdgeAnchor" type="Marker2D" parent="Bus" unique_id=613728874]
 editor_description = "Measured leftmost/front edge of the left-facing bus art. At BusStopAnchor x 859 this lands at screen x 576, exactly on MinerDropOffAnchor."
@@ -191,6 +174,10 @@ position = Vector2(-283, 0)
 [node name="RearEdgeAnchor" type="Marker2D" parent="Bus" unique_id=613728875]
 editor_description = "Measured rightmost/trailing edge of the bus art, mirroring FrontEdgeAnchor. At BusStopAnchor x 859 this lands at screen x 1142, inside the 1152 px frame. The opening shot's camera frames against this point, so re-measuring the art here moves the transition's framing with it."
 position = Vector2(283, 0)
+
+[node name="MinerDropOffAnchor" type="Marker2D" parent="Bus" unique_id=2110078351]
+editor_description = "Where the miner is standing the moment he is off the bus: on the front wheel, which BusStopAnchor parks clear to the right of the drawn bench. It is a child of the bus on purpose, so the spot travels with the art it is lined up against and you can drag it against the wheel in the editor; moving where he gets out means moving the wheel there, which is BusStopAnchor's x. He is drawn behind the bus here, so the parked bus covers him and its trailing edge is what uncovers him. Only x is read, and only at the moment he is placed; his y is the top of the road, and the bus carrying this anchor away afterwards costs nothing."
+position = Vector2(-167, 0)
 
 [node name="DoorStepAnchor" type="Marker2D" parent="Bus" unique_id=1918650185]
 editor_description = "Middle of the drawn doorway, texture x about 1690, on the unmirrored door-facing art. The miner boards out of sight behind the bus rather than stepping down through it, so this is kept for placement reference and for any future visible step-off."
@@ -214,9 +201,9 @@ editor_description = "Measured to the drawn bench: seat surface at texture y=115
 position = Vector2(10, -32)
 
 [node name="Attendant" parent="." unique_id=750824844 instance=ExtResource("2_character_presenter")]
-editor_description = "A silent, unrelated bystander reading a newspaper at the stop; he is not the lantern-staff man or another story character. Stands at the drawn bench (x 477-567), immediately left of the miner's x 576 starting point, with feet on the ground line so the stand-in already previews where the seated character will be. Do not move it left onto the trellis panel: the figure then reads as standing inside a cage. The current appearance is a standing 256 px frame, so seating it on the bench would float it and push its head under the letterbox. When seated art arrives, move this to AttendantSeatAnchor and re-check the head against the top bar."
-z_index = 2
-position = Vector2(522, 264)
+editor_description = "A silent, unrelated bystander reading a newspaper at the stop; he is not the lantern-staff man or another story character. Stands at the left end of the drawn bench (x 477-567), clear of the spot the miner steps off the bus onto, with feet on the ground line so the stand-in already previews where the seated character will be. Do not move it left onto the trellis panel: the figure then reads as standing inside a cage. The current appearance is a standing 256 px frame, so seating it on the bench would float it and push its head under the letterbox. When seated art arrives, move this to AttendantSeatAnchor and re-check the head against the top bar. He is at the stop's own draw order rather than above it: he waits at the far side of the road, so an ambient bus running the near lane has to pass in front of him. Being listed after Station is what still draws him over the bench."
+z_index = 1
+position = Vector2(500, 264)
 
 [node name="EditorTerrainPreview" type="Node2D" parent="." unique_id=1669499363 node_paths=PackedStringArray("terrain_manager", "terrain_renderer", "test_impacts_root")]
 editor_description = "Editor-only. Runs the production TerrainManager and TerrainLayerRenderer so the props are placed against the real ground line, grass and crust rather than an empty canvas. Depth 0 keeps it on the surface. It frees itself in a running game and nothing reads from it."

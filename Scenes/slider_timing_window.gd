@@ -31,8 +31,8 @@ signal pressed(success: bool, hit_direction: int, combo : int)
 @export var desired_target_heirarchy_index : int = 1
 
 var direction: float = 1.0
-# Growth is bounded by the configured baseline plus nine authored pickaxe
-# unlocks; a lost streak prunes the collection back to its baseline.
+# Growth is bounded by two starting targets plus four authored combo bonuses;
+# a lost streak prunes the collection back to its current level's baseline.
 var targets: Array[TimingTarget] = []
 var consecutive_hits : int = 0
 var _starting_target_count: int = 1

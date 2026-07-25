@@ -236,7 +236,16 @@ func build_preview() -> void:
 	# under the cast is built as unbroken rock and the room appears only after
 	# some later edit happens to rebuild it.
 	var schedule := get_encounter_config()
-	if terrain_manager.encounter_config != schedule:
+	# Borrowed for the rebuild and handed straight back, never left on the node.
+	#
+	# TerrainManager.encounter_config is an exported property, so a value left
+	# sitting on it is written into whatever scene is open the next time it is
+	# saved. That made every stage scene reference the schedule, the schedule
+	# reference its encounters, and each encounter reference its stage scene -
+	# a load cycle that took the whole cutscene set down with it. The preview is
+	# editor-only furniture and must leave no trace in the saved scene.
+	var borrowed_from := terrain_manager.encounter_config
+	if borrowed_from != schedule:
 		terrain_manager.encounter_config = schedule
 		terrain_manager.invalidate_sculpt_placements()
 	_align_to_runtime_stage_anchor()
@@ -245,6 +254,8 @@ func build_preview() -> void:
 	terrain_manager.set_view_position(_get_preview_view_position())
 	terrain_renderer.rebuild_all_chunks()
 	_apply_test_impacts()
+	if borrowed_from != schedule:
+		terrain_manager.encounter_config = borrowed_from
 
 
 ## Offsets this preview so the stage's origin lands exactly where the running

@@ -13,6 +13,11 @@ shader_type canvas_item;
 //   the one in front of it, which is what turns a flat gradient into distance.
 // - surface_screen_y is pushed by SurfacePresentation, so digging scrolls the
 //   whole backdrop away together and no pass can drift off the ground line.
+// - Every pixel value below is measured in viewport pixels, not world units.
+//   The rect this runs on is planted in the world and resized to whatever the
+//   camera can see, so it is the frame conversion at the top of fragment() that
+//   keeps the sun, the clouds, and the ridges nailed to the frame while the
+//   opening shot zooms in. Only the ground line is allowed to move under them.
 // - No loops and no texture samples, for GL Compatibility and the web export.
 
 // Sky band. horizon_color meets the ground, zenith_color sits at the top edge.
@@ -25,6 +30,11 @@ uniform vec4 underground_color : source_color = vec4(0.075, 0.095, 0.13, 1.0);
 
 uniform vec4 sun_color : source_color = vec4(1.0, 0.74, 0.40, 1.0);
 uniform vec4 sun_halo_color : source_color = vec4(1.0, 0.47, 0.22, 1.0);
+// Whether the disc itself is drawn. Off: the sun is only its halo and the
+// cushion of light on the horizon, which is the sky doing the work. A drawn
+// disc in a stylised sky reads as a circle pasted over the gradient, and it is
+// the one element here with a hard edge.
+uniform bool sun_disc_enabled = false;
 
 // Viewport pixels. SurfacePresentation owns this value so the sky and the warm
 // wash always place the sun at the same point.
@@ -88,6 +98,11 @@ uniform float cloud_light_reach_px = 460.0;
 
 uniform float surface_screen_y = 260.0;
 uniform vec2 viewport_size = vec2(1152.0, 648.0);
+// How large this rect currently draws, in those same viewport pixels. It is the
+// one value that knows about the zoom: the rect is grown in world units to
+// cover the wide title shot, and dividing that back out is what stops every
+// authored pixel value above from growing with it.
+uniform vec2 backdrop_screen_size = vec2(1152.0, 648.0);
 
 // Local copy of the value-noise pair the terrain shader uses. It stays local on
 // purpose: the terrain version is on the per-hit hot path and is not worth
@@ -132,7 +147,10 @@ float ridge_height(float pixel_x, float period_px, float offset_px) {
 }
 
 void fragment() {
-	vec2 pixel = UV * viewport_size;
+	// Rect UV to viewport pixels. SurfacePresentation centres this rect on the
+	// camera, so UV 0.5 is the middle of the frame at every zoom and the whole
+	// backdrop holds still while the opening shot pushes in.
+	vec2 pixel = (UV - vec2(0.5)) * backdrop_screen_size + viewport_size * 0.5;
 
 	// Warm the sky as it approaches the ground so the horizon carries the light.
 	float horizon_blend = smoothstep(
@@ -148,10 +166,14 @@ void fragment() {
 
 	// One distance drives both the disc and its halo.
 	float sun_distance = length(pixel - sun_screen_position);
-	float sun_disc = 1.0 - smoothstep(
-		sun_radius,
-		sun_radius + max(sun_edge_softness, 0.01),
-		sun_distance
+	float sun_disc = (
+		sun_disc_enabled
+		? 1.0 - smoothstep(
+			sun_radius,
+			sun_radius + max(sun_edge_softness, 0.01),
+			sun_distance
+		)
+		: 0.0
 	);
 	float halo_falloff = 1.0 - clamp(
 		sun_distance / max(sun_halo_radius, 1.0),
