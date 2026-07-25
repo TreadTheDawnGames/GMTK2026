@@ -26,6 +26,20 @@ const FINAL_BREAKTHROUGH_CUE: StringName = &"resume_mining"
 ## foreground layer, which is the ground the player sees them standing on now
 ## that TerrainLayerProfile no longer lowers it over a chamber floor.
 const CAST_FLOOR_LAYER_INDEX: int = 0
+## How far above its floor row a landing still counts as having arrived.
+##
+## A cutscene room's ground is not its floor row. The level tunnel lays up to
+## three cells of loose rock along the floor, and that rock is what the miner
+## comes to rest on, so a fall into a sculpted room legitimately stops short of
+## the row the schedule calls the floor. Requiring the bare row waits for a
+## landing that cannot happen: the encounter stays pending forever with the
+## cinematic flow already claimed, which reads in game as mining that simply
+## stops working.
+##
+## Four rows clears the tallest authored bump with one to spare. The story
+## contract asks this comparison to tolerate overshoot rather than demand an
+## exact impact row, and this is the same allowance in the other direction.
+const LANDING_FLOOR_TOLERANCE_ROWS: int = 4
 
 @export_category("Schedule")
 @export var encounter_config: DepthEncounterConfig
@@ -121,7 +135,10 @@ func _try_activate_pending_encounter() -> void:
 		mining_config.initial_surface_row
 		+ pending_encounter.resolve_depth(mining_config.total_run_depth)
 	)
-	if _latest_landing_world_y < encounter_floor_y:
+	if (
+		_latest_landing_world_y
+		< encounter_floor_y - LANDING_FLOOR_TOLERANCE_ROWS
+	):
 		print("[ENC] pending, landing %d has not reached floor %d" % [
 			_latest_landing_world_y,
 			encounter_floor_y,
