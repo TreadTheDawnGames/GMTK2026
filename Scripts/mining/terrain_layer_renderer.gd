@@ -1126,8 +1126,47 @@ func _process_next_pending_impact_work() -> void:
 
 
 ## Prunes completed queue slots and releases temporary oversized stamp images
-## as soon as every pending stratum has consumed them.
-func _compact_pending_impact_work() -> void:
+## as soon as every pending stratum has consumed them. Streaming may also
+## discard bounded stale work because chunk reload replays registered stamps.
+func _compact_pending_impact_work(
+	prune_streamed_out_work: bool = false
+) -> void:
+	if prune_streamed_out_work:
+		var write_index: int = 0
+		for read_index in range(
+			_pending_impact_work_head,
+			_pending_impact_work.size()
+		):
+			var work := _pending_impact_work[read_index]
+			var remains_visible := false
+			if work.prepare_only and work.stamp != null:
+				for chunk_index in _get_stamp_chunk_indices(work.stamp):
+					if _active_chunks.has(chunk_index):
+						remains_visible = true
+						break
+			else:
+				remains_visible = (
+					_active_chunks.get(work.chunk_index) == work.chunk
+				)
+			if remains_visible:
+				_pending_impact_work[write_index] = work
+				write_index += 1
+				continue
+			work.chunk = null
+			work.stamp = null
+			work.raster_band_index = 0
+			work.raster_band_count = 1
+			work.prepare_only = false
+			work.finish_preparation = false
+			work.prepared_patch = null
+			work.image_preparation = null
+			if _impact_work_pool.size() < MAX_PENDING_IMPACT_WORK_ITEMS:
+				_impact_work_pool.append(work)
+		_pending_impact_work.resize(write_index)
+		_pending_impact_work_head = 0
+		if _pending_impact_work.is_empty():
+			_clear_temporary_stamp_cache()
+		return
 	if _pending_impact_work_head <= 0:
 		return
 	if _pending_impact_work_head >= _pending_impact_work.size():
@@ -1269,6 +1308,7 @@ func _refresh_active_chunks() -> void:
 
 	_loaded_first_chunk = first_chunk
 	_loaded_last_chunk = last_chunk
+	_compact_pending_impact_work(true)
 
 
 ## Fills one terrain chunk's strata, reusing a retired chunk's nodes when the
