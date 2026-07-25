@@ -63,16 +63,16 @@ signal attendant_picked_up
 @export var attendant_pickup_stop_anchor: Marker2D
 
 @export_category("Timing")
-@export_range(0.2, 6.0, 0.05) var bus_arrival_seconds: float = 1.6
-@export_range(0.0, 1.5, 0.05) var bus_settle_seconds: float = 0.22
+@export_range(0.2, 6.0, 0.05) var bus_arrival_seconds: float = 0.9
+@export_range(0.0, 1.5, 0.05) var bus_settle_seconds: float = 0.12
 ## Beat between the bus stopping and the miner being off it. He alights on the
 ## far side, so this is the pause the doors happen in.
-@export_range(0.0, 3.0, 0.05) var miner_exit_delay_seconds: float = 0.5
+@export_range(0.0, 3.0, 0.05) var miner_exit_delay_seconds: float = 0.2
 ## How long the departing bus is allowed to slide before the miner sets off.
 ## Its trailing edge has to clear him first, or he walks out of solid bus.
-@export_range(0.0, 4.0, 0.05) var miner_reveal_hold_seconds: float = 0.8
-@export_range(0.1, 4.0, 0.05) var miner_walk_seconds: float = 1.15
-@export_range(0.0, 2.0, 0.05) var hold_before_dialogue_seconds: float = 0.3
+@export_range(0.0, 4.0, 0.05) var miner_reveal_hold_seconds: float = 0.35
+@export_range(0.1, 4.0, 0.05) var miner_walk_seconds: float = 0.65
+@export_range(0.0, 2.0, 0.05) var hold_before_dialogue_seconds: float = 0.0
 @export_range(0.2, 6.0, 0.05) var bus_departure_seconds: float = 1.5
 
 @export_category("Drive Past")

@@ -71,11 +71,11 @@ z_index = 5
 position = Vector2(1500, 262)
 
 [node name="BusSprite" type="Sprite2D" parent="Bus"]
-editor_description = "Drawn bus. Placement is measured from the art: wheels bottom out at texture y=1002, and the door art's opaque body centres on texture x=1143. There is no engine mirror any more: the artist drew a left-facing side, so the sequence swaps frames by direction of travel. Each frame carries its own sprite offset and wheel-shine UVs, applied together in _apply_bus_art, because the left-facing art's wheels sit at different texture positions. Re-measure both if the art moves. Linear filtering because the source is downscaled about 2.3x and it moves across the screen."
-texture_filter = 2
+editor_description = "Drawn bus. Placement is measured from the art: wheels bottom out at texture y=1002, and the door art's opaque body centres on texture x=1143. There is no engine mirror any more: the artist drew a left-facing side, so the sequence swaps frames by direction of travel. Each frame carries its own sprite offset and wheel-shine UVs, applied together in _apply_bus_art, because the left-facing art's wheels sit at different texture positions. Re-measure both if the art moves. The import is capped at 1024 px; this compensated scale preserves the original footprint, and linear mipmap filtering keeps the moving art stable."
+texture_filter = 4
 material = SubResource("ShaderMaterial_bus_wheels")
 position = Vector2(-14, -74)
-scale = Vector2(0.44, 0.44)
+scale = Vector2(0.955625, 0.955625)
 texture = ExtResource("3_bus")
 
 [node name="DoorStepAnchor" type="Marker2D" parent="Bus"]
@@ -88,10 +88,10 @@ z_index = 1
 position = Vector2(880, 262)
 
 [node name="StationSprite" type="Sprite2D" parent="Station"]
-editor_description = "Drawn bus stop. Placement is measured from the art: the opaque base sits at texture y=1262 and the art is already centred on the texture, so no x correction is needed. It is then sunk about 10 px past the ground line on purpose - seated exactly on it, the bright horizon glow shows through the gap under the shelter's base. Terrain layer one draws in front of this node, so the sunk edge is covered by the ground it stands in. At scale 0.285 it stands 151 px tall, keeping its canopy clear of the 91 px letterbox bar. Linear filtering because the source is downscaled about 3.5x."
-texture_filter = 2
+editor_description = "Drawn bus stop. Placement is measured from the art: the opaque base sits at texture y=1262 and the art is already centred on the texture, so no x correction is needed. It is then sunk about 10 px past the ground line on purpose - seated exactly on it, the bright horizon glow shows through the gap under the shelter's base. Terrain layer one draws in front of this node, so the sunk edge is covered by the ground it stands in. The import is capped at 1024 px; the compensated scale keeps it 151 px tall and clear of the 91 px letterbox bar."
+texture_filter = 4
 position = Vector2(0, -112)
-scale = Vector2(0.285, 0.285)
+scale = Vector2(0.618984, 0.618984)
 texture = ExtResource("6_bus_stop")
 
 [node name="AttendantSeatAnchor" type="Marker2D" parent="Station"]

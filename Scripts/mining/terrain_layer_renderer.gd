@@ -1805,22 +1805,38 @@ func _prepare_hole_masks() -> void:
 	_big_mask_data.clear()
 	_resized_stamp_cache.clear()
 	_resized_stamp_cache_order.clear()
+	var prepared_masks: Dictionary[String, HoleMaskData] = {}
 	for layer_index in range(profile.get_layer_count()):
+		if (
+			profile.keep_back_layer_solid
+			and layer_index == profile.get_gameplay_layer_count() - 1
+		):
+			# The immutable backing layer is never stamped, so preparing two
+			# masks for it only delays the opening scene.
+			_small_mask_data.append(null)
+			_big_mask_data.append(null)
+			continue
 		var line_scale := profile.get_fracture_line_layer_scale(layer_index)
-		_small_mask_data.append(
-			_create_hole_mask_data(
-				profile.get_hole_mask(layer_index, false),
-				layer_index * 2,
-				line_scale
+		for use_big_hole in [false, true]:
+			var texture := profile.get_hole_mask(
+				layer_index,
+				use_big_hole
 			)
-		)
-		_big_mask_data.append(
-			_create_hole_mask_data(
-				profile.get_hole_mask(layer_index, true),
-				layer_index * 2 + 1,
-				line_scale
-			)
-		)
+			var cache_key := "%s|%.4f" % [
+				texture.resource_path if texture != null else "",
+				line_scale,
+			]
+			if not prepared_masks.has(cache_key):
+				prepared_masks[cache_key] = _create_hole_mask_data(
+					texture,
+					prepared_masks.size(),
+					line_scale
+				)
+			var mask_data := prepared_masks[cache_key]
+			if use_big_hole:
+				_big_mask_data.append(mask_data)
+			else:
+				_small_mask_data.append(mask_data)
 
 
 ## Loads one mask and measures the opening the artist authored.
@@ -1857,20 +1873,24 @@ func _create_hole_mask_data(
 		Image.FORMAT_LA8
 	)
 	fracture_source.fill(Color(1.0, 1.0, 1.0, 0.0))
+	var writes_fracture_lines := fracture_line_scale > 0.0
 	# Three temporary buffers the size of one authored mask. They are local to
 	# this call and released with it; nothing accumulates per hit or per chunk.
 	var cell_count := mask_width * mask_height
 	var cavity_cells := PackedByteArray()
 	cavity_cells.resize(cell_count)
 	var stroke_cells := PackedByteArray()
-	stroke_cells.resize(cell_count)
 	var stroke_coverage := PackedFloat32Array()
-	stroke_coverage.resize(cell_count)
+	if writes_fracture_lines:
+		stroke_cells.resize(cell_count)
+		stroke_coverage.resize(cell_count)
 	for source_y in range(mask_height):
 		var cell_row := source_y * mask_width
 		for source_x in range(mask_width):
 			var source_pixel := image.get_pixel(source_x, source_y)
 			if source_pixel.a > profile.transparent_alpha_threshold:
+				if not writes_fracture_lines:
+					continue
 				var luminance := (
 					source_pixel.r * 0.2126
 					+ source_pixel.g * 0.7152
@@ -1912,7 +1932,7 @@ func _create_hole_mask_data(
 			)
 	if maximum.x < minimum.x or maximum.y < minimum.y:
 		return null
-	if fracture_line_scale > 0.0:
+	if writes_fracture_lines:
 		_write_fracture_lines(
 			fracture_source,
 			cavity_cells,
