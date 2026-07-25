@@ -1,12 +1,12 @@
-[gd_resource type="Resource" script_class="DepthCharacterEncounter" format=4]
+[gd_resource type="Resource" script_class="DepthCharacterEncounter" format=4 uid="uid://dxib1krxwmdhm"]
 
-[ext_resource type="Script" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
+[ext_resource type="Script" uid="uid://sqs37vj87ep8" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
 [ext_resource type="Resource" path="res://resources/encounters/cloak_lantern_character_appearance.tres" id="2_appearance"]
-[ext_resource type="Resource" path="res://resources/dialogue/cloak_lantern_warning_conversation.tres" id="3_dialogue"]
+[ext_resource type="Resource" uid="uid://dgdmgvl3mietr" path="res://resources/dialogue/cloak_lantern_warning_conversation.tres" id="3_dialogue"]
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/lantern_warning_encounter_stage.tscn" id="4_5q5s1"]
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_beat.gd" id="4_gciew"]
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_sequence.gd" id="5_2jlv2"]
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_terrain_sculpt.gd" id="5_5q5s1"]
+[ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="4_gciew"]
+[ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="5_2jlv2"]
+[ext_resource type="Script" uid="uid://dsexeufmvrsb7" path="res://resources/cinematics/cutscene_terrain_sculpt.gd" id="5_5q5s1"]
 
 [sub_resource type="Resource" id="Resource_eb3br"]
 script = ExtResource("4_gciew")
@@ -39,7 +39,7 @@ pose = &"idle"
 [sub_resource type="Resource" id="Resource_60yun"]
 script = ExtResource("4_gciew")
 kind = 5
-start_seconds = 1.5999999999999999
+start_seconds = 1.6
 duration_seconds = 6.0
 conversation = ExtResource("3_dialogue")
 
@@ -57,7 +57,7 @@ step_height = 6.0
 script = ExtResource("4_gciew")
 kind = 10
 actor = &"cloak_lantern"
-start_seconds = 10.399999999999999
+start_seconds = 10.4
 
 [sub_resource type="Resource" id="Resource_xphbf"]
 script = ExtResource("5_2jlv2")

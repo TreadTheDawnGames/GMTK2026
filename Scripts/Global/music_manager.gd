@@ -56,7 +56,7 @@ var fill_overlap : int = 3
 
 func _play_fill(_beat_number : int = 0):
 	print("beats left: ", get_beats_remaining())
-	if get_beats_remaining() <= fill_overlap and current_intensity != music_intensity and not fill_playing:
+	if get_beats_remaining() <= fill_overlap and not fill_playing:
 		fill_playing = true
 		track_1.stream = fills.pick_random()
 		

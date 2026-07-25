@@ -1,11 +1,11 @@
-[gd_resource type="Resource" script_class="DepthCharacterEncounter" format=4]
+[gd_resource type="Resource" script_class="DepthCharacterEncounter" format=4 uid="uid://cu8wo4yt42t2d"]
 
-[ext_resource type="Script" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
+[ext_resource type="Script" uid="uid://sqs37vj87ep8" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
 [ext_resource type="Resource" path="res://resources/encounters/coffee_cat_character_appearance.tres" id="2_appearance"]
-[ext_resource type="Resource" path="res://resources/dialogue/coffee_cat_first_conversation.tres" id="3_dialogue"]
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_beat.gd" id="4_kdoyt"]
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_terrain_sculpt.gd" id="5_auch3"]
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_sequence.gd" id="5_n0yit"]
+[ext_resource type="Resource" uid="uid://bpovruhocqc5" path="res://resources/dialogue/coffee_cat_first_conversation.tres" id="3_dialogue"]
+[ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="4_kdoyt"]
+[ext_resource type="Script" uid="uid://dsexeufmvrsb7" path="res://resources/cinematics/cutscene_terrain_sculpt.gd" id="5_auch3"]
+[ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="5_n0yit"]
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/quibble_encounter_stage.tscn" id="5_stage"]
 
 [sub_resource type="Resource" id="Resource_m7fue"]
@@ -55,7 +55,7 @@ pose = &"walk"
 script = ExtResource("4_kdoyt")
 kind = 10
 actor = &"coffee_cat"
-start_seconds = 7.3999999999999995
+start_seconds = 7.4
 
 [sub_resource type="Resource" id="Resource_6pppk"]
 script = ExtResource("5_n0yit")

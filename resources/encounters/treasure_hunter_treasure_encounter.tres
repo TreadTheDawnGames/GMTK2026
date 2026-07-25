@@ -1,13 +1,13 @@
-[gd_resource type="Resource" script_class="DepthCharacterEncounter" format=4]
+[gd_resource type="Resource" script_class="DepthCharacterEncounter" format=4 uid="uid://b0ed5u2wr3dll"]
 
-[ext_resource type="Script" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
+[ext_resource type="Script" uid="uid://sqs37vj87ep8" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
 [ext_resource type="Resource" path="res://resources/encounters/treasure_hunter_character_appearance.tres" id="2_appearance"]
-[ext_resource type="Resource" path="res://resources/dialogue/treasure_hunter_treasure_conversation.tres" id="3_dialogue"]
-[ext_resource type="Resource" path="res://resources/pickaxes/seismic_pickaxe.tres" id="4_pickaxe"]
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_beat.gd" id="5_g8kae"]
+[ext_resource type="Resource" uid="uid://yigtckpqgod" path="res://resources/dialogue/treasure_hunter_treasure_conversation.tres" id="3_dialogue"]
+[ext_resource type="Resource" uid="uid://clbcnexuivy42" path="res://resources/pickaxes/seismic_pickaxe.tres" id="4_pickaxe"]
+[ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="5_g8kae"]
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/treasure_hunter_hoard_encounter_stage.tscn" id="5_stage"]
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_terrain_sculpt.gd" id="6_0lxqd"]
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_sequence.gd" id="6_sc2eu"]
+[ext_resource type="Script" uid="uid://dsexeufmvrsb7" path="res://resources/cinematics/cutscene_terrain_sculpt.gd" id="6_0lxqd"]
+[ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="6_sc2eu"]
 
 [sub_resource type="Resource" id="Resource_plink"]
 script = ExtResource("5_g8kae")
@@ -56,7 +56,7 @@ pose = &"walk"
 script = ExtResource("5_g8kae")
 kind = 10
 actor = &"treasure_hunter"
-start_seconds = 7.3999999999999995
+start_seconds = 7.4
 
 [sub_resource type="Resource" id="Resource_osegq"]
 script = ExtResource("6_sc2eu")
