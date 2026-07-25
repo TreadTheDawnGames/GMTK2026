@@ -1,15 +1,11 @@
 [gd_resource type="Resource" script_class="CharacterAppearance" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://resources/encounters/character_appearance.gd" id="1_appearance"]
-[ext_resource type="Texture2D" path="res://Assets/Characters/MrNotOffensiveName-Sheet.png" id="2_texture"]
+[ext_resource type="Texture2D" path="res://Assets/Characters/newspaper_man/newspaper_man.png" id="2_texture"]
 
 [resource]
 resource_name = "Newspaper Reader Appearance"
 script = ExtResource("1_appearance")
 texture = ExtResource("2_texture")
-horizontal_frames = 7
-frame = 0
-sprite_scale = Vector2(0.62, 0.62)
-sprite_offset = Vector2(0, -74)
-tint = Color(0.88, 0.76, 0.61, 1)
-flip_h = true
+sprite_scale = Vector2(0.12, 0.12)
+sprite_offset = Vector2(0, -70)
