@@ -29,7 +29,9 @@ extends Resource
 ## Used only when story text should remain encrypted in source control.
 @export var encrypted_conversation: EncryptedDialogueConversation
 @export var speaker_slot: StringName
-## Adds this pickaxe to the cumulative stack after dialogue.
+## Optional collectible granted once after dialogue. Author it using
+## res://resources/pickaxes/pickaxe_authoring.md. Production mining and timing
+## behavior belongs to the corresponding EncounterProgressionLevel.
 @export var pickaxe_reward: PickaxeDefinition
 ## Requests the canonical persistent coffee speed reward after dialogue.
 @export var grants_coffee_speed_boost: bool = false

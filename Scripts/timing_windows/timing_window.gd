@@ -92,6 +92,8 @@ func set_pickaxe_target_unlocks(
 
 
 ## Applies the timing portion of one complete encounter-progression level.
+## New level-owned timing rules are added to this explicit contract and passed
+## by EncounterProgression.apply_level(), as documented in pickaxe_authoring.md.
 func set_progression_target_rules(
 	target_scenes: Array[PackedScene],
 	slider_speed: float,

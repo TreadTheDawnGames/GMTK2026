@@ -92,7 +92,9 @@ const MAX_PLAYABLE_DEPTH: int = 2_000_000_000
 @export_range(0.1, 5.0, 0.05) var recovery_speed_multiplier: float = 1.2
 
 @export_category("Encounter Progression")
-## Complete levels zero through nine. Encounter ten intentionally has no entry.
+## Complete production rules in order: level zero starts the run, and encounter
+## index N applies level N + 1. Keep levels zero through nine populated. See
+## res://resources/pickaxes/pickaxe_authoring.md before adding a pickaxe reward.
 @export var progression_levels: Array[EncounterProgressionLevel] = []
 
 @export_category("Effects")
