@@ -2,6 +2,10 @@ extends Node
 
 @export var tracks : Array[AudioStream] = []
 @export var fills : Array[AudioStream] = []
+@export var fail_riffs : Array[AudioStream] = []
+
+var bpm : float = 120
+var beats_per_measure : int = 4
 
 @onready var track_1: AudioStreamPlayer = %Track1
 @onready var track_2: AudioStreamPlayer = %Track2
@@ -15,10 +19,12 @@ var current_intensity : int = 0
 var fill_playing : bool = false
 
 func _ready():
-	Conductor.set_song(tracks[0], 120, 4)
+	Conductor.set_song(tracks[0], bpm, beats_per_measure)
 	Conductor.play()
 	Conductor.finished.connect(_transition_to)
 	Conductor.beat.connect(_play_fill)
+	
+	set_process(OS.has_feature("editor"))
 	
 func get_total_beats() -> float:
 	var beat_count = Conductor.stream.get_length() / Conductor.sec_per_beat
@@ -29,25 +35,48 @@ func get_beats_remaining() -> int:
 
 func _transition_to():
 	Conductor.last_reported_beat = -1
-	Conductor.set_song(tracks[music_intensity], 120, 4)
+	Conductor.set_song(tracks[music_intensity], bpm, beats_per_measure)
 	Conductor.play()
 	current_intensity = music_intensity
-	
 
-func _play_fill(_beat_number):
-	if get_beats_remaining() <= 2 and current_intensity != music_intensity and not fill_playing:
+func _process(delta: float) -> void:
+	if Input.is_action_just_pressed("aim_right"):
+		music_intensity += 1
+		set_intensity_on_beat(music_intensity)
+		print("music intensity: ", music_intensity)
+	if Input.is_action_just_pressed("aim_left"):
+		music_intensity -= 1
+		print("music intensity: ", music_intensity)
+		set_intensity_on_beat(music_intensity)
+	if Input.is_action_just_pressed("Space"):
+		set_intensity_on_beat(music_intensity)
+		print("music intensity: ", music_intensity)
+
+var fill_overlap : int = 3
+
+func _play_fill(_beat_number : int = 0):
+	print("beats left: ", get_beats_remaining())
+	if get_beats_remaining() <= fill_overlap and current_intensity != music_intensity and not fill_playing:
 		fill_playing = true
 		track_1.stream = fills.pick_random()
-		track_1.play()
+		
+		play_song_from_beat(fill_overlap-get_beats_remaining(), Conductor.sec_per_beat)
 		await track_1.finished
 		fill_playing = false
 
+func force_play_fill(stream : AudioStream = null):
+	fill_playing = true
+	track_1.stream = stream if stream else fills.pick_random()
+	
+	play_song_from_beat(fill_overlap-get_beats_remaining(), Conductor.sec_per_beat)
+	await track_1.finished
+	fill_playing = false
+
 func set_current_intensity(intensity : int):
 	music_intensity = intensity
-	pass
+	
 func _on_intensity_changed(intensity : int, previous_intensity):
 	set_current_intensity(intensity)
-	pass
 
 func _on_combo_tier_changed(tier: int, previous_tier: int):
 	pass
@@ -58,4 +87,22 @@ func _on_streak_lost(previous_combo : int, previous_tier : int):
 
 func _on_run_reset():
 	set_current_intensity(0)
+	pass
+
+func play_song_from_beat(beat:float, sec_per_beat : float):
+	track_1.play(sec_per_beat*beat)
+
+## sets the intensity after a number of beats equal to [beats] and plays the new intenisty from the asked for beat. 
+# If 0 it waits until the end of the measure.
+func set_intensity_on_beat(intensity : int):
+	music_intensity = intensity
+	
+	while int(Conductor.current_beat) % beats_per_measure != 0:
+		await Conductor.beat
+	#force_play_fill(fail_riffs.pick_random() if fail_riffs.size() > 0 else null)
+	
+	Conductor.last_reported_beat = -1
+	Conductor.set_song(tracks[music_intensity], bpm, beats_per_measure)
+	Conductor.play()
+	current_intensity = music_intensity
 	pass
