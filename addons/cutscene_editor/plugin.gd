@@ -67,11 +67,21 @@ func _enter_tree() -> void:
 	var toolbar := HBoxContainer.new()
 	toolbar.add_child(_playtest_button)
 
+	# The panel scrolls rather than growing. Godot sizes a bottom panel to its
+	# content, so a tall stack of controls pushed the 2D viewport down to a
+	# strip — and this is a tool you use by looking at the viewport.
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size.y = 190.0
+	scroll.add_child(tabs)
+	tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
 	_dock = VBoxContainer.new()
 	_dock.name = "Cutscene"
-	_dock.custom_minimum_size.y = 280.0
+	_dock.custom_minimum_size.y = 220.0
 	_dock.add_child(toolbar)
-	_dock.add_child(tabs)
+	_dock.add_child(scroll)
 	add_control_to_bottom_panel(_dock, "Cutscene")
 
 	_sculpt_panel.armed_changed.connect(_on_armed_changed)

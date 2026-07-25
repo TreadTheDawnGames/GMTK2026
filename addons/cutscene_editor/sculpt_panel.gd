@@ -38,6 +38,18 @@ const OPERATIONS: Array[StringName] = [
 	CutsceneSculptBrush.OP_ROUGHEN,
 	OP_DIG_HIT,
 ]
+## One line per tool saying what it is for, because a row of five verbs does
+## not tell a designer which one shapes a room and which one breaks into it.
+const OPERATION_TOOLTIPS: Array[String] = [
+	"Open rock. This is how a room is cut.",
+	"Close rock. Leaves pillars, ledges and walls the chamber never had.",
+	"Wear an edge down toward its neighbours, softening a wall.",
+	"Jag an edge. Only cells already on a solid/open boundary move, so it "
+		+ "roughens a silhouette without punching holes through solid rock.",
+	"Break in with a real mining hit through the production terrain, so you "
+		+ "can see the room as it looks once the miner has arrived. "
+		+ "Alt-click heals one.",
+]
 
 var _context: CutsceneEditorContext
 var _brush := CutsceneSculptBrush.new()
@@ -170,6 +182,7 @@ func _build_controls() -> void:
 	)
 	encounter_row.add_child(encounter_label)
 	_encounter_selector = OptionButton.new()
+	_encounter_selector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_encounter_selector.item_selected.connect(_on_encounter_selected)
 	encounter_row.add_child(_encounter_selector)
 	add_child(encounter_row)
@@ -182,93 +195,104 @@ func _build_controls() -> void:
 	_create_button.pressed.connect(_on_create_pressed)
 	add_child(_create_button)
 
-	_controls_root = VBoxContainer.new()
+	# Three named columns rather than one tall stack. Stacked, these controls
+	# stood taller than the 2D viewport they exist to serve, which is the wrong
+	# way round for a tool used by looking at the terrain.
+	_controls_root = HBoxContainer.new()
+	_controls_root.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_child(_controls_root)
 
+	var brush_column := _add_column("Brush")
 	_arm_button = Button.new()
 	_arm_button.text = "Sculpt Terrain"
 	_arm_button.toggle_mode = true
 	_arm_button.tooltip_text = (
-		"Click and drag the previewed rock to sculpt it. "
-		+ "Hold Alt to invert carve and fill."
+		"Arms the brush. While it is on, dragging in the 2D viewport sculpts "
+		+ "instead of selecting. Hold Alt to swap carve and fill mid-drag."
 	)
 	_arm_button.toggled.connect(_on_arm_toggled)
-	_controls_root.add_child(_arm_button)
+	brush_column.add_child(_arm_button)
 
-	var operation_row := HBoxContainer.new()
-	_controls_root.add_child(operation_row)
+	var operation_grid := GridContainer.new()
+	operation_grid.columns = 3
+	brush_column.add_child(operation_grid)
 	for operation_index in range(OPERATION_LABELS.size()):
 		var button := Button.new()
 		button.text = OPERATION_LABELS[operation_index]
 		button.toggle_mode = true
 		button.button_pressed = operation_index == 0
+		button.tooltip_text = OPERATION_TOOLTIPS[operation_index]
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.pressed.connect(_on_operation_pressed.bind(operation_index))
-		operation_row.add_child(button)
+		operation_grid.add_child(button)
 		_operation_buttons.append(button)
 
-	_radius_slider = _add_slider("Brush size", 1.0, 40.0, 0.5, 6.0)
-	_strength_slider = _add_slider("Strength", 0.05, 1.0, 0.05, 1.0)
-	_falloff_slider = _add_slider("Edge falloff", 0.0, 1.0, 0.05, 0.5)
+	_radius_slider = _add_slider(
+		brush_column, "Size", 1.0, 40.0, 0.5, 6.0,
+		"Brush radius in terrain cells."
+	)
+	_strength_slider = _add_slider(
+		brush_column, "Strength", 0.05, 1.0, 0.05, 1.0,
+		"How far into the brush the cut reaches. Below one it bites a smaller "
+		+ "disc; it never scatters loose cells."
+	)
+	_falloff_slider = _add_slider(
+		brush_column, "Falloff", 0.0, 1.0, 0.05, 0.5,
+		"How quickly the brush weakens toward its rim."
+	)
 
-	var layer_row := HBoxContainer.new()
-	var layer_label := Label.new()
-	layer_label.text = "Sculpting"
-	layer_row.add_child(layer_label)
-	_layer_selector = OptionButton.new()
-	_layer_selector.tooltip_text = (
-		"Shape edits every stratum and the ground the miner stands on. "
-		+ "A single stratum changes only what that layer draws."
+	var layer_column := _add_column("Layers")
+	_layer_selector = _add_dropdown(
+		layer_column, "Sculpting",
+		"Shape moves the rock and the ground the miner stands on together. A "
+		+ "single stratum changes only what that layer draws."
 	)
 	_layer_selector.item_selected.connect(_on_layer_selected)
-	layer_row.add_child(_layer_selector)
-	_controls_root.add_child(layer_row)
-
-	_controls_root.add_child(HSeparator.new())
-
-	var focus_row := HBoxContainer.new()
-	var focus_label := Label.new()
-	focus_label.text = "See only"
-	focus_label.custom_minimum_size.x = 120.0
-	focus_label.tooltip_text = (
+	_focus_selector = _add_dropdown(
+		layer_column, "See only",
 		"Isolates one stratum while you work on it. The foreground rock covers "
 		+ "everything behind it, so a buried layer cannot be judged until the "
-		+ "layers in front of it get out of the way. This changes nothing the "
-		+ "game draws."
+		+ "layers in front get out of the way. Nothing the game draws changes."
 	)
-	focus_row.add_child(focus_label)
-	_focus_selector = OptionButton.new()
 	_focus_selector.item_selected.connect(_on_focus_selected)
-	focus_row.add_child(_focus_selector)
-	_focus_mode_selector = OptionButton.new()
-	_focus_mode_selector.add_item("dim the rest")
-	_focus_mode_selector.add_item("hide the rest")
+	_focus_mode_selector = _add_dropdown(
+		layer_column, "Others",
+		"Whether the strata you are not looking at fade or disappear."
+	)
+	_focus_mode_selector.add_item("dim")
+	_focus_mode_selector.add_item("hide")
 	_focus_mode_selector.item_selected.connect(_on_focus_mode_selected)
-	focus_row.add_child(_focus_mode_selector)
-	_controls_root.add_child(focus_row)
-
-	_dim_slider = _add_slider("Dimmed to", 0.0, 1.0, 0.05, 0.15)
+	_dim_slider = _add_slider(
+		layer_column, "Dimmed to", 0.0, 1.0, 0.05, 0.15,
+		"How faint the other strata go. Dimming keeps them as context; hiding "
+		+ "removes them entirely."
+	)
 	_dim_slider.value_changed.connect(_on_dim_changed)
-
 	_follow_sculpt_layer = CheckBox.new()
-	_follow_sculpt_layer.text = "Follow the stratum I am sculpting"
+	_follow_sculpt_layer.text = "Follow sculpted layer"
 	_follow_sculpt_layer.button_pressed = true
 	_follow_sculpt_layer.tooltip_text = (
 		"Picking a stratum to sculpt also isolates it."
 	)
 	_follow_sculpt_layer.toggled.connect(_on_follow_toggled)
-	_controls_root.add_child(_follow_sculpt_layer)
+	layer_column.add_child(_follow_sculpt_layer)
 
-	_controls_root.add_child(HSeparator.new())
-
-	_smoothing_slider = _add_slider("Rock smoothing", 0.0, 1.0, 0.05, 1.0)
+	var room_column := _add_column("Room")
+	_smoothing_slider = _add_slider(
+		room_column, "Rock smoothing", 0.0, 1.0, 0.05, 1.0,
+		"How much the drawn rock rounds off the cell grid. Zero leaves hard "
+		+ "cell edges; jaggedness is better made with the Roughen brush."
+	)
 	_smoothing_slider.value_changed.connect(_on_smoothing_changed)
 
 	var floor_row := HBoxContainer.new()
 	var floor_label := Label.new()
-	floor_label.text = "Guarded floor rows"
+	floor_label.text = "Guarded floor"
+	floor_label.custom_minimum_size.x = 90.0
 	floor_label.tooltip_text = (
-		"Rows at the encounter floor that stay solid whatever is painted, "
-		+ "so the miner always lands in the room instead of falling past it."
+		"Rows at the encounter floor kept solid whatever you paint over them. "
+		+ "The miner arrives by falling, so carving through the floor drops him "
+		+ "past the cast. Set it to zero only for a deliberately floorless room."
 	)
 	floor_row.add_child(floor_label)
 	_floor_rows_spin = SpinBox.new()
@@ -276,63 +300,117 @@ func _build_controls() -> void:
 	_floor_rows_spin.max_value = 16
 	_floor_rows_spin.value_changed.connect(_on_floor_rows_changed)
 	floor_row.add_child(_floor_rows_spin)
-	_controls_root.add_child(floor_row)
+	room_column.add_child(floor_row)
 
 	var action_row := HBoxContainer.new()
-	_controls_root.add_child(action_row)
-	_add_action(action_row, "Reset to chamber", _on_bake_pressed)
-	_add_action(action_row, "Fill solid", _on_fill_all_pressed)
-	_add_action(action_row, "Open all", _on_clear_all_pressed)
+	room_column.add_child(action_row)
+	_add_action(
+		action_row, "Reset", _on_bake_pressed,
+		"Throws the room away and rebuilds the chamber the game generates."
+	)
+	_add_action(
+		action_row, "Fill solid", _on_fill_all_pressed,
+		"Fills every cell with rock, to carve a room out from nothing."
+	)
+	_add_action(
+		action_row, "Open all", _on_clear_all_pressed,
+		"Empties the room, leaving only the guarded floor."
+	)
 
-	_controls_root.add_child(HSeparator.new())
 	_status_label = Label.new()
 	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_controls_root.add_child(_status_label)
+	_status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	room_column.add_child(_status_label)
 	_landing_label = Label.new()
 	_landing_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_controls_root.add_child(_landing_label)
+	_landing_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	room_column.add_child(_landing_label)
+
+
+## Starts one titled column, so every control sits under a heading saying what
+## it is for instead of in one anonymous run of rows.
+func _add_column(title: String) -> VBoxContainer:
+	if _controls_root.get_child_count() > 0:
+		_controls_root.add_child(VSeparator.new())
+	var column := VBoxContainer.new()
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_controls_root.add_child(column)
+	var heading := Label.new()
+	heading.text = title
+	heading.add_theme_color_override("font_color", Color(0.62, 0.72, 0.86))
+	column.add_child(heading)
+	return column
+
+
+func _add_dropdown(
+	parent: VBoxContainer,
+	label_text: String,
+	tooltip: String
+) -> OptionButton:
+	var row := HBoxContainer.new()
+	var label := Label.new()
+	label.text = label_text
+	label.custom_minimum_size.x = 90.0
+	label.tooltip_text = tooltip
+	row.add_child(label)
+	var dropdown := OptionButton.new()
+	dropdown.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dropdown.tooltip_text = tooltip
+	row.add_child(dropdown)
+	parent.add_child(row)
+	return dropdown
 
 
 func _add_slider(
+	parent: VBoxContainer,
 	label_text: String,
 	minimum: float,
 	maximum: float,
 	step: float,
-	value: float
+	value: float,
+	tooltip: String
 ) -> HSlider:
 	var row := HBoxContainer.new()
 	var label := Label.new()
 	label.text = label_text
-	label.custom_minimum_size.x = 120.0
+	label.custom_minimum_size.x = 90.0
+	label.tooltip_text = tooltip
 	row.add_child(label)
 	var slider := HSlider.new()
 	slider.min_value = minimum
 	slider.max_value = maximum
 	slider.step = step
 	slider.value = value
-	slider.custom_minimum_size.x = 160.0
+	slider.tooltip_text = tooltip
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.custom_minimum_size.x = 80.0
 	row.add_child(slider)
 	var readout := Label.new()
 	readout.text = "%.2f" % value
+	readout.custom_minimum_size.x = 38.0
 	row.add_child(readout)
 	slider.value_changed.connect(
 		func(new_value: float) -> void:
 			readout.text = "%.2f" % new_value
 			_on_brush_slider_changed()
 	)
-	_controls_root.add_child(row)
+	parent.add_child(row)
 	return slider
 
 
 func _add_action(
 	row: HBoxContainer,
 	label_text: String,
-	handler: Callable
+	handler: Callable,
+	tooltip: String
 ) -> void:
 	var button := Button.new()
 	button.text = label_text
+	button.tooltip_text = tooltip
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.pressed.connect(handler)
 	row.add_child(button)
+
 
 
 func _on_arm_toggled(pressed: bool) -> void:
