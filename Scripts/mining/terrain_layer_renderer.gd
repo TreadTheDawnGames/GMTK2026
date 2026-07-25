@@ -19,6 +19,10 @@ class TerrainChunkVisual:
 	var mask_images: Array[Image] = []
 	var mask_textures: Array[ImageTexture] = []
 	var layer_sprites: Array[Sprite2D] = []
+	## One bit per stratum still drawing the shared intact mask. A shared stratum
+	## owns no image and no texture, so streaming untouched rock allocates
+	## nothing; the bit is cleared the moment a stamp needs to write into it.
+	var shared_layers: int = 0
 
 
 class HoleMaskData:
@@ -50,6 +54,7 @@ class ResizedStampImages:
 	var fracture_source: Image
 
 
+
 const LAYER_SHADER: Shader = preload(
 	"res://Shaders/terrain_layer.gdshader"
 )
@@ -64,6 +69,10 @@ const MAX_SUPPORT_SCAN_ROWS: int = 64
 const FRACTURE_SUPPORT_SCAN_MASK_PIXELS: int = 8
 const FRACTURE_SUPPORT_HALF_WIDTH_MASK_PIXELS: int = 2
 const FRACTURE_SUPPORT_VALUE_THRESHOLD: float = 0.9
+# Retired chunk nodes are kept so streaming reuses their sprites and fully
+# configured materials instead of rebuilding both per crossed chunk boundary.
+# The window is three to five chunks tall, so a handful covers every crossing.
+const CHUNK_VISUAL_POOL_LIMIT: int = 4
 @export_category("References")
 @export var terrain_manager: TerrainManager
 @export var profile: TerrainLayerProfile
@@ -96,6 +105,17 @@ const FRACTURE_SUPPORT_VALUE_THRESHOLD: float = 0.9
 @export var logical_overlay_color := Color(0.2, 1.0, 0.35, 0.45)
 
 var _active_chunks: Dictionary[int, TerrainChunkVisual] = {}
+# Nodes, sprites, and materials of chunks the view has left, waiting to be
+# refilled by the next chunk it reaches.
+var _chunk_visual_pool: Array[TerrainChunkVisual] = []
+# One solid mask every untouched stratum draws. Sharing it is what makes an
+# ordinary streamed chunk cost no image allocation and no texture upload.
+var _pristine_mask_image: Image
+var _pristine_mask_texture: ImageTexture
+var _pristine_mask_size := Vector2i.ZERO
+# One authored room rasterized at mask resolution, keyed by its sculpt and
+# indexed by stratum plus one, where index zero is the shared logical shape.
+var _sculpt_mask_images: Dictionary[CutsceneTerrainSculpt, Array] = {}
 # Historical stamps are retained so review mode can rebuild old terrain.
 # Growth is bounded by the configured run and accepted hit count; only the
 # viewport-sized _active_chunks set owns Image and ImageTexture allocations.
@@ -147,6 +167,7 @@ func _ready() -> void:
 		)
 		_prepare_hole_masks()
 		_prepare_chamber_transition_stamps()
+		_prepare_sculpt_masks()
 		_on_view_position_changed(terrain_manager.get_view_position())
 		return
 	if terrain_manager == null or profile == null:
@@ -182,7 +203,20 @@ func _ready() -> void:
 	)
 	_prepare_hole_masks()
 	_prepare_chamber_transition_stamps()
+	_prepare_sculpt_masks()
 	_on_view_position_changed(terrain_manager.get_view_position())
+
+
+## Rasterizes every authored room before the run starts. Reaching one mid-run
+## then costs a clipped copy instead of the build, which is what keeps a room's
+## chunk streaming in at the same cost as the rock around it.
+func _prepare_sculpt_masks() -> void:
+	for placement in terrain_manager.get_sculpt_placements():
+		_get_sculpt_mask_image(placement.sculpt, -1)
+		if not placement.sculpt.has_layer_masks():
+			continue
+		for layer_index in range(profile.get_gameplay_layer_count()):
+			_get_sculpt_mask_image(placement.sculpt, layer_index)
 
 
 ## Captures the combo used by synchronous damage stamps for one resolved hit.
@@ -260,6 +294,10 @@ func rebuild_all_chunks() -> void:
 	_impact_stamps_by_chunk.clear()
 	for chunk_index in _active_chunks.keys():
 		_unload_chunk(chunk_index)
+	# A rebuild is how an authored edit reaches the screen, so nothing built from
+	# the previous profile or room may survive it.
+	_clear_chunk_visual_pool()
+	_sculpt_mask_images.clear()
 	_latest_impact_stamp = null
 	_latest_foreground_opening_rect = Rect2()
 	_loaded_first_chunk = -1
@@ -342,32 +380,180 @@ func _refresh_active_chunks() -> void:
 	_loaded_last_chunk = last_chunk
 
 
-## Creates every visual stratum for one terrain chunk.
+## Fills one terrain chunk's strata, reusing a retired chunk's nodes when the
+## view has already left one. Untouched rock starts on the shared intact mask and
+## only allocates a stratum of its own when a stamp writes into it.
 func _load_chunk(chunk_index: int) -> void:
 	var layer_count := profile.get_layer_count()
 	if layer_count <= 0:
 		return
 
-	var chunk := TerrainChunkVisual.new()
-	chunk.root = Node2D.new()
-	chunk.root.name = "LayeredTerrainChunk_%d" % chunk_index
-	add_child(chunk.root)
-
-	var config: MiningConfig = terrain_manager.config
-	var chunk_start_row := chunk_index * config.chunk_height_cells
-	var chunk_contains_chamber := false
-	if terrain_manager.encounter_config != null:
-		for local_row in range(config.chunk_height_cells):
-			if terrain_manager.encounter_config.is_chamber_row(
-				chunk_start_row + local_row
-					- config.initial_surface_row,
-				config.total_run_depth
-			):
-				chunk_contains_chamber = true
-				break
+	var chunk := _acquire_chunk_visual(chunk_index, layer_count)
+	_active_chunks[chunk_index] = chunk
+	var chunk_contains_chamber := _chunk_contains_chamber(chunk_index)
 	# A sculpted room may sit in a chunk the encounter schedule alone would call
 	# ordinary rock, so streaming has to ask about rooms as well as chambers.
 	var chunk_contains_sculpt := _chunk_contains_sculpt(chunk_index)
+	if _is_chunk_intact_rock(
+		chunk_index,
+		chunk_contains_chamber,
+		chunk_contains_sculpt
+	):
+		_share_intact_masks(chunk, layer_count)
+	else:
+		_build_chunk_masks(
+			chunk,
+			chunk_index,
+			layer_count,
+			chunk_contains_chamber,
+			chunk_contains_sculpt
+		)
+	# The authored reveal band belongs to the foreground alone, so a chunk whose
+	# only departure from intact rock is that band keeps three shared strata.
+	if not _get_chunk_floor_reveal_rects(chunk_index).is_empty():
+		_make_layer_writable(chunk, 0)
+		_clear_chamber_foreground_floor_bands(
+			chunk.mask_images[0],
+			chunk_index
+		)
+
+	var chamber_stamps: Array = _chamber_stamps_by_chunk.get(
+		chunk_index,
+		[]
+	)
+	for chamber_stamp: ImpactStamp in chamber_stamps:
+		_apply_impact_stamp(chunk, chunk_index, chamber_stamp)
+	var saved_stamps: Array = _impact_stamps_by_chunk.get(
+		chunk_index,
+		[]
+	)
+	for saved_stamp: ImpactStamp in saved_stamps:
+		_apply_impact_stamp(chunk, chunk_index, saved_stamp)
+	_clear_temporary_stamp_cache()
+	_publish_chunk_textures(chunk)
+
+
+## Reuses a retired chunk's nodes, or builds the strata this chunk needs once.
+func _acquire_chunk_visual(
+	chunk_index: int,
+	layer_count: int
+) -> TerrainChunkVisual:
+	var chunk: TerrainChunkVisual = null
+	while not _chunk_visual_pool.is_empty():
+		var candidate: TerrainChunkVisual = _chunk_visual_pool.pop_back()
+		if (
+			is_instance_valid(candidate.root)
+			and candidate.layer_sprites.size() == layer_count
+		):
+			chunk = candidate
+			break
+		if is_instance_valid(candidate.root):
+			candidate.root.free()
+	if chunk == null:
+		chunk = _create_chunk_visual(layer_count)
+	chunk.root.name = "LayeredTerrainChunk_%d" % chunk_index
+	chunk.root.visible = true
+	var world_origin := Vector2(
+		0.0,
+		float(chunk_index) * _get_chunk_world_size().y
+	)
+	for layer_index in range(layer_count):
+		var sprite := chunk.layer_sprites[layer_index]
+		# The rock the shader draws is placed in world space, so moving a reused
+		# stratum to another depth is the one parameter that has to follow it.
+		(sprite.material as ShaderMaterial).set_shader_parameter(
+			&"world_origin",
+			world_origin
+		)
+		# Editor stratum isolation. Nothing at runtime sets an override, so this
+		# reads 1.0 during play and the sprite is untouched. Applying it on every
+		# acquire is what makes an isolated stratum survive streaming.
+		sprite.modulate.a = get_layer_display_opacity(layer_index)
+	return chunk
+
+
+## Builds one chunk's nodes, sprites, and fully configured layer materials.
+func _create_chunk_visual(layer_count: int) -> TerrainChunkVisual:
+	var chunk := TerrainChunkVisual.new()
+	chunk.root = Node2D.new()
+	add_child(chunk.root)
+	var chunk_world_size := _get_chunk_world_size()
+	for layer_index in range(layer_count):
+		var sprite := Sprite2D.new()
+		sprite.name = "TerrainLayer_%d" % layer_index
+		sprite.centered = false
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		sprite.scale = Vector2.ONE * (
+			float(terrain_manager.config.terrain_cell_world_size)
+			/ float(profile.mask_pixels_per_cell)
+		)
+		sprite.z_index = profile.get_layer_z_index(layer_index)
+		sprite.material = _create_layer_material(
+			layer_index,
+			Vector2.ZERO,
+			chunk_world_size
+		)
+		chunk.root.add_child(sprite)
+		chunk.layer_sprites.append(sprite)
+		chunk.mask_images.append(null)
+		chunk.mask_textures.append(null)
+	return chunk
+
+
+## Reports whether a chunk is ordinary rock with nothing authored inside it.
+func _is_chunk_intact_rock(
+	chunk_index: int,
+	chunk_contains_chamber: bool,
+	chunk_contains_sculpt: bool
+) -> bool:
+	if chunk_contains_chamber or chunk_contains_sculpt:
+		return false
+	var config: MiningConfig = terrain_manager.config
+	var chunk_start_row := chunk_index * config.chunk_height_cells
+	return (
+		chunk_start_row >= config.initial_surface_row
+		and chunk_start_row + config.chunk_height_cells - 1
+			<= config.get_bottom_surface_row()
+	)
+
+
+## Reports whether the encounter schedule opens a chamber inside a chunk.
+func _chunk_contains_chamber(chunk_index: int) -> bool:
+	var encounter_config := terrain_manager.encounter_config
+	if encounter_config == null:
+		return false
+	var config: MiningConfig = terrain_manager.config
+	var chunk_start_row := chunk_index * config.chunk_height_cells
+	for local_row in range(config.chunk_height_cells):
+		if encounter_config.is_chamber_row(
+			chunk_start_row + local_row - config.initial_surface_row,
+			config.total_run_depth
+		):
+			return true
+	return false
+
+
+## Points every stratum at the shared intact mask, allocating nothing.
+func _share_intact_masks(
+	chunk: TerrainChunkVisual,
+	layer_count: int
+) -> void:
+	var intact_image := _get_pristine_mask_image()
+	for layer_index in range(layer_count):
+		chunk.mask_images[layer_index] = intact_image
+		chunk.mask_textures[layer_index] = _pristine_mask_texture
+		chunk.layer_sprites[layer_index].texture = _pristine_mask_texture
+	chunk.shared_layers = (1 << layer_count) - 1
+
+
+## Builds this chunk's own strata for chambers, rooms, and the run's edges.
+func _build_chunk_masks(
+	chunk: TerrainChunkVisual,
+	chunk_index: int,
+	layer_count: int,
+	chunk_contains_chamber: bool,
+	chunk_contains_sculpt: bool
+) -> void:
 	var chunk_has_per_layer_sculpt := (
 		chunk_contains_sculpt and _chunk_has_per_layer_sculpt(chunk_index)
 	)
@@ -389,14 +575,10 @@ func _load_chunk(chunk_index: int) -> void:
 			if chunk_contains_chamber
 			else base_mask
 		)
-	var chunk_world_size := _get_chunk_world_size()
-	var world_origin := Vector2(
-		0.0,
-		float(chunk_index) * chunk_world_size.y
-	)
 	var first_backdrop_source_layer := (
 		profile.get_gameplay_layer_count() - 1
 	)
+	chunk.shared_layers = 0
 	for layer_index in range(layer_count):
 		# The fourth gameplay stratum begins intact as the tunnel back wall.
 		var uses_backdrop_source := (
@@ -432,53 +614,76 @@ func _load_chunk(chunk_index: int) -> void:
 				chunk_contains_sculpt,
 				layer_index
 			)
-		if layer_index == 0:
-			_clear_chamber_foreground_floor_bands(
-				layer_mask,
-				chunk_index
-			)
-		chunk.mask_images.append(layer_mask)
-	var chamber_stamps: Array = _chamber_stamps_by_chunk.get(
-		chunk_index,
-		[]
-	)
-	for chamber_stamp: ImpactStamp in chamber_stamps:
-		_apply_impact_stamp(chunk, chunk_index, chamber_stamp)
-	var saved_stamps: Array = _impact_stamps_by_chunk.get(
-		chunk_index,
-		[]
-	)
-	for saved_stamp: ImpactStamp in saved_stamps:
-		_apply_impact_stamp(chunk, chunk_index, saved_stamp)
-	_clear_temporary_stamp_cache()
+		chunk.mask_images[layer_index] = layer_mask
 
-	for layer_index in range(layer_count):
-		var mask_image := chunk.mask_images[layer_index]
-		var mask_texture := ImageTexture.create_from_image(mask_image)
-		var sprite := Sprite2D.new()
-		sprite.name = "TerrainLayer_%d" % layer_index
-		sprite.centered = false
+
+## Gives one stratum an image of its own before a stamp writes into it.
+func _make_layer_writable(
+	chunk: TerrainChunkVisual,
+	layer_index: int
+) -> void:
+	if chunk.shared_layers & (1 << layer_index) == 0:
+		return
+	chunk.mask_images[layer_index] = (
+		chunk.mask_images[layer_index].duplicate()
+	)
+	chunk.shared_layers &= ~(1 << layer_index)
+
+
+## Publishes every stratum's mask, creating a texture only where one is owned.
+func _publish_chunk_textures(chunk: TerrainChunkVisual) -> void:
+	for layer_index in range(chunk.mask_images.size()):
+		_publish_layer_texture(chunk, layer_index)
+
+
+## Uploads one stratum, reusing its texture unless the mask it draws changed
+## identity. A stratum that just left the shared intact mask needs a texture of
+## its own; one that was already its own is updated in place.
+func _publish_layer_texture(
+	chunk: TerrainChunkVisual,
+	layer_index: int
+) -> void:
+	var mask_image: Image = chunk.mask_images[layer_index]
+	if mask_image == null:
+		return
+	var sprite := chunk.layer_sprites[layer_index]
+	if chunk.shared_layers & (1 << layer_index) != 0:
+		if sprite.texture != _pristine_mask_texture:
+			chunk.mask_textures[layer_index] = _pristine_mask_texture
+			sprite.texture = _pristine_mask_texture
+		return
+	var mask_texture: ImageTexture = chunk.mask_textures[layer_index]
+	if (
+		mask_texture == null
+		or mask_texture == _pristine_mask_texture
+		or Vector2i(mask_texture.get_size()) != mask_image.get_size()
+	):
+		mask_texture = ImageTexture.create_from_image(mask_image)
+		chunk.mask_textures[layer_index] = mask_texture
 		sprite.texture = mask_texture
-		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		sprite.scale = Vector2.ONE * (
-			float(terrain_manager.config.terrain_cell_world_size)
-			/ float(profile.mask_pixels_per_cell)
-		)
-		sprite.z_index = profile.get_layer_z_index(layer_index)
-		# Editor stratum isolation. Nothing at runtime sets an override, so
-		# this reads 1.0 during play and the sprite is untouched. Applying it
-		# here rather than only to live chunks is what makes an isolated
-		# stratum survive the rebuild every sculpt stroke causes.
-		sprite.modulate.a = get_layer_display_opacity(layer_index)
-		sprite.material = _create_layer_material(
-			layer_index,
-			world_origin,
-			chunk_world_size
-		)
-		chunk.root.add_child(sprite)
-		chunk.layer_sprites.append(sprite)
-		chunk.mask_textures.append(mask_texture)
-	_active_chunks[chunk_index] = chunk
+		return
+	mask_texture.update(mask_image)
+	if sprite.texture != mask_texture:
+		sprite.texture = mask_texture
+
+
+## Returns the one solid mask every intact stratum draws.
+func _get_pristine_mask_image() -> Image:
+	var mask_size := _get_chunk_mask_size()
+	if _pristine_mask_image != null and _pristine_mask_size == mask_size:
+		return _pristine_mask_image
+	_pristine_mask_size = mask_size
+	_pristine_mask_image = Image.create(
+		mask_size.x,
+		mask_size.y,
+		false,
+		Image.FORMAT_LA8
+	)
+	_pristine_mask_image.fill(SOLID_MASK_COLOR)
+	_pristine_mask_texture = ImageTexture.create_from_image(
+		_pristine_mask_image
+	)
+	return _pristine_mask_image
 
 
 ## Dims or hides one stratum everywhere it is drawn, so a designer sculpting a
@@ -523,14 +728,42 @@ func _apply_layer_display_opacity() -> void:
 			)
 
 
-## Removes rendered chunk nodes while retaining their impact records.
+## Retires a chunk's nodes for reuse while retaining their impact records.
 func _unload_chunk(chunk_index: int) -> void:
 	var chunk := _active_chunks[chunk_index]
-	# Streaming can cross many chunk boundaries in one frame during a fast
-	# review or fall. Deferred deletion would retain every old ImageTexture
-	# until the frame ends and can exhaust memory before Godot flushes it.
-	chunk.root.free()
 	_active_chunks.erase(chunk_index)
+	if _chunk_visual_pool.size() >= CHUNK_VISUAL_POOL_LIMIT:
+		# Streaming can cross many chunk boundaries in one frame during a fast
+		# review or fall. Deferred deletion would retain every old ImageTexture
+		# until the frame ends and can exhaust memory before Godot flushes it.
+		chunk.root.free()
+		return
+	# The nodes and their configured materials are what the next chunk reuses.
+	# Masks are released here for the same reason: a pooled chunk must not hold
+	# a departed chunk's image and texture memory.
+	_release_chunk_masks(chunk)
+	chunk.root.visible = false
+	chunk.root.name = "PooledTerrainChunk"
+	_chunk_visual_pool.append(chunk)
+
+
+## Drops a retired chunk's owned masks back onto the shared intact mask.
+func _release_chunk_masks(chunk: TerrainChunkVisual) -> void:
+	var intact_image := _get_pristine_mask_image()
+	for layer_index in range(chunk.mask_images.size()):
+		chunk.mask_images[layer_index] = intact_image
+		chunk.mask_textures[layer_index] = _pristine_mask_texture
+		chunk.layer_sprites[layer_index].texture = _pristine_mask_texture
+	chunk.shared_layers = (1 << chunk.mask_images.size()) - 1
+
+
+## Frees every retired chunk, so a profile or room edit cannot hand stale
+## materials to the next streamed chunk.
+func _clear_chunk_visual_pool() -> void:
+	for chunk in _chunk_visual_pool:
+		if is_instance_valid(chunk.root):
+			chunk.root.free()
+	_chunk_visual_pool.clear()
 
 
 ## Builds one layer's undamaged terrain before applying organic openings.
@@ -613,14 +846,6 @@ func _build_chunk_base_mask(
 					Rect2i(0, row_mask_y, mask_size.x, mask_cell_size),
 					SOLID_MASK_COLOR
 				)
-			_fill_sculpt_row_mask(
-				image,
-				row_mask_y,
-				world_row,
-				mask_cell_size,
-				sculpt_placement,
-				sculpt_layer_index
-			)
 			continue
 		if not is_chamber_row:
 			image.fill_rect(
@@ -668,6 +893,8 @@ func _build_chunk_base_mask(
 			world_row,
 			mask_cell_size
 		)
+	if chunk_contains_sculpt and not preserve_chamber_backdrop:
+		_blit_sculpt_rooms(image, chunk_index, sculpt_layer_index)
 	return image
 
 
@@ -701,75 +928,174 @@ func _chunk_has_per_layer_sculpt(chunk_index: int) -> bool:
 	return false
 
 
-## Prints one authored room row over the terrain already drawn beneath it.
-## Interior cells are filled in runs and only cells touching a solid/open
-## boundary pay per-pixel work, which is what keeps a sculpted chunk's build
-## cost in the same range as the procedural chamber it replaces.
-func _fill_sculpt_row_mask(
+## Prints every authored room reaching into one chunk over the terrain already
+## drawn beneath it. The room arrives as a mask rasterized once, so a streamed
+## chunk pays a clipped copy rather than rebuilding the room's rim per row.
+func _blit_sculpt_rooms(
 	image: Image,
-	row_mask_y: int,
-	world_row: int,
-	mask_cell_size: int,
-	placement: TerrainManager.SculptPlacement,
+	chunk_index: int,
 	sculpt_layer_index: int
 ) -> void:
 	var config: MiningConfig = terrain_manager.config
-	var sculpt: CutsceneTerrainSculpt = placement.sculpt
-	var room_rect: Rect2i = placement.world_rect
-	var local_y: int = world_row - room_rect.position.y
-	var first_cell_x: int = maxi(room_rect.position.x, 0)
-	var last_cell_x: int = mini(
-		room_rect.end.x,
-		config.terrain_width_cells
-	) - 1
-	if last_cell_x < first_cell_x:
-		return
+	var mask_cell_size := profile.mask_pixels_per_cell
+	var chunk_start_row := chunk_index * config.chunk_height_cells
+	var chunk_end_row := chunk_start_row + config.chunk_height_cells
+	for placement in terrain_manager.get_sculpt_placements():
+		var room_rect: Rect2i = placement.world_rect
+		if (
+			room_rect.position.y >= chunk_end_row
+			or room_rect.end.y <= chunk_start_row
+		):
+			continue
+		var room_mask := _get_sculpt_mask_image(
+			placement.sculpt,
+			sculpt_layer_index
+		)
+		if room_mask == null:
+			continue
+		var first_row := maxi(room_rect.position.y, chunk_start_row)
+		var last_row := mini(room_rect.end.y, chunk_end_row)
+		var source_rect := Rect2i(
+			0,
+			(first_row - room_rect.position.y) * mask_cell_size,
+			room_mask.get_width(),
+			(last_row - first_row) * mask_cell_size
+		)
+		var destination := Vector2i(
+			room_rect.position.x * mask_cell_size,
+			(first_row - chunk_start_row) * mask_cell_size
+		)
+		# A room reaching past either edge of the run is clipped there rather
+		# than wrapped around to the opposite wall.
+		if destination.x < 0:
+			source_rect.position.x -= destination.x
+			source_rect.size.x += destination.x
+			destination.x = 0
+		var overflow_x := (
+			destination.x + source_rect.size.x - image.get_width()
+		)
+		if overflow_x > 0:
+			source_rect.size.x -= overflow_x
+		if source_rect.size.x <= 0 or source_rect.size.y <= 0:
+			continue
+		image.blit_rect(room_mask, source_rect, destination)
 
-	var run_start_cell_x: int = first_cell_x
-	var run_is_solid: bool = _is_sculpt_cell_solid(
-		sculpt,
-		sculpt_layer_index,
-		Vector2i(first_cell_x - room_rect.position.x, local_y)
+
+## Returns one room's rock at mask resolution, rasterizing it on first use.
+func _get_sculpt_mask_image(
+	sculpt: CutsceneTerrainSculpt,
+	sculpt_layer_index: int
+) -> Image:
+	if sculpt == null:
+		return null
+	var cache_index := sculpt_layer_index + 1
+	var layer_masks: Array = _sculpt_mask_images.get(sculpt, [])
+	if layer_masks.size() > cache_index and layer_masks[cache_index] != null:
+		return layer_masks[cache_index]
+	var room_mask := _rasterize_sculpt_mask(sculpt, sculpt_layer_index)
+	while layer_masks.size() <= cache_index:
+		layer_masks.append(null)
+	layer_masks[cache_index] = room_mask
+	_sculpt_mask_images[sculpt] = layer_masks
+	return room_mask
+
+
+## Draws one authored room once, at mask resolution.
+##
+## The room is written at one pixel per cell and then upscaled: Godot's bilinear
+## filter samples the same cell centers a hand-written rim sampler would, so the
+## visible contour is the sub-cell one, produced in a single pass instead of per
+## mask pixel. Luminance stays full across the room because the shader reads it
+## as crack ink; only alpha carries the shape the room was carved into.
+func _rasterize_sculpt_mask(
+	sculpt: CutsceneTerrainSculpt,
+	sculpt_layer_index: int
+) -> Image:
+	var mask_cell_size := profile.mask_pixels_per_cell
+	var grid := sculpt.grid_size
+	if grid.x <= 0 or grid.y <= 0 or mask_cell_size <= 0:
+		return null
+	# One solid cell of padding stands in for the untouched rock around the room,
+	# which is what a cell on the room's own edge interpolates against.
+	var padded_size := grid + Vector2i(2, 2)
+	var cell_bytes := PackedByteArray()
+	cell_bytes.resize(padded_size.x * padded_size.y * 2)
+	var byte_index := 0
+	for padded_y in range(padded_size.y):
+		for padded_x in range(padded_size.x):
+			cell_bytes[byte_index] = 255
+			cell_bytes[byte_index + 1] = (
+				255
+				if _is_sculpt_cell_solid(
+					sculpt,
+					sculpt_layer_index,
+					Vector2i(padded_x - 1, padded_y - 1)
+				)
+				else 0
+			)
+			byte_index += 2
+	var cell_image := Image.create_from_data(
+		padded_size.x,
+		padded_size.y,
+		false,
+		Image.FORMAT_LA8,
+		cell_bytes
 	)
-	for cell_x in range(first_cell_x, last_cell_x + 2):
-		var is_solid: bool = (
-			run_is_solid
-			if cell_x > last_cell_x
-			else _is_sculpt_cell_solid(
+	cell_image.resize(
+		padded_size.x * mask_cell_size,
+		padded_size.y * mask_cell_size,
+		(
+			Image.INTERPOLATE_BILINEAR
+			if sculpt.edge_smoothing > 0.0
+			else Image.INTERPOLATE_NEAREST
+		)
+	)
+	var room_mask := cell_image.get_region(
+		Rect2i(
+			Vector2i(mask_cell_size, mask_cell_size),
+			grid * mask_cell_size
+		)
+	)
+	if sculpt.edge_smoothing > 0.0 and sculpt.edge_smoothing < 1.0:
+		_harden_sculpt_mask_rims(room_mask, sculpt, sculpt_layer_index)
+	return room_mask
+
+
+## Pulls a partly smoothed room's rim back toward the cells it was painted on.
+## Only cells on a solid/open boundary can differ from their own cell value, so
+## only those pay per-pixel work, and only when a room asks for a harder edge.
+func _harden_sculpt_mask_rims(
+	room_mask: Image,
+	sculpt: CutsceneTerrainSculpt,
+	sculpt_layer_index: int
+) -> void:
+	var mask_cell_size := profile.mask_pixels_per_cell
+	var smoothing := sculpt.edge_smoothing
+	for local_y in range(sculpt.grid_size.y):
+		for local_x in range(sculpt.grid_size.x):
+			var local_cell := Vector2i(local_x, local_y)
+			if not _is_sculpt_boundary_cell(
 				sculpt,
 				sculpt_layer_index,
-				Vector2i(cell_x - room_rect.position.x, local_y)
+				local_cell
+			):
+				continue
+			var hard_value := (
+				1.0
+				if _is_sculpt_cell_solid(
+					sculpt,
+					sculpt_layer_index,
+					local_cell
+				)
+				else 0.0
 			)
-		)
-		if is_solid == run_is_solid and cell_x <= last_cell_x:
-			continue
-		image.fill_rect(
-			Rect2i(
-				run_start_cell_x * mask_cell_size,
-				row_mask_y,
-				(cell_x - run_start_cell_x) * mask_cell_size,
-				mask_cell_size
-			),
-			SOLID_MASK_COLOR if run_is_solid else EMPTY_MASK_COLOR
-		)
-		run_start_cell_x = cell_x
-		run_is_solid = is_solid
-
-	if sculpt.edge_smoothing <= 0.0:
-		return
-	for cell_x in range(first_cell_x, last_cell_x + 1):
-		var local_cell := Vector2i(cell_x - room_rect.position.x, local_y)
-		if not _is_sculpt_boundary_cell(sculpt, sculpt_layer_index, local_cell):
-			continue
-		_write_sculpt_boundary_cell(
-			image,
-			cell_x * mask_cell_size,
-			row_mask_y,
-			mask_cell_size,
-			sculpt,
-			sculpt_layer_index,
-			local_cell
-		)
+			for sub_y in range(mask_cell_size):
+				var mask_y := local_y * mask_cell_size + sub_y
+				for sub_x in range(mask_cell_size):
+					var mask_x := local_x * mask_cell_size + sub_x
+					var smoothed := room_mask.get_pixel(mask_x, mask_y)
+					smoothed.a = lerpf(hard_value, smoothed.a, smoothing)
+					room_mask.set_pixel(mask_x, mask_y, smoothed)
 
 
 ## Reads one room cell, choosing the stratum's own rock when the strata were
@@ -809,100 +1135,20 @@ func _is_sculpt_boundary_cell(
 	return false
 
 
-## Softens one rim cell toward its neighbours so a sculpted wall reads as rock
-## rather than as the stair-stepped grid it was painted on. edge_smoothing at
-## zero leaves the hard cell edge, which is what makes a roughened wall jagged.
-func _write_sculpt_boundary_cell(
-	image: Image,
-	cell_mask_x: int,
-	cell_mask_y: int,
-	mask_cell_size: int,
-	sculpt: CutsceneTerrainSculpt,
-	sculpt_layer_index: int,
-	local_cell: Vector2i
-) -> void:
-	var smoothing := sculpt.edge_smoothing
-	var hard_value := (
-		1.0
-		if _is_sculpt_cell_solid(sculpt, sculpt_layer_index, local_cell)
-		else 0.0
-	)
-	var image_width := image.get_width()
-	var image_height := image.get_height()
-	for sub_y in range(mask_cell_size):
-		var mask_y := cell_mask_y + sub_y
-		if mask_y < 0 or mask_y >= image_height:
-			continue
-		for sub_x in range(mask_cell_size):
-			var mask_x := cell_mask_x + sub_x
-			if mask_x < 0 or mask_x >= image_width:
-				continue
-			var coverage := _sample_sculpt_coverage(
-				sculpt,
-				sculpt_layer_index,
-				local_cell,
-				(float(sub_x) + 0.5) / float(mask_cell_size),
-				(float(sub_y) + 0.5) / float(mask_cell_size)
-			)
-			image.set_pixel(
-				mask_x,
-				mask_y,
-				Color(1.0, 1.0, 1.0, lerpf(hard_value, coverage, smoothing))
-			)
-
-
-## Interpolates the four room cells nearest one mask pixel. Sampling cell
-## centers rather than cell corners is what keeps a straight wall straight
-## instead of pulling it half a cell into the rock.
-func _sample_sculpt_coverage(
-	sculpt: CutsceneTerrainSculpt,
-	sculpt_layer_index: int,
-	local_cell: Vector2i,
-	sub_cell_x: float,
-	sub_cell_y: float
-) -> float:
-	var sample_x := float(local_cell.x) + sub_cell_x - 0.5
-	var sample_y := float(local_cell.y) + sub_cell_y - 0.5
-	var base_x := floori(sample_x)
-	var base_y := floori(sample_y)
-	var weight_x := sample_x - float(base_x)
-	var weight_y := sample_y - float(base_y)
-	var top_left := _get_sculpt_cell_value(
-		sculpt, sculpt_layer_index, Vector2i(base_x, base_y)
-	)
-	var top_right := _get_sculpt_cell_value(
-		sculpt, sculpt_layer_index, Vector2i(base_x + 1, base_y)
-	)
-	var bottom_left := _get_sculpt_cell_value(
-		sculpt, sculpt_layer_index, Vector2i(base_x, base_y + 1)
-	)
-	var bottom_right := _get_sculpt_cell_value(
-		sculpt, sculpt_layer_index, Vector2i(base_x + 1, base_y + 1)
-	)
-	return lerpf(
-		lerpf(top_left, top_right, weight_x),
-		lerpf(bottom_left, bottom_right, weight_x),
-		weight_y
-	)
-
-
-func _get_sculpt_cell_value(
-	sculpt: CutsceneTerrainSculpt,
-	sculpt_layer_index: int,
-	local_cell: Vector2i
-) -> float:
-	return (
-		1.0
-		if _is_sculpt_cell_solid(sculpt, sculpt_layer_index, local_cell)
-		else 0.0
-	)
-
-
 ## Lowers only layer one beneath each room's unchanged layer-two support.
 func _clear_chamber_foreground_floor_bands(
 	image: Image,
 	chunk_index: int
 ) -> void:
+	for reveal_rect in _get_chunk_floor_reveal_rects(chunk_index):
+		image.fill_rect(reveal_rect, EMPTY_MASK_COLOR)
+
+
+## Returns the authored reveal bands one chunk's foreground has to drop. Asking
+## for the rectangles rather than clearing them directly is what lets streaming
+## tell an ordinary chunk from one carrying a band before it builds any mask.
+func _get_chunk_floor_reveal_rects(chunk_index: int) -> Array[Rect2i]:
+	var reveal_rects: Array[Rect2i] = []
 	var config := terrain_manager.config
 	var encounter_config := terrain_manager.encounter_config
 	if (
@@ -910,7 +1156,7 @@ func _clear_chamber_foreground_floor_bands(
 		or profile.chamber_layer_two_floor_reveal_px <= 0.0
 		or profile.mask_pixels_per_cell <= 0
 	):
-		return
+		return reveal_rects
 	var reveal_mask_height := maxi(
 		ceili(
 			profile.chamber_layer_two_floor_reveal_px
@@ -923,7 +1169,7 @@ func _clear_chamber_foreground_floor_bands(
 		config.chunk_height_cells * profile.mask_pixels_per_cell
 	)
 	var chunk_mask_top := chunk_index * chunk_mask_height
-	var image_bounds := Rect2i(Vector2i.ZERO, image.get_size())
+	var chunk_bounds := Rect2i(Vector2i.ZERO, _get_chunk_mask_size())
 	for encounter in encounter_config.encounters:
 		if encounter == null:
 			continue
@@ -950,9 +1196,10 @@ func _clear_chamber_foreground_floor_bands(
 			(chamber_bounds.y - chamber_bounds.x)
 				* profile.mask_pixels_per_cell,
 			reveal_mask_height
-		).intersection(image_bounds)
+		).intersection(chunk_bounds)
 		if reveal_rect.has_area():
-			image.fill_rect(reveal_rect, EMPTY_MASK_COLOR)
+			reveal_rects.append(reveal_rect)
+	return reveal_rects
 
 
 ## Draws the shared chamber taper at mask-pixel resolution. This runs only
@@ -1229,6 +1476,7 @@ func _apply_impact_stamp(
 		if is_layer_covering_backdrop and not stamp.use_big_hole:
 			continue
 		var layer_changed := false
+		_make_layer_writable(chunk, layer_index)
 		if not stamp.narrow_path_points.is_empty():
 			if _punch_narrow_path(
 				chunk.mask_images[layer_index],
@@ -2731,9 +2979,7 @@ func _upload_chunk_masks(
 	for layer_index in range(chunk.mask_images.size()):
 		if changed_layers & (1 << layer_index) == 0:
 			continue
-		chunk.mask_textures[layer_index].update(
-			chunk.mask_images[layer_index]
-		)
+		_publish_layer_texture(chunk, layer_index)
 
 
 ## Returns a conservative area containing every layer opening.

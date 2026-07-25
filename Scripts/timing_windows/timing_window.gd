@@ -104,9 +104,20 @@ func _mining_window_pressed(
 			(mining_config.combo_speed_multiplier)
 		)
 		if not AudioLibrary.MINE_SOUNDS.is_empty():
-			_audio_handler.play_sound(AudioLibrary.MINE_SOUNDS[
-				clampi(combo - 1, 0, AudioLibrary.MINE_SOUNDS.size() - 1)
-			],)
+			# The sample ladder runs out at MINE_SOUNDS.size(); past that the
+			# pitch keeps climbing so a long streak still sounds like it is
+			# going somewhere instead of flattening out.
+			var steps_past_ladder = maxi(
+				combo - AudioLibrary.MINE_SOUNDS.size(), 0
+			)
+			_audio_handler.play_sound(
+				AudioLibrary.MINE_SOUNDS[
+					clampi(combo - 1, 0, AudioLibrary.MINE_SOUNDS.size() - 1)
+				],
+				"SFX",
+				false,
+				minf(1.0 + 0.03 * float(steps_past_ladder), 1.6)
+			)
 
 		var unlocked_pickaxe_target := false
 		for definition in _target_unlocks:
