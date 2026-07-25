@@ -122,6 +122,10 @@ func _ready() -> void:
 	)
 	_connect_once(
 		terrain_manager.view_position_changed,
+		gem_outcrop_field._on_view_position_changed
+	)
+	_connect_once(
+		terrain_manager.view_position_changed,
 		encounter_controller._on_view_position_changed
 	)
 	_connect_once(

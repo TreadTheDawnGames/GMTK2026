@@ -8,10 +8,10 @@ extends Node2D
 ## - Which stratum a crystal belongs to decides its colour, its size and which
 ##   depth it draws at, so a shallow break and a deep one yield different finds.
 ## - Cutscenes call place_gem() to stand an authored crystal wherever they frame.
-## - Input is terrain damage; output is drawing. No other system reads it back.
-## The invariant is that a crystal only ever grows out of rock that is still
-## there: each one keeps the solid cell it was rooted to, is dropped when that
-## cell is later mined, and so can never be left floating in an open tunnel.
+## - Records stay in terrain space and are saved; scrolling only redraws the
+##   nearby chunks, so returning to an old depth finds the same crystal there.
+## The invariant is that placing a gem never turns it into screen-space state:
+## mining, review scrolling, scene reloads and render culling cannot move it.
 
 ## Draws the crystals belonging to one stratum. Each shelf carries that
 ## stratum's own z_index, so a crystal uncovered deep in the tunnel is covered
@@ -22,7 +22,10 @@ class GemShelf:
 	extends Node2D
 
 	var field: GemOutcropField
-	var gems: Array[GemOutcrop] = []
+	## At most maximum_gems_per_chunk entries are retained across all shelves in
+	## one chunk. Drawing only visits the visible chunk range, so a 100,000-row
+	## run does not add per-frame work as its sparse record set grows.
+	var gems_by_chunk: Dictionary[int, Array] = {}
 
 	func _draw() -> void:
 		field.draw_shelf(self)
@@ -31,7 +34,8 @@ class GemShelf:
 ## One placed crystal. Terrain-space so it survives streaming and view movement.
 class GemOutcrop:
 	var terrain_position: Vector2
-	## The solid cell this crystal grew out of. Mining it takes the crystal too.
+	## The original rock cell remains useful for palette selection and saving,
+	## but it is not an attachment: later mining cannot move or delete the gem.
 	var anchor_cell: Vector2i
 	var rotation: float
 	var world_height: float
@@ -96,14 +100,20 @@ class GemOutcrop:
 @export_range(50, 20_000, 50) var depth_variant_period_rows: int = 900
 
 @export_category("Performance")
-## Oldest crystals are dropped past this count, so placements cannot accumulate
-## across a run. Crystals rooted to mined-away rock are dropped as it goes.
-@export_range(1, 128, 1) var maximum_gems: int = 20
-## Applies a lower simultaneous limit in browser exports.
-@export_range(1, 64, 1) var web_maximum_gems: int = 10
+## Bounds both saved density and the number a viewport can draw. Four gems per
+## 64-row chunk means the default 100,000-row map retains at most about 6,300
+## lightweight records, while a 648px web viewport normally visits 2-3 chunks.
+@export_range(1, 32, 1) var maximum_gems_per_chunk: int = 4
+## Keeps crystals just outside the viewport ready during smooth camera motion.
+@export_range(0.0, 512.0, 8.0) var draw_margin_screen_px: float = 96.0
 
 var _shelves: Array[GemShelf] = []
 var _random := RandomNumberGenerator.new()
+var _gem_count_by_chunk: Dictionary[int, int] = {}
+var _gem_count: int = 0
+var _first_visible_chunk: int = 0
+var _last_visible_chunk: int = 0
+var _game_state: RunState
 
 
 ## Builds one drawing shelf per stratum a hit can expose.
@@ -121,16 +131,18 @@ func _ready() -> void:
 		shelf.z_index = terrain_profile.get_layer_z_index(layer_index)
 		add_child(shelf)
 		_shelves.append(shelf)
+	_game_state = RunState.get_global(self)
+	_restore_saved_gems()
+	_refresh_visible_chunk_range(terrain_manager.get_view_position())
 	set_process(false)
 
 
-## Rolls for a crystal on newly opened ground and drops any the hit undermined.
+## Rolls for a crystal on newly opened ground.
 func _on_terrain_damaged(
 	destroyed_cells: Array[Vector2i],
 	_horizontal_direction: int,
 	impact_origin_cell: Vector2i
 ) -> void:
-	_drop_unsupported_gems()
 	if (
 		gem_texture == null
 		or _shelves.is_empty()
@@ -170,9 +182,18 @@ func place_gem(
 
 ## Clears every placed crystal, so a restarted run does not inherit the last.
 func clear_gems() -> void:
+	var had_saved_gems := (
+		_game_state != null
+		and _game_state.save_game != null
+		and not _game_state.save_game.gem_outcrops.is_empty()
+	)
 	for shelf in _shelves:
-		shelf.gems.clear()
+		shelf.gems_by_chunk.clear()
 		shelf.queue_redraw()
+	_gem_count_by_chunk.clear()
+	_gem_count = 0
+	if had_saved_gems:
+		_persist_gems()
 	set_process(false)
 
 
@@ -181,14 +202,22 @@ func _process(delta: float) -> void:
 	var still_emerging := false
 	for shelf in _shelves:
 		var shelf_emerging := false
-		for gem in shelf.gems:
-			if gem.emergence >= 1.0:
+		for chunk_index in range(
+			_first_visible_chunk,
+			_last_visible_chunk + 1
+		):
+			if not shelf.gems_by_chunk.has(chunk_index):
 				continue
-			gem.emergence = minf(
-				gem.emergence + delta / maxf(emergence_duration, 0.01),
-				1.0
-			)
-			shelf_emerging = true
+			var chunk_gems: Array = shelf.gems_by_chunk[chunk_index]
+			for gem: GemOutcrop in chunk_gems:
+				if gem.emergence >= 1.0:
+					continue
+				gem.emergence = minf(
+					gem.emergence
+						+ delta / maxf(emergence_duration, 0.01),
+					1.0
+				)
+				shelf_emerging = true
 		if shelf_emerging:
 			shelf.queue_redraw()
 			still_emerging = true
@@ -213,35 +242,57 @@ func draw_shelf(shelf: GemShelf) -> void:
 		float(_shelves.find(shelf))
 		/ maxf(float(_shelves.size() - 1), 1.0)
 	)
-	for gem in shelf.gems:
-		var height := gem.world_height
-		var width := height * frame_size.x / frame_size.y
-		# The crystal keeps its drawn proportions and slides out of the rock
-		# instead of growing in place, so the covering stratum does the reveal.
-		# Easing out and nudging past the resting point mid-slide reads as it
-		# breaking free rather than being placed.
-		var emerged := ease(gem.emergence, 0.4)
-		emerged += sin(PI * gem.emergence) * 0.07
-		var buried_slide := (1.0 - emerged) * height
-		shelf.draw_set_transform(
-			terrain_manager.terrain_to_screen_position(gem.terrain_position),
-			gem.rotation,
-			Vector2(-1.0 if gem.flip_x else 1.0, 1.0)
-		)
-		# Local down is into the rock once the transform has aligned the crystal
-		# to the face it grew from, so the slide is one offset on that axis.
-		shelf.draw_texture_rect_region(
-			gem_texture,
-			Rect2(
-				Vector2(-width * 0.5, -height + buried_slide),
-				Vector2(width, height)
-			),
-			Rect2(
-				Vector2(frame_size.x * float(gem.variant_index), 0.0),
-				frame_size
-			),
-			depth_shade
-		)
+	var viewport_size := get_viewport_rect().size
+	for chunk_index in range(
+		_first_visible_chunk,
+		_last_visible_chunk + 1
+	):
+		if not shelf.gems_by_chunk.has(chunk_index):
+			continue
+		var chunk_gems: Array = shelf.gems_by_chunk[chunk_index]
+		for gem: GemOutcrop in chunk_gems:
+			var screen_position := terrain_manager.terrain_to_screen_position(
+				gem.terrain_position
+			)
+			if (
+				screen_position.x < -draw_margin_screen_px
+				or screen_position.x
+					> viewport_size.x + draw_margin_screen_px
+				or screen_position.y < -draw_margin_screen_px
+				or screen_position.y
+					> viewport_size.y + draw_margin_screen_px
+			):
+				continue
+			var height := gem.world_height
+			var width := height * frame_size.x / frame_size.y
+			# The crystal keeps its drawn proportions and slides out of the rock
+			# instead of growing in place, so the covering stratum does the
+			# reveal. The record itself never leaves terrain space.
+			var emerged := ease(gem.emergence, 0.4)
+			emerged += sin(PI * gem.emergence) * 0.07
+			var buried_slide := (1.0 - emerged) * height
+			shelf.draw_set_transform(
+				screen_position,
+				gem.rotation,
+				Vector2(-1.0 if gem.flip_x else 1.0, 1.0)
+			)
+			# Local down is into the rock once the transform has aligned the
+			# crystal to its original face.
+			shelf.draw_texture_rect_region(
+				gem_texture,
+				Rect2(
+					Vector2(-width * 0.5, -height + buried_slide),
+					Vector2(width, height)
+				),
+				Rect2(
+					Vector2(
+						frame_size.x * float(gem.variant_index),
+						0.0
+					),
+					frame_size
+				),
+				depth_shade
+			)
 	shelf.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
@@ -400,6 +451,12 @@ func _add_gem(
 	variant_index: int,
 	world_height: float
 ) -> void:
+	var chunk_index := _terrain_position_to_chunk(terrain_position)
+	if (
+		_gem_count_by_chunk.get(chunk_index, 0)
+		>= maximum_gems_per_chunk
+	):
+		return
 	var gem := GemOutcrop.new()
 	gem.terrain_position = terrain_position
 	gem.anchor_cell = anchor_cell
@@ -428,13 +485,8 @@ func _add_gem(
 			)
 		)
 	)
-	_shelves[layer_index].gems.append(gem)
-
-	var gem_budget := maximum_gems
-	if OS.has_feature("web"):
-		gem_budget = mini(gem_budget, web_maximum_gems)
-	while _count_gems() > gem_budget:
-		_drop_oldest_gem()
+	_append_gem(layer_index, chunk_index, gem)
+	_persist_gems()
 	for shelf in _shelves:
 		shelf.queue_redraw()
 	set_process(true)
@@ -466,31 +518,140 @@ func _get_exposed_layer_count() -> int:
 	return maxi(gameplay_layers, 1)
 
 
-## Returns every placed crystal across all strata.
-func _count_gems() -> int:
-	var total := 0
+## Redraws only the sparse chunk window surrounding the current camera.
+func _on_view_position_changed(view_cell_position: Vector2) -> void:
+	# A crystal discovered on the previous screen must not replay its entrance
+	# when the player eventually scrolls back. Only the old visible chunks can
+	# contain an animation that was interrupted by this camera move.
 	for shelf in _shelves:
-		total += shelf.gems.size()
-	return total
-
-
-## Drops the shallowest shelf's oldest crystal, then the next, so the cap never
-## empties one stratum while another still holds stale placements.
-func _drop_oldest_gem() -> void:
+		for chunk_index in range(
+			_first_visible_chunk,
+			_last_visible_chunk + 1
+		):
+			if not shelf.gems_by_chunk.has(chunk_index):
+				continue
+			var chunk_gems: Array = shelf.gems_by_chunk[chunk_index]
+			for gem: GemOutcrop in chunk_gems:
+				gem.emergence = 1.0
+	_refresh_visible_chunk_range(view_cell_position)
 	for shelf in _shelves:
-		if not shelf.gems.is_empty():
-			shelf.gems.remove_at(0)
-			return
-
-
-## Removes crystals whose rock was mined away, so none is left hanging.
-func _drop_unsupported_gems() -> void:
-	for shelf in _shelves:
-		var surviving_gems: Array[GemOutcrop] = []
-		for gem in shelf.gems:
-			if terrain_manager.is_solid_cell(gem.anchor_cell):
-				surviving_gems.append(gem)
-		if surviving_gems.size() == shelf.gems.size():
-			continue
-		shelf.gems = surviving_gems
 		shelf.queue_redraw()
+
+
+## Converts a terrain-space y coordinate into the same chunk grid as terrain.
+func _terrain_position_to_chunk(terrain_position: Vector2) -> int:
+	var cell_size := float(terrain_manager.config.terrain_cell_world_size)
+	var terrain_row := floori(terrain_position.y / cell_size)
+	return floori(
+		float(terrain_row)
+		/ float(terrain_manager.config.chunk_height_cells)
+	)
+
+
+## Adds one record to its saved chunk without creating a node per gem.
+func _append_gem(
+	layer_index: int,
+	chunk_index: int,
+	gem: GemOutcrop
+) -> void:
+	var shelf := _shelves[layer_index]
+	var chunk_gems: Array = shelf.gems_by_chunk.get(chunk_index, [])
+	chunk_gems.append(gem)
+	shelf.gems_by_chunk[chunk_index] = chunk_gems
+	_gem_count_by_chunk[chunk_index] = (
+		_gem_count_by_chunk.get(chunk_index, 0) + 1
+	)
+	_gem_count += 1
+
+
+## Restores exact terrain-space records. Loaded gems are already emerged so a
+## scene reload cannot replay their discovery animation.
+func _restore_saved_gems() -> void:
+	if _game_state == null or _game_state.save_game == null:
+		return
+	for saved_gem: Dictionary in _game_state.save_game.gem_outcrops:
+		var layer_index := clampi(
+			int(saved_gem.get("layer_index", 0)),
+			0,
+			_shelves.size() - 1
+		)
+		var terrain_position: Vector2 = saved_gem.get(
+			"terrain_position",
+			Vector2.ZERO
+		)
+		var chunk_index := _terrain_position_to_chunk(terrain_position)
+		if (
+			_gem_count_by_chunk.get(chunk_index, 0)
+			>= maximum_gems_per_chunk
+		):
+			continue
+		var gem := GemOutcrop.new()
+		gem.terrain_position = terrain_position
+		gem.anchor_cell = saved_gem.get(
+			"anchor_cell",
+			Vector2i.ZERO
+		)
+		gem.rotation = float(saved_gem.get("rotation", 0.0))
+		gem.world_height = maxf(
+			float(saved_gem.get("world_height", minimum_world_height)),
+			1.0
+		)
+		gem.variant_index = clampi(
+			int(saved_gem.get("variant_index", 0)),
+			0,
+			maxi(gem_variant_count, 1) - 1
+		)
+		gem.flip_x = bool(saved_gem.get("flip_x", false))
+		gem.emergence = 1.0
+		_append_gem(layer_index, chunk_index, gem)
+	for shelf in _shelves:
+		shelf.queue_redraw()
+
+
+## Serializes compact values only when a rare placement changes the map. Review
+## scrolling never writes or rebuilds this complete list.
+func _persist_gems() -> void:
+	if _game_state == null or _game_state.save_game == null:
+		return
+	var saved_gems: Array[Dictionary] = []
+	saved_gems.resize(_gem_count)
+	var saved_index := 0
+	for layer_index in range(_shelves.size()):
+		var shelf := _shelves[layer_index]
+		for chunk_gems: Array in shelf.gems_by_chunk.values():
+			for gem: GemOutcrop in chunk_gems:
+				saved_gems[saved_index] = {
+					"layer_index": layer_index,
+					"terrain_position": gem.terrain_position,
+					"anchor_cell": gem.anchor_cell,
+					"rotation": gem.rotation,
+					"world_height": gem.world_height,
+					"variant_index": gem.variant_index,
+					"flip_x": gem.flip_x,
+				}
+				saved_index += 1
+	_game_state.save_game.gem_outcrops = saved_gems
+	_game_state.save_game.write_savegame()
+
+
+## Computes the bounded draw window without scanning stored gems.
+func _refresh_visible_chunk_range(view_cell_position: Vector2) -> void:
+	var config := terrain_manager.config
+	var cell_size := float(config.terrain_cell_world_size)
+	var chunk_height := float(config.chunk_height_cells)
+	var viewport_height := get_viewport_rect().size.y
+	var first_visible_row := (
+		view_cell_position.y
+		+ (-config.mining_face_screen_y - draw_margin_screen_px)
+			/ cell_size
+	)
+	var last_visible_row := (
+		view_cell_position.y
+		+ (
+			viewport_height
+			- config.mining_face_screen_y
+			+ draw_margin_screen_px
+		) / cell_size
+	)
+	_first_visible_chunk = floori(first_visible_row / chunk_height)
+	_last_visible_chunk = floori(last_visible_row / chunk_height)

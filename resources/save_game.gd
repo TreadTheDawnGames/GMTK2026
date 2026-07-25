@@ -11,6 +11,9 @@ const save_path : String = "user://savegame.tres"
 @export var music_mute : bool  = false
 @export var mute_bounce : bool = false
 @export var vsync_mode : int = 0
+## Sparse terrain-space gem records. GemOutcropField keeps these chunked while
+## active, so saving the full map does not make review scrolling visit it all.
+@export var gem_outcrops: Array[Dictionary] = []
 
 func write_savegame() -> void:
 	ResourceSaver.save(self, save_path)
