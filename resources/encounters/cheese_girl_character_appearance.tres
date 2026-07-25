@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="CharacterAppearance" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="CharacterAppearance" format=3 uid="uid://cpqjkl4c3ygg2"]
 
-[ext_resource type="Script" path="res://resources/encounters/character_appearance.gd" id="1_appearance"]
+[ext_resource type="Script" uid="uid://bpg6fvsw6y7ai" path="res://resources/encounters/character_appearance.gd" id="1_appearance"]
 [ext_resource type="Texture2D" path="res://resources/actors/cheese_girl_idle_texture.tres" id="2_texture"]
 
 [resource]

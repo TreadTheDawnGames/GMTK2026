@@ -31,7 +31,7 @@ extends Node
 
 @export_category("Escalation")
 @export var combo_director: ComboDirector
-@export var music_director: MusicDirector
+#@export var music_director: MusicDirector
 @export var combo_tier_punch: ComboTierPunch
 
 @export_category("Landing Impact")
@@ -218,19 +218,19 @@ func _ready() -> void:
 	)
 	_connect_once(
 		combo_director.intensity_changed,
-		music_director._on_intensity_changed
+		MusicManager._on_intensity_changed
 	)
 	_connect_once(
 		combo_director.combo_tier_changed,
-		music_director._on_combo_tier_changed
+		MusicManager._on_combo_tier_changed
 	)
 	_connect_once(
 		combo_director.streak_lost,
-		music_director._on_streak_lost
+		MusicManager._on_streak_lost
 	)
 	_connect_once(
 		_game_state.run_reset,
-		music_director._on_run_reset
+		MusicManager._on_run_reset
 	)
 	_connect_once(
 		combo_director.combo_tier_changed,
