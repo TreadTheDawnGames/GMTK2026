@@ -822,7 +822,8 @@ func _compact_pending_stamp_preparation() -> void:
 func _on_terrain_damaged(
 	destroyed_cells: Array[Vector2i],
 	horizontal_direction: int,
-	impact_origin_cell: Vector2i
+	impact_origin_cell: Vector2i,
+	destroyed_bounds: Rect2i
 ) -> void:
 	if destroyed_cells.is_empty():
 		return
@@ -833,7 +834,8 @@ func _on_terrain_damaged(
 		destroyed_cells,
 		horizontal_direction,
 		false,
-		impact_origin_cell.x
+		impact_origin_cell.x,
+		destroyed_bounds
 	)
 	_latest_impact_stamp = stamp
 	_latest_foreground_opening_rect = _get_layer_opening_rect(stamp, 0)
@@ -875,6 +877,10 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 	if _defer_impact_rasterization:
 		var layer_count: int = profile.get_gameplay_layer_count()
 		var queued_authoritative_preparation := false
+		var prepared_patches_by_stamp: Array[Dictionary] = []
+		prepared_patches_by_stamp.resize(stamps.size())
+		for stamp_index in range(stamps.size()):
+			prepared_patches_by_stamp[stamp_index] = {}
 		# The authoritative transform is a first-class queue item immediately
 		# before fallback raster bands. Fully prepared layers skip both costs and
 		# promote their immutable terrain patch instead.
@@ -883,6 +889,9 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 			if not stamp.narrow_path_points.is_empty():
 				continue
 			var preparation_layers: Array[int] = []
+			var prepared_patches: Dictionary = (
+				prepared_patches_by_stamp[stamp_index]
+			)
 			for layer_index in range(layer_count):
 				if not _can_apply_impact_stamp_layer(stamp, layer_index):
 					continue
@@ -892,17 +901,20 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 					var chunk: TerrainChunkVisual = _active_chunks[
 						chunk_index
 					]
-					if (
+					var prepared_patch := (
 						_get_valid_prepared_layer_patch(
 							stamp,
 							chunk,
 							chunk_index,
 							layer_index
 						)
-						== null
-					):
+					)
+					if prepared_patch == null:
 						preparation_layers.append(layer_index)
 						break
+					prepared_patches[
+						chunk_index * layer_count + layer_index
+					] = prepared_patch
 			for preparation_index in range(preparation_layers.size()):
 				queued_authoritative_preparation = true
 				_append_impact_work(
@@ -936,12 +948,9 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 						layer_index
 					):
 						continue
-					var prepared_patch := (
-						_get_valid_prepared_layer_patch(
-							stamp,
-							chunk,
-							chunk_index,
-							layer_index
+					var prepared_patch: PreparedLayerPatch = (
+						prepared_patches_by_stamp[stamp_index].get(
+							chunk_index * layer_count + layer_index
 						)
 					)
 					if prepared_patch != null:
@@ -1971,43 +1980,35 @@ func _build_chunk_base_mask(
 	sculpt_layer_index: int = -1
 ) -> Image:
 	var config := terrain_manager.config
-	var mask_cell_size := profile.mask_pixels_per_cell
+	# Sculpt caches retain one authored sample per logical cell. Expand only the
+	# active chunk; the shader's linear sampling reconstructs the same threshold
+	# contour without keeping every full-room layer at gameplay density.
+	var mask_cell_size := (
+		1 if chunk_contains_sculpt else profile.mask_pixels_per_cell
+	)
 	var mask_size := _get_chunk_mask_size()
 	var chunk_start_row := chunk_index * config.chunk_height_cells
 	var chunk_end_row := (
 		chunk_start_row + config.chunk_height_cells - 1
 	)
+	var raster_size := Vector2i(
+		config.terrain_width_cells * mask_cell_size,
+		config.chunk_height_cells * mask_cell_size
+	)
 	var image: Image
-	while not _chunk_mask_image_pool.is_empty():
-		var candidate: Image = _chunk_mask_image_pool.pop_back()
-		if candidate.get_size() == mask_size:
-			image = candidate
-			break
+	if raster_size == mask_size:
+		while not _chunk_mask_image_pool.is_empty():
+			var candidate: Image = _chunk_mask_image_pool.pop_back()
+			if candidate.get_size() == mask_size:
+				image = candidate
+				break
 	if image == null:
 		image = Image.create(
-			mask_size.x,
-			mask_size.y,
+			raster_size.x,
+			raster_size.y,
 			false,
 			Image.FORMAT_LA8
 		)
-	if chunk_contains_sculpt and not preserve_chamber_backdrop:
-		for placement in terrain_manager.get_sculpt_placements():
-			var room_rect: Rect2i = placement.world_rect
-			if (
-				room_rect.position.x <= 0
-				and room_rect.end.x >= config.terrain_width_cells
-				and room_rect.position.y <= chunk_start_row
-				and room_rect.end.y >= chunk_end_row + 1
-			):
-				# The clipped room copy overwrites the complete pooled image.
-				# Skipping the clear and procedural row fills preserves the
-				# exact raster while removing redundant multi-megabyte writes.
-				_blit_sculpt_rooms(
-					image,
-					chunk_index,
-					sculpt_layer_index
-				)
-				return image
 	if (
 		not chunk_contains_chamber
 		and not chunk_contains_sculpt
@@ -2064,7 +2065,7 @@ func _build_chunk_base_mask(
 				)
 			else:
 				image.fill_rect(
-					Rect2i(0, row_mask_y, mask_size.x, mask_cell_size),
+					Rect2i(0, row_mask_y, raster_size.x, mask_cell_size),
 					SOLID_MASK_COLOR
 				)
 			continue
@@ -2073,7 +2074,7 @@ func _build_chunk_base_mask(
 				Rect2i(
 					0,
 					row_mask_y,
-					mask_size.x,
+					raster_size.x,
 					mask_cell_size
 				),
 				SOLID_MASK_COLOR
@@ -2115,7 +2116,18 @@ func _build_chunk_base_mask(
 			mask_cell_size
 		)
 	if chunk_contains_sculpt and not preserve_chamber_backdrop:
-		_blit_sculpt_rooms(image, chunk_index, sculpt_layer_index)
+		_blit_sculpt_rooms(
+			image,
+			chunk_index,
+			sculpt_layer_index,
+			mask_cell_size
+		)
+	if raster_size != mask_size:
+		image.resize(
+			mask_size.x,
+			mask_size.y,
+			Image.INTERPOLATE_NEAREST
+		)
 	return image
 
 
@@ -2155,10 +2167,10 @@ func _chunk_has_per_layer_sculpt(chunk_index: int) -> bool:
 func _blit_sculpt_rooms(
 	image: Image,
 	chunk_index: int,
-	sculpt_layer_index: int
+	sculpt_layer_index: int,
+	mask_cell_size: int
 ) -> void:
 	var config: MiningConfig = terrain_manager.config
-	var mask_cell_size := profile.mask_pixels_per_cell
 	var chunk_start_row := chunk_index * config.chunk_height_cells
 	var chunk_end_row := chunk_start_row + config.chunk_height_cells
 	for placement in terrain_manager.get_sculpt_placements():
@@ -2232,7 +2244,7 @@ func _rasterize_sculpt_mask(
 	sculpt: CutsceneTerrainSculpt,
 	sculpt_layer_index: int
 ) -> Image:
-	var mask_cell_size := profile.mask_pixels_per_cell
+	var mask_cell_size := 1
 	var grid := sculpt.grid_size
 	if grid.x <= 0 or grid.y <= 0 or mask_cell_size <= 0:
 		return null
@@ -2290,7 +2302,10 @@ func _harden_sculpt_mask_rims(
 	sculpt: CutsceneTerrainSculpt,
 	sculpt_layer_index: int
 ) -> void:
-	var mask_cell_size := profile.mask_pixels_per_cell
+	var mask_cell_size := maxi(
+		room_mask.get_width() / maxi(sculpt.grid_size.x, 1),
+		1
+	)
 	var smoothing := sculpt.edge_smoothing
 	for local_y in range(sculpt.grid_size.y):
 		for local_x in range(sculpt.grid_size.x):
@@ -2530,15 +2545,25 @@ func _create_impact_stamp(
 	destroyed_cells: Array[Vector2i],
 	horizontal_direction: int,
 	is_narrow_path: bool = false,
-	impact_origin_cell_x: int = -1
+	impact_origin_cell_x: int = -1,
+	destroyed_bounds: Rect2i = Rect2i()
 ) -> ImpactStamp:
-	var minimum_cell := destroyed_cells[0]
-	var maximum_cell := destroyed_cells[0]
-	for cell in destroyed_cells:
-		minimum_cell.x = mini(minimum_cell.x, cell.x)
-		minimum_cell.y = mini(minimum_cell.y, cell.y)
-		maximum_cell.x = maxi(maximum_cell.x, cell.x)
-		maximum_cell.y = maxi(maximum_cell.y, cell.y)
+	var minimum_cell := (
+		destroyed_bounds.position
+		if destroyed_bounds.has_area()
+		else destroyed_cells[0]
+	)
+	var maximum_cell := (
+		destroyed_bounds.end - Vector2i.ONE
+		if destroyed_bounds.has_area()
+		else destroyed_cells[0]
+	)
+	if not destroyed_bounds.has_area():
+		for cell in destroyed_cells:
+			minimum_cell.x = mini(minimum_cell.x, cell.x)
+			minimum_cell.y = mini(minimum_cell.y, cell.y)
+			maximum_cell.x = maxi(maximum_cell.x, cell.x)
+			maximum_cell.y = maxi(maximum_cell.y, cell.y)
 	if not is_narrow_path:
 		return _create_ordinary_impact_stamp_from_bounds(
 			minimum_cell,

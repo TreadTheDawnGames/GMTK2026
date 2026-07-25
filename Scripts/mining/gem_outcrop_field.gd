@@ -147,7 +147,8 @@ func set_save_game(save_game: SaveGame) -> void:
 func _on_terrain_damaged(
 	destroyed_cells: Array[Vector2i],
 	_horizontal_direction: int,
-	impact_origin_cell: Vector2i
+	impact_origin_cell: Vector2i,
+	_destroyed_bounds: Rect2i
 ) -> void:
 	if (
 		gem_texture == null
