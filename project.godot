@@ -22,6 +22,8 @@ buses/default_bus_layout="uid://ct33mw21k8ao4"
 [autoload]
 
 GameState="*res://Scenes/globals/game_state.tscn"
+AudioHandler="uid://b2mhajhoyn0n2"
+AudioManager="*uid://dngiuhq5ehbk6"
 
 [display]
 
@@ -33,7 +35,7 @@ window/vsync/vsync_mode=0
 
 [editor_plugins]
 
-enabled=PackedStringArray()
+enabled=PackedStringArray("res://addons/any_audio_manager/plugin.cfg")
 
 [input]
 

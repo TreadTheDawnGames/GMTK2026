@@ -17,3 +17,16 @@ func PlaySoundAtGlobalPosition(sound : AudioStream, globPos : Vector2, doPitchSc
 	audioPlayer.bus = busName
 	audioPlayer.finished.connect(func(): audioPlayer.queue_free())
 	get_tree().root.add_child(audioPlayer)
+	
+func play_sound(sound : AudioStream, busName : String = "SFX", doPitchScale = false):
+	if(not sound):
+		DisplayServer.beep()
+	
+	var audioPlayer : AudioStreamPlayer = AudioStreamPlayer.new()
+	audioPlayer.stream = sound
+	#audioPlayer.global_position = get_viewport_rect().get_center()
+	audioPlayer.autoplay = true
+	audioPlayer.pitch_scale = (randf_range(1.0, 1.5) if doPitchScale else 1.0)
+	audioPlayer.bus = busName
+	audioPlayer.finished.connect(func(): audioPlayer.queue_free())
+	get_tree().root.add_child(audioPlayer)

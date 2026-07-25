@@ -9,7 +9,6 @@ signal pressed(success: bool, hit_direction: int, combo : int)
 
 @onready var slider: Panel = %Slider
 @onready var backing: Control = %Backing
-@onready var bounce_sound: AudioStreamPlayer2D = %BounceSound
 
 
 @export var speed: float = 500.0
@@ -226,7 +225,7 @@ func _process(delta: float) -> void:
 	if hit_left_edge or hit_right_edge:
 		direction *= -1
 		if not GameState.save_game.mute_bounce:
-			bounce_sound.play()
+			AudioManager.play_sfx(&"LineHitEdge")
 		if one_shot:
 			pressed.emit(false, 0, consecutive_hits)
 			stop()

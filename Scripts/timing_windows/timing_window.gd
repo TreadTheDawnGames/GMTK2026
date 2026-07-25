@@ -25,7 +25,6 @@ var combo: int = 0:
 		combo_label.text = "Combo: " + str(-combo)
 var stored_combo : int = 0
 
-@export var mine_sounds: Array[AudioStream]
 @export var combo_saved_color: Color = Color.CYAN
 @export var combo_lost_color: Color = Color.RED
 
@@ -106,11 +105,9 @@ func _mining_window_pressed(
 		mining_window.speed_multiplier = (
 			(mining_config.combo_speed_multiplier)
 		)
-		if not mine_sounds.is_empty():
-			hit_sound.stream = mine_sounds[
-				clampi(combo - 1, 0, mine_sounds.size() - 1)
-			]
-			hit_sound.play()
+		#if not AudioLibrary.MINE_SOUNDS.is_empty():
+		AudioManager.play_sfx("Mine"+str(clampi(combo - 1, 0, 7 - 1))
+		,)
 
 		var unlocked_pickaxe_target := false
 		for definition in _target_unlocks:
@@ -134,10 +131,10 @@ func _mining_window_pressed(
 	else:
 		stored_combo = combo
 		if combo >= mining_config.recovery_combo_threshold:
-			warning_sound.play()
+			AudioManager.play_sfx(&"MissWithSave")
 			await mining_window.pause(true)
 			recovery_window.start()
-			save_bwah_sound.play()
+			AudioManager.play_sfx(&"SaveBuildup")
 		else:
 			var lost_combo := combo
 			pressed.emit(false, combo, 0)
@@ -147,7 +144,7 @@ func _mining_window_pressed(
 			mining_window.remove_all_extra_targets()
 			mining_window.speed_multiplier = 1.0
 			mining_window.play_animation(Color.RED)
-			streak_lost_sound.play()
+			AudioManager.play_sfx(&"StreakLost")
 			mining_window.reset_all_targets()
 
 
@@ -164,7 +161,7 @@ func _recovery_window_pressed(
 		mining_window.reset_all_targets()
 		pressed.emit(false, combo, 0)
 		streak_ended.emit(lost_combo)
-		streak_lost_sound.play()
+		AudioManager.play_sfx(&"StreakLost")
 		#recovery_window.stop()
 
 		mining_window.speed_multiplier = 1.0
@@ -176,8 +173,7 @@ func _recovery_window_pressed(
 		recovery_window.speed_multiplier *= (
 			(mining_config.recovery_speed_multiplier)
 		)
-
-		streak_saved_sound.play()
+		AudioManager.play_sfx(&"Save")
 		recovery_window.animation_color = combo_saved_color
 		
 	await recovery_window.pause(true)

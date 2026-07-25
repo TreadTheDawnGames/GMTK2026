@@ -3,7 +3,6 @@
 [ext_resource type="Theme" uid="uid://cy302o2vx18ng" path="res://resources/themes/Menus.tres" id="1_sc1bs"]
 [ext_resource type="Script" uid="uid://t7rbu3tvtnwg" path="res://Scripts/ui/Options.gd" id="1_settings"]
 [ext_resource type="PackedScene" uid="uid://blig0domcdoj" path="res://Scenes/volume_control.tscn" id="2_y60rh"]
-[ext_resource type="Script" uid="uid://dpjj13onqvxe4" path="res://Scripts/ui/player_audio_handler.gd" id="4_f5liw"]
 [ext_resource type="Texture2D" uid="uid://byhuld6l80gl5" path="res://Assets/UI/Kenney/checkbox_grey_checked.png" id="4_q4at1"]
 
 [node name="Options" type="Control" unique_id=560086525]
@@ -152,9 +151,6 @@ Addons: [font_size=6]GAMESTERVIRUS[/font_size]"
 [node name="ReturnToSettings" type="Button" parent="TabContainer/PanelContainer/VBoxContainer" unique_id=843285135]
 layout_mode = 2
 text = "Back"
-
-[node name="PlayerAudioHandler" type="Node2D" parent="." unique_id=1792036821]
-script = ExtResource("4_f5liw")
 
 [connection signal="item_selected" from="TabContainer/Panel/VBoxContainer/HBoxContainer2/Control/VSyncOptions" to="." method="_on_v_sync_options_item_selected"]
 [connection signal="pressed" from="TabContainer/Panel/VBoxContainer/HBoxContainer/CreditsButton" to="." method="_on_credits_button_pressed"]

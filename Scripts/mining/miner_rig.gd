@@ -79,8 +79,7 @@ func _show_success_wind_up() -> void:
 ## Reports the hammer-tip position when the animation reaches the ground.
 func _emit_success_impact() -> void:
 	_set_miner_texture(impact_miner_texture)
-	if impact_audio_player.stream != null:
-		impact_audio_player.play()
+	AudioManager.play_sfx(&"Impact")
 	impact_contact.emit(impact_point.global_position)
 
 

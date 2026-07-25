@@ -2,7 +2,6 @@
 
 [ext_resource type="Script" uid="uid://yknrp1dp4whn" path="res://Scenes/slider_timing_window.gd" id="1_iyxre"]
 [ext_resource type="PackedScene" uid="uid://bcoaf8y2mxx7" path="res://Scenes/targets/shrinking_target.tscn" id="2_eprdb"]
-[ext_resource type="AudioStream" uid="uid://cbv4v668aoluj" path="res://Assets/Audio/LineHitEdge.wav" id="9_6q4rb"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_eprdb"]
 bg_color = Color(0, 0, 0, 0.57254905)
@@ -58,8 +57,3 @@ grow_vertical = 2
 offset_transform_enabled = true
 offset_transform_position_ratio = Vector2(-0.5, 0)
 theme_override_styles/panel = SubResource("StyleBoxFlat_7muo2")
-
-[node name="BounceSound" type="AudioStreamPlayer2D" parent="." unique_id=1736793923]
-unique_name_in_owner = true
-stream = ExtResource("9_6q4rb")
-bus = &"SFX"

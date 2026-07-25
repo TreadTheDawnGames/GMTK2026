@@ -1,0 +1,111 @@
+[gd_scene format=3 uid="uid://dngiuhq5ehbk6"]
+
+[ext_resource type="Script" uid="uid://cx04q44t4hl2w" path="res://addons/any_audio_manager/Scripts/audio_manager.gd" id="1_je6gq"]
+[ext_resource type="Script" uid="uid://cgcton68ihwfi" path="res://addons/any_audio_manager/Scripts/Resources/audio_entry.gd" id="2_p74pt"]
+[ext_resource type="Script" uid="uid://c8hltc037dgci" path="res://addons/any_audio_manager/Scripts/Resources/audio_library.gd" id="3_c50nw"]
+[ext_resource type="Script" uid="uid://ba7om6b5pr0ql" path="res://addons/any_audio_manager/Scripts/audio_setting_library.gd" id="4_snu7c"]
+
+[sub_resource type="Resource" id="Resource_5y6jx"]
+resource_name = "Impact"
+script = ExtResource("2_p74pt")
+key = &"Impact"
+path = "res://Assets/Audio/513694__kasparsj__impact-stone-heavy.wav"
+
+[sub_resource type="Resource" id="Resource_6cqcw"]
+resource_name = "Happy"
+script = ExtResource("2_p74pt")
+key = &"Happy"
+path = "res://Assets/Audio/Happy.wav"
+
+[sub_resource type="Resource" id="Resource_yurg4"]
+resource_name = "LineHitEdge"
+script = ExtResource("2_p74pt")
+key = &"LineHitEdge"
+path = "res://Assets/Audio/LineHitEdge.wav"
+
+[sub_resource type="Resource" id="Resource_2kd2v"]
+resource_name = "Mine1"
+script = ExtResource("2_p74pt")
+key = &"Mine1"
+path = "res://Assets/Audio/Mine1.wav"
+
+[sub_resource type="Resource" id="Resource_3l0q1"]
+resource_name = "Mine2"
+script = ExtResource("2_p74pt")
+key = &"Mine2"
+path = "res://Assets/Audio/Mine2.wav"
+
+[sub_resource type="Resource" id="Resource_t2quw"]
+resource_name = "Mine3"
+script = ExtResource("2_p74pt")
+key = &"Mine3"
+path = "res://Assets/Audio/Mine3.wav"
+
+[sub_resource type="Resource" id="Resource_ye308"]
+resource_name = "Mine4"
+script = ExtResource("2_p74pt")
+key = &"Mine4"
+path = "res://Assets/Audio/Mine4.wav"
+
+[sub_resource type="Resource" id="Resource_xbjkw"]
+resource_name = "Mine5"
+script = ExtResource("2_p74pt")
+key = &"Mine5"
+path = "res://Assets/Audio/Mine5.wav"
+
+[sub_resource type="Resource" id="Resource_cjps8"]
+resource_name = "Mine6"
+script = ExtResource("2_p74pt")
+key = &"Mine6"
+path = "res://Assets/Audio/Mine6.wav"
+
+[sub_resource type="Resource" id="Resource_uqdlb"]
+resource_name = "Mine7"
+script = ExtResource("2_p74pt")
+key = &"Mine7"
+path = "res://Assets/Audio/Mine7.wav"
+
+[sub_resource type="Resource" id="Resource_qdxeg"]
+resource_name = "MissWithoutSave"
+script = ExtResource("2_p74pt")
+key = &"MissWithoutSave"
+path = "res://Assets/Audio/MissWithoutSave.wav"
+
+[sub_resource type="Resource" id="Resource_ibpcr"]
+resource_name = "MissWithSave"
+script = ExtResource("2_p74pt")
+key = &"MissWithSave"
+path = "res://Assets/Audio/MissWithSave.wav"
+
+[sub_resource type="Resource" id="Resource_3turk"]
+resource_name = "Save"
+script = ExtResource("2_p74pt")
+key = &"Save"
+path = "res://Assets/Audio/Save.wav"
+
+[sub_resource type="Resource" id="Resource_0tna6"]
+resource_name = "SaveBuildup"
+script = ExtResource("2_p74pt")
+key = &"SaveBuildup"
+path = "res://Assets/Audio/SaveBuildup.wav"
+
+[sub_resource type="Resource" id="Resource_xjx2w"]
+resource_name = "StreakLost"
+script = ExtResource("2_p74pt")
+key = &"StreakLost"
+path = "res://Assets/Audio/StreakLost.wav"
+
+[sub_resource type="Resource" id="Resource_moayn"]
+script = ExtResource("3_c50nw")
+audio_dir = "res://Assets/Audio"
+entries = [SubResource("Resource_5y6jx"), SubResource("Resource_6cqcw"), SubResource("Resource_yurg4"), SubResource("Resource_2kd2v"), SubResource("Resource_3l0q1"), SubResource("Resource_t2quw"), SubResource("Resource_ye308"), SubResource("Resource_xbjkw"), SubResource("Resource_cjps8"), SubResource("Resource_uqdlb"), SubResource("Resource_qdxeg"), SubResource("Resource_ibpcr"), SubResource("Resource_3turk"), SubResource("Resource_0tna6"), SubResource("Resource_xjx2w")]
+metadata/_custom_type_script = "uid://c8hltc037dgci"
+
+[sub_resource type="Resource" id="Resource_1ujuk"]
+script = ExtResource("4_snu7c")
+metadata/_custom_type_script = "uid://ba7om6b5pr0ql"
+
+[node name="AudioManager" type="Node" unique_id=86541453]
+script = ExtResource("1_je6gq")
+audio_library = SubResource("Resource_moayn")
+audio_setting_library = SubResource("Resource_1ujuk")

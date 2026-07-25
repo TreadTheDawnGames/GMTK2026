@@ -2,7 +2,6 @@
 
 [ext_resource type="Script" uid="uid://doqncdiwvq0t5" path="res://Scripts/mining/miner_rig.gd" id="1_rig"]
 [ext_resource type="Texture2D" uid="uid://bq8qwl3xn5qny" path="res://Assets/Characters/miner_idle-Pickaxe.png" id="2_6q48d"]
-[ext_resource type="AudioStream" uid="uid://bptrknuwih5g2" path="res://Assets/Audio/513694__kasparsj__impact-stone-heavy.wav" id="2_avhsd"]
 [ext_resource type="Texture2D" uid="uid://cpy531sdh8q1o" path="res://Assets/Characters/miner_impact.png" id="5_impact_miner"]
 [ext_resource type="Texture2D" uid="uid://b7itm01ip56lo" path="res://Assets/Characters/miner_wound_up.png" id="6_wind_up_miner"]
 
@@ -499,7 +498,7 @@ impact_miner_texture = ExtResource("5_impact_miner")
 impact_point = NodePath("VisualRoot/DrawnImpactPoint")
 stand_in_hammer_head = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/StandInToolHead")
 final_hammer_head_sprite = NodePath("VisualRoot/BodyPivot/ArmPivot/PickaxePivot/PickaxeHeadSprite")
-impact_audio_player = NodePath("ImpactAudio")
+impact_audio_player = NodePath("")
 
 [node name="VisualRoot" type="Node2D" parent="." unique_id=465234156]
 editor_description = "Animate this for whole-character bounce, squash, recoil, and small fall offsets. Do not use it to calculate mining progress."
@@ -609,6 +608,3 @@ position = Vector2(79.44684, -13.451826)
 [node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=716358974]
 editor_description = "Choose idle, mine_success, or mine_miss in the bottom Animation panel. RESET stores the neutral pose and should not be used as the authored action animation."
 libraries/ = SubResource("AnimationLibrary_rig")
-
-[node name="ImpactAudio" type="AudioStreamPlayer2D" parent="." unique_id=233120121]
-stream = ExtResource("2_avhsd")

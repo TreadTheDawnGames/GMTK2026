@@ -37,6 +37,3 @@ grow_vertical = 2
 texture = ExtResource("3_2228f")
 expand_mode = 2
 stretch_mode = 4
-
-[node name="HitSound" type="AudioStreamPlayer2D" parent="." unique_id=1574758798]
-unique_name_in_owner = true

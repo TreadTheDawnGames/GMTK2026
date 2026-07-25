@@ -28,7 +28,7 @@ func _process(delta: float) -> void:
 	)
 	if hit_left_edge or hit_right_edge:
 		direction *= -1
-		bounce_sound.play()
+		AudioManager.play_sfx(&"LineHitEdge")
 
 func slider_half_width() -> float:
 	return size.x * 0.5
