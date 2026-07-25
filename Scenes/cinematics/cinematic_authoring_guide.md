@@ -175,6 +175,18 @@ The room replaces the procedural chamber **inside its own footprint only**, so
 you can open rock the taper left solid and leave a pillar standing where it
 would have carved one away.
 
+### Seeing the layer you are working on
+
+The foreground stratum covers everything behind it, so a buried layer cannot be
+judged while you sculpt it. **See only** leaves one stratum fully visible and
+either dims the rest to **Dimmed to** or hides them outright. It follows the
+stratum you pick in **Sculpting** unless you untick *Follow the stratum I am
+sculpting*.
+
+This is a view, not an edit. It moves no cell, no mask and no draw order, it is
+cleared when you open another scene, and nothing in a running game ever sets it
+— the game draws every stratum fully opaque exactly as before.
+
 ### The landing line
 
 The miner reaches every cutscene by breaking the ceiling and falling, so the
