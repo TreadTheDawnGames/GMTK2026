@@ -1,18 +1,8 @@
-[gd_resource type="Resource" script_class="DialogueConversation" load_steps=11 format=3]
+[gd_resource type="Resource" script_class="DialogueConversation" format=3 uid="uid://20b36hdg7moq"]
 
-[ext_resource type="Script" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
-[ext_resource type="Script" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
-[ext_resource type="Script" path="res://resources/dialogue/dialogue_line.gd" id="3_line"]
-
-[sub_resource type="Resource" id="Participant_miner"]
-script = ExtResource("2_participant")
-slot = &"miner"
-display_name = "Miner"
-
-[sub_resource type="Resource" id="Participant_coffee_cat"]
-script = ExtResource("2_participant")
-slot = &"coffee_cat"
-display_name = "Quibble"
+[ext_resource type="Script" uid="uid://c55utdbjdwaui" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
+[ext_resource type="Script" uid="uid://ivfntthetp0i" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
+[ext_resource type="Script" uid="uid://bwwpoalvqb7ni" path="res://resources/dialogue/dialogue_line.gd" id="3_line"]
 
 [sub_resource type="Resource" id="Line_coffee"]
 script = ExtResource("3_line")
@@ -48,6 +38,16 @@ script = ExtResource("3_line")
 speaker_slot = &"coffee_cat"
 speaker_pose = &"idle"
 text = "Now let's get to that cafe!"
+
+[sub_resource type="Resource" id="Participant_miner"]
+script = ExtResource("2_participant")
+slot = &"miner"
+display_name = "Miner"
+
+[sub_resource type="Resource" id="Participant_coffee_cat"]
+script = ExtResource("2_participant")
+slot = &"coffee_cat"
+display_name = "Quibble"
 
 [resource]
 script = ExtResource("1_conversation")

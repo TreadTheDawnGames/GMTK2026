@@ -1,18 +1,8 @@
-[gd_resource type="Resource" script_class="DialogueConversation" load_steps=9 format=3]
+[gd_resource type="Resource" script_class="DialogueConversation" format=3 uid="uid://dd1ja2k32r6v0"]
 
-[ext_resource type="Script" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
-[ext_resource type="Script" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
-[ext_resource type="Script" path="res://resources/dialogue/dialogue_line.gd" id="3_line"]
-
-[sub_resource type="Resource" id="Participant_miner"]
-script = ExtResource("2_participant")
-slot = &"miner"
-display_name = "Miner"
-
-[sub_resource type="Resource" id="Participant_cloak_lantern"]
-script = ExtResource("2_participant")
-slot = &"cloak_lantern"
-display_name = "Lantern Keeper"
+[ext_resource type="Script" uid="uid://c55utdbjdwaui" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
+[ext_resource type="Script" uid="uid://ivfntthetp0i" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
+[ext_resource type="Script" uid="uid://bwwpoalvqb7ni" path="res://resources/dialogue/dialogue_line.gd" id="3_line"]
 
 [sub_resource type="Resource" id="Line_return"]
 script = ExtResource("3_line")
@@ -33,6 +23,16 @@ text = "The Thief is not a tale. The Thief waits far below."
 script = ExtResource("3_line")
 speaker_slot = &"cloak_lantern"
 text = "Be certain before you keep digging."
+
+[sub_resource type="Resource" id="Participant_miner"]
+script = ExtResource("2_participant")
+slot = &"miner"
+display_name = "Miner"
+
+[sub_resource type="Resource" id="Participant_cloak_lantern"]
+script = ExtResource("2_participant")
+slot = &"cloak_lantern"
+display_name = "Lantern Keeper"
 
 [resource]
 script = ExtResource("1_conversation")

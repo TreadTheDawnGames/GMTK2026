@@ -23,9 +23,6 @@ buses/default_bus_layout="uid://ct33mw21k8ao4"
 
 GameState="*res://Scenes/globals/game_state.tscn"
 AudioHandler="*res://Scenes/globals/audio_handler.tscn"
-
-[autoload]
-
 Conductor="*uid://c5rvmkaorxynb"
 
 [display]
