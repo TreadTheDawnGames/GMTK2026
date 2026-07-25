@@ -213,6 +213,9 @@ var _mask_upload_images: Array[Image] = []
 # sculpt and indexed by stratum plus one. The cache is bounded by the authored
 # sculpt count and layer count, not the shipped 16-pixel terrain density.
 var _sculpt_mask_images: Dictionary[CutsceneTerrainSculpt, Array] = {}
+# Matching one-sample logical rooms make streamed chunks pay one clipped blit
+# instead of querying resource bits per cell. The same sculpt/layer bound applies.
+var _sculpt_logical_mask_images: Dictionary[CutsceneTerrainSculpt, Array] = {}
 # Historical stamps are retained so review mode can rebuild old terrain.
 # Growth is bounded by the configured run and accepted hit count; only the
 # viewport-sized _active_chunks set owns Image and ImageTexture allocations.
@@ -408,10 +411,15 @@ func _process(_delta: float) -> void:
 func _prepare_sculpt_masks() -> void:
 	for placement in terrain_manager.get_sculpt_placements():
 		_get_sculpt_mask_image(placement.sculpt, -1)
+		_get_sculpt_logical_mask_image(placement.sculpt, -1)
 		if not placement.sculpt.has_layer_masks():
 			continue
 		for layer_index in range(profile.get_gameplay_layer_count()):
 			_get_sculpt_mask_image(placement.sculpt, layer_index)
+			_get_sculpt_logical_mask_image(
+				placement.sculpt,
+				layer_index
+			)
 
 
 ## Captures the combo used by synchronous damage stamps for one resolved hit.
@@ -1233,6 +1241,7 @@ func rebuild_all_chunks() -> void:
 	# the previous profile or room may survive it.
 	_clear_chunk_visual_pool()
 	_sculpt_mask_images.clear()
+	_sculpt_logical_mask_images.clear()
 	_latest_impact_stamp = null
 	_latest_foreground_opening_rect = Rect2()
 	_loaded_first_chunk = -1
@@ -2048,13 +2057,11 @@ func _build_chunk_base_mask(
 	sculpt_layer_index: int = -1
 ) -> Image:
 	var config := terrain_manager.config
-	# Sculpt caches retain enough authored samples for edge_smoothing, then only
-	# the active chunk expands to shipped density. Ordinary rock stays on the
-	# direct full-density path and pays no conversion.
+	# Sculpt chunks first build one logical sample per cell. Their binary bulk
+	# expands by runs; a bounded four-sample room strip restores edge_smoothing
+	# afterward without resizing the untouched width of the world.
 	var mask_cell_size := (
-		_get_sculpt_cache_pixels_per_cell()
-		if chunk_contains_sculpt
-		else profile.mask_pixels_per_cell
+		1 if chunk_contains_sculpt else profile.mask_pixels_per_cell
 	)
 	var mask_size := _get_chunk_mask_size()
 	var chunk_start_row := chunk_index * config.chunk_height_cells
@@ -2193,15 +2200,53 @@ func _build_chunk_base_mask(
 			mask_cell_size
 		)
 	if raster_size != mask_size:
-		# Structural masks are bounded to four authored samples per cell. Godot's
-		# native nearest expansion retains those alpha levels and is markedly
-		# cheaper than scanning the 16-pixel destination in GDScript; the expanded
-		# image is still owned by the active chunk and returned to its bounded pool.
-		image.resize(
-			mask_size.x,
-			mask_size.y,
-			Image.INTERPOLATE_NEAREST
-		)
+		var expanded_image: Image
+		while not _chunk_mask_image_pool.is_empty():
+			var pooled_image: Image = _chunk_mask_image_pool.pop_back()
+			if pooled_image.get_size() == mask_size:
+				expanded_image = pooled_image
+				break
+		if expanded_image == null:
+			expanded_image = Image.create(
+				mask_size.x,
+				mask_size.y,
+				false,
+				Image.FORMAT_LA8
+			)
+		expanded_image.fill(SOLID_MASK_COLOR)
+		var expansion := profile.mask_pixels_per_cell
+		# Binary room interiors expand as horizontal runs, keeping structural
+		# work proportional to logical rows instead of millions of mask pixels.
+		for source_y in range(image.get_height()):
+			var opening_run_start := -1
+			for source_x in range(image.get_width() + 1):
+				var is_opening := (
+					source_x < image.get_width()
+					and image.get_pixel(source_x, source_y).a <= 0.5
+				)
+				if is_opening and opening_run_start < 0:
+					opening_run_start = source_x
+				elif not is_opening and opening_run_start >= 0:
+					expanded_image.fill_rect(
+						Rect2i(
+							opening_run_start * expansion,
+							source_y * expansion,
+							(source_x - opening_run_start) * expansion,
+							expansion
+						),
+						EMPTY_MASK_COLOR
+					)
+					opening_run_start = -1
+		image = expanded_image
+		if chunk_contains_sculpt and not preserve_chamber_backdrop:
+			# A second clipped blit restores only the authored room's four-sample
+			# rim; it never resizes the full 384-cell terrain width.
+			_blit_sculpt_rooms(
+				image,
+				chunk_index,
+				sculpt_layer_index,
+				profile.mask_pixels_per_cell
+			)
 	return image
 
 
@@ -2235,9 +2280,10 @@ func _chunk_has_per_layer_sculpt(chunk_index: int) -> bool:
 	return false
 
 
-## Prints every authored room reaching into one chunk over the terrain already
-## drawn beneath it. The room arrives as a mask rasterized once, so a streamed
-## chunk pays a clipped copy rather than rebuilding the room's rim per row.
+## Prints every authored room reaching into one chunk over the terrain beneath.
+## The logical pass writes cheap whole-cell runs. The display-density pass
+## scales only the clipped four-sample room strip, preserving edge_smoothing
+## without resizing the full terrain width.
 func _blit_sculpt_rooms(
 	image: Image,
 	chunk_index: int,
@@ -2247,6 +2293,7 @@ func _blit_sculpt_rooms(
 	var config: MiningConfig = terrain_manager.config
 	var chunk_start_row := chunk_index * config.chunk_height_cells
 	var chunk_end_row := chunk_start_row + config.chunk_height_cells
+	var sculpt_cache_density := _get_sculpt_cache_pixels_per_cell()
 	for placement in terrain_manager.get_sculpt_placements():
 		var room_rect: Rect2i = placement.world_rect
 		if (
@@ -2254,38 +2301,76 @@ func _blit_sculpt_rooms(
 			or room_rect.end.y <= chunk_start_row
 		):
 			continue
+		var first_row := maxi(room_rect.position.y, chunk_start_row)
+		var last_row := mini(room_rect.end.y, chunk_end_row)
+		var first_column := maxi(room_rect.position.x, 0)
+		var last_column := mini(
+			room_rect.end.x,
+			config.terrain_width_cells
+		)
+		if first_column >= last_column or first_row >= last_row:
+			continue
+		if mask_cell_size == 1:
+			var logical_mask := _get_sculpt_logical_mask_image(
+				placement.sculpt,
+				sculpt_layer_index
+			)
+			var logical_source_rect := Rect2i(
+				Vector2i(
+					first_column - room_rect.position.x,
+					first_row - room_rect.position.y
+				),
+				Vector2i(
+					last_column - first_column,
+					last_row - first_row
+				)
+			)
+			image.blit_rect(
+				logical_mask,
+				logical_source_rect,
+				Vector2i(
+					first_column,
+					first_row - chunk_start_row
+				)
+			)
+			continue
 		var room_mask := _get_sculpt_mask_image(
 			placement.sculpt,
 			sculpt_layer_index
 		)
 		if room_mask == null:
 			continue
-		var first_row := maxi(room_rect.position.y, chunk_start_row)
-		var last_row := mini(room_rect.end.y, chunk_end_row)
+		var clipped_cell_size := Vector2i(
+			last_column - first_column,
+			last_row - first_row
+		)
 		var source_rect := Rect2i(
-			0,
-			(first_row - room_rect.position.y) * mask_cell_size,
-			room_mask.get_width(),
-			(last_row - first_row) * mask_cell_size
+			Vector2i(
+				first_column - room_rect.position.x,
+				first_row - room_rect.position.y
+			) * sculpt_cache_density,
+			clipped_cell_size * sculpt_cache_density
 		)
 		var destination := Vector2i(
-			room_rect.position.x * mask_cell_size,
+			first_column * mask_cell_size,
 			(first_row - chunk_start_row) * mask_cell_size
 		)
-		# A room reaching past either edge of the run is clipped there rather
-		# than wrapped around to the opposite wall.
-		if destination.x < 0:
-			source_rect.position.x -= destination.x
-			source_rect.size.x += destination.x
-			destination.x = 0
-		var overflow_x := (
-			destination.x + source_rect.size.x - image.get_width()
-		)
-		if overflow_x > 0:
-			source_rect.size.x -= overflow_x
-		if source_rect.size.x <= 0 or source_rect.size.y <= 0:
+		if sculpt_cache_density == mask_cell_size:
+			image.blit_rect(room_mask, source_rect, destination)
 			continue
-		image.blit_rect(room_mask, source_rect, destination)
+		# At most one clipped room strip per overlapping placement is transient.
+		# It is released after this blit, so memory cannot grow with traversal.
+		var scaled_strip := room_mask.get_region(source_rect)
+		scaled_strip.resize(
+			clipped_cell_size.x * mask_cell_size,
+			clipped_cell_size.y * mask_cell_size,
+			Image.INTERPOLATE_NEAREST
+		)
+		image.blit_rect(
+			scaled_strip,
+			Rect2i(Vector2i.ZERO, scaled_strip.get_size()),
+			destination
+		)
 
 
 ## Returns one room's rock at mask resolution, rasterizing it on first use.
@@ -2305,6 +2390,52 @@ func _get_sculpt_mask_image(
 	layer_masks[cache_index] = room_mask
 	_sculpt_mask_images[sculpt] = layer_masks
 	return room_mask
+
+
+## Returns the same authored room as one binary sample per gameplay cell.
+## It is prepared beside the smoothed cache so streaming performs one clipped
+## blit and never calls the resource once per traversed cell.
+func _get_sculpt_logical_mask_image(
+	sculpt: CutsceneTerrainSculpt,
+	sculpt_layer_index: int
+) -> Image:
+	if sculpt == null:
+		return null
+	var cache_index := sculpt_layer_index + 1
+	var layer_masks: Array = _sculpt_logical_mask_images.get(
+		sculpt,
+		[]
+	)
+	if layer_masks.size() > cache_index and layer_masks[cache_index] != null:
+		return layer_masks[cache_index]
+	var logical_bytes := PackedByteArray()
+	logical_bytes.resize(sculpt.grid_size.x * sculpt.grid_size.y * 2)
+	var byte_index := 0
+	for local_y in range(sculpt.grid_size.y):
+		for local_x in range(sculpt.grid_size.x):
+			logical_bytes[byte_index] = 255
+			logical_bytes[byte_index + 1] = (
+				255
+				if _is_sculpt_cell_solid(
+					sculpt,
+					sculpt_layer_index,
+					Vector2i(local_x, local_y)
+				)
+				else 0
+			)
+			byte_index += 2
+	var logical_mask := Image.create_from_data(
+		sculpt.grid_size.x,
+		sculpt.grid_size.y,
+		false,
+		Image.FORMAT_LA8,
+		logical_bytes
+	)
+	while layer_masks.size() <= cache_index:
+		layer_masks.append(null)
+	layer_masks[cache_index] = logical_mask
+	_sculpt_logical_mask_images[sculpt] = layer_masks
+	return logical_mask
 
 
 ## Draws one authored room once at a density bounded independently of gameplay.
