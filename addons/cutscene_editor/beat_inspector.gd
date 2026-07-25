@@ -42,6 +42,20 @@ func show_beat(beat: CutsceneBeat) -> void:
 	_rebuild()
 
 
+## Returns the playable pose names authored for one placed actor preview.
+func get_pose_names_for_actor(actor_id: StringName) -> PackedStringArray:
+	var pose_names := PackedStringArray()
+	var pose_set := _get_actor_pose_set(actor_id)
+	if pose_set == null:
+		return pose_names
+	for pose in pose_set.poses:
+		if pose == null or not pose.is_playable():
+			continue
+		if not pose_names.has(str(pose.pose_name)):
+			pose_names.append(str(pose.pose_name))
+	return pose_names
+
+
 ## Returns the field names that should be visible for a beat kind.
 func get_visible_fields_for_kind(kind: int) -> PackedStringArray:
 	var fields := PackedStringArray([
@@ -126,7 +140,7 @@ func _rebuild() -> void:
 		CutsceneBeat.Kind.MOVE:
 			_add_marker_field()
 			_add_vector_field("Target offset", FIELD_TARGET_OFFSET, _selected_beat.target_offset)
-			_add_text_field("Pose", FIELD_POSE, _selected_beat.pose)
+			_add_pose_field()
 			_add_number_field(
 				"Step height",
 				FIELD_STEP_HEIGHT,
@@ -136,7 +150,7 @@ func _rebuild() -> void:
 				0.5
 			)
 		CutsceneBeat.Kind.POSE:
-			_add_text_field("Pose", FIELD_POSE, _selected_beat.pose)
+			_add_pose_field()
 		CutsceneBeat.Kind.FACE:
 			_add_facing_field()
 		CutsceneBeat.Kind.BOUNCE:
@@ -244,6 +258,56 @@ func _add_marker_field() -> void:
 	row.add_child(option)
 	if not option.item_selected.is_connected(_on_marker_changed):
 		option.item_selected.connect(_on_marker_changed)
+
+
+func _add_pose_field() -> void:
+	var row := _make_row("Pose")
+	var option := OptionButton.new()
+	option.name = String(FIELD_POSE)
+	option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var pose_set := _get_actor_pose_set(_selected_beat.actor)
+	var pose_names := get_pose_names_for_actor(_selected_beat.actor)
+	if pose_names.is_empty():
+		option.add_item(
+			"No pose set"
+			if pose_set == null
+			else "No playable poses"
+		)
+		option.disabled = true
+	else:
+		var selected_index := -1
+		for pose_name in pose_names:
+			option.add_item(pose_name)
+			option.set_item_metadata(option.item_count - 1, StringName(pose_name))
+			if StringName(pose_name) == _selected_beat.pose:
+				selected_index = option.item_count - 1
+		if selected_index >= 0:
+			option.select(selected_index)
+		else:
+			option.select(-1)
+		if (
+			not _selected_beat.pose.is_empty()
+			and not pose_names.has(str(_selected_beat.pose))
+		):
+			var warning := Label.new()
+			warning.text = "Current pose is not in this pose set."
+			warning.add_theme_color_override(
+				&"font_color",
+				Color("#e5a15b")
+			)
+			_form.add_child(warning)
+	row.add_child(option)
+	if not option.item_selected.is_connected(_on_pose_changed):
+		option.item_selected.connect(_on_pose_changed)
+
+
+func _get_actor_pose_set(actor_id: StringName) -> ActorPoseSet:
+	if _context == null or actor_id.is_empty():
+		return null
+	var preview := _context.get_actor_preview(actor_id)
+	if not is_instance_valid(preview) or preview.appearance == null:
+		return null
+	return preview.appearance.pose_set
 
 
 func _add_vector_field(
@@ -423,6 +487,19 @@ func _on_marker_changed(index: int) -> void:
 		FIELD_TARGET_MARKER,
 		option.get_item_metadata(index),
 		"Edit target marker"
+	)
+
+
+func _on_pose_changed(index: int) -> void:
+	if _selected_beat == null:
+		return
+	var option := _find_control(String(FIELD_POSE)) as OptionButton
+	if option == null or index < 0:
+		return
+	_commit_property(
+		FIELD_POSE,
+		option.get_item_metadata(index),
+		"Edit pose"
 	)
 
 

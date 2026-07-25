@@ -110,6 +110,9 @@ class _TimelineCanvas extends Control:
 var _context: CutsceneEditorContext
 var _canvas: _TimelineCanvas
 var _toolbar: HBoxContainer
+var _status_bar: HBoxContainer
+var _playhead_readout: Label
+var _legend: HBoxContainer
 var _kind_option: OptionButton
 var _actor_option: OptionButton
 var _zoom_spin: SpinBox
@@ -250,6 +253,7 @@ func _show_empty_state() -> void:
 func _build_valid_panel() -> void:
 	_clear_children()
 	_build_toolbar()
+	_build_status_bar()
 	_canvas = _TimelineCanvas.new()
 	_canvas.configure(
 		Callable(self, "_draw_timeline"),
@@ -277,6 +281,7 @@ func _build_valid_panel() -> void:
 	_refresh_validation()
 	_update_timeline_size()
 	_update_toolbar_readout()
+	_update_playhead_readout()
 	set_process(true)
 
 
@@ -374,10 +379,52 @@ func _build_toolbar() -> void:
 	_update_actor_option_state()
 
 
+func _build_status_bar() -> void:
+	_status_bar = HBoxContainer.new()
+	_status_bar.name = "TimelineStatusBar"
+	_status_bar.custom_minimum_size = Vector2(0.0, 26.0)
+	_status_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_child(_status_bar)
+
+	_playhead_readout = Label.new()
+	_playhead_readout.name = "PlayheadReadout"
+	_playhead_readout.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_playhead_readout.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_playhead_readout.clip_text = true
+	_status_bar.add_child(_playhead_readout)
+
+	_legend = HBoxContainer.new()
+	_legend.name = "KindLegend"
+	_legend.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_status_bar.add_child(_legend)
+	_add_legend_item("MOVE", CutsceneBeat.Kind.MOVE)
+	_add_legend_item("POSE", CutsceneBeat.Kind.POSE)
+	_add_legend_item("DIALOGUE", CutsceneBeat.Kind.DIALOGUE)
+	_add_legend_item("STAGE CUE", CutsceneBeat.Kind.STAGE_CUE)
+
+
+func _add_legend_item(caption: String, kind: int) -> void:
+	var swatch := ColorRect.new()
+	swatch.custom_minimum_size = Vector2(8.0, 8.0)
+	swatch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	swatch.color = KIND_COLORS.get(kind, Color("#7e8794"))
+	swatch.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_legend.add_child(swatch)
+	var label := Label.new()
+	label.text = caption
+	label.add_theme_font_size_override(&"font_size", 10)
+	label.add_theme_color_override(&"font_color", Color("#b8c1ce"))
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_legend.add_child(label)
+
+
 func _clear_children() -> void:
 	for child in get_children():
 		child.free()
 	_toolbar = null
+	_status_bar = null
+	_playhead_readout = null
+	_legend = null
 	_canvas = null
 	_validation_list = null
 	_empty_message = null
@@ -694,6 +741,7 @@ func _set_scrub_time(seconds: float, emit_signal: bool) -> void:
 	_scrub_time = clampf(seconds, 0.0, _sequence_duration())
 	_apply_preview_at_time()
 	_update_toolbar_readout()
+	_update_playhead_readout()
 	if _canvas != null:
 		_canvas.queue_redraw()
 	if emit_signal:
@@ -724,10 +772,9 @@ func _apply_preview_at_time() -> void:
 			preview.visible = bool(state[&"visible"])
 		if state.has(&"facing") and preview.has_method(&"set_facing_direction"):
 			preview.call(&"set_facing_direction", int(state[&"facing"]))
-		if state.has(&"pose") and preview.has_method(&"play_pose"):
+		if state.has(&"pose"):
 			var pose: StringName = state[&"pose"]
-			if not pose.is_empty():
-				preview.call(&"play_pose", pose)
+			preview.pose = pose
 
 
 func _capture_preview_states() -> void:
@@ -742,6 +789,7 @@ func _capture_preview_states() -> void:
 		_preview_base_states[actor_id] = {
 			"position": preview.global_position,
 			"scale": preview.scale,
+			"pose": preview.pose,
 			"visible": preview.visible,
 		}
 
@@ -757,6 +805,7 @@ func _restore_preview_states() -> void:
 		var base_state: Dictionary = _preview_base_states[actor_id_variant]
 		preview.global_position = base_state["position"]
 		preview.scale = base_state["scale"]
+		preview.pose = base_state["pose"]
 		preview.visible = bool(base_state["visible"])
 
 
@@ -988,15 +1037,27 @@ func _draw_beat(
 	var label := _kind_name(beat.kind)
 	if beat == _selected_beat:
 		label = "● " + label
+	var text_width := maxf(rect.size.x - 10.0, 0.0)
 	canvas.draw_string(
 		font,
 		rect.position + Vector2(7.0, 20.0),
 		label,
 		HORIZONTAL_ALIGNMENT_LEFT,
-		maxf(rect.size.x - 10.0, 0.0),
+		text_width,
 		11,
 		Color("#f4f6f8")
 	)
+	var detail := _beat_detail_label(beat)
+	if not detail.is_empty() and rect.size.x >= 60.0:
+		canvas.draw_string(
+			font,
+			rect.position + Vector2(7.0, 35.0),
+			_fit_draw_text(font, detail, 10, text_width),
+			HORIZONTAL_ALIGNMENT_LEFT,
+			text_width,
+			10,
+			Color("#e7ebf0")
+		)
 	if _invalid_beat_indices.has(beat_index):
 		canvas.draw_line(
 			Vector2(rect.position.x, rect.end.y - 2.0),
@@ -1004,6 +1065,44 @@ func _draw_beat(
 			Color("#ff6c6c"),
 			2.0
 		)
+
+
+func _beat_detail_label(beat: CutsceneBeat) -> String:
+	match beat.kind:
+		CutsceneBeat.Kind.MOVE, CutsceneBeat.Kind.POSE:
+			return str(beat.pose) if not beat.pose.is_empty() else ""
+		CutsceneBeat.Kind.STAGE_CUE:
+			return str(beat.cue) if not beat.cue.is_empty() else ""
+	return ""
+
+
+func _fit_draw_text(
+	font: Font,
+	text: String,
+	font_size: int,
+	available_width: float
+) -> String:
+	if available_width <= 0.0:
+		return ""
+	if font.get_string_size(
+		text,
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1.0,
+		font_size
+	).x <= available_width:
+		return text
+	var shortened := text
+	while shortened.length() > 1:
+		shortened = shortened.left(shortened.length() - 1)
+		var candidate := shortened + "..."
+		if font.get_string_size(
+			candidate,
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1.0,
+			font_size
+		).x <= available_width:
+			return candidate
+	return ""
 
 
 func _make_beat_box(color: Color, selected: bool) -> StyleBoxFlat:
@@ -1044,6 +1143,7 @@ func _on_context_data_changed() -> void:
 	_update_timeline_size()
 	_apply_preview_at_time()
 	_update_toolbar_readout()
+	_update_playhead_readout()
 	if _canvas != null:
 		_canvas.queue_redraw()
 
@@ -1078,6 +1178,45 @@ func _update_toolbar_readout() -> void:
 		return
 	_time_label.text = _format_time(_scrub_time)
 	_duration_label.text = "/ %s" % _format_time(_sequence_duration())
+
+
+func _update_playhead_readout() -> void:
+	if _playhead_readout == null:
+		return
+	if not _has_valid_context():
+		_playhead_readout.text = "Playhead: no cutscene"
+		return
+	_begin_preview_evaluation()
+	var result := _preview_player.evaluate_at(
+		_context.sequence,
+		_scrub_time
+	)
+	var actor_states: Dictionary = result.get(&"actors", {})
+	var stage_cue_text := str(result.get(&"stage_cue", StringName()))
+	if stage_cue_text.is_empty():
+		stage_cue_text = "none"
+	var entries := PackedStringArray()
+	for actor_id_text in _lane_actor_ids:
+		var actor_id := StringName(actor_id_text)
+		var state: Dictionary = actor_states.get(actor_id, {})
+		var pose_text := str(state.get(&"pose", StringName()))
+		if pose_text.is_empty():
+			pose_text = "none"
+		entries.append(
+			"%s: pose %s, anim %s" % [
+				actor_id_text,
+				pose_text,
+				stage_cue_text,
+			]
+		)
+	if entries.is_empty():
+		_playhead_readout.text = "At %s | no actors" % _format_time(_scrub_time)
+		return
+	_playhead_readout.text = "At %s | %s" % [
+		_format_time(_scrub_time),
+		" | ".join(entries),
+	]
+	_playhead_readout.tooltip_text = _playhead_readout.text
 
 
 func _sequence_duration() -> float:

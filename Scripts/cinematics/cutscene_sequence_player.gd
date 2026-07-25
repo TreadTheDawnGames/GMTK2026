@@ -145,7 +145,7 @@ func notify_dialogue_finished() -> void:
 
 
 ## Evaluates authored presentation state without changing nodes or creating tweens.
-## Result contains direct actor-id keys, an `actors` mirror, and `dialogue` data.
+## Result contains direct actor-id keys, an `actors` mirror, stage cue, and dialogue data.
 func evaluate_at(
 	sequence: CutsceneSequence,
 	seconds: float
@@ -153,10 +153,12 @@ func evaluate_at(
 	var result: Dictionary = {}
 	if sequence == null:
 		result[&"actors"] = {}
+		result[&"stage_cue"] = StringName()
 		result[&"dialogue"] = null
 		return result
 	var actor_states: Dictionary = {}
 	var evaluation_seconds := maxf(seconds, 0.0)
+	var stage_cue := _evaluate_stage_cue_at(sequence, evaluation_seconds)
 	for actor_id_text in sequence.get_actor_ids():
 		var actor_id := StringName(actor_id_text)
 		var state := _evaluate_actor_at(
@@ -164,9 +166,11 @@ func evaluate_at(
 			actor_id,
 			evaluation_seconds
 		)
+		state[&"stage_cue"] = stage_cue
 		actor_states[actor_id] = state
 		result[actor_id] = state
 	result[&"actors"] = actor_states
+	result[&"stage_cue"] = stage_cue
 	result[&"dialogue"] = _evaluate_dialogue_at(
 		sequence,
 		evaluation_seconds
@@ -521,6 +525,9 @@ func _evaluate_actor_at(
 	else:
 		state = _get_actor_state(_resolve_actor(actor_id))
 	var active_move: Dictionary = {}
+	var persistent_pose: StringName = state.get(&"pose", StringName())
+	var active_move_pose: StringName
+	var active_move_pose_start: float = -INF
 	for beat in sequence.get_beats_sorted():
 		if beat.actor != actor_id or beat.start_seconds > seconds + 0.00001:
 			continue
@@ -562,11 +569,17 @@ func _evaluate_actor_at(
 						"duration": beat.duration_seconds,
 						"grounded": false,
 					}
-				if not beat.pose.is_empty():
-					state[&"pose"] = beat.pose
+				if (
+					beat.kind == CutsceneBeat.Kind.MOVE
+					and not beat.pose.is_empty()
+					and _beat_is_active_at(beat, seconds)
+					and beat.start_seconds >= active_move_pose_start
+				):
+					active_move_pose = beat.pose
+					active_move_pose_start = beat.start_seconds
 				_set_state_facing_for_move(state, start_position, target_position)
 			CutsceneBeat.Kind.POSE:
-				state[&"pose"] = beat.pose
+				persistent_pose = beat.pose
 			CutsceneBeat.Kind.FACE:
 				state[&"facing"] = beat.facing
 			CutsceneBeat.Kind.SHOW:
@@ -582,7 +595,37 @@ func _evaluate_actor_at(
 			active_move.get("start", state[&"position"]),
 			active_move.get("target", state[&"position"])
 		)
+	state[&"pose"] = (
+			active_move_pose
+			if not active_move_pose.is_empty()
+			else persistent_pose
+		)
 	return state
+
+
+func _evaluate_stage_cue_at(
+	sequence: CutsceneSequence,
+	seconds: float
+) -> StringName:
+	var active_cue: StringName
+	var active_start: float = -INF
+	for beat in sequence.get_beats_sorted():
+		if (
+			beat.kind == CutsceneBeat.Kind.STAGE_CUE
+			and _beat_is_active_at(beat, seconds)
+			and beat.start_seconds >= active_start
+		):
+			active_cue = beat.cue
+			active_start = beat.start_seconds
+	return active_cue
+
+
+func _beat_is_active_at(beat: CutsceneBeat, seconds: float) -> bool:
+	if beat.start_seconds > seconds + 0.00001:
+		return false
+	if beat.duration_seconds <= 0.0:
+		return is_equal_approx(seconds, beat.start_seconds)
+	return seconds <= beat.get_end_seconds() + 0.00001
 
 
 func _position_for_move(move: Dictionary, seconds: float) -> Vector2:
@@ -665,12 +708,14 @@ func _get_actor_state(actor: Node2D) -> Dictionary:
 			&"position": Vector2.ZERO,
 			&"facing": 1,
 			&"pose": &"",
+			&"stage_cue": &"",
 			&"visible": false,
 		}
 	return {
 		&"position": actor.global_position,
 		&"facing": _get_actor_facing(actor),
 		&"pose": &"",
+		&"stage_cue": &"",
 		&"visible": actor.visible,
 	}
 
