@@ -27,15 +27,18 @@ func PlaySoundAtGlobalPosition(sound : AudioStream, globPos : Vector2, doPitchSc
 	audioPlayer.finished.connect(func(): audioPlayer.queue_free())
 	get_tree().root.add_child(audioPlayer)
 	
-func play_sound(sound : AudioStream, busName : String = "SFX", doPitchScale = false):
+## pitchScale is applied when doPitchScale is false, so callers that already
+## know the pitch they want (the combo ladder) can set it exactly instead of
+## taking the random spread.
+func play_sound(sound : AudioStream, busName : String = "SFX", doPitchScale = false, pitchScale : float = 1.0):
 	if(not sound):
 		DisplayServer.beep()
-	
+
 	var audioPlayer : AudioStreamPlayer = AudioStreamPlayer.new()
 	audioPlayer.stream = sound
 	#audioPlayer.global_position = get_viewport_rect().get_center()
 	audioPlayer.autoplay = true
-	audioPlayer.pitch_scale = (randf_range(1.0, 1.5) if doPitchScale else 1.0)
+	audioPlayer.pitch_scale = (randf_range(1.0, 1.5) if doPitchScale else pitchScale)
 	audioPlayer.bus = busName
 	audioPlayer.finished.connect(func(): audioPlayer.queue_free())
 	get_tree().root.add_child(audioPlayer)
