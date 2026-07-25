@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="DepthCharacterEncounter" format=4 uid="uid://yjqxjobgqi5l"]
+[gd_resource type="Resource" script_class="DepthCharacterEncounter" format=3 uid="uid://yjqxjobgqi5l"]
 
 [ext_resource type="Script" uid="uid://sqs37vj87ep8" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
-[ext_resource type="Resource" path="res://resources/encounters/cloak_lantern_character_appearance.tres" id="2_appearance"]
+[ext_resource type="Resource" uid="uid://dq5euoa1catq7" path="res://resources/encounters/cloak_lantern_character_appearance.tres" id="2_appearance"]
 [ext_resource type="Resource" uid="uid://dao8yvcqfuv7f" path="res://resources/dialogue/cloak_lantern_first_conversation.tres" id="3_dialogue"]
 [ext_resource type="PackedScene" uid="uid://dq1edo6hktxtb" path="res://Scenes/cinematics/lantern_first_encounter_stage.tscn" id="4_18km8"]
 [ext_resource type="Resource" uid="uid://0p25yxfx0eo1" path="res://resources/cinematics/sequences/cloak_lantern_first_sequence.tres" id="4_ximfy"]

@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="CreditEntry" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="CreditEntry" format=3 uid="uid://cow3sppglnh4y"]
 
-[ext_resource type="Script" path="res://resources/credits/credit_entry.gd" id="1_entry"]
+[ext_resource type="Script" uid="uid://c66qkeqn8p820" path="res://resources/credits/credit_entry.gd" id="1_entry"]
 
 [resource]
 script = ExtResource("1_entry")

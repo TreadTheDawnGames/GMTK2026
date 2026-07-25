@@ -122,6 +122,10 @@ func _try_activate_pending_encounter() -> void:
 		+ pending_encounter.resolve_depth(mining_config.total_run_depth)
 	)
 	if _latest_landing_world_y < encounter_floor_y:
+		print("[ENC] pending, landing %d has not reached floor %d" % [
+			_latest_landing_world_y,
+			encounter_floor_y,
+		])
 		return
 	_activate_pending_encounter()
 
@@ -164,7 +168,9 @@ func _schedule_next_encounter() -> bool:
 	if not _can_schedule_next_encounter():
 		return false
 	if not cinematic_flow.try_begin(FLOW_OWNER):
+		print("[ENC] flow refused - another cinematic owns it")
 		return false
+	print("[ENC] scheduled index=%d" % _next_encounter_index)
 	_pending_encounter_index = _next_encounter_index
 	_try_activate_pending_encounter()
 	return true
@@ -304,6 +310,11 @@ func _begin_active_encounter() -> void:
 	_reset_speech_reactions()
 	if _is_gathering_encounter(_active_encounter_index):
 		_gather_cafe_characters()
+	# TEMPORARY ENCOUNTER TRACE - remove once the soft lock is closed.
+	print("[ENC] begin id=%s stage=%s" % [
+		encounter.encounter_id,
+		_stages[_active_encounter_index],
+	])
 	_active_stage = _stages[_active_encounter_index]
 	if _active_stage != null:
 		# Before the frame opens, so the first drawn cutscene frame already has
@@ -311,7 +322,9 @@ func _begin_active_encounter() -> void:
 		miner_rig.enter_cutscene_draw_order()
 		_enter_cast_cutscene_draw_order()
 		dialogue_director.open_cinematic_frame()
+		print("[ENC] waiting for frame")
 		await dialogue_director.wait_until_frame_open()
+		print("[ENC] frame open")
 		if _active_encounter_index < 0:
 			return
 		# Layer one, the stratum the cast actually stands on.
@@ -334,7 +347,9 @@ func _begin_active_encounter() -> void:
 			)
 			_fail_active_encounter()
 			return
+		print("[ENC] prepared, playing opening")
 		await _active_stage.play_opening()
+		print("[ENC] opening done")
 		if _active_encounter_index < 0:
 			return
 	_active_conversation = encounter.conversation
