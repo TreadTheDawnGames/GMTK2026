@@ -794,46 +794,6 @@ func _get_valid_prepared_layer_patch(
 	return patch
 
 
-## Resolves one exact transform key for speculative or committed ownership.
-func _prepare_stamp_layer_images(
-	stamp: ImpactStamp,
-	layer_index: int,
-	is_speculative: bool
-) -> void:
-	var mask_data := _get_hole_mask_data(
-		layer_index,
-		stamp.use_big_hole
-	)
-	if mask_data == null:
-		return
-	var opening_rect := _get_layer_opening_rect(
-		stamp,
-		layer_index
-	)
-	var layer_variation := _get_layer_stamp_variation(
-		stamp,
-		layer_index
-	)
-	var full_stamp_rect := _get_full_stamp_world_rect(
-		opening_rect,
-		mask_data,
-		layer_variation.x == 1,
-		layer_variation.y == 1,
-		layer_variation.z
-	)
-	if not full_stamp_rect.has_area():
-		return
-	_get_resized_stamp_images(
-		mask_data,
-		_get_stamp_pixel_size(full_stamp_rect.size),
-		layer_variation.x == 1,
-		layer_variation.y == 1,
-		layer_variation.z,
-		is_speculative,
-		stamp.include_fracture_lines
-	)
-
-
 ## Recycles completed candidate descriptors; transformed images remain in the
 ## cache's bounded prepared generation until contact or a target regeneration.
 func _compact_pending_stamp_preparation() -> void:
