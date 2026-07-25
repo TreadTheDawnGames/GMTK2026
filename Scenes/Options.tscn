@@ -58,17 +58,17 @@ layout_mode = 2
 [node name="MasterVolume" parent="TabContainer/Panel/VBoxContainer" unique_id=1247329782 instance=ExtResource("2_y60rh")]
 unique_name_in_owner = true
 layout_mode = 2
-busName = "Master"
+bus_name = &"Master"
 
 [node name="Music" parent="TabContainer/Panel/VBoxContainer" unique_id=1181797806 instance=ExtResource("2_y60rh")]
 unique_name_in_owner = true
 layout_mode = 2
-busName = "Music"
+bus_name = &"Music"
 
 [node name="SFX" parent="TabContainer/Panel/VBoxContainer" unique_id=684634811 instance=ExtResource("2_y60rh")]
 unique_name_in_owner = true
 layout_mode = 2
-busName = "SFX"
+bus_name = &"SFX"
 
 [node name="HBoxContainer2" type="HBoxContainer" parent="TabContainer/Panel/VBoxContainer" unique_id=870888829]
 layout_mode = 2
@@ -151,8 +151,3 @@ Addons: [font_size=6]GAMESTERVIRUS[/font_size]"
 [node name="ReturnToSettings" type="Button" parent="TabContainer/PanelContainer/VBoxContainer" unique_id=843285135]
 layout_mode = 2
 text = "Back"
-
-[connection signal="item_selected" from="TabContainer/Panel/VBoxContainer/HBoxContainer2/Control/VSyncOptions" to="." method="_on_v_sync_options_item_selected"]
-[connection signal="pressed" from="TabContainer/Panel/VBoxContainer/HBoxContainer/CreditsButton" to="." method="_on_credits_button_pressed"]
-[connection signal="pressed" from="TabContainer/Panel/VBoxContainer/HBoxContainer/BackButton" to="." method="_on_back_button_pressed"]
-[connection signal="pressed" from="TabContainer/PanelContainer/VBoxContainer/ReturnToSettings" to="." method="_on_return_to_settings_pressed"]
