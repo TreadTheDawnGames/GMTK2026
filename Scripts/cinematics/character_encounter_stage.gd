@@ -47,6 +47,34 @@ signal sequence_dialogue_requested(
 @export var closing_pose: StringName = &"walk"
 @export var rest_pose: StringName = &"idle"
 @export var hide_actor_after_closing: bool = false
+## Seconds spent fading the actor out as the closing move runs. Zero leaves the
+## old behaviour, where a departing actor is simply hidden when it arrives.
+##
+## Some visitors do not walk off; they go. The lantern-staff man hops once and
+## fades where he stands, and the shot has to read as him ceasing to be there
+## rather than as him stepping out of frame. Fading is a stage concern rather than
+## an actor one because the stage already owns the reversible ownership of the
+## presenter, and a presenter is reused across encounters: he is the same node all
+## three times he appears, so anything that dims him has to be certain to put him
+## back.
+@export_range(0.0, 4.0, 0.05) var closing_fade_seconds: float = 0.0
+
+@export_category("Actor Facing")
+## Which way an actor faces on arrival, while settled to speak, and on leaving.
+## -1 looks left, 1 looks right, and 0 leaves the facing alone.
+##
+## Zero everywhere preserves the old behaviour, where facing is whatever the walk
+## last set. It matters for a visitor who is not looking at the miner: the
+## lantern-staff man stands at the lip of his drop with his back turned, turns to
+## deliver his warning, and turns back to it before he goes. Without this the
+## walk's own direction is the only thing that can aim anyone, so a character who
+## does not walk cannot be aimed at all.
+##
+## Facing is a world direction. CharacterPresenter folds art_faces_left in when
+## it applies this, so -1 always means looking left whichever way the art is drawn.
+@export_range(-1, 1, 1) var entrance_facing: int = 0
+@export_range(-1, 1, 1) var conversation_facing: int = 0
+@export_range(-1, 1, 1) var closing_facing: int = 0
 ## Dynamically keeps this actor beside the miner regardless of landing column.
 @export var conversation_tracks_miner: bool = false
 ## Presenter-root offset; actor sprite offsets remain authored by appearance.
@@ -67,6 +95,8 @@ var _floor_sampler: Callable
 var _restore_position: Vector2
 var _restore_visible: bool = false
 var _restore_flip_h: bool = false
+var _restore_modulate: Color = Color.WHITE
+var _fade_tween: Tween
 var _is_active: bool = false
 var _active_cue: StringName
 
@@ -147,9 +177,14 @@ func prepare(
 	_restore_position = presenter.global_position
 	_restore_visible = presenter.visible
 	_restore_flip_h = presenter.character_sprite.flip_h
+	# A presenter is shared across every visit a character makes, so a previous
+	# encounter that faded him out must not leave him arriving transparent.
+	_restore_modulate = presenter.modulate
+	presenter.modulate.a = 1.0
 	_presenter.cancel_grounded_motion()
 	_presenter.global_position = entrance_marker.global_position
 	_presenter.show()
+	_apply_facing(entrance_facing)
 	_is_active = true
 	return true
 
@@ -176,6 +211,9 @@ func play_opening() -> void:
 	if not _is_active:
 		return
 	_play_pose_if_available(conversation_pose)
+	# After the walk, not before: a MOVE aims the actor along its own travel, so
+	# anything set earlier is overwritten by the approach.
+	_apply_facing(conversation_facing)
 	opening_finished.emit()
 
 
@@ -198,6 +236,8 @@ func play_closing() -> void:
 	if not _is_active:
 		return
 	_play_pose_if_available(closing_pose)
+	_apply_facing(closing_facing)
+	_start_closing_fade()
 	var target_marker := (
 		exit_marker if hide_actor_after_closing else rest_marker
 	)
@@ -215,6 +255,7 @@ func play_closing() -> void:
 		return
 	if not hide_actor_after_closing:
 		_play_pose_if_available(rest_pose)
+	_finish_closing_fade()
 	_is_active = false
 	_presenter = null
 	_floor_sampler = Callable()
@@ -233,10 +274,14 @@ func cancel_and_restore() -> void:
 			animation_player.play(&"RESET")
 			animation_player.advance(0.0)
 			animation_player.stop()
+	if is_instance_valid(_fade_tween) and _fade_tween.is_valid():
+		_fade_tween.kill()
+	_fade_tween = null
 	if is_instance_valid(_presenter):
 		_presenter.cancel_grounded_motion()
 		_presenter.global_position = _restore_position
 		_presenter.character_sprite.flip_h = _restore_flip_h
+		_presenter.modulate = _restore_modulate
 		if _restore_visible:
 			_presenter.show()
 		else:
@@ -320,6 +365,47 @@ func _wait_for_animation(animation_name: StringName) -> void:
 		and animation_player.current_animation == animation_name
 	):
 		await animation_player.animation_finished
+
+
+## Hops the actor once and fades them out over the closing move.
+##
+## The hop is the existing speech bounce rather than a new motion: it is already
+## the one movement every presenter can make on the spot, and one of them under a
+## fade reads as a departure the shot never has to follow.
+func _start_closing_fade() -> void:
+	if closing_fade_seconds <= 0.0 or not is_instance_valid(_presenter):
+		return
+	_presenter.react_to_presented_line()
+	if is_instance_valid(_fade_tween) and _fade_tween.is_valid():
+		_fade_tween.kill()
+	_fade_tween = _presenter.create_tween()
+	_fade_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_fade_tween.tween_property(
+		_presenter,
+		"modulate:a",
+		0.0,
+		closing_fade_seconds
+	)
+
+
+## Puts the shared presenter back to full opacity once the shot has released it.
+## Without this the next encounter this character appears in opens with an
+## invisible actor, and the reason would be three cutscenes away.
+func _finish_closing_fade() -> void:
+	if is_instance_valid(_fade_tween) and _fade_tween.is_valid():
+		_fade_tween.kill()
+	_fade_tween = null
+	if closing_fade_seconds <= 0.0 or not is_instance_valid(_presenter):
+		return
+	_presenter.hide()
+	_presenter.modulate = _restore_modulate
+
+
+## Turns the actor to face a world direction, or leaves them as they are on zero.
+func _apply_facing(direction: int) -> void:
+	if direction == 0 or not is_instance_valid(_presenter):
+		return
+	_presenter.set_facing_direction(direction)
 
 
 func _play_pose_if_available(pose_name: StringName) -> void:

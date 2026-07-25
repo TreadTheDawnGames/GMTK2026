@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Texture2D" path="res://Assets/Props/lantern_staff.png" id="1_staff"]
+
+[node name="LanternStaff" type="Sprite2D"]
+editor_description = "The lantern-staff man's staff, left standing in the floor at the bottom of the shaft he steps off into. He is not with it; that is the whole point of the shot. The offset puts the art's foot on the node's origin - the source canvas is mostly empty, so it undoes both the padding and the Sprite2D centring - which means dropping this on a floor marker plants it rather than floating it."
+texture = ExtResource("1_staff")
+offset = Vector2(-393.5, -595)
+scale = Vector2(0.35, 0.35)

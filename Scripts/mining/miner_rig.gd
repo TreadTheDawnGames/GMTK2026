@@ -52,13 +52,22 @@ signal swing_finished
 ## (z_index 2). He is on top of the ground there, not in it, so the foreground
 ## stratum must not cut his legs off during the arrival shot.
 @export_range(0, 16, 1) var surface_draw_order: int = 3
-## Digging in used to drop him behind layer one so the stratum closed over his
-## legs. The camera does not follow him down — the terrain scrolls past it — so
-## he is at the top of his own shaft in every frame of the run, and there the
-## stratum cut him off at the shins for the whole descent rather than only while
-## he was genuinely inside the ground. He stays in front of it instead. Lowering
-## this back below the layer one z_index of 2 restores the old look.
-@export_range(0, 16, 1) var buried_draw_order: int = 3
+## Where he stands while mining: behind the foreground stratum and in front of
+## the one behind it, which is what puts him down in the dig rather than pasted
+## on top of it.
+##
+## This was briefly raised to 3 so he drew in front of everything. The camera
+## does not follow him down — the terrain scrolls past it — so he sits at the top
+## of his own shaft in every frame, and the foreground stratum cut him off at the
+## shins for the whole descent rather than only while he was genuinely inside the
+## ground. That is the cost of this value, and it is accepted on purpose: being
+## occluded by the ground he is standing in is the read, and a cutscene lifts him
+## clear of it anyway through cutscene_draw_order.
+##
+## Kept strictly between the two frontmost strata z indices, currently 2 and 0.
+## verify_cutscene_cast_draw_order.gd asserts that relationship, because this
+## number and the terrain profile live in different files.
+@export_range(0, 16, 1) var buried_draw_order: int = 1
 ## Standing in an authored cutscene room, in front of terrain layer one
 ## (z_index 2) again. A cutscene frames the whole cast standing on the room's
 ## floor and holds on it, so the foreground stratum cutting him off at the shins
@@ -74,6 +83,15 @@ signal swing_finished
 @export var idle_miner_texture: Texture2D
 @export var wind_up_miner_texture: Texture2D
 @export var impact_miner_texture: Texture2D
+## Drawn while a cutscene drops him into its room. Null keeps the idle frame,
+## which is how this behaved before the pose existed.
+##
+## The fall is the one moment the run shows him off his feet, and holding the
+## idle stance through it reads as the whole man being slid downward rather than
+## falling. The swap back is deliberately hung off the cinematic restore rather
+## than off the tween finishing: a fall that is cancelled halfway must not leave
+## him falling forever on solid ground.
+@export var falling_miner_texture: Texture2D
 @export var impact_point: Marker2D
 @export var stand_in_hammer_head: Line2D
 @export var final_hammer_head_sprite: Sprite2D
@@ -516,6 +534,9 @@ func fall_cinematic_foot_to(
 	reset_speech_motion()
 	if _cinematic_tween != null and _cinematic_tween.is_valid():
 		_cinematic_tween.kill()
+	if falling_miner_texture != null:
+		animation_player.stop()
+		_set_miner_texture(falling_miner_texture)
 	var foot_delta: Vector2 = (
 		screen_position - get_cinematic_foot_screen_position()
 	)

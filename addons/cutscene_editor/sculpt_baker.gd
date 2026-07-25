@@ -89,6 +89,29 @@ const EXIT_TUNNEL_ROOF_WAVE_COUNT: float = 2.5
 ## them; the day someone lowers that guard, the ground opens.
 const EXIT_TUNNEL_FLOOR_CLEARANCE_CELLS: float = 0.25
 
+## The bite one scallop takes out of an end wall's face, and how far apart the
+## bites fall. Spacing under twice the radius is what merges them into one worn
+## surface instead of a row of separate scoops.
+##
+## Radius is the whole reason this is a brush pass and not authored cells. A cell
+## edge can only ever run flat or straight up, so a wall built cell by cell reads
+## as a staircase however finely the steps are cut. A carved disc leaves an arc,
+## and overlapping arcs are what rock worn by water and pickaxes actually looks
+## like.
+const END_WALL_SCALLOP_RADIUS_CELLS: float = 3.5
+const END_WALL_SCALLOP_SPACING_CELLS: float = 3.0
+## Extra reach on the occasional deeper bite, and how often one lands.
+const END_WALL_SCALLOP_DEEP_BITE_CELLS: float = 2.0
+const END_WALL_SCALLOP_DEEP_BITE_INTERVAL: int = 3
+## How far a bite wanders off the face it is eating, so the scallops vary in
+## depth instead of arriving as a neat row of identical scoops.
+const END_WALL_SCALLOP_WANDER_CELLS: float = 1.6
+## Gap kept between the lowest bite and the floor row, in cells. Bites are held
+## clear of the floor entirely rather than trimmed afterward: a disc that reaches
+## the ground opens the very row the miner has to land on, and on a room authored
+## without guarded floor rows nothing would put it back.
+const END_WALL_SCALLOP_FLOOR_CLEARANCE_CELLS: float = 0.5
+
 
 static func bake_procedural_chamber(
 	sculpt: CutsceneTerrainSculpt,
@@ -349,6 +372,137 @@ static func carve_right_exit_tunnel(
 	))
 	sculpt.end_edit()
 	apply_visual_depth_masks(sculpt)
+
+
+## Closes one end of a room with broken rock climbing from the floor to the
+## ceiling, and fills everything past it with untouched stone.
+##
+## `foot_local_x` is the column the climb starts from, standing on the floor.
+## `face_local_x` is the column it tops out at, past which the room is solid.
+## Either order works: a face left of the foot closes the room's left end, a face
+## right of it closes the right end. Nothing here is specific to one encounter -
+## the walls the cutscenes need are this same cut mirrored.
+##
+## The wall closes from the grid's top edge rather than from the tunnel ceiling.
+## The ceiling waves, so filling only underneath it leaves a slot open above the
+## top of the climb, which reads as a crawlspace nobody authored.
+##
+## The teeth are cut rather than roughened. Roughen flips single boundary cells,
+## and a single cell is the finest thing the drawn mask can carry, so it jags the
+## rim into aliasing instead of rock. Authored runs stay wide enough to read.
+static func carve_jagged_end_wall(
+	sculpt: CutsceneTerrainSculpt,
+	foot_local_x: int,
+	face_local_x: int
+) -> void:
+	if sculpt == null or foot_local_x == face_local_x:
+		return
+	var floor_row := sculpt.get_floor_local_row()
+	if floor_row <= 0 or floor_row >= sculpt.grid_size.y:
+		return
+	var direction := signi(face_local_x - foot_local_x)
+	var ceiling_row := _find_open_row_below_top(sculpt, face_local_x, floor_row)
+
+	# The face is resolved one ROW at a time, which is the whole trick.
+	#
+	# Walking columns and choosing a height for each is what builds a staircase:
+	# the edge can then only run flat or straight up, and no amount of finer teeth
+	# changes that. Walking rows and choosing how far in the rock reaches gives a
+	# near-vertical wall whose edge wanders, and the mask's sub-cell interpolation
+	# carries that wander as a curve.
+	var climb_rows := float(maxi(floor_row - ceiling_row, 1))
+	sculpt.begin_edit()
+	for local_y in range(0, floor_row):
+		var height_progress := clampf(
+			float(floor_row - local_y) / climb_rows,
+			0.0,
+			1.0
+		)
+		# The face leans back as it rises, so the wall overhangs its own foot the
+		# way the drawing does, rather than standing up like a slab.
+		var lean := float(absi(face_local_x - foot_local_x)) * height_progress
+		var boundary_x := (
+			float(foot_local_x)
+			+ float(direction) * (lean + _get_end_wall_face_wobble(local_y))
+		)
+		var solid_first_x := 0 if direction < 0 else int(ceilf(boundary_x))
+		var solid_last_x := (
+			int(floorf(boundary_x))
+			if direction < 0
+			else sculpt.grid_size.x - 1
+		)
+		for local_x in range(maxi(solid_first_x, 0), solid_last_x + 1):
+			sculpt.set_solid_local(Vector2i(local_x, local_y), true)
+	sculpt.end_edit()
+
+	# One pass of overlapping bites along the finished face. The wandering edge
+	# already reads as rock; this is what stops it reading as one continuous
+	# surface, by taking scoops out of it at uneven depths.
+	var brush := CutsceneSculptBrush.new()
+	brush.falloff = 0.3
+	var lowest_bite_row := (
+		float(floor_row)
+		- END_WALL_SCALLOP_RADIUS_CELLS
+		- END_WALL_SCALLOP_FLOOR_CLEARANCE_CELLS
+	)
+	sculpt.begin_edit()
+	var bite_row := lowest_bite_row
+	var bite_index := 0
+	while bite_row > float(ceiling_row):
+		var height_progress := clampf(
+			(float(floor_row) - bite_row) / climb_rows,
+			0.0,
+			1.0
+		)
+		var lean := float(absi(face_local_x - foot_local_x)) * height_progress
+		var deep_bite := (
+			END_WALL_SCALLOP_DEEP_BITE_CELLS
+			if bite_index % END_WALL_SCALLOP_DEEP_BITE_INTERVAL == 0
+			else 0.0
+		)
+		brush.radius_cells = END_WALL_SCALLOP_RADIUS_CELLS + deep_bite
+		# Centred a radius into the open air, so the disc takes a crescent off the
+		# face instead of boring a tunnel back through the rock behind it.
+		brush.carve(sculpt, Vector2(
+			float(foot_local_x)
+			+ float(direction) * (
+				lean
+				- END_WALL_SCALLOP_RADIUS_CELLS
+				+ sin(float(bite_index) * 1.9 + 0.6)
+					* END_WALL_SCALLOP_WANDER_CELLS
+			),
+			bite_row
+		))
+		bite_row -= END_WALL_SCALLOP_SPACING_CELLS
+		bite_index += 1
+	sculpt.end_edit()
+	apply_visual_depth_masks(sculpt)
+
+
+## Returns how far one row's edge wanders off the leaning face, in cells.
+##
+## Three frequencies sharing no whole-number ratio, so the wall neither repeats on
+## a short cycle nor drifts into one straight bevel, and deterministic from the
+## row so recutting a room gives back the wall a designer remembers.
+static func _get_end_wall_face_wobble(local_y: int) -> float:
+	var row := float(local_y)
+	var coarse := sin(row * 0.31)
+	var medium := sin(row * 0.73 + 2.1)
+	var fine := sin(row * 1.61 + 0.4)
+	return (coarse + medium * 0.6 + fine * 0.35) * END_WALL_SCALLOP_WANDER_CELLS
+
+
+## Returns the first open row under the rock at one column, which is where the
+## room's ceiling actually sits after the tunnel cut waved and scalloped it.
+static func _find_open_row_below_top(
+	sculpt: CutsceneTerrainSculpt,
+	local_x: int,
+	floor_row: int
+) -> int:
+	for local_y in range(0, floor_row):
+		if not sculpt.is_solid_local(Vector2i(local_x, local_y)):
+			return local_y
+	return maxi(floor_row - LEVEL_TUNNEL_HEIGHT_CELLS, 0)
 
 
 ## Derives the room's visible depth without moving one collision cell.

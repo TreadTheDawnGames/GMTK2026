@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b4xrv6mg0tq3f"
-path="res://.godot/imported/Tween.png-295fff38d860ecf032619b751ca0dc97.ctex"
+uid="uid://cqdpe6txncfn"
+path="res://.godot/imported/lantern_staff.png-646efca54e65c2d1f244dddd628e24e2.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://addons/conductor/icons/Tween.png"
-dest_files=["res://.godot/imported/Tween.png-295fff38d860ecf032619b751ca0dc97.ctex"]
+source_file="res://Assets/Props/lantern_staff.png"
+dest_files=["res://.godot/imported/lantern_staff.png-646efca54e65c2d1f244dddd628e24e2.ctex"]
 
 [params]
 

@@ -2,9 +2,10 @@
 
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
 [ext_resource type="Script" uid="uid://7qy8qeox17tk" path="res://Scripts/cinematics/cutscene_actor_preview.gd" id="2_hbiw8"]
-[ext_resource type="Resource" path="res://resources/encounters/cloak_lantern_character_appearance.tres" id="3_vk64v"]
+[ext_resource type="Resource" uid="uid://dq5euoa1catq7" path="res://resources/encounters/cloak_lantern_character_appearance.tres" id="3_vk64v"]
 [ext_resource type="Script" uid="uid://bpg6fvsw6y7ai" path="res://resources/encounters/character_appearance.gd" id="4_ml811"]
 [ext_resource type="Texture2D" uid="uid://bq8qwl3xn5qny" path="res://Assets/Characters/miner_idle-Pickaxe.png" id="5_thcas"]
+[ext_resource type="PackedScene" path="res://Scenes/props/lantern_staff.tscn" id="6_staff"]
 
 [sub_resource type="Resource" id="Resource_psbsn"]
 script = ExtResource("4_ml811")
@@ -13,27 +14,39 @@ sprite_scale = Vector2(0.44, 0.44)
 sprite_offset = Vector2(0, -68)
 
 [node name="LanternFirstEncounterStage" unique_id=211847311 instance=ExtResource("1_stage")]
-editor_description = "Story beat 3, depth 1,400: the player first meets the man with the lantern staff, who cryptically foreshadows the Thief. He arrives unhurried and leaves the same way, because the shot's job is to plant a warning the player cannot act on yet. His art is drawn looking left, so he holds the conversation on the miner's right; on the left he would deliver the warning with his back turned."
-opening_move_seconds = 1.6
-closing_move_seconds = 2.4
+editor_description = "Story beat 3, depth 1,400: the player first meets the man with the lantern staff, who cryptically foreshadows the Thief, then hops once and fades away where he stands. He is ALREADY on his ledge when the miner breaks through - he does not walk in - so Entrance sits on the same mark as Conversation and the opening move is only long enough to keep the tween honest. He stands with his back to the miner over the drop, turns to deliver the warning, and turns back to it before he goes; that is what the three Actor Facing values do. Conversation Tracks Miner is off because a ledge cannot slide to meet a landing column, so his distance from the miner varies with where the fall left him. The jagged end wall is on the miner's RIGHT, the cheese girl wall mirrored."
+opening_move_seconds = 0.2
+closing_move_seconds = 0.9
 opening_step_height = 6.0
 hide_actor_after_closing = true
-conversation_tracks_miner = true
-conversation_root_offset_from_miner_x = 88.0
+closing_fade_seconds = 0.9
+entrance_facing = -1
+conversation_facing = 1
+closing_facing = -1
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
-editor_description = "Right of the miner, so walking in never carries him across the frame."
-position = Vector2(264, 0)
+editor_description = "Same mark as Conversation. He is already standing on the ledge when the miner breaks through, so there is no approach to walk."
+position = Vector2(-592, -64)
 
 [node name="Conversation" parent="ActorMarkers" index="1"]
-position = Vector2(-96, 0)
+editor_description = "Near the TIP of the overhang, out where the slab has nothing under it. y is -64 because the ledge stands eight rows above the miner's ground, and every marker here is authored on the surface it is used from."
+position = Vector2(-592, -64)
+
+[node name="Work" parent="ActorMarkers" index="2"]
+editor_description = "The very end of the overhang, kept as the spot to aim any later beat that walks him out to the edge."
+position = Vector2(-632, -64)
 
 [node name="Rest" parent="ActorMarkers" index="3"]
-position = Vector2(-96, 0)
+position = Vector2(-592, -64)
 
 [node name="Exit" parent="ActorMarkers" index="4"]
-editor_description = "Past the right edge of the frame, so he is out of shot well before he is hidden."
-position = Vector2(520, 0)
+editor_description = "His own mark: he does not leave by walking. Closing Fade Seconds hops him once and fades him out where he stands, and Closing Facing turns him back to the drop first."
+position = Vector2(-592, -64)
+
+[node name="LanternStaff" parent="PropMarkers" index="0" unique_id=2096771290 instance=ExtResource("6_staff")]
+editor_description = "Standing in the floor at the dead centre of the shaft, 95 rows below the room - far under the bottom of the cutscene frame, so nothing of it is visible while he is still talking. The miner mines straight down past the shaft afterwards and meets it on the way by. Placed here rather than spawned: an encounter stage lives for the whole run, so the staff is simply already there when the player arrives."
+position = Vector2(-704, 764)
+scale = Vector2(0.2462, 0.2462)
 
 [node name="EditorTerrainPreview" parent="." index="4"]
 editor_description = "Previews cloak_lantern_first at its authored depth."
@@ -42,11 +55,12 @@ preview_depth_rows = 1400
 
 [node name="cloak_lantern" type="Node2D" parent="." index="5" unique_id=1905941146]
 z_index = 3
-position = Vector2(264, 0)
+position = Vector2(-360, -25)
+scale = Vector2(0.8, 0.8)
 script = ExtResource("2_hbiw8")
 actor_id = &"cloak_lantern"
 appearance = ExtResource("3_vk64v")
-pose = &"walk"
+pose = &"idle"
 metadata/_edit_group_ = true
 
 [node name="Miner" type="Node2D" parent="." index="6" unique_id=901033075]

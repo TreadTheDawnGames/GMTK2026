@@ -26,6 +26,20 @@ const FINAL_BREAKTHROUGH_CUE: StringName = &"resume_mining"
 ## foreground layer, which is the ground the player sees them standing on now
 ## that TerrainLayerProfile no longer lowers it over a chamber floor.
 const CAST_FLOOR_LAYER_INDEX: int = 0
+## How far above its floor row a landing still counts as having arrived.
+##
+## A cutscene room's ground is not its floor row. The level tunnel lays up to
+## three cells of loose rock along the floor, and that rock is what the miner
+## comes to rest on, so a fall into a sculpted room legitimately stops short of
+## the row the schedule calls the floor. Requiring the bare row waits for a
+## landing that cannot happen: the encounter stays pending forever with the
+## cinematic flow already claimed, which reads in game as mining that simply
+## stops working.
+##
+## Four rows clears the tallest authored bump with one to spare. The story
+## contract asks this comparison to tolerate overshoot rather than demand an
+## exact impact row, and this is the same allowance in the other direction.
+const LANDING_FLOOR_TOLERANCE_ROWS: int = 4
 
 @export_category("Schedule")
 @export var encounter_config: DepthEncounterConfig
@@ -116,7 +130,10 @@ func _try_activate_pending_encounter() -> void:
 		mining_config.initial_surface_row
 		+ pending_encounter.resolve_depth(mining_config.total_run_depth)
 	)
-	if _latest_landing_world_y < encounter_floor_y:
+	if (
+		_latest_landing_world_y
+		< encounter_floor_y - LANDING_FLOOR_TOLERANCE_ROWS
+	):
 		return
 	_activate_pending_encounter()
 
@@ -183,19 +200,38 @@ func _activate_pending_encounter() -> void:
 	if stage != null:
 		stage.position = encounter_anchor
 		if stage.conversation_tracks_miner:
-			var conversation_position := (
-				stage.conversation_marker.global_position
-			)
-			conversation_position.x = (
-				miner_rig.get_cinematic_foot_screen_position().x
-				+ stage.conversation_root_offset_from_miner_x
-			)
-			stage.conversation_marker.global_position = conversation_position
-			var rest_position := stage.rest_marker.global_position
-			rest_position.x = conversation_position.x
-			stage.rest_marker.global_position = rest_position
+			_align_actor_markers_to_miner(stage)
 	cinematic_flow.focus(FLOW_OWNER)
 	_begin_active_encounter.call_deferred()
+
+
+## Slides the whole actor marker set so the conversation stop lands the authored
+## distance from wherever the miner's descent actually left him.
+##
+## The snaking fall can arrive down any column in a wide band, and the encounter
+## camera centres on that column, so a marker pinned to the room is at a
+## different place in the frame every run. Moving only the conversation and rest
+## markers fixed the wrong half of that: a visitor staged a few body-widths away
+## could be sent to a stop beyond her own entrance, and an exit authored past the
+## frame edge stayed on screen whenever the miner landed toward that side.
+##
+## Shifting the whole set keeps every authored relationship — how long the
+## approach is, how far past the frame the exit sits — true at every landing
+## column. The shift is measured from where the conversation marker currently is,
+## so running this twice moves nothing the second time.
+func _align_actor_markers_to_miner(stage: CharacterEncounterStage) -> void:
+	if (
+		not is_instance_valid(stage.actor_markers_root)
+		or not is_instance_valid(stage.conversation_marker)
+	):
+		return
+	var target_x := (
+		miner_rig.get_cinematic_foot_screen_position().x
+		+ stage.conversation_root_offset_from_miner_x
+	)
+	stage.actor_markers_root.global_position.x += (
+		target_x - stage.conversation_marker.global_position.x
+	)
 
 
 ## Keeps all authored characters attached to their terrain positions.
@@ -281,6 +317,10 @@ func _begin_active_encounter() -> void:
 	if _is_gathering_encounter(_active_encounter_index):
 		_gather_cafe_characters()
 	_active_stage = _stages[_active_encounter_index]
+	if _active_stage == null:
+		# Revealing a presenter is the stage's job, through prepare(). An
+		# encounter authored without one still has to be seen to speak.
+		presenter.show()
 	if _active_stage != null:
 		# Before the frame opens, so the first drawn cutscene frame already has
 		# them in front of the foreground layer instead of popping forward.
@@ -554,6 +594,16 @@ func _prepare_authored_characters() -> bool:
 			character_parent.add_child(presenter)
 			presenter.apply_appearance(encounter.appearance)
 			presenter.position = encounter_position
+			# Hidden until their own cutscene claims them.
+			#
+			# Every character is built up front and parked at the depth they are
+			# owed, which is what lets one presenter be reused across repeat
+			# visits and gathered for the cafe. Parked and visible, though, means
+			# a player mining down to 300 finds Cheese Girl already standing in
+			# the rock waiting for him, and then watches her teleport off screen
+			# so she can walk back in. The stage's prepare() reveals whoever it
+			# takes, and the cafe gathering shows its own roster explicitly.
+			presenter.hide()
 			_presenters_by_actor_id[encounter.actor_id] = presenter
 			_speaker_slots_by_actor_id[encounter.actor_id] = (
 				encounter.speaker_slot

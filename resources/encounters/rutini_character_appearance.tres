@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="CharacterAppearance" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="CharacterAppearance" format=3 uid="uid://ckltv12x6klri"]
 
-[ext_resource type="Script" path="res://resources/encounters/character_appearance.gd" id="1_appearance"]
-[ext_resource type="Texture2D" path="res://Assets/Characters/mice/mouse_brown.png" id="2_texture"]
+[ext_resource type="Script" uid="uid://bpg6fvsw6y7ai" path="res://resources/encounters/character_appearance.gd" id="1_appearance"]
+[ext_resource type="Texture2D" uid="uid://dw2uei06nak77" path="res://Assets/Characters/mice/mouse_red.png" id="2_texture"]
 
 [resource]
 script = ExtResource("1_appearance")
