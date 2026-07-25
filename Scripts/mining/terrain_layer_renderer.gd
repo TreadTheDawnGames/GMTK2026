@@ -74,7 +74,7 @@ const FRACTURE_SUPPORT_VALUE_THRESHOLD: float = 0.9
 
 @export_category("Web Performance")
 ## Limits reusable resized masks so repeated hit sizes avoid image allocations.
-@export_range(0, 48, 1) var resized_stamp_cache_limit: int = 12
+@export_range(0, 48, 1) var resized_stamp_cache_limit: int = 48
 ## Oversized combo openings are one-off and must not occupy the reusable cache.
 @export_range(1, 1_048_576, 1) var resized_stamp_cache_max_pixels: int = 65_536
 
@@ -119,6 +119,8 @@ var _latest_foreground_opening_rect := Rect2()
 var _latest_impact_stamp: ImpactStamp
 var _latest_support_world_position := Vector2(NAN, NAN)
 var _show_logical_overlay: bool = false
+# One entry per stratum, all 1.0 unless the editor is isolating a layer.
+var _layer_display_opacity: PackedFloat32Array = PackedFloat32Array()
 var _active_impact_combo: int = 0
 
 
@@ -463,6 +465,11 @@ func _load_chunk(chunk_index: int) -> void:
 			/ float(profile.mask_pixels_per_cell)
 		)
 		sprite.z_index = profile.get_layer_z_index(layer_index)
+		# Editor stratum isolation. Nothing at runtime sets an override, so
+		# this reads 1.0 during play and the sprite is untouched. Applying it
+		# here rather than only to live chunks is what makes an isolated
+		# stratum survive the rebuild every sculpt stroke causes.
+		sprite.modulate.a = get_layer_display_opacity(layer_index)
 		sprite.material = _create_layer_material(
 			layer_index,
 			world_origin,
@@ -472,6 +479,48 @@ func _load_chunk(chunk_index: int) -> void:
 		chunk.layer_sprites.append(sprite)
 		chunk.mask_textures.append(mask_texture)
 	_active_chunks[chunk_index] = chunk
+
+
+## Dims or hides one stratum everywhere it is drawn, so a designer sculpting a
+## buried layer can see it instead of the foreground rock covering it.
+##
+## Editor-only by convention rather than by a flag: nothing in a running game
+## calls this, so every stratum reads 1.0 and the game draws exactly as it did.
+## It changes no mask, no cell, and no z-order — only how visible a stratum is
+## while it is being worked on.
+func set_layer_display_opacity(layer_index: int, opacity: float) -> void:
+	if layer_index < 0 or layer_index >= profile.get_layer_count():
+		return
+	if _layer_display_opacity.size() < profile.get_layer_count():
+		_layer_display_opacity.resize(profile.get_layer_count())
+		_layer_display_opacity.fill(1.0)
+	_layer_display_opacity[layer_index] = clampf(opacity, 0.0, 1.0)
+	_apply_layer_display_opacity()
+
+
+## Returns how visible a stratum is currently drawn. Defaults to fully opaque,
+## which is the only value a running game ever sees.
+func get_layer_display_opacity(layer_index: int) -> float:
+	if layer_index < 0 or layer_index >= _layer_display_opacity.size():
+		return 1.0
+	return _layer_display_opacity[layer_index]
+
+
+## Restores every stratum to fully visible.
+func clear_layer_display_overrides() -> void:
+	if _layer_display_opacity.is_empty():
+		return
+	_layer_display_opacity.fill(1.0)
+	_apply_layer_display_opacity()
+
+
+func _apply_layer_display_opacity() -> void:
+	for chunk_index: int in _active_chunks:
+		var chunk := _active_chunks[chunk_index]
+		for layer_index in range(chunk.layer_sprites.size()):
+			chunk.layer_sprites[layer_index].modulate.a = (
+				get_layer_display_opacity(layer_index)
+			)
 
 
 ## Removes rendered chunk nodes while retaining their impact records.

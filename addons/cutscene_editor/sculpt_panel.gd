@@ -58,6 +58,12 @@ var _create_button: Button
 var _missing_label: Label
 var _controls_root: VBoxContainer
 var _encounter_selector: OptionButton
+var _focus_selector: OptionButton
+var _focus_mode_selector: OptionButton
+var _dim_slider: HSlider
+var _follow_sculpt_layer: CheckBox
+# -1 shows every stratum; otherwise the one stratum left fully visible.
+var _focused_layer: int = -1
 
 
 func _init() -> void:
@@ -67,7 +73,14 @@ func _init() -> void:
 
 ## Rebinds every control to a newly opened scene.
 func set_context(context: CutsceneEditorContext) -> void:
+	# A stratum left dimmed in the scene being closed would carry over into the
+	# next one, where nothing explains why the rock is faded.
+	if _context != null and _context.is_valid():
+		var previous: TerrainLayerRenderer = _context.preview.terrain_renderer
+		if previous != null:
+			previous.clear_layer_display_overrides()
 	_context = context
+	_focused_layer = -1
 	set_armed(false)
 	refresh()
 
@@ -188,6 +201,41 @@ func _build_controls() -> void:
 
 	_controls_root.add_child(HSeparator.new())
 
+	var focus_row := HBoxContainer.new()
+	var focus_label := Label.new()
+	focus_label.text = "See only"
+	focus_label.custom_minimum_size.x = 120.0
+	focus_label.tooltip_text = (
+		"Isolates one stratum while you work on it. The foreground rock covers "
+		+ "everything behind it, so a buried layer cannot be judged until the "
+		+ "layers in front of it get out of the way. This changes nothing the "
+		+ "game draws."
+	)
+	focus_row.add_child(focus_label)
+	_focus_selector = OptionButton.new()
+	_focus_selector.item_selected.connect(_on_focus_selected)
+	focus_row.add_child(_focus_selector)
+	_focus_mode_selector = OptionButton.new()
+	_focus_mode_selector.add_item("dim the rest")
+	_focus_mode_selector.add_item("hide the rest")
+	_focus_mode_selector.item_selected.connect(_on_focus_mode_selected)
+	focus_row.add_child(_focus_mode_selector)
+	_controls_root.add_child(focus_row)
+
+	_dim_slider = _add_slider("Dimmed to", 0.0, 1.0, 0.05, 0.15)
+	_dim_slider.value_changed.connect(_on_dim_changed)
+
+	_follow_sculpt_layer = CheckBox.new()
+	_follow_sculpt_layer.text = "Follow the stratum I am sculpting"
+	_follow_sculpt_layer.button_pressed = true
+	_follow_sculpt_layer.tooltip_text = (
+		"Picking a stratum to sculpt also isolates it."
+	)
+	_follow_sculpt_layer.toggled.connect(_on_follow_toggled)
+	_controls_root.add_child(_follow_sculpt_layer)
+
+	_controls_root.add_child(HSeparator.new())
+
 	_smoothing_slider = _add_slider("Rock smoothing", 0.0, 1.0, 0.05, 1.0)
 	_smoothing_slider.value_changed.connect(_on_smoothing_changed)
 
@@ -288,7 +336,59 @@ func _on_layer_selected(selected_index: int) -> void:
 	_brush.target_layer = selected_index - 1
 	if _brush.target_layer >= 0 and _context != null and _context.sculpt != null:
 		_context.sculpt.ensure_layer_masks(_brush.target_layer + 1)
+	if _follow_sculpt_layer.button_pressed:
+		_set_focused_layer(_brush.target_layer)
 	brush_settings_changed.emit()
+
+
+func _on_focus_selected(selected_index: int) -> void:
+	_set_focused_layer(selected_index - 1)
+
+
+func _on_focus_mode_selected(_selected_index: int) -> void:
+	_apply_layer_focus()
+
+
+func _on_dim_changed(_value: float) -> void:
+	_apply_layer_focus()
+
+
+func _on_follow_toggled(pressed: bool) -> void:
+	if pressed:
+		_set_focused_layer(_brush.target_layer)
+
+
+func _set_focused_layer(layer_index: int) -> void:
+	_focused_layer = layer_index
+	if _focus_selector.item_count > 0:
+		_focus_selector.select(
+			clampi(layer_index + 1, 0, _focus_selector.item_count - 1)
+		)
+	_apply_layer_focus()
+
+
+## Dims or hides every stratum except the focused one. Restores all of them
+## when nothing is focused, so leaving the tool never leaves the preview in a
+## state a designer has to undo by hand.
+func _apply_layer_focus() -> void:
+	if _context == null or not _context.is_valid():
+		return
+	var renderer: TerrainLayerRenderer = _context.preview.terrain_renderer
+	if renderer == null or renderer.profile == null:
+		return
+	if _focused_layer < 0:
+		renderer.clear_layer_display_overrides()
+		return
+	var others_opacity := (
+		0.0
+		if _focus_mode_selector.selected == 1
+		else _dim_slider.value
+	)
+	for layer_index in range(renderer.profile.get_layer_count()):
+		renderer.set_layer_display_opacity(
+			layer_index,
+			1.0 if layer_index == _focused_layer else others_opacity
+		)
 
 
 func _on_smoothing_changed(value: float) -> void:
@@ -429,9 +529,13 @@ func _sync_layer_selector() -> void:
 		return
 	_layer_selector.clear()
 	_layer_selector.add_item("Shape (all strata)")
+	_focus_selector.clear()
+	_focus_selector.add_item("All strata")
 	for layer_index in range(layer_count):
 		_layer_selector.add_item("Stratum %d only" % (layer_index + 1))
+		_focus_selector.add_item("Stratum %d" % (layer_index + 1))
 	_layer_selector.select(clampi(_brush.target_layer + 1, 0, layer_count))
+	_focus_selector.select(clampi(_focused_layer + 1, 0, layer_count))
 
 
 func _sync_sculpt_controls(sculpt: CutsceneTerrainSculpt) -> void:
