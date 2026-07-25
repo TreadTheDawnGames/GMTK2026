@@ -54,6 +54,8 @@ func _ready() -> void:
 	#for target in targets:
 		#randomize_target(target)
 	
+	if not one_shot:
+		randomize_all_targets()
 	reset_one_shot()
 	if one_shot:
 		stop()
