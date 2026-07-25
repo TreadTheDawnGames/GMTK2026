@@ -51,6 +51,20 @@ const OPERATION_TOOLTIPS: Array[String] = [
 		+ "Alt-click heals one.",
 ]
 
+## One colour per stratum, foreground first. These are identity, not decoration:
+## the same colour marks a stratum's swatch, its outline in the viewport, and
+## the brush ring while that stratum is selected, so "which layer am I cutting"
+## is answered by colour rather than by reading a dropdown mid-stroke.
+const LAYER_COLORS: Array[Color] = [
+	Color(1.00, 0.78, 0.28),
+	Color(0.42, 0.82, 1.00),
+	Color(0.62, 1.00, 0.55),
+	Color(1.00, 0.55, 0.85),
+	Color(0.80, 0.70, 1.00),
+]
+## Colour used when the brush edits the shape itself rather than one stratum.
+const SHAPE_COLOR := Color(1.0, 1.0, 1.0, 0.95)
+
 var _context: CutsceneEditorContext
 var _brush := CutsceneSculptBrush.new()
 var _operation_index: int = 0
@@ -74,6 +88,7 @@ var _focus_selector: OptionButton
 var _focus_mode_selector: OptionButton
 var _dim_slider: HSlider
 var _follow_sculpt_layer: CheckBox
+var _swatch_row: HBoxContainer
 # -1 shows every stratum; otherwise the one stratum left fully visible.
 var _focused_layer: int = -1
 
@@ -105,6 +120,53 @@ func get_brush() -> CutsceneSculptBrush:
 ## Returns which operation is armed.
 func get_operation() -> StringName:
 	return OPERATIONS[_operation_index]
+
+
+## Returns the colour standing for whatever the brush is currently editing, so
+## the viewport can draw the brush and the stratum outline in the same colour.
+func get_active_layer_color() -> Color:
+	return get_layer_color(_brush.target_layer)
+
+
+## Returns one stratum's colour, or the shape colour for a negative index.
+func get_layer_color(layer_index: int) -> Color:
+	if layer_index < 0:
+		return SHAPE_COLOR
+	return LAYER_COLORS[layer_index % LAYER_COLORS.size()]
+
+
+## Returns the armed tool's human name, for the on-canvas readout.
+func get_operation_label() -> String:
+	return OPERATION_LABELS[_operation_index]
+
+
+## Returns the stratum the viewport should outline, or -1 for none.
+func get_outlined_layer() -> int:
+	return _brush.target_layer
+
+
+## Grows or shrinks the brush by one wheel notch. Steps are proportional so a
+## small brush stays finely adjustable while a large one moves usefully.
+func step_brush_size(direction: int) -> void:
+	var step := maxf(1.0, _radius_slider.value * 0.2)
+	_radius_slider.value = clampf(
+		_radius_slider.value + step * float(signi(direction)),
+		_radius_slider.min_value,
+		_radius_slider.max_value
+	)
+
+
+## Moves between the shape and each stratum by one wheel notch, wrapping, so a
+## designer can change what they are cutting without leaving the viewport.
+func step_focused_layer(direction: int) -> void:
+	if _layer_selector.item_count <= 0:
+		return
+	var next_index := posmod(
+		_layer_selector.selected + signi(direction),
+		_layer_selector.item_count
+	)
+	_layer_selector.select(next_index)
+	_on_layer_selected(next_index)
 
 
 ## Reports whether viewport clicks should sculpt instead of select.
@@ -248,6 +310,12 @@ func _build_controls() -> void:
 		+ "single stratum changes only what that layer draws."
 	)
 	_layer_selector.item_selected.connect(_on_layer_selected)
+	_swatch_row = HBoxContainer.new()
+	_swatch_row.tooltip_text = (
+		"Click a colour to choose what the brush cuts. Ctrl and the mouse "
+		+ "wheel do the same thing without leaving the viewport."
+	)
+	layer_column.add_child(_swatch_row)
 	_focus_selector = _add_dropdown(
 		layer_column, "See only",
 		"Isolates one stratum while you work on it. The foreground rock covers "
@@ -658,6 +726,40 @@ func _sync_layer_selector() -> void:
 		_focus_selector.add_item("Stratum %d" % (layer_index + 1))
 	_layer_selector.select(clampi(_brush.target_layer + 1, 0, layer_count))
 	_focus_selector.select(clampi(_focused_layer + 1, 0, layer_count))
+	_rebuild_swatches(layer_count)
+
+
+## Draws one clickable colour per stratum, plus the shape itself. The selected
+## one is outlined so the row reads as a choice rather than a legend.
+func _rebuild_swatches(layer_count: int) -> void:
+	for child in _swatch_row.get_children():
+		child.queue_free()
+	for swatch_index in range(layer_count + 1):
+		var layer_index := swatch_index - 1
+		var swatch := Button.new()
+		swatch.custom_minimum_size = Vector2(22.0, 18.0)
+		swatch.tooltip_text = (
+			"Shape: cuts every stratum and the ground the miner stands on."
+			if layer_index < 0
+			else "Stratum %d only: changes what this layer draws." % (
+				layer_index + 1
+			)
+		)
+		var style := StyleBoxFlat.new()
+		style.bg_color = get_layer_color(layer_index)
+		if layer_index == _brush.target_layer:
+			style.border_color = Color.WHITE
+			style.set_border_width_all(2)
+		swatch.add_theme_stylebox_override("normal", style)
+		swatch.add_theme_stylebox_override("hover", style)
+		swatch.add_theme_stylebox_override("pressed", style)
+		swatch.pressed.connect(_on_swatch_pressed.bind(layer_index))
+		_swatch_row.add_child(swatch)
+
+
+func _on_swatch_pressed(layer_index: int) -> void:
+	_layer_selector.select(layer_index + 1)
+	_on_layer_selected(layer_index + 1)
 
 
 func _sync_sculpt_controls(sculpt: CutsceneTerrainSculpt) -> void:

@@ -38,6 +38,9 @@ var _last_stroke_local := Vector2.ZERO
 var _stroke_before: CutsceneTerrainSculpt
 var _hover_local := Vector2.ZERO
 var _has_hover: bool = false
+var _stroke_origin_local := Vector2.ZERO
+# Outline segments cached in scene space; see _rebuild_layer_outline.
+var _outline_points := PackedVector2Array()
 
 
 func _enter_tree() -> void:
@@ -136,6 +139,7 @@ func _rebuild_context() -> void:
 	_cast_panel.set_context(_context)
 	_timeline_panel.set_context(_context)
 	_beat_inspector.set_context(_context)
+	_rebuild_layer_outline()
 	update_overlays()
 
 
@@ -143,6 +147,7 @@ func _on_authored_data_changed() -> void:
 	if _context.preview != null:
 		_context.preview.build_preview()
 	_sculpt_panel.refresh()
+	_rebuild_layer_outline()
 	update_overlays()
 
 
@@ -151,6 +156,9 @@ func _on_armed_changed(_is_armed: bool) -> void:
 
 
 func _on_brush_settings_changed() -> void:
+	# The outline follows the selected stratum, so changing what the brush cuts
+	# changes what is traced.
+	_rebuild_layer_outline()
 	update_overlays()
 
 
@@ -224,12 +232,40 @@ func _forward_canvas_gui_input(event: InputEvent) -> bool:
 		_has_hover = true
 		update_overlays()
 		if _is_stroking:
-			_stroke_to(_hover_local, motion.alt_pressed)
+			# Shift locks the stroke to the axis it started along, which is how
+			# a flat floor or a straight wall gets cut without a steady hand.
+			_stroke_to(
+				_constrain_stroke(_hover_local, motion.shift_pressed),
+				motion.alt_pressed
+			)
 			return true
 		return false
 
 	var button := event as InputEventMouseButton
-	if button == null or button.button_index != MOUSE_BUTTON_LEFT:
+	if button == null:
+		return false
+	# The wheel is the fastest control in any painting tool, so it resizes the
+	# brush; with Ctrl it steps between strata instead, because choosing which
+	# rock you are cutting is the other thing done constantly mid-stroke.
+	if (
+		button.pressed
+		and (
+			button.button_index == MOUSE_BUTTON_WHEEL_UP
+			or button.button_index == MOUSE_BUTTON_WHEEL_DOWN
+		)
+	):
+		var step := (
+			1
+			if button.button_index == MOUSE_BUTTON_WHEEL_UP
+			else -1
+		)
+		if button.ctrl_pressed:
+			_sculpt_panel.step_focused_layer(step)
+		else:
+			_sculpt_panel.step_brush_size(step)
+		update_overlays()
+		return true
+	if button.button_index != MOUSE_BUTTON_LEFT:
 		return false
 	var local_cell := preview.global_position_to_sculpt_local(
 		_to_world_position(button.position)
@@ -260,9 +296,22 @@ func _dig_hit(world_position: Vector2, heal: bool) -> void:
 		undo_redo.commit_action(false)
 
 
+## Locks a held stroke to the axis it has travelled furthest along. The axis is
+## chosen from the whole stroke rather than the last mouse move, so a wobble
+## near the start cannot flip a long straight cut halfway through.
+func _constrain_stroke(local_cell: Vector2, constrain: bool) -> Vector2:
+	if not constrain:
+		return local_cell
+	var travel := local_cell - _stroke_origin_local
+	if absf(travel.x) >= absf(travel.y):
+		return Vector2(local_cell.x, _stroke_origin_local.y)
+	return Vector2(_stroke_origin_local.x, local_cell.y)
+
+
 func _begin_stroke(local_cell: Vector2, invert: bool) -> void:
 	_stroke_before = CutsceneTerrainSculpt.new()
 	_stroke_before.copy_shape_from(_context.sculpt)
+	_stroke_origin_local = local_cell
 	_is_stroking = true
 	_last_stroke_local = local_cell
 	_apply_operation(local_cell, local_cell, invert)
@@ -291,6 +340,7 @@ func _end_stroke() -> void:
 	if not sculpt.resource_path.is_empty():
 		ResourceSaver.save(sculpt, sculpt.resource_path)
 	_sculpt_panel.refresh()
+	_rebuild_layer_outline()
 	update_overlays()
 
 
@@ -323,9 +373,12 @@ func _forward_canvas_draw_over_viewport(overlay: Control) -> void:
 		return
 	var transform := _get_viewport_transform()
 	_draw_room_bounds(overlay, preview, sculpt, transform)
+	_draw_layer_outline(overlay, transform)
 	_draw_landing_line(overlay, preview, sculpt, transform)
-	if _sculpt_panel.is_armed() and _has_hover:
-		_draw_brush(overlay, preview, transform)
+	if _sculpt_panel.is_armed():
+		_draw_readout(overlay)
+		if _has_hover:
+			_draw_brush(overlay, preview, transform)
 
 
 func _draw_room_bounds(
@@ -397,14 +450,135 @@ func _draw_brush(
 	var edge := transform * preview.sculpt_local_to_global_position(
 		_hover_local + Vector2(_sculpt_panel.get_brush().radius_cells, 0.0)
 	)
+	# The ring carries the selected stratum's colour, so what the brush will
+	# cut is answered by looking at the cursor rather than at the panel.
+	var brush_color: Color = _sculpt_panel.get_active_layer_color()
 	overlay.draw_arc(
 		center,
 		center.distance_to(edge),
 		0.0,
 		TAU,
 		48,
-		BRUSH_COLOR,
+		brush_color,
 		2.0
+	)
+	overlay.draw_arc(center, 2.0, 0.0, TAU, 8, brush_color, 2.0)
+
+
+## Traces the selected stratum's solid/open boundary. The segments are cached
+## in scene space and rebuilt only when the room or the selection changes: a
+## 140x120 room is nearly seventeen thousand cells, and walking it on every
+## mouse-move frame would stall the viewport.
+func _draw_layer_outline(overlay: Control, transform: Transform2D) -> void:
+	if _outline_points.size() < 2:
+		return
+	var color: Color = _sculpt_panel.get_active_layer_color()
+	color.a = 0.85
+	var screen_points := PackedVector2Array()
+	screen_points.resize(_outline_points.size())
+	for point_index in range(_outline_points.size()):
+		screen_points[point_index] = transform * _outline_points[point_index]
+	overlay.draw_multiline(screen_points, color, 1.0)
+
+
+func _rebuild_layer_outline() -> void:
+	_outline_points = PackedVector2Array()
+	var preview := _context.preview
+	var sculpt := _context.sculpt
+	if preview == null or sculpt == null:
+		return
+	var layer_index: int = _sculpt_panel.get_outlined_layer()
+	for local_y in range(sculpt.grid_size.y):
+		for local_x in range(sculpt.grid_size.x):
+			var cell := Vector2i(local_x, local_y)
+			if not _is_outlined_solid(sculpt, layer_index, cell):
+				continue
+			# Only the sides facing open air are drawn, so the result is the
+			# silhouette of the rock rather than a grid over it.
+			if not _is_outlined_solid(
+				sculpt, layer_index, cell + Vector2i.RIGHT
+			):
+				_append_outline_edge(
+					preview,
+					Vector2(local_x + 1, local_y),
+					Vector2(local_x + 1, local_y + 1)
+				)
+			if not _is_outlined_solid(
+				sculpt, layer_index, cell + Vector2i.LEFT
+			):
+				_append_outline_edge(
+					preview,
+					Vector2(local_x, local_y),
+					Vector2(local_x, local_y + 1)
+				)
+			if not _is_outlined_solid(
+				sculpt, layer_index, cell + Vector2i.DOWN
+			):
+				_append_outline_edge(
+					preview,
+					Vector2(local_x, local_y + 1),
+					Vector2(local_x + 1, local_y + 1)
+				)
+			if not _is_outlined_solid(sculpt, layer_index, cell + Vector2i.UP):
+				_append_outline_edge(
+					preview,
+					Vector2(local_x, local_y),
+					Vector2(local_x + 1, local_y)
+				)
+
+
+func _is_outlined_solid(
+	sculpt: CutsceneTerrainSculpt,
+	layer_index: int,
+	cell: Vector2i
+) -> bool:
+	if layer_index < 0:
+		return sculpt.is_solid_local(cell)
+	return sculpt.is_layer_solid_local(layer_index, cell)
+
+
+func _append_outline_edge(
+	preview: CinematicTerrainPreview,
+	from_local: Vector2,
+	to_local: Vector2
+) -> void:
+	_outline_points.append(preview.sculpt_local_to_global_position(from_local))
+	_outline_points.append(preview.sculpt_local_to_global_position(to_local))
+
+
+## States the tool, its size and what it is cutting, on the canvas where the
+## work is happening, and lists the modifiers. A tool whose modifiers are only
+## documented elsewhere may as well not have them.
+func _draw_readout(overlay: Control) -> void:
+	var font := overlay.get_theme_default_font()
+	if font == null:
+		return
+	var brush := _sculpt_panel.get_brush()
+	var layer_index: int = _sculpt_panel.get_outlined_layer()
+	var headline := "%s  ·  size %.0f  ·  %s" % [
+		_sculpt_panel.get_operation_label(),
+		brush.radius_cells,
+		(
+			"shape"
+			if layer_index < 0
+			else "stratum %d" % (layer_index + 1)
+		),
+	]
+	var origin := Vector2(12.0, 22.0)
+	overlay.draw_string(
+		font, origin + Vector2.ONE, headline, HORIZONTAL_ALIGNMENT_LEFT,
+		-1.0, 14, Color(0.0, 0.0, 0.0, 0.7)
+	)
+	overlay.draw_string(
+		font, origin, headline, HORIZONTAL_ALIGNMENT_LEFT,
+		-1.0, 14, _sculpt_panel.get_active_layer_color()
+	)
+	var hint := (
+		"wheel size  ·  ctrl+wheel layer  ·  shift straight  ·  alt invert"
+	)
+	overlay.draw_string(
+		font, origin + Vector2(0.0, 18.0), hint, HORIZONTAL_ALIGNMENT_LEFT,
+		-1.0, 12, Color(0.82, 0.86, 0.92, 0.75)
 	)
 
 
