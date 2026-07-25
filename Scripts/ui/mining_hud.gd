@@ -1,7 +1,7 @@
 class_name MiningHud
 extends CanvasLayer
 
-## Displays remaining depth and a pace-based estimate to the run bottom.
+## Displays distance to or beyond the Thief and a pace-based arrival estimate.
 
 @export var depth_label: Label
 @export var bottom_eta_label: Label
@@ -47,16 +47,25 @@ func _on_run_time_changed(elapsed_seconds: int) -> void:
 
 ## Shows how much gameplay depth remains before the run bottom.
 func _update_remaining_depth(remaining_depth: int) -> void:
+	if _game_state.has_reached_thief:
+		depth_label.text = (
+			"DISTANCE SINCE THIEF  %s"
+			% _format_number(_game_state.distance_since_thief)
+		)
+		return
 	depth_label.text = (
-		"DEPTH  %s"
+		"REMAINING TO THE THIEF  %s"
 		% _format_number(remaining_depth)
 	)
 
 
 ## Projects the current average descent pace across all remaining depth.
 func _update_bottom_eta() -> void:
+	if _game_state.has_reached_thief:
+		bottom_eta_label.text = "THIEF PASSED"
+		return
 	if _game_state.depth <= 0:
-		bottom_eta_label.text = "BOTTOM ETA  --:--"
+		bottom_eta_label.text = "THIEF ETA  --:--"
 		return
 	var estimated_seconds := ceili(
 		_elapsed_run_seconds
@@ -81,7 +90,7 @@ func _update_bottom_eta() -> void:
 		else "%02d:%02d"
 			% [estimated_minutes, estimated_remaining_seconds]
 	)
-	bottom_eta_label.text = "BOTTOM ETA  %s" % formatted_eta
+	bottom_eta_label.text = "THIEF ETA  %s" % formatted_eta
 
 
 ## Adds commas to a whole number.

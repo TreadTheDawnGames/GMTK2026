@@ -18,6 +18,7 @@ func _ready() -> void:
 	master_volume.set_bus_volume(_game_state.save_game.master_volume)
 	music.set_bus_volume(_game_state.save_game.sfx_volume)
 	sfx.set_bus_volume(_game_state.save_game.music_volume)
+	mute_bounce.grab_focus()
 
 # Called when Back button is pressed
 func _on_back_button_pressed() -> void:
@@ -35,9 +36,11 @@ func _on_back_button_pressed() -> void:
 var instantiated_credits
 func _on_credits_button_pressed() -> void:
 	tab_container.current_tab = 1
+	$TabContainer/PanelContainer/VBoxContainer/ReturnToSettings.grab_focus()
 
 func _on_return_to_settings_pressed() -> void:
 	tab_container.current_tab = 0
+	mute_bounce.grab_focus()
 	pass # Replace with function body.
 
 func _on_v_sync_options_item_selected(index: int) -> void:

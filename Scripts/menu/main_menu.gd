@@ -209,7 +209,14 @@ func _open_game_scene() -> void:
 
 ## Opens the authored settings screen over the menu.
 func _on_options_pressed() -> void:
-	var options := options_scene.instantiate()
+	var options := options_scene.instantiate() as Control
+	if options == null:
+		push_error("The configured options scene must instantiate a Control.")
+		return
+	options.tree_exited.connect(
+		options_button.grab_focus,
+		CONNECT_ONE_SHOT
+	)
 	add_child(options)
 
 

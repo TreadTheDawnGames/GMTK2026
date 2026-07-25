@@ -5,6 +5,9 @@ extends Node2D
 ## Mining impacts add bounded terrain-space lobes to one short-lived cloud.
 ## The node simulates bonding, buoyancy, and terrain collision, then writes
 ## every lobe to one MultiMesh draw call; it emits no gameplay state.
+## One lobe is one drawn dust puff: mining_smoke.gdshader gives each quad a
+## hard inked silhouette and flat tone bands, so a cloud reads as overlapping
+## drawn puffs in the terrain palette rather than as stacked soft blobs.
 ## The invariant is that the lobe count never exceeds the active platform cap.
 ## Jam justification: simulation and rendering share one small lobe dataset and
 ## one consumer; keep this local unless a second smoke presenter is introduced.
@@ -49,6 +52,14 @@ class SmokeCloud:
 ## Lower browser cap bounds per-frame collision samples and MultiMesh writes.
 @export_range(1, 24, 1) var web_maximum_lobes: int = 12
 @export var smoke_color: Color = Color(0.52, 0.40, 0.30)
+## Dust is drawn as a wispy volume rather than a solid shape, so a single lobe
+## stays thin and overlapping lobes accumulate into the denser core of a cloud.
+## Raising this past about 0.7 collapses that accumulation back into flat discs.
+@export_range(0.1, 1.0, 0.01) var body_opacity: float = 0.55
+## Share of the cloud's life spent fading out. The dust holds its opacity until
+## the remaining life drops inside this share, so a cloud thins out once rather
+## than dimming from the instant it is born.
+@export_range(0.05, 1.0, 0.05) var fade_portion: float = 0.45
 
 @export_category("Bonding")
 @export_range(1.0, 300.0, 1.0) var minimum_bond_spacing: float = 96.0
@@ -296,6 +307,11 @@ func _sync_render_instances() -> void:
 		0.0,
 		1.0
 	)
+	var body_alpha := body_opacity * clampf(
+		life_ratio / maxf(fade_portion, 0.05),
+		0.0,
+		1.0
+	)
 	for lobe_index in range(visible_count):
 		var lobe := _cloud.lobes[lobe_index]
 		var screen_position := (
@@ -311,13 +327,14 @@ func _sync_render_instances() -> void:
 			lobe.display_right_radius
 			- lobe.display_left_radius
 		) * 0.5
+		var vertical_half_size := lobe.current_radius * 1.2
 		smoke_multimesh.set_instance_transform_2d(
 			lobe_index,
 			Transform2D(
 				0.0,
 				Vector2(
 					horizontal_half_size,
-					lobe.current_radius * 1.2
+					vertical_half_size
 				),
 				0.0,
 				screen_position
@@ -325,18 +342,28 @@ func _sync_render_instances() -> void:
 			)
 		)
 		var rock_color := smoke_color
-		rock_color.a = 0.68 * life_ratio
+		rock_color.a = body_alpha
 		smoke_multimesh.set_instance_color(
 			lobe_index,
 			rock_color
 		)
+		# The shader needs the quad's real proportions to keep the drawn edge
+		# scallops evenly sized on a lobe stretched wide across a tunnel. Custom
+		# data is normalised into 0..1 here and expanded back in the shader, so
+		# a lobe that fills an unusually wide opening can never hand the noise a
+		# runaway value.
+		var packed_aspect := clampf(
+			horizontal_half_size / maxf(vertical_half_size, 1.0),
+			0.0,
+			8.0
+		) / 8.0
 		smoke_multimesh.set_instance_custom_data(
 			lobe_index,
 			Color(
 				fposmod(lobe.shape_seed / TAU, 1.0),
 				lobe.shape_phase,
 				_cloud.pressure,
-				0.0
+				packed_aspect
 			)
 		)
 

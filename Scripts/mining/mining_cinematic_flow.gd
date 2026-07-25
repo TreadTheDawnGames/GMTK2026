@@ -94,6 +94,48 @@ func finish(owner: StringName) -> bool:
 	return true
 
 
+## Restores gameplay through a short authored fade while dialogue stays visible.
+func finish_with_presentation_fade(
+	owner: StringName,
+	fade_seconds: float
+) -> bool:
+	if not is_owned_by(owner):
+		return false
+	var hud_alpha := (
+		gameplay_hud.modulate.a if gameplay_hud != null else 1.0
+	)
+	var feedback_alpha := (
+		impact_feedback_layer.modulate.a
+		if impact_feedback_layer != null
+		else 1.0
+	)
+	if gameplay_hud != null:
+		gameplay_hud.modulate.a = 0.0
+	if impact_feedback_layer != null:
+		impact_feedback_layer.modulate.a = 0.0
+	if not finish(owner):
+		return false
+	var fade_duration := maxf(fade_seconds, 0.01)
+	var fade_tween := create_tween()
+	fade_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	fade_tween.set_parallel(true)
+	if gameplay_hud != null:
+		fade_tween.tween_property(
+			gameplay_hud,
+			"modulate:a",
+			hud_alpha,
+			fade_duration
+		)
+	if impact_feedback_layer != null:
+		fade_tween.tween_property(
+			impact_feedback_layer,
+			"modulate:a",
+			feedback_alpha,
+			fade_duration
+		)
+	return true
+
+
 ## Uses the same guarded cleanup for interrupted interactions.
 func cancel(owner: StringName) -> bool:
 	return finish(owner)

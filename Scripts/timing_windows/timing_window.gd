@@ -1,7 +1,7 @@
 extends Control
 class_name TimingWindowTask
 
-## Resolves timing attempts from Space or left click.
+## Resolves timing attempts through the project's primary input action.
 
 @onready var mining_window: SliderTimingWindow = %MiningWindow
 @onready var recovery_window: SliderTimingWindow = %RecoveryWindow
@@ -58,10 +58,10 @@ func _ready() -> void:
 	if not _target_unlocks.is_empty():
 		_apply_pickaxe_target_unlocks()
 	
-## Shows remaining run depth from the shared state.
+## Shows distance to the Thief, then distance travelled beyond the Thief.
 func _update_depth_label(_depth: int) -> void:
 	depth_label.text = Utils.format_number_with_commas(
-		_game_state.remaining_depth
+		_game_state.displayed_distance
 	)
 
 

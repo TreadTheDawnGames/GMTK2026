@@ -13,6 +13,8 @@ extends Node
 @export var hit_particles: MiningHitParticles
 @export var gem_outcrop_field: GemOutcropField
 @export var impact_smoke: MiningImpactSmoke
+@export var impact_spark: ImpactSpark
+@export var combo_vignette: ComboImpactVignette
 @export var dig_number_presenter: DigNumberPresenter
 @export var impact_shake: ImpactShake
 @export var pickaxe_progression: PickaxeProgression
@@ -89,6 +91,10 @@ func _ready() -> void:
 	_connect_once(
 		cinematic_flow.flow_finished,
 		run_timeline._on_cinematic_flow_finished
+	)
+	_connect_once(
+		cinematic_flow.flow_finished,
+		encounter_controller._on_cinematic_flow_finished
 	)
 	_connect_once(
 		run_timeline.run_time_changed,
@@ -179,6 +185,10 @@ func _ready() -> void:
 	_connect_once(
 		mining_controller.swing_requested,
 		miner_rig.play_success
+	)
+	_connect_once(
+		mining_controller.mine_resolved,
+		encounter_controller._on_final_breakthrough_mined
 	)
 	_connect_once(
 		dialogue_director.conversation_finished,

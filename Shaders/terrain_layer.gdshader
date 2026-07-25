@@ -554,16 +554,6 @@ vec4 sample_foreground_gem(vec2 world_position) {
 	return vec4(art.rgb, silhouette * footprint * gem_present);
 }
 
-// Keeps the optional crystal composition identical whether drawn rocks are
-// enabled or the foreground is using dirt plus gems alone.
-vec3 apply_foreground_gem(vec3 surface_color, vec2 world_position) {
-	if (!use_foreground_gems) {
-		return surface_color;
-	}
-	vec4 foreground_gem = sample_foreground_gem(world_position);
-	return mix(surface_color, foreground_gem.rgb, foreground_gem.a);
-}
-
 // Grass helpers. Godot will not let a user function take the built-in TEXTURE
 // sampler, so the terrain-mask tap stays in fragment(); the grass sheet is its
 // own uniform and can be sampled here.
@@ -685,7 +675,7 @@ vec3 apply_strata_texture(vec3 surface_color, vec2 world_position) {
 		detail_mix
 	);
 	if (!use_rock_texture) {
-		return apply_foreground_gem(dirt_only_surface, world_position);
+		return dirt_only_surface;
 	}
 
 	// Drawn rock clusters, composited far to near over the finished dirt. The
@@ -762,7 +752,7 @@ vec3 apply_strata_texture(vec3 surface_color, vec2 world_position) {
 		near_rock.rgb,
 		near_rock.a * rock_strength
 	);
-	return apply_foreground_gem(detailed_surface, world_position);
+	return detailed_surface;
 }
 
 // Composes optional art, tint, procedural strata detail, and the damage mask.
@@ -812,6 +802,19 @@ void fragment() {
 			world_position
 		);
 	}
+	// Keep the terrain beneath a gem so fracture ink can reveal that terrain
+	// instead of flattening every line into a new opaque color.
+	vec3 terrain_surface = surface_color;
+	float foreground_gem_coverage = 0.0;
+	if (use_foreground_gems) {
+		vec4 foreground_gem = sample_foreground_gem(world_position);
+		foreground_gem_coverage = foreground_gem.a;
+		surface_color = mix(
+			surface_color,
+			foreground_gem.rgb,
+			foreground_gem_coverage
+		);
+	}
 	// Bevel this stratum against its own opening before the cracks go on, so
 	// the rim shading reads as form and the strokes still sit on top of it.
 	if (use_layer_edge_shading && mask_alpha > 0.0) {
@@ -857,13 +860,31 @@ void fragment() {
 		fracture_value = 1.0 - ink * fracture_line_ink;
 	}
 
-	// A stroke tints the rock toward its own deep-earth tone instead of printing
-	// neutral black over it, so a crack reads as this same material in shadow
-	// rather than as ink sitting on top of the painting.
+	// Preserve the original multiplicative fracture rendering everywhere. Only
+	// where a gem intersects ink does the shader substitute the dirt beneath it
+	// and normalize the authored line strength to fully occlude the crystal.
+	float fracture_mix = 1.0 - fracture_value;
+	float gem_fracture_mix = fracture_mix;
+	if (fracture_line_ink > 0.0) {
+		gem_fracture_mix = clamp(
+			fracture_mix / fracture_line_ink,
+			0.0,
+			1.0
+		);
+	}
+	vec3 fracture_surface = mix(
+		surface_color * fracture_shade_color.rgb,
+		terrain_surface * fracture_shade_color.rgb,
+		foreground_gem_coverage
+	);
 	surface_color = mix(
 		surface_color,
-		surface_color * fracture_shade_color.rgb,
-		1.0 - fracture_value
+		fracture_surface,
+		mix(
+			fracture_mix,
+			gem_fracture_mix,
+			foreground_gem_coverage
+		)
 	);
 
 	// Only alpha is cut by the streamed mask. Optional artwork alpha and layer

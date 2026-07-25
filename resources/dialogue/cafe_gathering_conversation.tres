@@ -1,8 +1,39 @@
-[gd_resource type="Resource" script_class="DialogueConversation" load_steps=15 format=3]
+[gd_resource type="Resource" script_class="DialogueConversation" format=3 uid="uid://btlq5nsfh84a6"]
 
-[ext_resource type="Script" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
-[ext_resource type="Script" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
-[ext_resource type="Script" path="res://resources/dialogue/dialogue_line.gd" id="3_line"]
+[ext_resource type="Script" uid="uid://c55utdbjdwaui" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
+[ext_resource type="Script" uid="uid://ivfntthetp0i" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
+[ext_resource type="Script" uid="uid://bwwpoalvqb7ni" path="res://resources/dialogue/dialogue_line.gd" id="3_line"]
+
+[sub_resource type="Resource" id="Line_cheese"]
+script = ExtResource("3_line")
+speaker_slot = &"cheese_girl"
+text = "You found it. I knew you would."
+
+[sub_resource type="Resource" id="Line_treasure"]
+script = ExtResource("3_line")
+speaker_slot = &"treasure_hunter"
+text = "No treasure here. Good. I was tired of carrying things."
+
+[sub_resource type="Resource" id="Line_rutini"]
+script = ExtResource("3_line")
+speaker_slot = &"rutini"
+text = "Easy, lads. We're here."
+
+[sub_resource type="Resource" id="Line_coffee"]
+script = ExtResource("3_line")
+speaker_slot = &"coffee_cat"
+speaker_pose = &"hold_cup"
+text = "C-c-cafe coffee! We made it! Did we make it fast? I think we made it fast!"
+
+[sub_resource type="Resource" id="Line_cloak"]
+script = ExtResource("3_line")
+speaker_slot = &"cloak_lantern"
+text = "Stay a while. Not every minute needs somewhere to go."
+
+[sub_resource type="Resource" id="Line_miner"]
+script = ExtResource("3_line")
+speaker_slot = &"miner"
+text = "..."
 
 [sub_resource type="Resource" id="Participant_miner"]
 script = ExtResource("2_participant")
@@ -33,37 +64,6 @@ display_name = "Quibble"
 script = ExtResource("2_participant")
 slot = &"cloak_lantern"
 display_name = "Lantern Keeper"
-
-[sub_resource type="Resource" id="Line_cheese"]
-script = ExtResource("3_line")
-speaker_slot = &"cheese_girl"
-text = "You made it! Welcome to the Cheese Cafe!"
-
-[sub_resource type="Resource" id="Line_treasure"]
-script = ExtResource("3_line")
-speaker_slot = &"treasure_hunter"
-text = "Treasure found, friends gathered, and cheese on the table. What a day!"
-
-[sub_resource type="Resource" id="Line_rutini"]
-script = ExtResource("3_line")
-speaker_slot = &"rutini"
-text = "The whole colony made it! Digging together got us straight here."
-
-[sub_resource type="Resource" id="Line_coffee"]
-script = ExtResource("3_line")
-speaker_slot = &"coffee_cat"
-speaker_pose = &"hold_cup"
-text = "CAFE COFFEE!!! Best reward for a fast trip down!"
-
-[sub_resource type="Resource" id="Line_cloak"]
-script = ExtResource("3_line")
-speaker_slot = &"cloak_lantern"
-text = "Enjoy this moment. On the road ahead, manage your time carefully. How you spend it matters."
-
-[sub_resource type="Resource" id="Line_miner"]
-script = ExtResource("3_line")
-speaker_slot = &"miner"
-text = "..."
 
 [resource]
 script = ExtResource("1_conversation")

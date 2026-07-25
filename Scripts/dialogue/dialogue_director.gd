@@ -43,6 +43,7 @@ var _presentation_token: int = 0
 var _tree_was_paused: bool = false
 var _keep_frame_open_after_conversation: bool = false
 var _references_valid: bool = false
+var _advance_input_enabled: bool = true
 
 
 ## Starts hidden and owns the internal presentation signal connections.
@@ -76,6 +77,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		)
 	if (
 		not is_conversation_active()
+		or not _advance_input_enabled
 		or not is_continue_press
 		or event.is_echo()
 	):
@@ -112,6 +114,7 @@ func start_conversation(
 	_current_line_index = 0
 	_presentation_token += 1
 	_tree_was_paused = get_tree().paused
+	_advance_input_enabled = true
 	_keep_frame_open_after_conversation = keep_frame_open_after_finish
 	dialogue_root.show()
 	if auto_frame_conversations:
@@ -144,6 +147,7 @@ func finish_conversation() -> void:
 	_presentation_token += 1
 	_active_conversation = null
 	_current_line_index = -1
+	_advance_input_enabled = true
 	_keep_frame_open_after_conversation = false
 	dialogue_root.hide()
 	if auto_frame_conversations and not keep_frame_open:
@@ -156,6 +160,17 @@ func finish_conversation() -> void:
 ## Returns whether a conversation is playing.
 func is_conversation_active() -> bool:
 	return _active_conversation != null
+
+
+## Leaves the current line visible but hands Space back to live gameplay.
+## The final Thief beat uses this to turn dialogue into a real mining target.
+func begin_gameplay_handoff() -> bool:
+	if not is_conversation_active():
+		return false
+	_advance_input_enabled = false
+	if pause_gameplay:
+		get_tree().paused = _tree_was_paused
+	return true
 
 
 ## Slides the authored letterbox bars into view.

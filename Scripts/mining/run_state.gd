@@ -4,7 +4,7 @@ extends Node
 ## Stores gameplay position, combo, and hit counts for one run.
 
 signal depth_changed(depth: int)
-signal bottom_reached
+signal thief_reached
 signal run_reset
 
 @export var config: MiningConfig
@@ -17,11 +17,23 @@ var mining_y: int = 0 # Authoritative terrain row beneath the player's feet.
 var combo: int = 0
 var successful_hits: int = 0
 var failed_hits: int = 0
-var has_reached_bottom: bool = false
+var has_reached_thief: bool = false
 
 var remaining_depth: int:
 	get:
 		return maxi(config.total_run_depth - depth, 0)
+
+var distance_since_thief: int:
+	get:
+		return maxi(depth - config.total_run_depth, 0)
+
+var displayed_distance: int:
+	get:
+		return (
+			distance_since_thief
+			if has_reached_thief
+			else remaining_depth
+		)
 
 
 ## Returns the project autoload without coupling consumers to a bare global.
@@ -56,7 +68,7 @@ func reset_run(clear_saved_run: bool = true) -> void:
 	combo = 0
 	successful_hits = 0
 	failed_hits = 0
-	has_reached_bottom = false
+	has_reached_thief = false
 	depth_changed.emit(depth)
 	run_reset.emit()
 
@@ -73,7 +85,7 @@ func record_success(
 		successful_hits += 1
 	depth = mini(
 		depth + maxi(depth_gained, 0),
-		config.total_run_depth
+		MiningConfig.MAX_PLAYABLE_DEPTH
 	)
 	mining_x = clampi(
 		new_mining_position.x,
@@ -86,9 +98,9 @@ func record_success(
 		config.get_bottom_surface_row()
 	)
 	depth_changed.emit(depth)
-	if depth >= config.total_run_depth and not has_reached_bottom:
-		has_reached_bottom = true
-		bottom_reached.emit()
+	if depth >= config.total_run_depth and not has_reached_thief:
+		has_reached_thief = true
+		thief_reached.emit()
 
 
 ## Adopts the resolved combo and records one failed hit.

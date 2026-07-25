@@ -199,7 +199,7 @@ func reset_all_targets() -> void:
 
 ## Moves the slider and resolves one press against every visible target.
 func _process(delta: float) -> void:
-	if Input.is_action_just_pressed(&"Space"):
+	if Input.is_action_just_pressed(&"primary_action"):
 		var hit_targets: Array = targets.filter(
 			func(target: TimingTarget) -> bool:
 				return target.is_point_within_bounds(slider_position, grace))

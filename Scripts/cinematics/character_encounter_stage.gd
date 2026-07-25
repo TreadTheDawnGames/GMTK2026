@@ -41,11 +41,16 @@ signal sequence_dialogue_requested(
 @export_category("Actor Motion")
 @export_range(0.01, 8.0, 0.01) var opening_move_seconds: float = 0.6
 @export_range(0.01, 8.0, 0.01) var closing_move_seconds: float = 0.6
+@export_range(0.0, 16.0, 0.5) var opening_step_height: float = 4.0
 @export var opening_pose: StringName = &"walk"
 @export var conversation_pose: StringName = &"idle"
 @export var closing_pose: StringName = &"walk"
 @export var rest_pose: StringName = &"idle"
 @export var hide_actor_after_closing: bool = false
+## Dynamically keeps this actor beside the miner regardless of landing column.
+@export var conversation_tracks_miner: bool = false
+## Presenter-root offset; actor sprite offsets remain authored by appearance.
+@export_range(-256.0, 256.0, 1.0) var conversation_root_offset_from_miner_x: float = 0.0
 ## Optional visual-editor timeline. Null preserves the legacy opening walk.
 @export var sequence: CutsceneSequence
 
@@ -106,7 +111,9 @@ func play_opening() -> void:
 	var movement := _presenter.move_grounded_to(
 		conversation_marker.global_position,
 		opening_move_seconds,
-		_floor_sampler
+		_floor_sampler,
+		false,
+		opening_step_height
 	)
 	var animation_name := _play_named_animation(opening_animation)
 	if movement != null:

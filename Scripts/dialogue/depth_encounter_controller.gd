@@ -20,6 +20,7 @@ signal character_stage_strike_requested(screen_position: Vector2)
 
 const FLOW_OWNER: StringName = &"depth_encounter"
 const MINER_SPEAKER_SLOT: StringName = &"miner"
+const FINAL_BREAKTHROUGH_CUE: StringName = &"resume_mining"
 
 @export_category("Schedule")
 @export var encounter_config: DepthEncounterConfig
@@ -47,6 +48,8 @@ var _is_initialized: bool = false
 var _credits_have_completed: bool = false
 var _latest_landing_world_y: int = -1
 var _active_conversation: DialogueConversation
+var _is_final_breakthrough_armed: bool = false
+var _is_final_breakthrough_resolving: bool = false
 @onready var _game_state: RunState = RunState.get_global(self)
 
 
@@ -132,6 +135,8 @@ func _on_credits_completed() -> void:
 ## Restores only the run-scoped credits prerequisite.
 func _on_run_reset() -> void:
 	_credits_have_completed = false
+	_is_final_breakthrough_armed = false
+	_is_final_breakthrough_resolving = false
 	_latest_landing_world_y = (
 		mining_config.initial_surface_row
 		if mining_config != null
@@ -211,14 +216,24 @@ func _on_dialogue_line_presented(
 		or conversation_id != _active_conversation.conversation_id
 	):
 		return
+	var active_line := (
+		_active_conversation.lines[line_index]
+		if line_index >= 0 and line_index < _active_conversation.lines.size()
+		else null
+	)
+	var encounter := encounter_config.encounters[_active_encounter_index]
+	if (
+		encounter.occurs_at_run_bottom
+		and active_line != null
+		and active_line.stage_cue == FINAL_BREAKTHROUGH_CUE
+	):
+		_arm_final_breakthrough()
 	if (
 		_active_stage != null
-		and line_index >= 0
-		and line_index < _active_conversation.lines.size()
+		and active_line != null
 	):
-		var line := _active_conversation.lines[line_index]
-		if line != null and not line.stage_cue.is_empty():
-			_active_stage.play_cue(line.stage_cue, line_index)
+		if not active_line.stage_cue.is_empty():
+			_active_stage.play_cue(active_line.stage_cue, line_index)
 	_reset_speech_reactions()
 	if speaker_slot == MINER_SPEAKER_SLOT:
 		miner_rig.react_to_presented_line()
@@ -387,6 +402,9 @@ func _on_conversation_finished(conversation_id: StringName) -> void:
 		coffee_speed_boost_requested.emit()
 	_reset_speech_reactions()
 	_active_conversation = null
+	if encounter.occurs_at_run_bottom and _is_final_breakthrough_resolving:
+		_complete_final_breakthrough()
+		return
 	if encounter.occurs_at_run_bottom:
 		final_encounter_reached.emit(encounter.encounter_id)
 		return
@@ -575,6 +593,41 @@ func has_pending_or_active_interaction() -> bool:
 func _finish_cinematic_flow() -> void:
 	_reset_speech_reactions()
 	cinematic_flow.finish(FLOW_OWNER)
+
+
+## Turns the authored dialogue cue into a live target without hiding its line.
+func _arm_final_breakthrough() -> void:
+	if (
+		_is_final_breakthrough_armed
+		or not cinematic_flow.is_owned_by(FLOW_OWNER)
+		or not dialogue_director.begin_gameplay_handoff()
+	):
+		return
+	_is_final_breakthrough_armed = true
+	cinematic_flow.finish_with_presentation_fade(FLOW_OWNER, 0.35)
+
+
+## A real resolved hit breaks the held line and starts the endless descent.
+func _on_final_breakthrough_mined(
+	depth_gained: int,
+	_cells_removed: int,
+	_combo: int,
+	_combo_strength: float
+) -> void:
+	if not _is_final_breakthrough_armed or depth_gained <= 0:
+		return
+	_is_final_breakthrough_armed = false
+	_is_final_breakthrough_resolving = true
+	dialogue_director.finish_conversation()
+	_is_final_breakthrough_resolving = false
+
+
+func _complete_final_breakthrough() -> void:
+	_reset_speech_reactions()
+	dialogue_director.close_cinematic_frame()
+	_next_encounter_index = _active_encounter_index + 1
+	_active_encounter_index = -1
+	_active_stage = null
 
 
 func _reset_speech_reactions() -> void:

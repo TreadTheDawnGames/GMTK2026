@@ -267,13 +267,13 @@ theme_override_constants/separation = 5
 
 [node name="DepthLabel" type="Label" parent="MiningScene/HUD/Layout/Content" unique_id=677929986]
 layout_mode = 2
-text = "DEPTH  100,000"
+text = "REMAINING TO THE THIEF  100,000"
 
 [node name="BottomEtaLabel" type="Label" parent="MiningScene/HUD/Layout/Content" unique_id=728776188]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.72, 0.72, 0.76, 1)
 theme_override_font_sizes/font_size = 14
-text = "BOTTOM ETA  --:--"
+text = "THIEF ETA  --:--"
 
 [node name="FPS" type="Label" parent="MiningScene/HUD/Layout/Content" unique_id=1876008124]
 layout_mode = 2

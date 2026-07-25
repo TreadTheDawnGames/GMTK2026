@@ -98,8 +98,6 @@ func resolve_attempt(
 	hit_direction: int = 0
 ) -> void:
 	var safe_combo := maxi(resolved_combo, 0)
-	if _game_state.has_reached_bottom:
-		return
 	if not success:
 		_game_state.record_failure(safe_combo)
 		# A miss stops retained future strikes, but an airborne hit still lands.
@@ -405,9 +403,6 @@ func finish_swing() -> void:
 	_is_swing_pending = false
 	_has_resolved_pending_impact = false
 	_pending_swing = null
-	if _game_state.has_reached_bottom:
-		_queued_swings.clear()
-		return
 	_try_start_queued_swing()
 
 
@@ -444,7 +439,6 @@ func _try_start_queued_swing() -> void:
 		_is_swing_queue_paused
 		or _is_swing_pending
 		or _queued_swings.is_empty()
-		or _game_state.has_reached_bottom
 	):
 		return
 	_start_swing(_queued_swings.pop_front())

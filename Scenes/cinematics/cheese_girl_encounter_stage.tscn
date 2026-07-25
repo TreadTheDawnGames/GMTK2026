@@ -3,7 +3,11 @@
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
 
 [node name="CheeseGirlEncounterStage" instance=ExtResource("1_stage")]
-editor_description = "Cheese Girl enters from the side and stops at the tunnel center for her first conversation."
+editor_description = "Cheese Girl hobbles in from the side and stops immediately right of the miner for her first conversation."
+opening_move_seconds = 1.1
+opening_step_height = 8.0
+conversation_tracks_miner = true
+conversation_root_offset_from_miner_x = -64.0
 
 [node name="Conversation" parent="ActorMarkers" index="1"]
 position = Vector2(-176, 0)

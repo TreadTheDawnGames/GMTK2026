@@ -1,10 +1,10 @@
-[gd_resource type="Resource" script_class="DepthCharacterEncounter" load_steps=6 format=3]
+[gd_resource type="Resource" script_class="DepthCharacterEncounter" format=3 uid="uid://cqt6oj8jcwyhu"]
 
-[ext_resource type="Script" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
+[ext_resource type="Script" uid="uid://sqs37vj87ep8" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
 [ext_resource type="Resource" path="res://resources/encounters/treasure_hunter_character_appearance.tres" id="2_appearance"]
-[ext_resource type="Resource" path="res://resources/dialogue/treasure_hunter_treasure_conversation.tres" id="3_dialogue"]
-[ext_resource type="Resource" path="res://resources/pickaxes/seismic_pickaxe.tres" id="4_pickaxe"]
-[ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="5_stage"]
+[ext_resource type="Resource" uid="uid://yigtckpqgod" path="res://resources/dialogue/treasure_hunter_treasure_conversation.tres" id="3_dialogue"]
+[ext_resource type="Resource" uid="uid://clbcnexuivy42" path="res://resources/pickaxes/seismic_pickaxe.tres" id="4_pickaxe"]
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/treasure_hunter_hoard_encounter_stage.tscn" id="5_stage"]
 
 [resource]
 script = ExtResource("1_encounter")
