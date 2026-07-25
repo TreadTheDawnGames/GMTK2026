@@ -183,19 +183,38 @@ func _activate_pending_encounter() -> void:
 	if stage != null:
 		stage.position = encounter_anchor
 		if stage.conversation_tracks_miner:
-			var conversation_position := (
-				stage.conversation_marker.global_position
-			)
-			conversation_position.x = (
-				miner_rig.get_cinematic_foot_screen_position().x
-				+ stage.conversation_root_offset_from_miner_x
-			)
-			stage.conversation_marker.global_position = conversation_position
-			var rest_position := stage.rest_marker.global_position
-			rest_position.x = conversation_position.x
-			stage.rest_marker.global_position = rest_position
+			_align_actor_markers_to_miner(stage)
 	cinematic_flow.focus(FLOW_OWNER)
 	_begin_active_encounter.call_deferred()
+
+
+## Slides the whole actor marker set so the conversation stop lands the authored
+## distance from wherever the miner's descent actually left him.
+##
+## The snaking fall can arrive down any column in a wide band, and the encounter
+## camera centres on that column, so a marker pinned to the room is at a
+## different place in the frame every run. Moving only the conversation and rest
+## markers fixed the wrong half of that: a visitor staged a few body-widths away
+## could be sent to a stop beyond her own entrance, and an exit authored past the
+## frame edge stayed on screen whenever the miner landed toward that side.
+##
+## Shifting the whole set keeps every authored relationship — how long the
+## approach is, how far past the frame the exit sits — true at every landing
+## column. The shift is measured from where the conversation marker currently is,
+## so running this twice moves nothing the second time.
+func _align_actor_markers_to_miner(stage: CharacterEncounterStage) -> void:
+	if (
+		not is_instance_valid(stage.actor_markers_root)
+		or not is_instance_valid(stage.conversation_marker)
+	):
+		return
+	var target_x := (
+		miner_rig.get_cinematic_foot_screen_position().x
+		+ stage.conversation_root_offset_from_miner_x
+	)
+	stage.actor_markers_root.global_position.x += (
+		target_x - stage.conversation_marker.global_position.x
+	)
 
 
 ## Keeps all authored characters attached to their terrain positions.

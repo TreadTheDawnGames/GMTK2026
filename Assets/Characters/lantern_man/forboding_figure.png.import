@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b4xrv6mg0tq3f"
-path="res://.godot/imported/Tween.png-295fff38d860ecf032619b751ca0dc97.ctex"
+uid="uid://dvfe08c8l1d2"
+path="res://.godot/imported/forboding_figure.png-c00754d82566ce80db5eaf3b809fa071.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://addons/conductor/icons/Tween.png"
-dest_files=["res://.godot/imported/Tween.png-295fff38d860ecf032619b751ca0dc97.ctex"]
+source_file="res://Assets/Characters/lantern_man/forboding_figure.png"
+dest_files=["res://.godot/imported/forboding_figure.png-c00754d82566ce80db5eaf3b809fa071.ctex"]
 
 [params]
 
