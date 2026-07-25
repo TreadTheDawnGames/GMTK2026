@@ -4,3 +4,6 @@
 
 # Editor-only playtest target written by the cutscene editor.
 /.cutscene_playtest_target
+
+# Web export output.
+/build/
