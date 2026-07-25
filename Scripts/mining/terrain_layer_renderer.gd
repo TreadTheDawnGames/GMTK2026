@@ -2514,7 +2514,8 @@ func _get_sculpt_logical_mask_image(
 
 
 ## Returns immutable horizontal alpha runs for a smoothed authored room.
-## Runs are generated during startup and consumed directly into active chunks.
+## Normal play prepares them in bounded rows; a direct test teleport finishes
+## only its requested room synchronously before composing that room's chunk.
 func _get_sculpt_mask_runs(
 	sculpt: CutsceneTerrainSculpt,
 	sculpt_layer_index: int
@@ -2525,37 +2526,101 @@ func _get_sculpt_mask_runs(
 	var layer_runs: Array = _sculpt_mask_runs.get(sculpt, [])
 	if layer_runs.size() > cache_index and layer_runs[cache_index] != null:
 		return layer_runs[cache_index]
+	var preparation := _queue_sculpt_run_preparation(
+		sculpt,
+		sculpt_layer_index
+	)
+	if preparation == null:
+		return []
+	while not _advance_sculpt_run_preparation(preparation):
+		pass
+	layer_runs = _sculpt_mask_runs.get(sculpt, [])
+	return (
+		layer_runs[cache_index]
+		if layer_runs.size() > cache_index
+		else []
+	)
+
+
+## Queues one immutable sculpt/layer cache, deduplicating background and forced
+## preparation so a room is never scanned twice.
+func _queue_sculpt_run_preparation(
+	sculpt: CutsceneTerrainSculpt,
+	sculpt_layer_index: int
+) -> SculptRunPreparation:
+	if sculpt == null:
+		return null
+	var cache_index := sculpt_layer_index + 1
+	var layer_runs: Array = _sculpt_mask_runs.get(sculpt, [])
+	if layer_runs.size() > cache_index and layer_runs[cache_index] != null:
+		return null
+	for work_index in range(
+		_pending_sculpt_run_preparation_head,
+		_pending_sculpt_run_preparations.size()
+	):
+		var pending := _pending_sculpt_run_preparations[work_index]
+		if (
+			pending.sculpt == sculpt
+			and pending.layer_index == sculpt_layer_index
+		):
+			return pending
 	var room_mask := _get_sculpt_mask_image(sculpt, sculpt_layer_index)
 	if room_mask == null:
-		return []
-	var mask_width := room_mask.get_width()
-	var mask_data := room_mask.get_data()
-	var mask_runs: Array[PackedInt32Array] = []
-	mask_runs.resize(room_mask.get_height())
-	for mask_y in range(room_mask.get_height()):
-		var row_runs := PackedInt32Array()
-		var run_start := 0
-		var row_byte_start := mask_y * mask_width * 2
-		var run_alpha := mask_data[row_byte_start + 1]
-		for mask_x in range(1, mask_width + 1):
-			var alpha := (
-				-1
-				if mask_x == mask_width
-				else mask_data[row_byte_start + mask_x * 2 + 1]
-			)
-			if alpha == run_alpha:
-				continue
-			row_runs.append(run_start)
-			row_runs.append(mask_x)
-			row_runs.append(run_alpha)
-			run_start = mask_x
-			run_alpha = alpha
-		mask_runs[mask_y] = row_runs
+		return null
+	var preparation := SculptRunPreparation.new()
+	preparation.sculpt = sculpt
+	preparation.layer_index = sculpt_layer_index
+	preparation.room_mask = room_mask
+	preparation.mask_data = room_mask.get_data()
+	preparation.mask_runs.resize(room_mask.get_height())
+	_pending_sculpt_run_preparations.append(preparation)
+	return preparation
+
+
+## Converts exactly one cached source row into [start, end, alpha] runs.
+func _advance_sculpt_run_preparation(
+	preparation: SculptRunPreparation
+) -> bool:
+	if preparation.finished:
+		return true
+	var mask_width := preparation.room_mask.get_width()
+	var mask_y := preparation.next_row
+	var row_runs := PackedInt32Array()
+	var run_start := 0
+	var row_byte_start := mask_y * mask_width * 2
+	var run_alpha := preparation.mask_data[row_byte_start + 1]
+	for mask_x in range(1, mask_width + 1):
+		var alpha := (
+			-1
+			if mask_x == mask_width
+			else preparation.mask_data[
+				row_byte_start + mask_x * 2 + 1
+			]
+		)
+		if alpha == run_alpha:
+			continue
+		row_runs.append(run_start)
+		row_runs.append(mask_x)
+		row_runs.append(run_alpha)
+		run_start = mask_x
+		run_alpha = alpha
+	preparation.mask_runs[mask_y] = row_runs
+	preparation.next_row += 1
+	if preparation.next_row < preparation.room_mask.get_height():
+		return false
+	var cache_index := preparation.layer_index + 1
+	var layer_runs: Array = _sculpt_mask_runs.get(
+		preparation.sculpt,
+		[]
+	)
 	while layer_runs.size() <= cache_index:
 		layer_runs.append(null)
-	layer_runs[cache_index] = mask_runs
-	_sculpt_mask_runs[sculpt] = layer_runs
-	return mask_runs
+	layer_runs[cache_index] = preparation.mask_runs
+	_sculpt_mask_runs[preparation.sculpt] = layer_runs
+	preparation.mask_data = PackedByteArray()
+	preparation.room_mask = null
+	preparation.finished = true
+	return true
 
 
 ## Draws one authored room once at a density bounded independently of gameplay.
