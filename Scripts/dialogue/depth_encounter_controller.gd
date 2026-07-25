@@ -178,6 +178,10 @@ func _schedule_next_encounter() -> bool:
 	if not cinematic_flow.try_begin(FLOW_OWNER):
 		return false
 	_pending_encounter_index = _next_encounter_index
+	# He is on his way down into the room from this moment. The pose holds until
+	# the landing promotes the encounter, which is the only thing that knows he
+	# has arrived.
+	miner_rig.show_cutscene_fall()
 	_try_activate_pending_encounter()
 	return true
 
@@ -201,6 +205,9 @@ func _activate_pending_encounter() -> void:
 		stage.position = encounter_anchor
 		if stage.conversation_tracks_miner:
 			_align_actor_markers_to_miner(stage)
+	# He has hit the room's floor. Sprawl, then get up, while the frame opens
+	# around him.
+	miner_rig.show_cutscene_landing()
 	cinematic_flow.focus(FLOW_OWNER)
 	_begin_active_encounter.call_deferred()
 
@@ -342,6 +349,19 @@ func _begin_active_encounter() -> void:
 			terrain_renderer
 			.get_layer_opening_floor_support_screen_y
 			.bind(_game_state.mining_y, CAST_FLOOR_LAYER_INDEX)
+		)
+		# Stand the miner on the rock rather than on the row underneath it.
+		#
+		# Mining seats him against the intact floor line, which is right for a
+		# shaft he is standing inside: the ground closes over his boots and that
+		# is the read. A cutscene holds on him in the open, where the same offset
+		# buries him to the ankles in the loose rock the room's floor carries.
+		# The cast are already dropped onto that surface through this sampler; he
+		# is the one who was not. Only for the shot - _finish_cinematic_flow puts
+		# his mining grounding back, so the intro and ordinary digging are
+		# untouched.
+		miner_rig.seat_landing_foot_at_screen_y(
+			floor_sampler.call(miner_rig.get_landing_foot_screen_x())
 		)
 		if not _active_stage.prepare(presenter, floor_sampler):
 			push_error(
@@ -666,6 +686,9 @@ func has_pending_or_active_interaction() -> bool:
 func _finish_cinematic_flow() -> void:
 	_reset_speech_reactions()
 	miner_rig.exit_cutscene_draw_order()
+	# Back to the mining grounding, so the shot's seating never follows him into
+	# the rest of the run.
+	miner_rig.show_intact_floor_grounding()
 	_exit_cast_cutscene_draw_order()
 	cinematic_flow.finish(FLOW_OWNER)
 
