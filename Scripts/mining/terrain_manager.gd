@@ -17,6 +17,14 @@ class DigResult:
 		cells_removed += other.cells_removed
 
 
+class SculptPlacement:
+	## Locates one authored cutscene room in world terrain cells, so a cell test
+	## can reject a room with a rectangle check before converting coordinates.
+	var sculpt: CutsceneTerrainSculpt
+	var anchor_cell: Vector2i
+	var world_rect: Rect2i
+
+
 # One lightning event allocates at most 8 paths × 32 cells. Pickaxe exports use
 # the same caps so direct callers cannot grow per-hit work beyond the web budget.
 const MAX_LIGHTNING_CRACKS: int = 8
@@ -47,6 +55,11 @@ var _destruction_masks: Dictionary[int, PackedByteArray] = {}
 var _current_view_x: float
 var _current_view_y: float
 var _random := RandomNumberGenerator.new()
+# Built once from the encounter schedule and reused, because a cell test runs
+# per cell per hit. Encounters without a sculpt contribute nothing, so a run
+# with no authored rooms pays one empty-array check.
+var _sculpt_placements: Array[SculptPlacement] = []
+var _sculpt_placements_are_built: bool = false
 
 
 ## Initializes coordinate conversion at the starting surface.
@@ -438,6 +451,67 @@ func is_authored_landing_floor(world_row: int) -> bool:
 	return false
 
 
+## Returns the world cell an encounter's authored room is measured from: the
+## chamber's center column on its own solid floor row. Sculpt tooling and the
+## renderer both anchor here, so a room cannot drift from the encounter it
+## belongs to when the run length or terrain width changes.
+func get_encounter_anchor_cell(
+	encounter: DepthCharacterEncounter
+) -> Vector2i:
+	if encounter == null:
+		return Vector2i.ZERO
+	return Vector2i(
+		floori(float(config.terrain_width_cells) * 0.5),
+		config.initial_surface_row
+			+ encounter.resolve_depth(config.total_run_depth)
+	)
+
+
+## Returns every authored room placed in world cells. Public so the renderer
+## draws the same rock the miner stands on rather than deriving its own.
+func get_sculpt_placements() -> Array[SculptPlacement]:
+	if _sculpt_placements_are_built:
+		return _sculpt_placements
+	_sculpt_placements_are_built = true
+	_sculpt_placements.clear()
+	if encounter_config == null or config == null:
+		return _sculpt_placements
+	for encounter in encounter_config.encounters:
+		if encounter == null or encounter.terrain_sculpt == null:
+			continue
+		var sculpt := encounter.terrain_sculpt
+		# Resizing a room moves its footprint, so the cache has to die with any
+		# edit. Listening here keeps that automatic instead of asking every
+		# caller to remember.
+		if not sculpt.changed.is_connected(invalidate_sculpt_placements):
+			sculpt.changed.connect(invalidate_sculpt_placements)
+		if not sculpt.enabled or not sculpt.get_sculpt_error().is_empty():
+			continue
+		var placement := SculptPlacement.new()
+		placement.sculpt = sculpt
+		placement.anchor_cell = get_encounter_anchor_cell(encounter)
+		placement.world_rect = sculpt.get_world_rect(placement.anchor_cell)
+		_sculpt_placements.append(placement)
+	return _sculpt_placements
+
+
+## Drops the cached room placements after a sculpt or the schedule changes.
+func invalidate_sculpt_placements() -> void:
+	_sculpt_placements_are_built = false
+
+
+## Returns the authored room covering a terrain row, or null. The renderer asks
+## once per row instead of once per mask pixel.
+func get_sculpt_placement_for_row(world_row: int) -> SculptPlacement:
+	for placement in get_sculpt_placements():
+		if (
+			world_row >= placement.world_rect.position.y
+			and world_row < placement.world_rect.end.y
+		):
+			return placement
+	return null
+
+
 ## Returns whether a cell can be destroyed by a new hit.
 func _is_mineable_cell(cell: Vector2i) -> bool:
 	return is_ground_cell(cell) and not _is_cell_destroyed(cell)
@@ -447,6 +521,16 @@ func _is_mineable_cell(cell: Vector2i) -> bool:
 func _is_encounter_chamber_cell(cell: Vector2i) -> bool:
 	if encounter_config == null:
 		return false
+
+	# An authored room is the whole truth inside its own footprint. That is what
+	# lets a designer both open rock the procedural taper left solid and leave a
+	# pillar standing where the taper would have carved one away.
+	for placement in get_sculpt_placements():
+		if not placement.world_rect.has_point(cell):
+			continue
+		return not placement.sculpt.is_solid_local(
+			placement.sculpt.world_to_local(cell, placement.anchor_cell)
+		)
 
 	var depth_row := cell.y - config.initial_surface_row
 	var chamber_bounds := (

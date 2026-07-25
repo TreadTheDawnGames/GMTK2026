@@ -61,13 +61,24 @@ func _process(_delta: float) -> void:
 	_publish_all()
 
 
-## Returns the viewport row currently showing the original ground line.
-func get_surface_screen_y() -> float:
+## Returns the viewport point currently showing the original surface centre.
+## World props use both axes; shaders use only its y component.
+func get_surface_screen_position() -> Vector2:
 	# Reuse the one terrain conversion path so daylight, apron, and dirt never
 	# disagree about where the surface is.
 	return terrain_manager.terrain_to_screen_position(
-		Vector2(0.0, _get_surface_terrain_y())
-	).y
+		Vector2(
+			float(config.terrain_width_cells)
+				* 0.5
+				* float(config.terrain_cell_world_size),
+			_get_surface_terrain_y()
+		)
+	)
+
+
+## Returns the viewport row currently showing the original ground line.
+func get_surface_screen_y() -> float:
+	return get_surface_screen_position().y
 
 
 func _publish_all() -> void:

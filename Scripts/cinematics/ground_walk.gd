@@ -73,14 +73,8 @@ static func walk_along(
 		resolved_path = PackedVector2Array([target.global_position])
 
 	# Cumulative distances are bounded by the cached path and die with the tween.
-	var cumulative_distances := PackedFloat32Array()
-	cumulative_distances.resize(resolved_path.size())
-	var total_distance := 0.0
-	for point_index in range(1, resolved_path.size()):
-		total_distance += resolved_path[
-			point_index - 1
-		].distance_to(resolved_path[point_index])
-		cumulative_distances[point_index] = total_distance
+	var cumulative_distances := _build_cumulative_distances(resolved_path)
+	var total_distance := cumulative_distances[-1]
 
 	var tween := target.create_tween()
 	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
@@ -99,19 +93,39 @@ static func walk_along(
 	return tween
 
 
-static func _set_walk_progress(
+## Returns the exact presentation position used by walk_along at one progress.
+static func position_along_path(
+	path: PackedVector2Array,
 	progress: float,
-	target: Node2D,
+	step_height: float
+) -> Vector2:
+	if path.is_empty():
+		return Vector2.ZERO
+	if path.size() == 1:
+		return path[-1]
+
+	var cumulative_distances := _build_cumulative_distances(path)
+	return _resolve_path_position(
+		path,
+		cumulative_distances,
+		cumulative_distances[-1],
+		progress,
+		step_height
+	)
+
+
+## Resolves one point on an already-measured path. Playback passes the
+## distances it measured once when the walk began; only the editor scrubber,
+## which has no tween to have measured them, builds them per call.
+static func _resolve_path_position(
 	path: PackedVector2Array,
 	cumulative_distances: PackedFloat32Array,
 	total_distance: float,
+	progress: float,
 	step_height: float
-) -> void:
-	if not is_instance_valid(target) or path.is_empty():
-		return
-	if path.size() == 1 or is_zero_approx(total_distance):
-		target.global_position = path[-1]
-		return
+) -> Vector2:
+	if is_zero_approx(total_distance):
+		return path[-1]
 
 	var traveled_distance := clampf(progress, 0.0, 1.0) * total_distance
 	var segment_index := 0
@@ -134,21 +148,62 @@ static func _set_walk_progress(
 			1.0
 		)
 	)
-	var travel_direction := (
-		path[segment_index + 1] - path[segment_index]
-	)
-	_set_facing_from_travel(target, travel_direction.x)
 	var step_count := maxi(path.size() - 1, 1)
 	var step_lift := absf(
-		sin(progress * PI * float(step_count))
-	) * step_height
-	target.global_position = (
-		path[segment_index].lerp(
-			path[segment_index + 1],
-			segment_progress
+		sin(clampf(progress, 0.0, 1.0) * PI * float(step_count))
+	) * maxf(step_height, 0.0)
+	return path[segment_index].lerp(
+		path[segment_index + 1],
+		segment_progress
+	) + Vector2.UP * step_lift
+
+
+static func _build_cumulative_distances(
+	path: PackedVector2Array
+) -> PackedFloat32Array:
+	var distances := PackedFloat32Array()
+	distances.resize(path.size())
+	var total_distance := 0.0
+	for point_index in range(1, path.size()):
+		total_distance += path[point_index - 1].distance_to(path[point_index])
+		distances[point_index] = total_distance
+	return distances
+
+
+static func _set_walk_progress(
+	progress: float,
+	target: Node2D,
+	path: PackedVector2Array,
+	cumulative_distances: PackedFloat32Array,
+	total_distance: float,
+	step_height: float
+) -> void:
+	if not is_instance_valid(target) or path.is_empty():
+		return
+	if path.size() > 1 and not is_zero_approx(total_distance):
+		var segment_index := 0
+		var traveled_distance := clampf(progress, 0.0, 1.0) * total_distance
+		while (
+			segment_index < path.size() - 2
+			and cumulative_distances[segment_index + 1] < traveled_distance
+		):
+			segment_index += 1
+		var travel_direction := (
+			path[segment_index + 1] - path[segment_index]
 		)
-		+ Vector2.UP * step_lift
-	)
+		_set_facing_from_travel(target, travel_direction.x)
+		# Reuses the distances measured when the walk began. Rebuilding them
+		# here would allocate a PackedFloat32Array every frame for every
+		# walking actor, on a path the tween already owns.
+		target.global_position = _resolve_path_position(
+			path,
+			cumulative_distances,
+			total_distance,
+			progress,
+			step_height
+		)
+		return
+	target.global_position = path[-1]
 
 
 static func _set_facing_from_travel(

@@ -28,6 +28,33 @@ extends Node2D
 ## scene's own terrain outside an editor and assert what a designer will see.
 @export var remove_in_running_game: bool = true
 
+@export_category("Encounter")
+## The run schedule this stage belongs to. Leave it empty and the preview loads
+## the shipped schedule on its own.
+##
+## It must not be authored as a resource reference in a stage scene. Encounters
+## point at their stage scene, so a stage scene pointing back at the schedule is
+## a load cycle, and Godot resolves that by dropping the reference and reporting
+## the scene as referencing a non-existent resource. Loading it here, at the
+## moment the preview is built, breaks the cycle.
+@export var encounter_config: DepthEncounterConfig:
+	set(value):
+		encounter_config = value
+		_resolved_encounter_config = value
+		_request_rebuild()
+## Which encounter in that schedule this stage plays at. Leave it empty for a
+## stage that is not tied to one, such as the surface arrival.
+@export var encounter_id: StringName:
+	set(value):
+		encounter_id = value
+		_request_rebuild()
+## Takes the preview depth from the named encounter, so moving an encounter in
+## the schedule cannot leave its stage previewing the wrong strata.
+@export var follow_encounter_depth: bool = true:
+	set(value):
+		follow_encounter_depth = value
+		_request_rebuild()
+
 @export_category("Framing")
 ## Rows below the surface this cutscene plays at, so the strata on screen are
 ## the ones the sequence will really open against.
@@ -45,8 +72,28 @@ extends Node2D
 # rebuild keeps a full chunk restream off every mouse-move frame.
 const _REBUILD_DELAY_SECONDS: float = 0.12
 
+const DEFAULT_ENCOUNTER_CONFIG_PATH := (
+	"res://resources/encounters/depth_encounter_config.tres"
+)
+
 var _tracked_impact_positions: PackedVector2Array = PackedVector2Array()
 var _rebuild_countdown: float = -1.0
+var _resolved_encounter_config: DepthEncounterConfig
+
+
+## Returns the run schedule this preview draws against, loading the shipped one
+## on first use. Only ever called in the editor; a running game frees this node
+## in _enter_tree, so the load never happens during play.
+func get_encounter_config() -> DepthEncounterConfig:
+	if _resolved_encounter_config != null:
+		return _resolved_encounter_config
+	if encounter_config != null:
+		_resolved_encounter_config = encounter_config
+		return _resolved_encounter_config
+	_resolved_encounter_config = (
+		load(DEFAULT_ENCOUNTER_CONFIG_PATH) as DepthEncounterConfig
+	)
+	return _resolved_encounter_config
 
 
 ## Disappears before a running game can pay for it. This has to happen in
@@ -125,6 +172,9 @@ func _watch_authored_resources() -> void:
 	for resource: Resource in [
 		terrain_renderer.profile if is_instance_valid(terrain_renderer) else null,
 		terrain_manager.config if is_instance_valid(terrain_manager) else null,
+		# The sculpt batches a whole brush stroke into one `changed`, so
+		# listening here redraws the room once per stroke rather than per cell.
+		get_sculpt(),
 	]:
 		if resource != null and not resource.changed.is_connected(_request_rebuild):
 			resource.changed.connect(_request_rebuild)
@@ -182,10 +232,81 @@ func heal_nearest_impact(
 func build_preview() -> void:
 	if not get_preview_error().is_empty():
 		return
+	# The schedule has to be attached before anything streams, or the chunk
+	# under the cast is built as unbroken rock and the room appears only after
+	# some later edit happens to rebuild it.
+	var schedule := get_encounter_config()
+	if terrain_manager.encounter_config != schedule:
+		terrain_manager.encounter_config = schedule
+		terrain_manager.invalidate_sculpt_placements()
+	_watch_authored_resources()
 	terrain_manager.clear_damage()
 	terrain_manager.set_view_position(_get_preview_view_position())
 	terrain_renderer.rebuild_all_chunks()
 	_apply_test_impacts()
+
+
+## Returns the encounter this stage plays at, or null when it is not tied to
+## one or the named encounter is not in the schedule.
+func get_encounter() -> DepthCharacterEncounter:
+	var schedule := get_encounter_config()
+	if schedule == null or encounter_id.is_empty():
+		return null
+	for encounter in schedule.encounters:
+		if encounter != null and encounter.encounter_id == encounter_id:
+			return encounter
+	return null
+
+
+## Returns the authored room this stage's encounter uses, or null.
+func get_sculpt() -> CutsceneTerrainSculpt:
+	var encounter := get_encounter()
+	return null if encounter == null else encounter.terrain_sculpt
+
+
+## Returns the world cell the authored room is measured from, so a tool can
+## convert a click into a room coordinate.
+func get_sculpt_anchor_cell() -> Vector2i:
+	var encounter := get_encounter()
+	if encounter == null:
+		return Vector2i.ZERO
+	return terrain_manager.get_encounter_anchor_cell(encounter)
+
+
+## Converts a position in the edited scene into a fractional room coordinate.
+## Fractional because a brush is dragged between cells; rounding here would
+## make a slow drag stutter from cell centre to cell centre.
+func global_position_to_sculpt_local(global_point: Vector2) -> Vector2:
+	var sculpt := get_sculpt()
+	if sculpt == null:
+		return Vector2.ZERO
+	var cell_size := float(terrain_manager.config.terrain_cell_world_size)
+	var terrain_position := terrain_manager.screen_to_terrain_position(
+		terrain_renderer.to_local(global_point)
+	)
+	var room_origin := get_sculpt_anchor_cell() + sculpt.anchor_offset_cells
+	return terrain_position / cell_size - Vector2(room_origin)
+
+
+## Converts a room coordinate back into the edited scene, so an overlay can
+## outline the cells a brush is about to change.
+func sculpt_local_to_global_position(local_cell: Vector2) -> Vector2:
+	var sculpt := get_sculpt()
+	if sculpt == null:
+		return Vector2.ZERO
+	var cell_size := float(terrain_manager.config.terrain_cell_world_size)
+	var room_origin := get_sculpt_anchor_cell() + sculpt.anchor_offset_cells
+	return terrain_renderer.to_global(
+		terrain_manager.terrain_to_screen_position(
+			(local_cell + Vector2(room_origin)) * cell_size
+		)
+	)
+
+
+## Returns the world size of one terrain cell on screen, so an overlay can
+## size a brush ring in the same units the brush works in.
+func get_cell_screen_size() -> float:
+	return float(terrain_manager.config.terrain_cell_world_size)
 
 
 ## Places the view at the authored depth, centred the way the run centres it.
@@ -193,8 +314,17 @@ func _get_preview_view_position() -> Vector2:
 	var config := terrain_manager.config
 	return Vector2(
 		float(config.terrain_width_cells) * 0.5,
-		float(config.initial_surface_row + preview_depth_rows)
+		float(config.initial_surface_row + get_effective_depth_rows())
 	)
+
+
+## Returns the depth this preview actually sits at: the encounter's own depth
+## when one is named, so a stage cannot drift from the schedule that places it.
+func get_effective_depth_rows() -> int:
+	var encounter := get_encounter()
+	if encounter == null or not follow_encounter_depth:
+		return preview_depth_rows
+	return encounter.resolve_depth(terrain_manager.config.total_run_depth)
 
 
 ## Digs one real tunnel per authored marker through the production terrain
@@ -204,24 +334,46 @@ func _apply_test_impacts() -> void:
 	if _tracked_impact_positions.is_empty():
 		return
 	var config := terrain_manager.config
-	var cell_size := float(config.terrain_cell_world_size)
 	# The renderer picks a hole size from the combo the hit resolved at, and
 	# that arrives by signal during play. In the editor there is no controller
 	# to send it, so the preview supplies the same value directly.
 	terrain_renderer._on_dig_presentation_started(preview_combo)
-	for screen_position in _tracked_impact_positions:
-		var terrain_position := terrain_manager.screen_to_terrain_position(
-			screen_position
-		)
-		var cell := Vector2i(
-			floori(terrain_position.x / cell_size),
-			floori(terrain_position.y / cell_size)
-		)
+	for marker_position in _tracked_impact_positions:
 		terrain_manager.dig_tunnel(
-			cell,
+			global_position_to_terrain_cell(marker_position),
 			config.base_mine_depth_rows,
 			config.base_tunnel_half_width_cells
 		)
+
+
+## Converts a position in the edited scene into the terrain cell drawn there.
+##
+## This has to go through the renderer's own transform. The renderer lays its
+## chunks out in its local space using screen coordinates, and this preview is
+## deliberately offset so the mining face lands on the stage origin. Reading a
+## global position as if it were already screen space therefore digs one screen
+## up and to the left of the click — the rock the designer aimed at stays
+## solid while an opening appears off-frame.
+func global_position_to_terrain_cell(global_point: Vector2) -> Vector2i:
+	var cell_size := float(terrain_manager.config.terrain_cell_world_size)
+	var terrain_position := terrain_manager.screen_to_terrain_position(
+		terrain_renderer.to_local(global_point)
+	)
+	return Vector2i(
+		floori(terrain_position.x / cell_size),
+		floori(terrain_position.y / cell_size)
+	)
+
+
+## Returns where one terrain cell's top-left corner is drawn in the edited
+## scene, so a tool can outline the cells it is about to change.
+func terrain_cell_to_global_position(cell: Vector2i) -> Vector2:
+	var cell_size := float(terrain_manager.config.terrain_cell_world_size)
+	return terrain_renderer.to_global(
+		terrain_manager.terrain_to_screen_position(
+			Vector2(cell) * cell_size
+		)
+	)
 
 
 func _get_test_impact_positions() -> PackedVector2Array:

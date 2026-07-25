@@ -4,7 +4,7 @@ extends Node2D
 ## How it works:
 ## - Authored Marker2D anchors say where the bus enters, stops, and leaves.
 ## - begin() reserves the miner's shared cinematic visual override and parks
-##   every prop; play_arrival() then drives the bus in and steps the miner down.
+##   every prop; play_arrival() then drives the bus in and reveals the miner.
 ## - The miner moves through MinerRig's existing override API only, so his
 ##   gameplay root, RunState, and mining depth are never touched.
 ## - The station stays after the intro. The camera is fixed and terrain scrolls
@@ -26,6 +26,8 @@ signal attendant_picked_up
 @export var miner_rig: MinerRig
 @export var bus: Node2D
 @export var bus_sprite: Sprite2D
+## Draws only the leading section above the miner during the exit reveal.
+@export var bus_front_sprite: Sprite2D
 ## Two travel states, drawn per direction. Left to right the door side faces the
 ## camera; right to left you see the far side with the door away. Swapping
 ## between them is a texture change, not a flip — the front must always lead.
@@ -38,6 +40,9 @@ signal attendant_picked_up
 ## sprite offset and wheel-shine UVs.
 @export var stopped_sprite_offset: Vector2 = Vector2(-14.0, -74.0)
 @export var side_left_sprite_offset: Vector2 = Vector2(14.0, -74.0)
+## Texture pixels retained for the leading section. Slightly over half keeps
+## the miner fully hidden until the bus's front passes his centre-screen spot.
+@export_range(1.0, 1024.0, 1.0) var bus_front_region_width_px: float = 560.0
 @export var stopped_wheel_uvs: PackedVector2Array = PackedVector2Array([
 	Vector2(0.390962, 0.568345),
 	Vector2(0.684128, 0.568345),
@@ -68,10 +73,6 @@ signal attendant_picked_up
 ## Beat between the bus stopping and the miner being off it. He alights on the
 ## far side, so this is the pause the doors happen in.
 @export_range(0.0, 3.0, 0.05) var miner_exit_delay_seconds: float = 0.2
-## How long the departing bus is allowed to slide before the miner sets off.
-## Its trailing edge has to clear him first, or he walks out of solid bus.
-@export_range(0.0, 4.0, 0.05) var miner_reveal_hold_seconds: float = 0.35
-@export_range(0.1, 4.0, 0.05) var miner_walk_seconds: float = 0.65
 @export_range(0.0, 2.0, 0.05) var hold_before_dialogue_seconds: float = 0.0
 @export_range(0.2, 6.0, 0.05) var bus_departure_seconds: float = 1.5
 
@@ -95,17 +96,22 @@ signal attendant_picked_up
 @export_range(0.0, 4.0, 0.05) var attendant_pickup_hold_seconds: float = 0.4
 
 @export_category("Placement")
-## The ground line every prop in this scene is authored against, in viewport
-## pixels. The node offsets itself by the difference from the live ground line.
-@export var authored_ground_screen_y: float = 262.0
+## The original surface-centre point every prop is authored against in viewport
+## pixels. Following its terrain conversion on both axes prevents horizontal
+## camera tracking from sliding the ground out from under the station.
+@export var authored_surface_anchor_screen_position: Vector2 = Vector2(
+	576.0,
+	262.0
+)
 
 @export_category("Motion")
 ## Vertical dip as the bus stops, so the arrival lands instead of gliding.
 @export_range(0.0, 32.0, 0.5) var bus_settle_dip_pixels: float = 5.0
 ## Keep this below bus_front_draw_order so the parked bus hides him until the wipe.
 @export_range(0, 16, 1) var miner_cinematic_draw_order: int = 4
-## Used only for the arrival, where the bus must cover the miner so its
-## departure can wipe him into view.
+## Full bus body behind the miner while he steps out.
+@export_range(0, 16, 1) var bus_body_draw_order: int = 3
+## Cropped leading section above the miner, so the front passes in front of him.
 @export_range(0, 16, 1) var bus_front_draw_order: int = 5
 ## Used for the ambient passes. They happen while the player is mining, so the
 ## bus runs behind the cast and can never sweep across the miner.
@@ -190,9 +196,9 @@ func _advance_wheel_spin() -> void:
 func _follow_ground_line() -> void:
 	if surface_presentation == null:
 		return
-	position.y = (
-		surface_presentation.get_surface_screen_y()
-		- authored_ground_screen_y
+	position = (
+		surface_presentation.get_surface_screen_position()
+		- authored_surface_anchor_screen_position
 	)
 
 
@@ -207,7 +213,7 @@ func begin() -> bool:
 	_is_playing = true
 	# Capture the miner's authored resting sole before anything moves it. The
 	# surface is flat, so this one point supplies both the ground line the bus
-	# stops on and the spot the miner walks back to.
+	# stops on and the exact spot where the miner is revealed.
 	var rest_foot := miner_rig.get_cinematic_foot_screen_position()
 	_ground_foot_y = rest_foot.y
 	_dig_foot_x = rest_foot.x
@@ -217,7 +223,9 @@ func begin() -> bool:
 		_bus_rest_position.y
 	)
 	_previous_bus_x = bus.position.x
-	bus.z_index = bus_front_draw_order
+	bus.z_index = bus_body_draw_order
+	bus_front_sprite.z_index = bus_front_draw_order
+	bus_front_sprite.show()
 	_set_bus_travel_art(-1)
 	station.modulate.a = 1.0
 	attendant.modulate.a = 1.0
@@ -227,7 +235,7 @@ func begin() -> bool:
 	return true
 
 
-## Drives the bus in, drops the miner off, and pulls away as he walks over.
+## Drives the bus in, drops the miner at the dig spot, and pulls away.
 func play_arrival() -> void:
 	if not _is_playing:
 		return
@@ -247,35 +255,6 @@ func play_arrival() -> void:
 	# the road is clear. The bus only pulls away once he is off it.
 	_place_miner_at_drop_off()
 	_begin_bus_departure()
-	if miner_reveal_hold_seconds > 0.0:
-		await get_tree().create_timer(
-			miner_reveal_hold_seconds,
-			true
-		).timeout
-	if not _is_playing:
-		return
-	# Then he walks in after the bus, so the shot never stalls on a parked bus.
-	var floor_sampler := (
-		terrain_renderer
-		.get_layer_opening_floor_support_screen_y
-		.bind(
-			terrain_renderer.terrain_manager.config.initial_surface_row,
-			0
-		)
-	)
-	var walk_tween := miner_rig.glide_cinematic_foot_to(
-		Vector2(_dig_foot_x, _ground_foot_y),
-		miner_walk_seconds,
-		miner_cinematic_draw_order,
-		floor_sampler
-	)
-	if walk_tween != null:
-		await walk_tween.finished
-	if not _is_playing:
-		return
-	# He walked in facing left, away from the stop. Turn him back before anyone
-	# speaks, so he is looking at whoever is talking to him.
-	miner_rig.set_facing_direction(1)
 	await _await_prop_tween()
 	if not _is_playing:
 		return
@@ -298,22 +277,19 @@ func finish(restore_seconds: float = 0.2) -> void:
 	_is_playing = false
 	_kill_prop_tween()
 	miner_rig.show()
-	# Plant him into his dig stance as one visible beat. Passing the gameplay
-	# draw order here hands it back at the START of that motion, so the
-	# foreground stratum closes over his legs while he is settling rather than
-	# snapping over them after the shot has already ended.
-	var settle_tween := miner_rig.glide_cinematic_foot_to(
+	# Hand back gameplay draw order in place. The miner is already at the exact
+	# dig spot, so the foreground can close over his legs without inventing a
+	# walk or another translation before input unlocks.
+	miner_rig.place_cinematic_foot_at(
 		Vector2(_dig_foot_x, _ground_foot_y),
-		restore_seconds,
 		miner_settle_draw_order
 	)
-	if settle_tween != null:
-		await settle_tween.finished
-	var restore_tween := miner_rig.restore_cinematic_visual(0.05)
+	var restore_tween := miner_rig.restore_cinematic_visual(restore_seconds)
 	if restore_tween != null:
 		await restore_tween.finished
 	# The ambient passes run behind the cast from here on, so neither can sweep
 	# across the miner while he is mining.
+	bus_front_sprite.hide()
 	bus.z_index = bus_behind_draw_order
 	_run_ambient_passes()
 
@@ -325,6 +301,7 @@ func abort_and_restore() -> void:
 	_is_playing = false
 	_is_pickup_active = false
 	_kill_prop_tween()
+	bus_front_sprite.hide()
 	miner_rig.show()
 	miner_rig.cancel_cinematic_visual_override()
 
@@ -512,10 +489,40 @@ func _apply_bus_art(
 		return
 	bus_sprite.texture = frame
 	bus_sprite.position = sprite_offset
+	_sync_bus_front_sprite(frame, sprite_offset)
 	if _wheel_material == null or wheel_uvs.size() < 2:
 		return
 	_wheel_material.set_shader_parameter(&"wheel_one_uv", wheel_uvs[0])
 	_wheel_material.set_shader_parameter(&"wheel_two_uv", wheel_uvs[1])
+
+
+## Crops and aligns the direction's leading section over the full bus body.
+func _sync_bus_front_sprite(
+	frame: Texture2D,
+	sprite_offset: Vector2
+) -> void:
+	if bus_front_sprite == null:
+		return
+	var texture_size := frame.get_size()
+	var region_width := minf(bus_front_region_width_px, texture_size.x)
+	var region_x := (
+		0.0
+		if frame == bus_side_left_texture
+		else texture_size.x - region_width
+	)
+	var region_center_x := region_x + region_width * 0.5
+	bus_front_sprite.texture = frame
+	bus_front_sprite.region_rect = Rect2(
+		region_x,
+		0.0,
+		region_width,
+		texture_size.y
+	)
+	bus_front_sprite.position = sprite_offset + Vector2(
+		(region_center_x - texture_size.x * 0.5) * bus_sprite.scale.x,
+		0.0
+	)
+	bus_front_sprite.scale = bus_sprite.scale
 
 
 ## Shuts the door and pulls away in one motion, without waiting for it.
@@ -545,17 +552,13 @@ func _await_prop_tween() -> void:
 ## shown here rather than after the wipe, so the bus's trailing edge uncovers a
 ## miner who was already standing there instead of one who pops into being.
 func _place_miner_at_drop_off() -> void:
-	miner_rig.glide_cinematic_foot_to(
+	miner_rig.place_cinematic_foot_at(
 		Vector2(
 			miner_drop_off_anchor.global_position.x,
 			_ground_foot_y
 		),
-		0.01,
 		miner_cinematic_draw_order
 	)
-	# He walks left to the dig spot, so he faces that way from the moment the
-	# bus reveals him.
-	miner_rig.set_facing_direction(-1)
 	miner_rig.show()
 
 
@@ -570,6 +573,7 @@ func _has_complete_references() -> bool:
 		miner_rig != null
 		and bus != null
 		and bus_sprite != null
+		and bus_front_sprite != null
 		and station != null
 		and attendant != null
 		and terrain_renderer != null

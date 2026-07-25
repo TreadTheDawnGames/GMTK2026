@@ -28,12 +28,14 @@ shader_parameter/rim_inner = 0.42
 shader_parameter/rim_outer = 1.0
 shader_parameter/sun_up_bias = 1.6
 
-[node name="ArrivalIntro" type="Node2D" node_paths=PackedStringArray("bus", "bus_sprite", "station", "attendant", "bus_arrival_anchor", "bus_stop_anchor", "bus_exit_anchor", "door_step_anchor", "miner_drop_off_anchor", "attendant_pickup_stop_anchor")]
-editor_description = "Surface arrival staging. Every prop is authored in viewport pixels with the ground line at y = 262; the node re-anchors itself to the live ground line each frame, so the stop stays planted and scrolls away only as the miner descends. The letterbox top bar covers the first 91 px: keep every prop's art below that. Assign miner_rig and surface_presentation from the mining scene."
+[node name="ArrivalIntro" type="Node2D" node_paths=PackedStringArray("bus", "bus_sprite", "bus_front_sprite", "station", "attendant", "bus_arrival_anchor", "bus_stop_anchor", "bus_exit_anchor", "door_step_anchor", "miner_drop_off_anchor", "attendant_pickup_stop_anchor")]
+editor_description = "Surface arrival staging. Every prop is authored around the original terrain surface centre at (576, 262). Process priority 100 re-anchors that terrain point on both axes after each view update, while the shared Camera2D gives terrain and stop identical shake. The letterbox top bar covers the first 91 px: keep every prop's art below that. Assign miner_rig and surface_presentation from the mining scene."
 process_mode = 3
+process_priority = 100
 script = ExtResource("1_arrival")
 bus = NodePath("Bus")
 bus_sprite = NodePath("Bus/BusSprite")
+bus_front_sprite = NodePath("Bus/BusFrontOccluder")
 bus_side_right_texture = ExtResource("3_bus")
 bus_side_left_texture = ExtResource("10_bus_left")
 station = NodePath("Station")
@@ -50,20 +52,20 @@ editor_description = "Offscreen RIGHT. Only the x coordinate is used; keep the w
 position = Vector2(1500, 262)
 
 [node name="BusStopAnchor" type="Marker2D" parent="."]
-editor_description = "Where the bus parks, right on top of the stop. Both coordinates are used: x is the stop, y is the ground line the suspension dip returns to. Parked here the bus spans 597-1163 and fully covers the shelter, which is what makes its departure wipe the whole reveal open."
-position = Vector2(880, 262)
+editor_description = "Where the bus parks with its left-facing front at viewport centre. Both coordinates are used: x is the bus root, y is the ground line the suspension dip returns to. Parked here the bus spans about 576-1142, putting its leftmost/front edge directly over the miner at x 576."
+position = Vector2(859, 262)
 
 [node name="AttendantPickupStopAnchor" type="Marker2D" parent="."]
 editor_description = "Where the returning bus parks to collect the attendant. Only x is used. Placed so the bus door lines up with the stop while the bus stays behind it in draw order, reading as the road behind the bench. Clearing this anchor disables the pickup without breaking the intro."
-position = Vector2(700, 262)
+position = Vector2(332, 262)
 
 [node name="BusExitAnchor" type="Marker2D" parent="."]
 editor_description = "Offscreen LEFT. Only the x coordinate is used. The bus draws in FRONT of the cast, so sliding away left uncovers the miner from behind its trailing edge."
 position = Vector2(-700, 262)
 
 [node name="MinerDropOffAnchor" type="Marker2D" parent="."]
-editor_description = "Where the miner is standing when the bus pulls away. Must sit inside the parked bus's span (597-1163) so he is hidden until the wipe uncovers him, and clear of the Attendant at x 890."
-position = Vector2(760, 262)
+editor_description = "Where the miner is standing when the bus pulls away: the fixed centre-screen mining point, immediately right of the bench reader and directly at the stopped bus's left-facing front edge. The miner is already at the place where play begins."
+position = Vector2(576, 262)
 
 [node name="Bus" type="Node2D" parent="."]
 editor_description = "Bus root, with the ground under its wheels at y = 0. The drawn art carries its own door, so opening it is a texture swap on BusSprite rather than a moving panel. z_index 5 puts it in front of the whole cast on purpose: the miner boards and waits behind it, and its departure is what reveals him."
@@ -71,21 +73,37 @@ z_index = 5
 position = Vector2(1500, 262)
 
 [node name="BusSprite" type="Sprite2D" parent="Bus"]
-editor_description = "Drawn bus. Placement is measured from the art: wheels bottom out at texture y=1002, and the door art's opaque body centres on texture x=1143. There is no engine mirror any more: the artist drew a left-facing side, so the sequence swaps frames by direction of travel. Each frame carries its own sprite offset and wheel-shine UVs, applied together in _apply_bus_art, because the left-facing art's wheels sit at different texture positions. Re-measure both if the art moves. The import is capped at 1024 px; this compensated scale preserves the original footprint, and linear mipmap filtering keeps the moving art stable."
+editor_description = "Full drawn bus body. During the miner exit this sits behind him; BusFrontOccluder redraws only the leading section above him so he emerges from the front instead of being uncovered by the rear. Placement is measured from the art: wheels bottom out at texture y=1002. Each travel frame carries its own sprite offset and wheel-shine UVs, applied together in _apply_bus_art. The import is capped at 1024 px; this compensated scale preserves the original footprint."
 texture_filter = 4
 material = SubResource("ShaderMaterial_bus_wheels")
 position = Vector2(-14, -74)
 scale = Vector2(0.955625, 0.955625)
 texture = ExtResource("3_bus")
 
+[node name="BusFrontOccluder" type="Sprite2D" parent="Bus"]
+editor_description = "Runtime-aligned crop of the bus's leading section. It is absolute z 5 above the cinematic miner while the full BusSprite remains below him, then hides before ambient bus passes."
+visible = false
+z_index = 5
+z_as_relative = false
+texture_filter = 4
+position = Vector2(207.6, -74)
+scale = Vector2(0.955625, 0.955625)
+texture = ExtResource("3_bus")
+region_enabled = true
+region_rect = Rect2(464, 0, 560, 768)
+
+[node name="FrontEdgeAnchor" type="Marker2D" parent="Bus"]
+editor_description = "Measured leftmost/front edge of the left-facing bus art. At BusStopAnchor x 859 this lands at screen x 576, exactly on MinerDropOffAnchor."
+position = Vector2(-283, 0)
+
 [node name="DoorStepAnchor" type="Marker2D" parent="Bus"]
 editor_description = "Middle of the drawn doorway, texture x about 1690, on the unmirrored door-facing art. The miner boards out of sight behind the bus rather than stepping down through it, so this is kept for placement reference and for any future visible step-off."
 position = Vector2(240, -4)
 
 [node name="Station" type="Node2D" parent="."]
-editor_description = "Bus stop, standing on the ground at y = 0. The drawn shelter is on StationSprite; the placeholder polygons it replaced have been removed."
+editor_description = "Bus stop, standing on the ground at y = 0. It is offset 64 px left of viewport centre so the drawn bench and reader sit immediately left of the fixed centre-screen miner while the stop remains the shot's focal point. The drawn shelter is on StationSprite; the placeholder polygons it replaced have been removed."
 z_index = 1
-position = Vector2(880, 262)
+position = Vector2(512, 262)
 
 [node name="StationSprite" type="Sprite2D" parent="Station"]
 editor_description = "Drawn bus stop. Placement is measured from the art: the opaque base sits at texture y=1262 and the art is already centred on the texture, so no x correction is needed. It is then sunk about 10 px past the ground line on purpose - seated exactly on it, the bright horizon glow shows through the gap under the shelter's base. Terrain layer one draws in front of this node, so the sunk edge is covered by the ground it stands in. The import is capped at 1024 px; the compensated scale keeps it 151 px tall and clear of the 91 px letterbox bar."
@@ -95,13 +113,13 @@ scale = Vector2(0.618984, 0.618984)
 texture = ExtResource("6_bus_stop")
 
 [node name="AttendantSeatAnchor" type="Marker2D" parent="Station"]
-editor_description = "Measured to the drawn bench: seat surface at texture y=1150, bench centred on texture x=1147. The standing stand-in cannot sit here without floating, so this is the reference point for the seated art swap, not a live position."
+editor_description = "Measured to the drawn bench: seat surface at texture y=1150, bench centred on texture x=1147. At this staging its screen x is 522, immediately left of the miner at x 576. The standing stand-in cannot sit here without floating, so this is the reference point for the seated art swap, not a live position."
 position = Vector2(10, -32)
 
 [node name="Attendant" parent="." instance=ExtResource("2_character_presenter")]
-editor_description = "The person at the stop. Stands at the drawn bench (x 845-935), feet on the ground line, so the stand-in already previews where the seated character will be. Do not move it left onto the trellis panel: the figure then reads as standing inside a cage. The current appearance is a standing 256 px frame, so seating it on the bench would float it and push its head under the letterbox. When the seated art lands, move this to AttendantSeatAnchor and re-check the head against the top bar."
+editor_description = "A silent, unrelated bystander reading a newspaper at the stop; he is not the lantern-staff man or another story character. Stands at the drawn bench (x 477-567), immediately left of the miner's x 576 starting point, with feet on the ground line so the stand-in already previews where the seated character will be. Do not move it left onto the trellis panel: the figure then reads as standing inside a cage. The current appearance is a standing 256 px frame, so seating it on the bench would float it and push its head under the letterbox. When seated art arrives, move this to AttendantSeatAnchor and re-check the head against the top bar."
 z_index = 2
-position = Vector2(890, 264)
+position = Vector2(522, 264)
 
 [node name="EditorTerrainPreview" type="Node2D" parent="." node_paths=PackedStringArray("terrain_manager", "terrain_renderer", "test_impacts_root")]
 z_index = -100

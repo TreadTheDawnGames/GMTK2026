@@ -89,7 +89,8 @@ func move_grounded_to(
 	target_position: Vector2,
 	duration: float,
 	floor_sampler: Callable,
-	hide_on_finish: bool = false
+	hide_on_finish: bool = false,
+	step_height: float = GroundWalkType.DEFAULT_STEP_HEIGHT
 ) -> Tween:
 	reset_speech_motion()
 	cancel_grounded_motion()
@@ -107,7 +108,7 @@ func move_grounded_to(
 		self,
 		ground_path,
 		duration,
-		GroundWalkType.DEFAULT_STEP_HEIGHT
+		step_height
 	)
 	if _departure_tween != null and hide_on_finish:
 		_departure_tween.tween_callback(hide)

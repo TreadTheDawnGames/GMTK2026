@@ -4,6 +4,7 @@
 [ext_resource type="Texture2D" path="res://Assets/Characters/MrNotOffensiveName-Sheet.png" id="2_texture"]
 
 [resource]
+resource_name = "Newspaper Reader Appearance"
 script = ExtResource("1_appearance")
 texture = ExtResource("2_texture")
 horizontal_frames = 7

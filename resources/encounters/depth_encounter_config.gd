@@ -1,8 +1,11 @@
+@tool
 class_name DepthEncounterConfig
 extends Resource
 
 ## Stores the named character schedule and shared chamber settings.
 ## Vertical values use gameplay depth measured from the miner's feet.
+## @tool because the cutscene terrain preview calls the chamber methods while
+## editing; without it Godot loads this resource as a placeholder instance.
 
 @export_category("Named Encounters")
 ## Lists every character and the final thief in authored depth order.

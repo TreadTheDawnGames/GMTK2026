@@ -12,15 +12,36 @@ extends Node
 ## The invariant is that this harness is a launcher and owns no cinematic state.
 
 const MINING_SCENE := preload("res://Scenes/mining/mining_proof.tscn")
+## Written by the cutscene editor just before it launches this harness, so
+## "playtest this cutscene" opens on the encounter being authored instead of
+## the surface. Absent means the ordinary numbered beats.
+const PLAYTEST_TARGET_PATH := "res://.cutscene_playtest_target"
 
 var _game_root: Node
 var _status: Label
 var _active_beat: StringName = &"intro"
+var _requested_encounter_id: StringName
 
 
 func _ready() -> void:
 	_build_status_label()
-	_restart_with_beat(&"intro")
+	_requested_encounter_id = _read_requested_encounter_id()
+	if _requested_encounter_id.is_empty():
+		_restart_with_beat(&"intro")
+		return
+	_restart_with_beat(&"requested")
+
+
+## Reads the encounter the editor asked for. A missing or empty file is the
+## normal case and must stay silent, because this harness is also opened
+## directly with F6.
+func _read_requested_encounter_id() -> StringName:
+	if not FileAccess.file_exists(PLAYTEST_TARGET_PATH):
+		return &""
+	var file := FileAccess.open(PLAYTEST_TARGET_PATH, FileAccess.READ)
+	if file == null:
+		return &""
+	return StringName(file.get_as_text().strip_edges())
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -71,6 +92,9 @@ func _restart_with_beat(beat: StringName) -> void:
 		&"encounter":
 			await _skip_run_intro()
 			await _play_depth_encounter()
+		&"requested":
+			await _skip_run_intro()
+			await _play_named_encounter(_requested_encounter_id)
 		_:
 			_set_status("Unknown beat '%s'." % beat)
 
@@ -95,8 +119,6 @@ func _skip_run_intro() -> void:
 	arrival.bus_arrival_seconds = 0.2
 	arrival.bus_settle_seconds = 0.0
 	arrival.miner_exit_delay_seconds = 0.05
-	arrival.miner_reveal_hold_seconds = 0.05
-	arrival.miner_walk_seconds = 0.1
 	arrival.hold_before_dialogue_seconds = 0.0
 	arrival.bus_departure_seconds = 0.2
 	if director.cinematic_frame != null:
@@ -146,6 +168,24 @@ func _play_depth_encounter() -> void:
 	_set_status(
 		"Beat: depth encounter (playing) - R replays, 1 intro, 2 rat colony"
 	)
+
+
+## Crosses one named encounter's real ceiling, so the cutscene being authored
+## opens the way it opens in a run: the miner breaks through and falls into it.
+func _play_named_encounter(encounter_id: StringName) -> void:
+	var encounter := _get_encounter_controller()
+	if encounter == null:
+		_set_status("Could not find the encounter controller.")
+		return
+	var encounter_index := _find_encounter_index(encounter, encounter_id)
+	if encounter_index < 0:
+		_set_status("No encounter named '%s' is scheduled." % encounter_id)
+		return
+	encounter._next_encounter_index = encounter_index
+	_set_status("Beat: %s (crossing ceiling)" % encounter_id)
+	_descend_to(_get_encounter_ceiling(encounter, encounter_index))
+	await get_tree().process_frame
+	_set_status("Beat: %s (playing) - R replays" % encounter_id)
 
 
 func _get_encounter_controller() -> DepthEncounterController:

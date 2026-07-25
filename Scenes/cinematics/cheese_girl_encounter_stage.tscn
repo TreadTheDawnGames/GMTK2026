@@ -1,0 +1,19 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
+
+[node name="CheeseGirlEncounterStage" instance=ExtResource("1_stage")]
+editor_description = "Cheese Girl enters from the side and stops at the tunnel center for her first conversation."
+
+[node name="Conversation" parent="ActorMarkers" index="1"]
+position = Vector2(-176, 0)
+
+[node name="Rest" parent="ActorMarkers" index="3"]
+position = Vector2(-176, 0)
+
+[node name="EditorTerrainPreview" parent="." index="4"]
+editor_description = "Previews cheese_girl_first at its authored depth."
+encounter_id = &"cheese_girl_first"
+preview_depth_rows = 600
+
+[editable path="ActorMarkers"]

@@ -5,8 +5,8 @@ extends Node
 ## - Scene readiness gates mining and hides the timing bar before anything moves.
 ## - The scene starts under the menu's black; the letterbox splits it apart from
 ##   the middle, and only then does the bus drive into frame.
-## - The authored arrival sequence steps the miner off the bus, then pulls the
-##   bus away while he walks over and settles into the mining stance.
+## - The authored arrival sequence places the miner at the dig spot, then pulls
+##   the bus away to reveal him already in the mining stance.
 ## - Only the letterbox and HUD change when control returns; the stop, its
 ##   attendant, and the dressed ground all stay standing behind the miner.
 ## - Every failure path still reveals the shot, so a black screen is never final.

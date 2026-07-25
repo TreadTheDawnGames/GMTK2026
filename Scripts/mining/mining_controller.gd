@@ -265,11 +265,20 @@ func resolve_impact(
 		)
 	)
 	var surface_after_primary_hit_y: int = surface_after_primary_hit.y
-	var crossed_open_chamber := (
-		surface_after_primary_hit_y
-		> fall_cell.y + requested_depth_rows
-	)
-	if dig_result.cells_removed > 0 and not crossed_open_chamber:
+	var crossed_floor_depth: int = -1
+	if terrain_manager.encounter_config != null:
+		crossed_floor_depth = (
+			terrain_manager.encounter_config
+			.get_first_crossed_encounter_floor_depth(
+				fall_cell.y - config.initial_surface_row,
+				surface_after_primary_hit_y - config.initial_surface_row,
+				config.total_run_depth
+			)
+		)
+	# A primary hit that opens an encounter chamber has reached its protected
+	# floor even when its requested endpoint lies deeper. Starting an aftershock
+	# from that surface would destroy the floor the miner must land on.
+	if dig_result.cells_removed > 0 and crossed_floor_depth < 0:
 		for definition in _pending_swing.pickaxes:
 			if (
 				definition == null
@@ -335,8 +344,11 @@ func resolve_impact(
 			impact_cell_x
 		)
 	)
-	if terrain_manager.encounter_config != null:
-		var crossed_floor_depth := (
+	if (
+		crossed_floor_depth < 0
+		and terrain_manager.encounter_config != null
+	):
+		crossed_floor_depth = (
 			terrain_manager.encounter_config
 			.get_first_crossed_encounter_floor_depth(
 				fall_cell.y - config.initial_surface_row,
@@ -344,11 +356,11 @@ func resolve_impact(
 				config.total_run_depth
 			)
 		)
-		if crossed_floor_depth >= 0:
-			new_mining_position.y = mini(
-				new_mining_position.y,
-				config.initial_surface_row + crossed_floor_depth
-			)
+	if crossed_floor_depth >= 0:
+		new_mining_position.y = mini(
+			new_mining_position.y,
+			config.initial_surface_row + crossed_floor_depth
+		)
 	var new_mining_y: int = new_mining_position.y
 	var depth_gained := maxi(new_mining_y - _game_state.mining_y, 0)
 	_game_state.record_success(

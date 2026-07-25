@@ -124,6 +124,11 @@ func _ready() -> void:
 		Object.CONNECT_DEFERRED
 	)
 	_connect_once(
+		view_controller.landing_reached,
+		encounter_controller._on_landing_reached,
+		Object.CONNECT_DEFERRED
+	)
+	_connect_once(
 		cinematic_flow.camera_focus_requested,
 		_on_cinematic_camera_focus_requested
 	)
@@ -134,6 +139,10 @@ func _ready() -> void:
 	_connect_once(
 		terrain_manager.view_position_changed,
 		terrain_renderer._on_view_position_changed
+	)
+	_connect_once(
+		terrain_manager.view_position_changed,
+		credits_overlay._on_view_position_changed
 	)
 	_connect_once(
 		terrain_manager.view_position_changed,
