@@ -864,8 +864,13 @@ func _on_terrain_paths_damaged(
 ## Stores related stamps and uploads each visible chunk only once.
 func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 	var affected_chunk_lookup: Dictionary[int, bool] = {}
+	var chunk_indices_by_stamp: Array[Array] = []
 	for stamp in stamps:
-		for chunk_index in _register_impact_stamp(stamp):
+		var stamp_chunk_indices: Array[int] = _register_impact_stamp(
+			stamp
+		)
+		chunk_indices_by_stamp.append(stamp_chunk_indices)
+		for chunk_index in stamp_chunk_indices:
 			affected_chunk_lookup[chunk_index] = true
 	if _defer_impact_rasterization:
 		var layer_count: int = profile.get_gameplay_layer_count()
@@ -873,14 +878,15 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 		# The authoritative transform is a first-class queue item immediately
 		# before fallback raster bands. Fully prepared layers skip both costs and
 		# promote their immutable terrain patch instead.
-		for stamp in stamps:
+		for stamp_index in range(stamps.size()):
+			var stamp := stamps[stamp_index]
 			if not stamp.narrow_path_points.is_empty():
 				continue
 			var preparation_layers: Array[int] = []
 			for layer_index in range(layer_count):
 				if not _can_apply_impact_stamp_layer(stamp, layer_index):
 					continue
-				for chunk_index in _get_stamp_chunk_indices(stamp):
+				for chunk_index in chunk_indices_by_stamp[stamp_index]:
 					if not _active_chunks.has(chunk_index):
 						continue
 					var chunk: TerrainChunkVisual = _active_chunks[
@@ -914,8 +920,12 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 			if not _active_chunks.has(chunk_index):
 				continue
 			var chunk: TerrainChunkVisual = _active_chunks[chunk_index]
-			for stamp in stamps:
-				if chunk_index not in _get_stamp_chunk_indices(stamp):
+			for stamp_index in range(stamps.size()):
+				var stamp := stamps[stamp_index]
+				if (
+					chunk_index
+					not in chunk_indices_by_stamp[stamp_index]
+				):
 					continue
 				for layer_index in range(layer_count):
 					# Do not allocate queue capacity for strata the production
