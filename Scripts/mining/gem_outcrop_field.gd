@@ -114,6 +114,9 @@ var _gem_count: int = 0
 var _first_visible_chunk: int = 0
 var _last_visible_chunk: int = 0
 var _save_game: SaveGame
+# At most one save callback is queued. Multiple gems discovered in one frame
+# coalesce into the same write, and disk I/O never extends the hit signal.
+var _persistence_queued: bool = false
 
 
 ## Builds one drawing shelf per stratum a hit can expose.
@@ -199,7 +202,7 @@ func clear_gems() -> void:
 	_gem_count_by_chunk.clear()
 	_gem_count = 0
 	if had_saved_gems:
-		_persist_gems()
+		_queue_gem_persistence()
 	set_process(false)
 
 
@@ -499,7 +502,7 @@ func _add_gem(
 		)
 	)
 	_append_gem(layer_index, chunk_index, gem)
-	_persist_gems()
+	_queue_gem_persistence()
 	for shelf in _shelves:
 		shelf.queue_redraw()
 	set_process(true)
@@ -621,9 +624,19 @@ func _restore_saved_gems() -> void:
 		shelf.queue_redraw()
 
 
+## Coalesces persistence outside the resolved hit signal. Saving is intentionally
+## not terrain work, and one frame may add or clear multiple presentation gems.
+func _queue_gem_persistence() -> void:
+	if _persistence_queued:
+		return
+	_persistence_queued = true
+	_persist_gems.call_deferred()
+
+
 ## Serializes compact values only when a rare placement changes the map. Review
 ## scrolling never writes or rebuilds this complete list.
 func _persist_gems() -> void:
+	_persistence_queued = false
 	if _save_game == null:
 		return
 	var saved_gems: Array[Dictionary] = []
