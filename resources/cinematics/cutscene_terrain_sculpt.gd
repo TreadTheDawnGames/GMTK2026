@@ -62,7 +62,12 @@ const MAXIMUM_GRID_SIZE := Vector2i(512, 512)
 ## rock; one interpolates every rim, which is what makes a smoothed wall read
 ## as a worn chamber. This changes the picture only — collision always uses
 ## whole cells.
-@export_range(0.0, 1.0, 0.05) var edge_smoothing: float = 0.65:
+## Defaults to full smoothing. The mask is written at four pixels per cell, so
+## interpolating the rim puts the visible edge on the true sub-cell contour;
+## blending back toward the raw cells only drags that contour onto the grid and
+## the wall reads as stair-steps. Jaggedness should come from the roughen
+## brush, which moves actual cells, not from refusing to interpolate.
+@export_range(0.0, 1.0, 0.05) var edge_smoothing: float = 1.0:
 	set(value):
 		edge_smoothing = clampf(value, 0.0, 1.0)
 		emit_changed()
@@ -149,8 +154,14 @@ func is_protected_floor_row(local_row: int) -> bool:
 ## Returns, for each column the run's snaking path can arrive down, the grid
 ## row the miner would first touch. The editor draws this so a designer sees
 ## the real landing line rather than guessing where a ledge catches him.
-## The returned array is one entry per column from the leftmost reachable
-## column rightward; -1 means that column has nothing to land on at all.
+##
+## The scan skips the intact rock above the room before looking for ground.
+## The miner does not land on the ceiling, he breaks through it: the row that
+## matters is the first solid cell *below the first opening*, which is what
+## TerrainManager.find_tunnel_surface_cell finds once he is falling.
+##
+## One entry per column from the leftmost reachable column rightward. -1 means
+## that column has no opening to fall into at all.
 func get_landing_local_rows(half_span_cells: int) -> PackedInt32Array:
 	var landing_rows := PackedInt32Array()
 	var floor_local_row := get_floor_local_row()
@@ -161,8 +172,12 @@ func get_landing_local_rows(half_span_cells: int) -> PackedInt32Array:
 	var last_local_x := mini(center_local_x + half_span_cells, grid_size.x - 1)
 	for local_x in range(first_local_x, last_local_x + 1):
 		var landing_row := -1
+		var has_reached_opening := false
 		for local_y in range(0, grid_size.y):
-			if is_solid_local(Vector2i(local_x, local_y)):
+			if not is_solid_local(Vector2i(local_x, local_y)):
+				has_reached_opening = true
+				continue
+			if has_reached_opening:
 				landing_row = local_y
 				break
 		landing_rows.append(landing_row)

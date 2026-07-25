@@ -117,10 +117,16 @@ func _apply_direct(
 		for local_x in range(bounds.position.x, bounds.end.x):
 			var cell := Vector2i(local_x, local_y)
 			var weight := _brush_weight(center, cell)
+			# Carve and fill are deliberately deterministic. Dicing each cell
+			# against the falloff ramp leaves unaffected cells scattered
+			# through the soft edge, and on terrain those are not a soft edge
+			# at all — they are floating debris the miner lands on, and the
+			# room fills with speckle. Strength shrinks the cut instead, and
+			# the softness of the drawn rim is the sculpt's edge_smoothing.
 			if (
 				weight <= 0.0
 				or not sculpt.contains_local(cell)
-				or not _passes_strength(cell, weight, _SELECTION_SALT)
+				or weight < 1.0 - clampf(strength, 0.0, 1.0)
 			):
 				continue
 			if _set_target_value(sculpt, cell, solid):

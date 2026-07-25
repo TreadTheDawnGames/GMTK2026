@@ -188,7 +188,7 @@ func _build_controls() -> void:
 
 	_controls_root.add_child(HSeparator.new())
 
-	_smoothing_slider = _add_slider("Rock smoothing", 0.0, 1.0, 0.05, 0.65)
+	_smoothing_slider = _add_slider("Rock smoothing", 0.0, 1.0, 0.05, 1.0)
 	_smoothing_slider.value_changed.connect(_on_smoothing_changed)
 
 	var floor_row := HBoxContainer.new()
@@ -472,16 +472,17 @@ func _describe_landing(sculpt: CutsceneTerrainSculpt) -> String:
 		return "The room does not contain its own floor row."
 	var floor_row := sculpt.get_floor_local_row()
 	var highest_landing := floor_row
-	var bottomless_columns := 0
+	var sealed_columns := 0
 	for landing_row in landing_rows:
 		if landing_row < 0:
-			bottomless_columns += 1
+			sealed_columns += 1
 			continue
 		highest_landing = mini(highest_landing, landing_row)
-	if bottomless_columns > 0:
+	if sealed_columns > 0:
 		return (
-			"%d of the columns the miner can fall down have nothing to land on."
-			% bottomless_columns
+			"%d of the columns the miner can arrive down have no opening to "
+			% sealed_columns
+			+ "fall into; he would break the ceiling onto solid rock."
 		)
 	if highest_landing >= floor_row:
 		return "The miner lands on the room's floor from every entry column."
