@@ -10,13 +10,25 @@ extends Node
 ##   out of frame with no extra bookkeeping.
 ## - Grass and crust are NOT here. They belong to the foreground stratum in
 ##   terrain_layer.gdshader, so that mining removes them with the ground.
+## - Both rects are resized to whatever the camera can see, and their shader
+##   coordinates are shifted by the rect's own origin. At gameplay zoom that is
+##   the authored full-viewport rect at (0, 0); while the opening shot is still
+##   zoomed out it is the larger area, so daylight never stops short of the
+##   frame edge.
 ## The invariant is that both rects agree on the horizon and the sun.
+
+# Pixels of backdrop carried past every frame edge, so a fractional zoom can
+# never round a seam of clear colour into the shot.
+const _BACKDROP_OVERSCAN_PX: float = 2.0
 
 @export_category("References")
 @export var terrain_manager: TerrainManager
 @export var config: MiningConfig
 @export var sky_rect: ColorRect
 @export var sunlight_wash_rect: ColorRect
+## The shot's camera. Both rects follow what it can see. Leaving it empty keeps
+## the authored full-viewport rects exactly as they are.
+@export var camera: Camera2D
 
 @export_category("Sun")
 ## Viewport pixels. Every rect reads this, so the halo in the sky and the warm
@@ -82,13 +94,42 @@ func get_surface_screen_y() -> float:
 
 
 func _publish_all() -> void:
+	_frame_backdrop_rects()
 	_publish_sun_position()
 	_publish_viewport_size()
 	_publish_surface_screen_y()
 
 
+## Grows both rects to cover everything the camera can see. Camera offset is
+## deliberately ignored: the rects stay planted in the world, so the impact
+## shake still carries the sky with it exactly as it did at a fixed size.
+func _frame_backdrop_rects() -> void:
+	if camera == null:
+		return
+	var camera_zoom := camera.zoom
+	if is_zero_approx(camera_zoom.x) or is_zero_approx(camera_zoom.y):
+		return
+	var covered_size := (
+		get_viewport().get_visible_rect().size / camera_zoom
+		+ Vector2.ONE * (_BACKDROP_OVERSCAN_PX * 2.0)
+	)
+	var covered_origin := camera.global_position - covered_size * 0.5
+	for rect: ColorRect in [sky_rect, sunlight_wash_rect]:
+		rect.position = covered_origin
+		rect.size = covered_size
+
+
+## Both shaders read UV against their own rect, so every viewport-space value
+## they are given has to be moved into that rect's frame first.
+func _get_backdrop_origin() -> Vector2:
+	return sky_rect.position
+
+
 func _publish_surface_screen_y() -> void:
-	var surface_screen_y := get_surface_screen_y()
+	var surface_screen_y := (
+		get_surface_screen_y()
+		- _get_backdrop_origin().y
+	)
 	if (
 		not is_nan(_last_surface_screen_y)
 		and is_equal_approx(surface_screen_y, _last_surface_screen_y)
@@ -99,17 +140,18 @@ func _publish_surface_screen_y() -> void:
 
 
 func _publish_sun_position() -> void:
-	if sun_screen_position.is_equal_approx(_last_sun_screen_position):
+	var rect_sun_position := sun_screen_position - _get_backdrop_origin()
+	if rect_sun_position.is_equal_approx(_last_sun_screen_position):
 		return
-	_last_sun_screen_position = sun_screen_position
+	_last_sun_screen_position = rect_sun_position
 	# Only the sky and the wash place the sun; the apron is lit by the wash.
 	_sky_material.set_shader_parameter(
 		&"sun_screen_position",
-		sun_screen_position
+		rect_sun_position
 	)
 	_wash_material.set_shader_parameter(
 		&"sun_screen_position",
-		sun_screen_position
+		rect_sun_position
 	)
 
 

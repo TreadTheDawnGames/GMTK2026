@@ -38,7 +38,10 @@ enum IrisState {
 @export_category("Blackout Reveal")
 ## Starts the scene fully covered so a fade-to-black scene change can hand over
 ## without a lit frame in between. The owning sequence must call
-## reveal_from_blackout(), or the shot never opens.
+## reveal_from_blackout(), or the shot never opens. The opening no longer needs
+## it: the title shot is the lit world with the bars already closed, so the
+## production overlay leaves this off and RunIntroController opens the frame
+## instantly instead.
 @export var starts_blacked_out: bool = false
 ## Half the viewport each, so the two bars meet exactly in the middle.
 @export_range(0.25, 0.5, 0.01) var blackout_bar_height_ratio: float = 0.5

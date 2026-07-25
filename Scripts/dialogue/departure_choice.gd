@@ -5,7 +5,9 @@ extends CanvasLayer
 
 signal keep_digging_selected
 
-const MAIN_MENU_SCENE := "res://Scenes/menu/main_menu.tscn"
+# The menu is an overlay inside the opening scene, so returning to the title
+# means reloading that scene rather than opening a menu scene of its own.
+const TITLE_SCENE := "res://Scenes/mining/mining_proof.tscn"
 
 @export var choice_root: Control
 @export var ending_root: Control
@@ -56,4 +58,4 @@ func _on_keep_digging_pressed() -> void:
 ## Returns the completed short route to the main menu.
 func _on_return_to_title_pressed() -> void:
 	get_tree().paused = false
-	get_tree().change_scene_to_file(MAIN_MENU_SCENE)
+	get_tree().change_scene_to_file(TITLE_SCENE)

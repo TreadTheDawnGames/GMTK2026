@@ -91,7 +91,7 @@ shader_parameter/bounce_height = 0.28
 shader_parameter/haze_color = Color(1, 0.55, 0.3, 1)
 shader_parameter/haze_strength = 0.06
 
-[node name="ArrivalIntro" type="Node2D" unique_id=1350024243 node_paths=PackedStringArray("bus", "bus_sprite", "bus_front_sprite", "station", "attendant", "bus_arrival_anchor", "bus_stop_anchor", "bus_exit_anchor", "door_step_anchor", "miner_drop_off_anchor", "attendant_pickup_stop_anchor")]
+[node name="ArrivalIntro" type="Node2D" unique_id=1350024243 node_paths=PackedStringArray("bus", "bus_sprite", "bus_front_sprite", "station", "attendant", "bus_arrival_anchor", "bus_stop_anchor", "bus_exit_anchor", "door_step_anchor", "bus_rear_edge_anchor", "miner_drop_off_anchor", "attendant_pickup_stop_anchor")]
 process_mode = 3
 process_priority = 100
 editor_description = "Surface arrival staging. Every prop is authored around the original terrain surface centre at (576, 262). Process priority 100 re-anchors that terrain point on both axes after each view update, while the shared Camera2D gives terrain and stop identical shake. The letterbox top bar covers the first 91 px: keep every prop's art below that. Assign miner_rig and surface_presentation from the mining scene."
@@ -107,12 +107,13 @@ bus_arrival_anchor = NodePath("BusArrivalAnchor")
 bus_stop_anchor = NodePath("BusStopAnchor")
 bus_exit_anchor = NodePath("BusExitAnchor")
 door_step_anchor = NodePath("Bus/DoorStepAnchor")
+bus_rear_edge_anchor = NodePath("Bus/RearEdgeAnchor")
 miner_drop_off_anchor = NodePath("MinerDropOffAnchor")
 attendant_pickup_stop_anchor = NodePath("AttendantPickupStopAnchor")
 
 [node name="BusArrivalAnchor" type="Marker2D" parent="." unique_id=1314320869]
-editor_description = "Offscreen RIGHT. Only the x coordinate is used; keep the whole bus past the viewport edge so the arrival starts clean. The bus runs right-to-left, so it enters here and leaves at BusExitAnchor on the far side."
-position = Vector2(1500, 262)
+editor_description = "Offscreen RIGHT. Only the x coordinate is used; keep the whole bus past the viewport edge so the arrival starts clean. The bus runs right-to-left, so it enters here and leaves at BusExitAnchor on the far side. Measured against the opening's wide title framing, not the gameplay frame: at menu_zoom 0.40 the shot already reaches x 2016, so the bus has to start well past that to be off screen while the menu is up. Its leading edge is 283 px ahead of this point, so anything below x 2299 has the bus's nose parked in shot behind the title."
+position = Vector2(2450, 262)
 
 [node name="BusStopAnchor" type="Marker2D" parent="." unique_id=2041891707]
 editor_description = "Where the bus parks with its left-facing front at viewport centre. Both coordinates are used: x is the bus root, y is the ground line the suspension dip returns to. Parked here the bus spans about 576-1142, putting its leftmost/front edge directly over the miner at x 576."
@@ -134,7 +135,7 @@ position = Vector2(576, 262)
 editor_description = "The field the stop is standing in. Two bands of the same drawn grass, both sunk far enough below the ground line that terrain layer one covers everything except the tops clearing the horizon, which is exactly what you see of a field that runs away from you. Depth comes from three things together: how much of each band clears the line, how much haze its material mixes in, and the sky ridges behind them. Negative z keeps both behind the terrain, so digging removes the ground in front of them and they scroll away with the surface."
 
 [node name="FarGrassBand" type="Sprite2D" parent="SurfaceBackdrop" unique_id=1672168181]
-editor_description = "The far field. region_rect is three texture widths and texture_repeat is on, so one sprite tiles the drawn band across the shot; the seams fall inside the strip hidden under the ground line and only unrelated blade tips clear the horizon. About 18 px of it shows, hazed hardest, so it reads as distance rather than as small grass."
+editor_description = "The far field. region_rect is eight texture widths and texture_repeat is on, so one sprite tiles the drawn band across the shot; the seams fall inside the strip hidden under the ground line and only unrelated blade tips clear the horizon. About 18 px of it shows, hazed hardest, so it reads as distance rather than as small grass. It is tiled far past the gameplay frame for the opening: at menu_zoom 0.40 the shot is 2880 px wide, and a band that ends inside that reads as the field simply stopping."
 z_index = -9
 texture_filter = 4
 texture_repeat = 2
@@ -143,10 +144,10 @@ position = Vector2(576, 262.8)
 scale = Vector2(0.42, 0.42)
 texture = ExtResource("14_grass_band")
 region_enabled = true
-region_rect = Rect2(0, 0, 3072, 92)
+region_rect = Rect2(0, 0, 8192, 92)
 
 [node name="MidGrassBand" type="Sprite2D" parent="SurfaceBackdrop" unique_id=178202384]
-editor_description = "The near field, standing in front of the far one. Bigger, less hazed, and offset sideways so the two silhouettes never line up. About 32 px of it clears the horizon."
+editor_description = "The near field, standing in front of the far one. Bigger, less hazed, and offset sideways so the two silhouettes never line up. About 32 px of it clears the horizon. Tiled to the same reach as the far band, so neither one runs out inside the opening's wide framing."
 z_index = -8
 texture_filter = 4
 texture_repeat = 2
@@ -155,7 +156,7 @@ position = Vector2(430, 258.3)
 scale = Vector2(0.62, 0.62)
 texture = ExtResource("14_grass_band")
 region_enabled = true
-region_rect = Rect2(0, 0, 3072, 92)
+region_rect = Rect2(0, 0, 6144, 92)
 
 [node name="Bus" type="Node2D" parent="." unique_id=1214144581]
 editor_description = "Bus root, with the ground under its wheels at y = 0. The drawn art carries its own door, so opening it is a texture swap on BusSprite rather than a moving panel. z_index 5 puts it in front of the whole cast on purpose: the miner boards and waits behind it, and its departure is what reveals him."
@@ -186,6 +187,10 @@ region_rect = Rect2(464, 0, 560, 768)
 [node name="FrontEdgeAnchor" type="Marker2D" parent="Bus" unique_id=613728874]
 editor_description = "Measured leftmost/front edge of the left-facing bus art. At BusStopAnchor x 859 this lands at screen x 576, exactly on MinerDropOffAnchor."
 position = Vector2(-283, 0)
+
+[node name="RearEdgeAnchor" type="Marker2D" parent="Bus" unique_id=613728875]
+editor_description = "Measured rightmost/trailing edge of the bus art, mirroring FrontEdgeAnchor. At BusStopAnchor x 859 this lands at screen x 1142, inside the 1152 px frame. The opening shot's camera frames against this point, so re-measuring the art here moves the transition's framing with it."
+position = Vector2(283, 0)
 
 [node name="DoorStepAnchor" type="Marker2D" parent="Bus" unique_id=1918650185]
 editor_description = "Middle of the drawn doorway, texture x about 1690, on the unmirrored door-facing art. The miner boards out of sight behind the bus rather than stepping down through it, so this is kept for placement reference and for any future visible step-off."

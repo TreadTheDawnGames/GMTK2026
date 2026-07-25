@@ -61,6 +61,12 @@ signal attendant_picked_up
 @export var bus_stop_anchor: Marker2D
 @export var bus_exit_anchor: Marker2D
 @export var door_step_anchor: Marker2D
+## Measured trailing edge of the bus body, mirroring FrontEdgeAnchor. The
+## opening shot frames against it, so re-measuring the art moves the framing
+## with it instead of leaving a hardcoded half-width somewhere else. It is
+## optional on purpose: without it the opening falls back to a plain timed
+## zoom rather than refusing to stage.
+@export var bus_rear_edge_anchor: Marker2D
 ## Where the miner waits while the parked bus hides him.
 @export var miner_drop_off_anchor: Marker2D
 ## Where the returning bus parks to collect the attendant. It stays behind the
@@ -68,7 +74,11 @@ signal attendant_picked_up
 @export var attendant_pickup_stop_anchor: Marker2D
 
 @export_category("Timing")
-@export_range(0.2, 6.0, 0.05) var bus_arrival_seconds: float = 0.9
+## The drive-in starts outside the wide title framing, so it covers about two
+## and a half times the distance the gameplay frame would have needed. This is
+## paced for that longer run at roughly the original speed; shortening it back
+## toward 0.9 makes the bus arrive two and a half times as fast.
+@export_range(0.2, 6.0, 0.05) var bus_arrival_seconds: float = 2.0
 @export_range(0.0, 1.5, 0.05) var bus_settle_seconds: float = 0.12
 ## Beat between the bus stopping and the miner being off it. He alights on the
 ## far side, so this is the pause the doors happen in.
@@ -103,6 +113,10 @@ signal attendant_picked_up
 	576.0,
 	262.0
 )
+## The rig's own landing-foot anchor sits this many pixels below where his
+## boots actually render, so this shot alone corrects for it and seats him
+## right at the ground line instead of shin-deep in the dirt.
+@export_range(0.0, 48.0, 1.0) var miner_ground_seat_lift_px: float = 18.0
 
 @export_category("Motion")
 ## Vertical dip as the bus stops, so the arrival lands instead of gliding.
@@ -210,7 +224,7 @@ func begin() -> bool:
 	# surface is flat, so this one point supplies both the ground line the bus
 	# stops on and the exact spot where the miner is revealed.
 	var rest_foot := miner_rig.get_cinematic_foot_screen_position()
-	_ground_foot_y = rest_foot.y
+	_ground_foot_y = rest_foot.y - miner_ground_seat_lift_px
 	_dig_foot_x = rest_foot.x
 	_bus_rest_position = bus_stop_anchor.position
 	bus.position = Vector2(
@@ -305,6 +319,15 @@ func abort_and_restore() -> void:
 ## Reports whether an arrival or departure currently owns the staging.
 func is_playing() -> bool:
 	return _is_playing
+
+
+## Returns the viewport x of the bus's trailing edge, or INF when the anchor is
+## not authored. The opening shot reads it every frame to keep the whole bus
+## inside a frame that is still shrinking around it.
+func get_bus_rear_edge_x() -> float:
+	if bus == null or bus_rear_edge_anchor == null:
+		return INF
+	return bus_rear_edge_anchor.global_position.x
 
 
 ## Reports whether the ambient bus has already taken the attendant away.

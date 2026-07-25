@@ -3,13 +3,19 @@ extends Node
 
 ## How it works:
 ## - Scene readiness gates mining and hides the timing bar before anything moves.
-## - The scene starts under the menu's black; the letterbox splits it apart from
-##   the middle, and only then does the bus drive into frame.
+## - The scene boots into the title shot: the letterbox is already closed, the
+##   camera holds its wide framing, and the stop stands with the miner hidden.
+##   That staged world is the menu's background, so nothing is loaded or
+##   swapped when the player starts.
+## - begin_run() is the menu's request. The bus drives in and the camera closes
+##   the shot onto it, so the world shrinks into gameplay framing at the speed
+##   the bus allows rather than on a timer of its own.
 ## - The authored arrival sequence places the miner at the dig spot, then pulls
 ##   the bus away to reveal him already in the mining stance.
 ## - Only the letterbox and HUD change when control returns; the stop, its
 ##   attendant, and the dressed ground all stay standing behind the miner.
-## - Every failure path still reveals the shot, so a black screen is never final.
+## - Every failure path still opens the frame and settles the camera, so a
+##   letterboxed or half-zoomed shot is never final.
 ## The invariant is that mining stays unavailable for the entire intro.
 
 const FLOW_OWNER: StringName = &"run_intro"
@@ -19,8 +25,8 @@ const MINER_SPEAKER_SLOT: StringName = &"miner"
 @export var attendant_appearance: CharacterAppearance
 
 @export_category("Animation")
-## Held after the blackout splits open, before the bus enters, so the player
-## reads the empty stop first.
+## Held after the menu leaves, before the bus enters, so the player reads the
+## empty stop first.
 @export_range(0.0, 3.0, 0.05) var hold_after_reveal_seconds: float = 0.0
 ## The closing beat: how long the miner takes to plant into his dig stance.
 ## Long enough to read as a deliberate settle rather than a snap.
@@ -32,36 +38,64 @@ const MINER_SPEAKER_SLOT: StringName = &"miner"
 @export var attendant_presenter: CharacterPresenter
 @export var miner_rig: MinerRig
 @export var cinematic_flow: MiningCinematicFlow
+@export var opening_camera: OpeningShotCamera
 
 var _is_intro_active: bool = false
+var _is_staged: bool = false
+var _title_shot_applied: bool = false
 
 
-## Stages the surface meeting before any mining input can be consumed.
+## Stages the surface meeting before any mining input can be consumed. The
+## staging stands for as long as the menu is up; nothing plays until it asks.
 func _ready() -> void:
 	if not _has_complete_references():
 		push_error("Run intro references are incomplete.")
-		_reveal_frame_safely()
+		_release_shot_safely()
 		return
 	attendant_presenter.apply_appearance(attendant_appearance)
 	if not cinematic_flow.try_begin(FLOW_OWNER):
 		push_error("Run intro could not acquire the cinematic flow.")
-		_reveal_frame_safely()
+		_release_shot_safely()
 		return
 	if not arrival_sequence.begin():
 		push_error("Run intro could not stage the arrival.")
 		cinematic_flow.cancel(FLOW_OWNER)
-		_reveal_frame_safely()
+		_release_shot_safely()
 		return
+	_is_staged = true
+	# The camera framing is applied after every _ready() has run, so anything
+	# that captures the authored rest zoom on readiness still reads 1.0.
+	_apply_title_shot.call_deferred()
+
+
+## Plays the canonical bus-only arrival once the menu hands the shot over.
+func begin_run() -> void:
+	if _is_intro_active:
+		return
+	if not _is_staged:
+		# Staging failed at boot, so there is no shot to play. Let the player
+		# into the game rather than stranding them behind a dead menu.
+		_release_shot_safely()
+		return
+	# A menu that hands over on the same frame the scene is staged arrives
+	# before the deferred pass, so the shot is applied on demand here instead.
+	_apply_title_shot()
 	_is_intro_active = true
-	_play_intro.call_deferred()
+	_play_intro()
 
 
-## Opens the inherited blackout and plays the canonical bus-only arrival.
-func _play_intro() -> void:
-	dialogue_director.reveal_cinematic_frame_from_blackout()
-	await dialogue_director.wait_until_blackout_revealed()
-	if not _is_intro_active:
+## Holds the wide title framing behind the menu with the letterbox closed. It
+## runs once: a second pass would reset a transition already in progress.
+func _apply_title_shot() -> void:
+	if _title_shot_applied:
 		return
+	_title_shot_applied = true
+	dialogue_director.open_cinematic_frame(true)
+	opening_camera.apply_menu_framing()
+
+
+## Drives the bus in while the camera closes the shot around it.
+func _play_intro() -> void:
 	if hold_after_reveal_seconds > 0.0:
 		await get_tree().create_timer(
 			hold_after_reveal_seconds,
@@ -69,6 +103,7 @@ func _play_intro() -> void:
 		).timeout
 	if not _is_intro_active:
 		return
+	opening_camera.start_zoom_in()
 	await arrival_sequence.play_arrival()
 	if not _is_intro_active:
 		return
@@ -77,6 +112,11 @@ func _play_intro() -> void:
 	# the foreground stratum closing over his legs reads as him settling in
 	# rather than as a clip the instant the frame opens up.
 	await arrival_sequence.finish(miner_restore_seconds)
+	if not _is_intro_active:
+		return
+	# The frame never opens on a shot that is still moving: gameplay coordinates
+	# are all authored against the settled framing.
+	await opening_camera.wait_until_settled()
 	if not _is_intro_active:
 		return
 	dialogue_director.close_cinematic_frame()
@@ -99,11 +139,12 @@ func _finish_intro() -> void:
 	cinematic_flow.finish(FLOW_OWNER)
 
 
-## Guarantees the player never inherits an unopened blackout from the menu.
-func _reveal_frame_safely() -> void:
+## Guarantees the player never inherits a closed frame or a half-closed shot.
+func _release_shot_safely() -> void:
 	if dialogue_director != null:
-		dialogue_director.reveal_cinematic_frame_from_blackout(true)
 		dialogue_director.close_cinematic_frame()
+	if opening_camera != null:
+		opening_camera.release()
 
 
 func _reset_speech_reactions() -> void:
@@ -119,4 +160,5 @@ func _has_complete_references() -> bool:
 		and attendant_presenter != null
 		and miner_rig != null
 		and cinematic_flow != null
+		and opening_camera != null
 	)
