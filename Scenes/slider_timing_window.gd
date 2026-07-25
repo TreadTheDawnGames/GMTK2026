@@ -9,6 +9,7 @@ signal pressed(success: bool, hit_direction: int, combo : int)
 
 @onready var slider: Panel = %Slider
 @onready var backing: Control = %Backing
+@onready var bounce_sound: AudioStreamPlayer2D = %BounceSound
 @onready var _game_state: RunState = RunState.get_global(self)
 
 
@@ -44,6 +45,7 @@ var slider_position : float = 0.0:
 
 ## Creates the configured target baseline and prepares one-shot recovery bars.
 func _ready() -> void:
+	set_process(false)
 	while targets.size() < _starting_target_count:
 		add_target()
 	Utils.set_control_width(slider, slider_size)
@@ -55,6 +57,8 @@ func _ready() -> void:
 	reset_one_shot()
 	if one_shot:
 		stop()
+	else:
+		set_process(true)
 
 
 ## Returns the slider edge area including input grace.
@@ -230,7 +234,7 @@ func _process(delta: float) -> void:
 			or _game_state.save_game == null
 			or not _game_state.save_game.mute_bounce
 		):
-			AudioHandler.play_sound(AudioLibrary.BOUNCE)
+			bounce_sound.play()
 		if one_shot:
 			pressed.emit(false, 0, consecutive_hits)
 			stop()
