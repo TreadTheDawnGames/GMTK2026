@@ -28,10 +28,10 @@ const MAX_PLAYABLE_DEPTH: int = 2_000_000_000
 ## lowering it back toward 192 is the first thing to try if the web export runs
 ## short of per-hit budget.
 @export_range(16, 512, 1) var terrain_width_cells: int = 384
-# Forty rows keep a 16-pixel mask upload near 4.9 MiB per stratum while avoiding
-# the extra publication fragments produced by 32-row maximum-combo impacts.
-# The previous 64-row unit exceeded the streamed-room atomic budget.
-@export_range(16, 256, 1) var chunk_height_cells: int = 40
+# Thirty-two rows keep high-density mask uploads below the atomic web limit.
+# Larger units reduce queue entries but make each texture update indivisible;
+# smaller units add publication overhead without increasing edge fidelity.
+@export_range(16, 256, 1) var chunk_height_cells: int = 32
 ## Sets the world-space size of one gameplay terrain cell.
 @export_range(1, 32, 1) var terrain_cell_world_size: int = 8
 @export_range(1, 512, 1) var initial_surface_row: int = 38
