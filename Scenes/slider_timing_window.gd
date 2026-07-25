@@ -236,12 +236,12 @@ func _process(delta: float) -> void:
 		if (
 			_game_state == null
 			or _game_state.save_game == null
-			or not _game_state.save_game.mute_bounce
 		):
 			bounce_sound.play()
 		if one_shot:
 			pressed.emit(false, 0, consecutive_hits)
-			stop()
+			if stop_one_shot_when_done:
+				stop()
 	
 	#slider.position.x = slider_position
 	#queue_redraw()

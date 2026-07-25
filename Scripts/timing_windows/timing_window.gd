@@ -112,16 +112,13 @@ func _mining_window_pressed(
 			# The sample ladder runs out at MINE_SOUNDS.size(); past that the
 			# pitch keeps climbing so a long streak still sounds like it is
 			# going somewhere instead of flattening out.
-			var steps_past_ladder = maxi(
-				combo - AudioLibrary.MINE_SOUNDS.size(), 0
-			)
+			
+			# Those tones are all the notes in a scale, so it sounds good if they're together
 			_audio_handler.play_sound(
 				AudioLibrary.MINE_SOUNDS[
 					clampi(combo - 1, 0, AudioLibrary.MINE_SOUNDS.size() - 1)
 				],
-				"SFX",
-				false,
-				minf(1.0 + 0.03 * float(steps_past_ladder), 1.6)
+				"SFX"
 			)
 
 		var unlocked_target_scenes: Array[PackedScene] = []
@@ -162,6 +159,7 @@ func _mining_window_pressed(
 			mining_window.play_animation(Color.RED)
 
 var failed_recovery : bool = false
+var use_second_recovery : bool = false
 
 ## Resolves recovery and restarts the main timing bar.
 func _recovery_window_pressed(
@@ -182,10 +180,12 @@ func _recovery_window_pressed(
 	else:
 		#if failed
 		# we want one shot at additional recovery
-		if not failed_recovery:
+		if not failed_recovery and use_second_recovery:
 			#This is our first failure
 			failed_recovery = true
+			_audio_handler.play_sound(AudioLibrary.MISS_WITH_SAVE)
 			print("first failure")
+			recovery_window.animation_repeats = 2
 			#all we want to do is open the secondary save, so do nothing
 		else:
 			#We've failed this track once already
@@ -194,7 +194,10 @@ func _recovery_window_pressed(
 			#reset window speeds
 			mining_window.speed_multiplier = 1.0
 			recovery_window.speed_multiplier = 1.0
+			recovery_window2.speed_multiplier = 1.0
 			#reset targets
+			recovery_window.animation_repeats = 3
+			
 			mining_window.remove_all_extra_targets()
 			#Set animation color
 			recovery_window.animation_color = combo_lost_color
@@ -215,6 +218,7 @@ func _recovery_window_pressed(
 		print("Option 2")
 		#Check if this is the first failure and if so,Start the secondary recovery process
 		recovery_window2.start()
+		_audio_handler.play_sound(AudioLibrary.SAVE_BUILDUP)
 	else:
 		print("Option 3")
 		#this is the second time failing. Reset the main window, our visibility, and the recovery state
@@ -248,6 +252,7 @@ func _additional_recovery_window_pressed(
 		#reset window speeds
 		mining_window.speed_multiplier = 1.0
 		recovery_window.speed_multiplier = 1.0
+		recovery_window2.speed_multiplier = 1.0
 		#reset targets
 		mining_window.remove_all_extra_targets()
 		#Set animation color
@@ -261,8 +266,8 @@ func _additional_recovery_window_pressed(
 	#after the animation, if it was a success
 	if success:
 		#targets call themselves and we clamp them to make sure they're within the allowed area
-		recovery_window.recovery_action()
-		recovery_window.clamp_all_targets()
+		mining_window.recovery_action()
+		mining_window.clamp_all_targets()
 		recovery_window.start()
 	#Regardless of whether we succeeded or failed, start the mining window
 	else:
