@@ -129,7 +129,7 @@ const CHUNK_MASK_TEXTURE_POOL_LIMIT: int = 12
 const MAX_PENDING_IMPACT_WORK_ITEMS: int = 192
 # A run has far fewer authored structural groups than this. Stale work is
 # skipped if its chunk streams out, and descriptors are recycled after use.
-const MAX_PENDING_CHUNK_TEXTURE_PUBLISH_ITEMS: int = 64
+const MAX_PENDING_CHUNK_TEXTURE_PUBLISH_ITEMS: int = 192
 const MAX_PREDICTED_IMPACT_CANDIDATES: int = 5
 # Every terrain mask is published as three 128-cell GPU tiles. The usual mining
 # x=192 lies inside the middle tile rather than on a seam, and 16 px/cell stays
@@ -172,10 +172,9 @@ const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 192
 @export_range(1, 1_048_576, 1) var resized_stamp_cache_max_pixels: int = 65_536
 
 @export_category("Chamber Integration")
-## Places overlapping organic openings across each encounter-room ceiling.
-## The logical chamber taper already owns the continuous opening. One decorative
-## stamp breaks up that edge without replaying eight impact-sized masks when a
-## chamber streams in; the chunk benchmark protects the 12 ms crossing ceiling.
+## The sub-cell logical taper is the shipped chamber edge. Runtime decorative
+## circles are disabled because each one replays impact rasters while streaming;
+## authored sculpt contours provide variation without softening that sharp rim.
 @export_range(0, 32, 1) var chamber_circle_count: int = 0
 @export_range(1, 16, 1) var chamber_circle_min_radius_cells: int = 5
 @export_range(1, 16, 1) var chamber_circle_max_radius_cells: int = 8
@@ -1240,13 +1239,11 @@ func _refresh_active_chunks() -> void:
 ## view has already left one. Untouched rock starts on the shared intact mask and
 ## only allocates a stratum of its own when a stamp writes into it.
 func _load_chunk(chunk_index: int) -> void:
-	var trace_started_at := Time.get_ticks_usec()
 	var layer_count := profile.get_layer_count()
 	if layer_count <= 0:
 		return
 
 	var chunk := _acquire_chunk_visual(chunk_index, layer_count)
-	var trace_after_acquire := Time.get_ticks_usec()
 	_active_chunks[chunk_index] = chunk
 	var chunk_contains_chamber := _chunk_contains_chamber(chunk_index)
 	# A sculpted room may sit in a chunk the encounter schedule alone would call
@@ -1266,7 +1263,6 @@ func _load_chunk(chunk_index: int) -> void:
 			chunk_contains_chamber,
 			chunk_contains_sculpt
 		)
-	var trace_after_build := Time.get_ticks_usec()
 	# The authored reveal band belongs to the foreground alone, so a chunk whose
 	# only departure from intact rock is that band keeps three shared strata.
 	if not _get_chunk_floor_reveal_rects(chunk_index).is_empty():
@@ -1289,7 +1285,6 @@ func _load_chunk(chunk_index: int) -> void:
 	)
 	for saved_stamp: ImpactStamp in saved_stamps:
 		_apply_impact_stamp(chunk, chunk_index, saved_stamp)
-	var trace_after_stamps := Time.get_ticks_usec()
 	_clear_temporary_stamp_cache()
 	# The first window must be complete before it is shown. Later structural
 	# chunks enter below the viewport margin and publish through the frame
@@ -1298,22 +1293,6 @@ func _load_chunk(chunk_index: int) -> void:
 		_publish_chunk_textures(chunk)
 	else:
 		_queue_chunk_textures(chunk, chunk_index)
-	if (
-		OS.get_environment("BENCHMARK_TRACE_CHUNKS") == "1"
-		and Time.get_ticks_usec() - trace_started_at > 5_000
-	):
-		print(
-			"CHUNK_TRACE index=%d acquire=%.2f build=%.2f stamps=%.2f publish=%.2f chamber=%s sculpt=%s"
-			% [
-				chunk_index,
-				float(trace_after_acquire - trace_started_at) / 1000.0,
-				float(trace_after_build - trace_after_acquire) / 1000.0,
-				float(trace_after_stamps - trace_after_build) / 1000.0,
-				float(Time.get_ticks_usec() - trace_after_stamps) / 1000.0,
-				chunk_contains_chamber,
-				chunk_contains_sculpt,
-			]
-		)
 
 
 ## Reuses a retired chunk's nodes, or builds the strata this chunk needs once.
@@ -2001,6 +1980,24 @@ func _build_chunk_base_mask(
 			false,
 			Image.FORMAT_LA8
 		)
+	if chunk_contains_sculpt and not preserve_chamber_backdrop:
+		for placement in terrain_manager.get_sculpt_placements():
+			var room_rect: Rect2i = placement.world_rect
+			if (
+				room_rect.position.x <= 0
+				and room_rect.end.x >= config.terrain_width_cells
+				and room_rect.position.y <= chunk_start_row
+				and room_rect.end.y >= chunk_end_row + 1
+			):
+				# The clipped room copy overwrites the complete pooled image.
+				# Skipping the clear and procedural row fills preserves the
+				# exact raster while removing redundant multi-megabyte writes.
+				_blit_sculpt_rooms(
+					image,
+					chunk_index,
+					sculpt_layer_index
+				)
+				return image
 	if (
 		not chunk_contains_chamber
 		and not chunk_contains_sculpt
