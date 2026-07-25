@@ -216,6 +216,10 @@ var _sculpt_mask_images: Dictionary[CutsceneTerrainSculpt, Array] = {}
 # Matching one-sample logical rooms make streamed chunks pay one clipped blit
 # instead of querying resource bits per cell. The same sculpt/layer bound applies.
 var _sculpt_logical_mask_images: Dictionary[CutsceneTerrainSculpt, Array] = {}
+# Each four-sample row is cached as [start, end, alpha] runs per sculpt/layer.
+# The cache is bounded by authored mask pixels and replaces transient scaled
+# room-strip allocations during traversal.
+var _sculpt_mask_runs: Dictionary[CutsceneTerrainSculpt, Array] = {}
 # Historical stamps are retained so review mode can rebuild old terrain.
 # Growth is bounded by the configured run and accepted hit count; only the
 # viewport-sized _active_chunks set owns Image and ImageTexture allocations.
@@ -412,6 +416,7 @@ func _prepare_sculpt_masks() -> void:
 	for placement in terrain_manager.get_sculpt_placements():
 		_get_sculpt_mask_image(placement.sculpt, -1)
 		_get_sculpt_logical_mask_image(placement.sculpt, -1)
+		_get_sculpt_mask_runs(placement.sculpt, -1)
 		if not placement.sculpt.has_layer_masks():
 			continue
 		for layer_index in range(profile.get_gameplay_layer_count()):
@@ -420,6 +425,7 @@ func _prepare_sculpt_masks() -> void:
 				placement.sculpt,
 				layer_index
 			)
+			_get_sculpt_mask_runs(placement.sculpt, layer_index)
 
 
 ## Captures the combo used by synchronous damage stamps for one resolved hit.
@@ -1242,6 +1248,7 @@ func rebuild_all_chunks() -> void:
 	_clear_chunk_visual_pool()
 	_sculpt_mask_images.clear()
 	_sculpt_logical_mask_images.clear()
+	_sculpt_mask_runs.clear()
 	_latest_impact_stamp = null
 	_latest_foreground_opening_rect = Rect2()
 	_loaded_first_chunk = -1
@@ -2334,11 +2341,11 @@ func _blit_sculpt_rooms(
 				)
 			)
 			continue
-		var room_mask := _get_sculpt_mask_image(
+		var room_runs := _get_sculpt_mask_runs(
 			placement.sculpt,
 			sculpt_layer_index
 		)
-		if room_mask == null:
+		if room_runs.is_empty():
 			continue
 		var clipped_cell_size := Vector2i(
 			last_column - first_column,
@@ -2355,22 +2362,43 @@ func _blit_sculpt_rooms(
 			first_column * mask_cell_size,
 			(first_row - chunk_start_row) * mask_cell_size
 		)
-		if sculpt_cache_density == mask_cell_size:
-			image.blit_rect(room_mask, source_rect, destination)
-			continue
-		# At most one clipped room strip per overlapping placement is transient.
-		# It is released after this blit, so memory cannot grow with traversal.
-		var scaled_strip := room_mask.get_region(source_rect)
-		scaled_strip.resize(
-			clipped_cell_size.x * mask_cell_size,
-			clipped_cell_size.y * mask_cell_size,
-			Image.INTERPOLATE_NEAREST
-		)
-		image.blit_rect(
-			scaled_strip,
-			Rect2i(Vector2i.ZERO, scaled_strip.get_size()),
-			destination
-		)
+		var run_scale: int = mask_cell_size / sculpt_cache_density
+		# Runs were prepared before play. Expanding only their clipped rectangles
+		# preserves the four-sample alpha exactly and performs no traversal-time
+		# image allocation or full-room resize.
+		for source_y in range(source_rect.position.y, source_rect.end.y):
+			var row_runs: PackedInt32Array = room_runs[source_y]
+			for run_index in range(0, row_runs.size(), 3):
+				var run_start := maxi(
+					row_runs[run_index],
+					source_rect.position.x
+				)
+				var run_end := mini(
+					row_runs[run_index + 1],
+					source_rect.end.x
+				)
+				if run_start >= run_end:
+					continue
+				var run_alpha := float(
+					row_runs[run_index + 2]
+				) / 255.0
+				image.fill_rect(
+					Rect2i(
+						destination.x
+							+ (
+								run_start
+								- source_rect.position.x
+							) * run_scale,
+						destination.y
+							+ (
+								source_y
+								- source_rect.position.y
+							) * run_scale,
+						(run_end - run_start) * run_scale,
+						run_scale
+					),
+					Color(1.0, 1.0, 1.0, run_alpha)
+				)
 
 
 ## Returns one room's rock at mask resolution, rasterizing it on first use.
@@ -2436,6 +2464,50 @@ func _get_sculpt_logical_mask_image(
 	layer_masks[cache_index] = logical_mask
 	_sculpt_logical_mask_images[sculpt] = layer_masks
 	return logical_mask
+
+
+## Returns immutable horizontal alpha runs for a smoothed authored room.
+## Runs are generated during startup and consumed directly into active chunks.
+func _get_sculpt_mask_runs(
+	sculpt: CutsceneTerrainSculpt,
+	sculpt_layer_index: int
+) -> Array:
+	if sculpt == null:
+		return []
+	var cache_index := sculpt_layer_index + 1
+	var layer_runs: Array = _sculpt_mask_runs.get(sculpt, [])
+	if layer_runs.size() > cache_index and layer_runs[cache_index] != null:
+		return layer_runs[cache_index]
+	var room_mask := _get_sculpt_mask_image(sculpt, sculpt_layer_index)
+	if room_mask == null:
+		return []
+	var mask_runs: Array[PackedInt32Array] = []
+	mask_runs.resize(room_mask.get_height())
+	for mask_y in range(room_mask.get_height()):
+		var row_runs := PackedInt32Array()
+		var run_start := 0
+		var run_alpha := roundi(room_mask.get_pixel(0, mask_y).a * 255.0)
+		for mask_x in range(1, room_mask.get_width() + 1):
+			var alpha := (
+				-1
+				if mask_x == room_mask.get_width()
+				else roundi(
+					room_mask.get_pixel(mask_x, mask_y).a * 255.0
+				)
+			)
+			if alpha == run_alpha:
+				continue
+			row_runs.append(run_start)
+			row_runs.append(mask_x)
+			row_runs.append(run_alpha)
+			run_start = mask_x
+			run_alpha = alpha
+		mask_runs[mask_y] = row_runs
+	while layer_runs.size() <= cache_index:
+		layer_runs.append(null)
+	layer_runs[cache_index] = mask_runs
+	_sculpt_mask_runs[sculpt] = layer_runs
+	return mask_runs
 
 
 ## Draws one authored room once at a density bounded independently of gameplay.
