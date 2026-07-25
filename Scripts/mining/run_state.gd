@@ -9,6 +9,8 @@ signal run_reset
 
 @export var config: MiningConfig
 
+var save_game : SaveGame
+
 var depth: int = 0 # Gameplay depth descended from the starting surface.
 var mining_x: int = 0 # Authoritative terrain column beneath the player.
 var mining_y: int = 0 # Authoritative terrain row beneath the player's feet.
@@ -31,9 +33,9 @@ static func get_global(context: Node) -> RunState:
 		push_error("GameState autoload is unavailable.")
 	return game_state
 
-
 ## Starts a new run when the node loads.
 func _ready() -> void:
+	save_game = SaveGame.load_savegame()
 	reset_run()
 
 

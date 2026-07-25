@@ -7,6 +7,8 @@ extends CanvasLayer
 @export var bottom_eta_label: Label
 @export var fps_label: Label
 @export var options_scene : PackedScene
+#Ref to open options so we don't open multiple options
+var open_options : Control
 @export_range(0.1, 2.0, 0.1) var eta_refresh_seconds: float = 0.25
 
 @onready var _game_state: RunState = RunState.get_global(self)
@@ -97,5 +99,10 @@ func _format_number(value: int) -> String:
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var keyvent : InputEventKey = event as InputEventKey
-		if keyvent.keycode == Key.KEY_ESCAPE:
-			add_child(options_scene.instantiate())
+		if not keyvent.pressed:
+			return
+		if keyvent.keycode == Key.KEY_ESCAPE and not open_options:
+			open_options = options_scene.instantiate()
+			add_child(open_options)
+		elif open_options:
+			open_options._on_back_button_pressed()

@@ -4,7 +4,6 @@
 [ext_resource type="Script" uid="uid://t7rbu3tvtnwg" path="res://Scripts/ui/Options.gd" id="1_settings"]
 [ext_resource type="PackedScene" uid="uid://blig0domcdoj" path="res://Scenes/volume_control.tscn" id="2_y60rh"]
 [ext_resource type="Script" uid="uid://dpjj13onqvxe4" path="res://Scripts/ui/player_audio_handler.gd" id="4_f5liw"]
-[ext_resource type="Texture2D" uid="uid://byhuld6l80gl5" path="res://Assets/UI/Kenney/checkbox_grey_checked.png" id="4_q4at1"]
 
 [node name="Options" type="Control" unique_id=560086525]
 process_mode = 3
@@ -57,17 +56,14 @@ custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
 
 [node name="MasterVolume" parent="TabContainer/Panel/VBoxContainer" unique_id=1247329782 instance=ExtResource("2_y60rh")]
-unique_name_in_owner = true
 layout_mode = 2
 busName = "Master"
 
 [node name="Music" parent="TabContainer/Panel/VBoxContainer" unique_id=1181797806 instance=ExtResource("2_y60rh")]
-unique_name_in_owner = true
 layout_mode = 2
 busName = "Music"
 
 [node name="SFX" parent="TabContainer/Panel/VBoxContainer" unique_id=684634811 instance=ExtResource("2_y60rh")]
-unique_name_in_owner = true
 layout_mode = 2
 busName = "SFX"
 
@@ -105,9 +101,8 @@ popup/item_2/id = 0
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 11
-theme_override_icons/checked = ExtResource("4_q4at1")
 button_pressed = true
-text = "Mute Edge Bounce"
+text = "Disable Edge Sound"
 
 [node name="HBoxContainer" type="HBoxContainer" parent="TabContainer/Panel/VBoxContainer" unique_id=1635268855]
 layout_mode = 2

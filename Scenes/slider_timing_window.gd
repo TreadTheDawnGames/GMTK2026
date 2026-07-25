@@ -44,8 +44,8 @@ var slider_position : float = 0.0:
 
 ## Creates the configured target baseline and prepares one-shot recovery bars.
 func _ready() -> void:
-	#while targets.size() < _starting_target_count:
-		#add_target()
+	while targets.size() < _starting_target_count:
+		add_target()
 	Utils.set_control_width(slider, slider_size)
 	await get_tree().process_frame
 	#randomize_all_targets()
@@ -225,7 +225,8 @@ func _process(delta: float) -> void:
 	)
 	if hit_left_edge or hit_right_edge:
 		direction *= -1
-		bounce_sound.play()
+		if not GameState.save_game.mute_bounce:
+			bounce_sound.play()
 		if one_shot:
 			pressed.emit(false, 0, consecutive_hits)
 			stop()

@@ -15,6 +15,7 @@
 [ext_resource type="Script" uid="uid://cwq85ldnfasbo" path="res://Scripts/pickaxes/pickaxe_progression.gd" id="19_pickaxe_progression"]
 [ext_resource type="Resource" uid="uid://bm7au74mrcaij" path="res://resources/pickaxes/basic_pickaxe.tres" id="20_basic_pickaxe"]
 [ext_resource type="Script" uid="uid://c4nd03mddc2vw" path="res://Scripts/mining/impact_shake.gd" id="21_impact_shake"]
+[ext_resource type="PackedScene" uid="uid://ce2kgb3fjtjut" path="res://Scenes/Options.tscn" id="22_a0hll"]
 [ext_resource type="Script" uid="uid://boq33gsihoh51" path="res://Scripts/ui/playtime_reveal.gd" id="22_playtime_reveal"]
 [ext_resource type="Script" uid="uid://b54eqv80difeg" path="res://Scripts/mining/mining_scene_wiring.gd" id="25_wiring"]
 [ext_resource type="Script" uid="uid://7cxed37q80pf" path="res://Scripts/mining/dig_number_presenter.gd" id="30_dig_number_presenter"]
@@ -148,6 +149,7 @@ script = ExtResource("6_hud")
 depth_label = NodePath("Layout/Content/DepthLabel")
 bottom_eta_label = NodePath("Layout/Content/BottomEtaLabel")
 fps_label = NodePath("Layout/Content/FPS")
+options_scene = ExtResource("22_a0hll")
 
 [node name="TimingWindow" parent="MiningScene/HUD" unique_id=1764051259 instance=ExtResource("8_timing_window")]
 

@@ -22,6 +22,7 @@ corner_radius_bottom_left = 7
 corner_detail = 7
 
 [node name="MiningWindow" type="PanelContainer" unique_id=888560620]
+process_mode = 1
 anchors_preset = 7
 anchor_left = 0.5
 anchor_top = 1.0
@@ -61,3 +62,4 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_7muo2")
 [node name="BounceSound" type="AudioStreamPlayer2D" parent="." unique_id=1736793923]
 unique_name_in_owner = true
 stream = ExtResource("9_6q4rb")
+bus = &"SFX"
