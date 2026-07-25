@@ -5,6 +5,7 @@ extends Node
 ## - Each encounter resource places one mineable chamber at an authored depth.
 ## - Crossing its ceiling captures the interaction even when one hit skips rows.
 ## - Dialogue begins only after the presentation miner lands on that floor.
+## - A blocked reservation retries when the previous cinematic releases.
 ## - Stable actor IDs reuse presenters across visits and the cafe gathering.
 ## - Optional encounter stages own reversible movement and named line cues.
 ## - MiningCinematicFlow gates input while this controller owns an interaction.
@@ -24,8 +25,6 @@ const MINER_SPEAKER_SLOT: StringName = &"miner"
 @export var encounter_config: DepthEncounterConfig
 @export var mining_config: MiningConfig
 
-@export_category("Character Placement")
-@export_range(-64, 64, 1) var horizontal_offset_cells: int = 22
 @export_category("References")
 @export var dialogue_director: DialogueDirector
 @export var character_scene: PackedScene
@@ -46,6 +45,7 @@ var _pending_encounter_index: int = -1
 var _active_encounter_index: int = -1
 var _is_initialized: bool = false
 var _credits_have_completed: bool = false
+var _latest_landing_world_y: int = -1
 var _active_conversation: DialogueConversation
 @onready var _game_state: RunState = RunState.get_global(self)
 
@@ -75,6 +75,20 @@ func _on_depth_changed(depth: int) -> void:
 ## Mining may report the crossed depth before ViewController receives its new
 ## target, so activating from depth_changed can freeze focus at the old height.
 func _on_landing_reached(mining_y: int) -> void:
+	_latest_landing_world_y = maxi(_latest_landing_world_y, mining_y)
+	if _pending_encounter_index < 0 and _game_state != null:
+		_on_depth_changed(_game_state.depth)
+	_try_activate_pending_encounter()
+
+
+## Retries a crossed floor after another cinematic releases the shared gate.
+func _on_cinematic_flow_finished(finished_owner: StringName) -> void:
+	if finished_owner == FLOW_OWNER or _game_state == null:
+		return
+	_on_depth_changed(_game_state.depth)
+
+
+func _try_activate_pending_encounter() -> void:
 	if (
 		_pending_encounter_index < 0
 		or _active_encounter_index >= 0
@@ -88,7 +102,7 @@ func _on_landing_reached(mining_y: int) -> void:
 		mining_config.initial_surface_row
 		+ pending_encounter.resolve_depth(mining_config.total_run_depth)
 	)
-	if mining_y < encounter_floor_y:
+	if _latest_landing_world_y < encounter_floor_y:
 		return
 	_activate_pending_encounter()
 
@@ -118,6 +132,11 @@ func _on_credits_completed() -> void:
 ## Restores only the run-scoped credits prerequisite.
 func _on_run_reset() -> void:
 	_credits_have_completed = false
+	_latest_landing_world_y = (
+		mining_config.initial_surface_row
+		if mining_config != null
+		else -1
+	)
 
 
 func _schedule_next_encounter() -> bool:
@@ -126,6 +145,7 @@ func _schedule_next_encounter() -> bool:
 	if not cinematic_flow.try_begin(FLOW_OWNER):
 		return false
 	_pending_encounter_index = _next_encounter_index
+	_try_activate_pending_encounter()
 	return true
 
 
@@ -146,6 +166,18 @@ func _activate_pending_encounter() -> void:
 	var stage := _stages[_active_encounter_index]
 	if stage != null:
 		stage.position = encounter_anchor
+		if stage.conversation_tracks_miner:
+			var conversation_position := (
+				stage.conversation_marker.global_position
+			)
+			conversation_position.x = (
+				miner_rig.get_cinematic_foot_screen_position().x
+				+ stage.conversation_root_offset_from_miner_x
+			)
+			stage.conversation_marker.global_position = conversation_position
+			var rest_position := stage.rest_marker.global_position
+			rest_position.x = conversation_position.x
+			stage.rest_marker.global_position = rest_position
 	cinematic_flow.focus(FLOW_OWNER)
 	_begin_active_encounter.call_deferred()
 
@@ -290,7 +322,7 @@ func _gather_cafe_characters() -> void:
 	var gathering_y := _presenters[_active_encounter_index].position.y
 	var actor_count := encounter_config.gathering_actor_ids.size()
 	var edge_margin_cells := clampi(
-		absi(horizontal_offset_cells) / 2,
+		absi(encounter_config.encounter_horizontal_offset_cells) / 2,
 		4,
 		maxi(mining_config.terrain_width_cells / 4, 4)
 	)
@@ -462,7 +494,7 @@ func _prepare_authored_characters() -> bool:
 		var encounter_position := Vector2(
 			(
 				float(mining_config.terrain_width_cells) * 0.5
-				+ float(horizontal_offset_cells)
+				+ float(encounter_config.encounter_horizontal_offset_cells)
 			) * cell_size,
 			float(
 				mining_config.initial_surface_row

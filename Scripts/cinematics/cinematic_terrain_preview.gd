@@ -239,11 +239,52 @@ func build_preview() -> void:
 	if terrain_manager.encounter_config != schedule:
 		terrain_manager.encounter_config = schedule
 		terrain_manager.invalidate_sculpt_placements()
+	_align_to_runtime_stage_anchor()
 	_watch_authored_resources()
 	terrain_manager.clear_damage()
 	terrain_manager.set_view_position(_get_preview_view_position())
 	terrain_renderer.rebuild_all_chunks()
 	_apply_test_impacts()
+
+
+## Offsets this preview so the stage's origin lands exactly where the running
+## game puts the stage, rather than on the mining face.
+##
+## DepthEncounterController places an encounter's cast and its stage at the
+## terrain centre plus encounter_horizontal_offset_cells. The preview used to
+## ignore that entirely and align the stage origin to the mining face, so every
+## marker, actor and prop a designer placed was that many cells left of where
+## it played. Deriving the offset here means the two cannot drift again.
+func _align_to_runtime_stage_anchor() -> void:
+	var config := terrain_manager.config
+	if config == null:
+		return
+	var offset_cells := 0
+	var schedule := get_encounter_config()
+	if schedule != null:
+		offset_cells = schedule.encounter_horizontal_offset_cells
+	position = Vector2(
+		-(
+			config.terrain_screen_center_x
+			+ float(offset_cells) * float(config.terrain_cell_world_size)
+		),
+		-config.mining_face_screen_y
+	)
+
+
+## Returns where the running game places this stage, in the terrain's own
+## screen space, so a test can assert the editor agrees with the game.
+func get_runtime_stage_screen_position() -> Vector2:
+	var config := terrain_manager.config
+	var offset_cells := 0
+	var schedule := get_encounter_config()
+	if schedule != null:
+		offset_cells = schedule.encounter_horizontal_offset_cells
+	return Vector2(
+		config.terrain_screen_center_x
+			+ float(offset_cells) * float(config.terrain_cell_world_size),
+		config.mining_face_screen_y
+	)
 
 
 ## Returns the encounter this stage plays at, or null when it is not tied to

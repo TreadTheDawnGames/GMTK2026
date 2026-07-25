@@ -11,6 +11,16 @@ extends Resource
 ## Lists every character and the final thief in authored depth order.
 @export var encounters: Array[DepthCharacterEncounter] = []
 
+@export_category("Placement")
+## How far right of the terrain centre an encounter's cast and its stage stand.
+##
+## This lives on the shared schedule rather than on the controller because the
+## editor needs the same number. It used to exist only at runtime, so a stage
+## authored in the editor sat on the mining face while the game placed it this
+## many cells to the right — every marker, actor and prop was off by exactly
+## this distance, and nothing in the editor could show it.
+@export_range(-64, 64, 1) var encounter_horizontal_offset_cells: int = 22
+
 @export_category("Chamber")
 @export_range(1, 2_000, 1) var chamber_height_rows: int = 100
 @export_range(1, 512, 1) var chamber_width_cells: int = 100
