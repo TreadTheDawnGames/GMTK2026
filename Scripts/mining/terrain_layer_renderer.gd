@@ -150,7 +150,7 @@ const MAX_FRACTURE_RADIUS_CELLS: float = 32.0
 # High-density transform work is its own queue item. Raster bands remove
 # repeated setup while the deferred benchmark protects the unchanged 7 ms
 # atomic ceiling; their height remains benchmark-protected at every density.
-# Twelve-pixel profiling leaves enough atomic headroom for 192 rows. The larger
+# Sixteen-pixel profiling leaves enough atomic headroom for 192 rows. The larger
 # band removes repeated clipping/blit setup while the 7 ms benchmark still
 # guards the final band plus its one dirty-tile upload.
 const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 192
