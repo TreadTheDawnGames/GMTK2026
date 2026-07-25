@@ -1,0 +1,24 @@
+[gd_scene format=3 uid="uid://qi6w5ueftd0u"]
+
+[ext_resource type="Script" uid="uid://8lrsitody4v4" path="res://Scripts/Global/music_manager.gd" id="1_a0ngj"]
+[ext_resource type="AudioStream" uid="uid://cqkwcxf3rel2b" path="res://Assets/Audio/Music/Tracks/Intensity 1 DEV.wav" id="2_libwa"]
+[ext_resource type="AudioStream" uid="uid://faveg3gkt8ky" path="res://Assets/Audio/Music/Tracks/Intensity 2 DEV.wav" id="3_f6o2p"]
+[ext_resource type="AudioStream" uid="uid://ckomcfc02jij3" path="res://Assets/Audio/Music/Tracks/Intensity 3 DEV.wav" id="4_qe7b2"]
+[ext_resource type="AudioStream" uid="uid://df37op8y3fdo7" path="res://Assets/Audio/Music/Tracks/Intensity 4 DEV.wav" id="5_fxo4j"]
+[ext_resource type="AudioStream" uid="uid://cq0hggco73ie2" path="res://Assets/Audio/Music/Fills/Fill 1 DEV.wav" id="6_rv6of"]
+[ext_resource type="AudioStream" uid="uid://c42p4tw3aicd2" path="res://Assets/Audio/Music/Fills/Filll 2 DEV.wav" id="7_0kwba"]
+[ext_resource type="AudioStream" uid="uid://77vudy25abmn" path="res://Assets/Audio/Music/Fills/Fill 3 DEV.wav" id="8_h6ha5"]
+
+[node name="MusicManager" type="Node" unique_id=1863380187]
+script = ExtResource("1_a0ngj")
+tracks = Array[AudioStream]([ExtResource("2_libwa"), ExtResource("3_f6o2p"), ExtResource("4_qe7b2"), ExtResource("5_fxo4j")])
+fills = Array[AudioStream]([ExtResource("6_rv6of"), ExtResource("7_0kwba"), ExtResource("8_h6ha5")])
+
+[node name="Track1" type="AudioStreamPlayer" parent="." unique_id=1408430976]
+unique_name_in_owner = true
+
+[node name="Track2" type="AudioStreamPlayer" parent="." unique_id=1137663289]
+unique_name_in_owner = true
+
+[node name="Track3" type="AudioStreamPlayer" parent="." unique_id=1761922511]
+unique_name_in_owner = true

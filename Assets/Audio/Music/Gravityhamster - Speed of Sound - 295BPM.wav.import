@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://dcpd5v4iqgnoc"
+path="res://.godot/imported/Gravityhamster - Speed of Sound - 295BPM.wav-32fb19f712ca24d13ad764bf57626d46.sample"
+
+[deps]
+
+source_file="res://Assets/Audio/Music/Gravityhamster - Speed of Sound - 295BPM.wav"
+dest_files=["res://.godot/imported/Gravityhamster - Speed of Sound - 295BPM.wav-32fb19f712ca24d13ad764bf57626d46.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2

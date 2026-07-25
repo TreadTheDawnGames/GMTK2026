@@ -29,6 +29,16 @@ script = ExtResource("2_participant")
 slot = &"cloak_lantern"
 display_name = "Lantern Keeper"
 
+[sub_resource type="Resource" id="Participant_miner"]
+script = ExtResource("2_participant")
+slot = &"miner"
+display_name = "Miner"
+
+[sub_resource type="Resource" id="Participant_cloak_lantern"]
+script = ExtResource("2_participant")
+slot = &"cloak_lantern"
+display_name = "Lantern Keeper"
+
 [resource]
 script = ExtResource("1_conversation")
 conversation_id = &"cloak_lantern_first"

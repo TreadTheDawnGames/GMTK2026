@@ -23,6 +23,7 @@ buses/default_bus_layout="res://default_bus_layout.tres"
 
 GameState="*res://Scenes/globals/game_state.tscn"
 AudioHandler="*res://Scenes/globals/audio_handler.tscn"
+Conductor="*uid://c5rvmkaorxynb"
 
 [display]
 

@@ -1,5 +1,7 @@
 extends Node2D
 class_name PlayerAudioHandler
+@onready var music_player: AudioStreamPlayer = %MusicPlayer
+@export var interactive_stream : AudioStream
 
 ## Returns the project autoload without coupling consumers to a bare global.
 static func get_global(context: Node) -> PlayerAudioHandler:
@@ -42,3 +44,12 @@ func play_sound(sound : AudioStream, busName : String = "SFX", doPitchScale = fa
 	audioPlayer.bus = busName
 	audioPlayer.finished.connect(func(): audioPlayer.queue_free())
 	get_tree().root.add_child(audioPlayer)
+
+# four intensities level 1 loop forever until you hit one, then it goes into
+# level two, which loops until you reach a threshold (7 hits), at which point
+# level three loops, etc. 
+
+#Between levels, put a random fill. But the fill is overlaid between them, not 
+# a track of its own. (Gonna complicate things, but not a hugie...?)
+
+#

@@ -35,6 +35,16 @@ script = ExtResource("2_participant")
 slot = &"rutini"
 display_name = "Rotini"
 
+[sub_resource type="Resource" id="Participant_miner"]
+script = ExtResource("2_participant")
+slot = &"miner"
+display_name = "Miner"
+
+[sub_resource type="Resource" id="Participant_rutini"]
+script = ExtResource("2_participant")
+slot = &"rutini"
+display_name = "Rotini"
+
 [resource]
 script = ExtResource("1_conversation")
 conversation_id = &"rutini_second"
