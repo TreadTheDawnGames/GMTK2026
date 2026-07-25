@@ -39,18 +39,18 @@ func _transition_to():
 	Conductor.play()
 	current_intensity = music_intensity
 
-func _process(delta: float) -> void:
-	if Input.is_action_just_pressed("aim_right"):
-		music_intensity += 1
-		set_intensity_on_beat(music_intensity)
-		print("music intensity: ", music_intensity)
-	if Input.is_action_just_pressed("aim_left"):
-		music_intensity -= 1
-		print("music intensity: ", music_intensity)
-		set_intensity_on_beat(music_intensity)
-	if Input.is_action_just_pressed("Space"):
-		set_intensity_on_beat(music_intensity)
-		print("music intensity: ", music_intensity)
+#func _process(delta: float) -> void:
+	#if Input.is_action_just_pressed("aim_right"):
+		#music_intensity += 1
+		#set_intensity_on_beat(music_intensity)
+		#print("music intensity: ", music_intensity)
+	#if Input.is_action_just_pressed("aim_left"):
+		#music_intensity -= 1
+		#print("music intensity: ", music_intensity)
+		#set_intensity_on_beat(music_intensity)
+	#if Input.is_action_just_pressed("Space"):
+		#set_intensity_on_beat(music_intensity)
+		#print("music intensity: ", music_intensity)
 
 var fill_overlap : int = 3
 
@@ -76,13 +76,15 @@ func set_current_intensity(intensity : int):
 	music_intensity = intensity
 	
 func _on_intensity_changed(intensity : int, previous_intensity):
-	set_current_intensity(intensity)
+	if intensity != previous_intensity:
+		set_current_intensity(intensity)
 
 func _on_combo_tier_changed(tier: int, previous_tier: int):
 	pass
 
 func _on_streak_lost(previous_combo : int, previous_tier : int):
-	set_current_intensity(0)
+	if previous_combo > 0:
+		set_current_intensity(0)
 	pass
 
 func _on_run_reset():
@@ -94,7 +96,7 @@ func play_song_from_beat(beat:float, sec_per_beat : float):
 
 ## sets the intensity after a number of beats equal to [beats] and plays the new intenisty from the asked for beat. 
 # If 0 it waits until the end of the measure.
-func set_intensity_on_beat(intensity : int):
+func set_intensity_after_measure(intensity : int):
 	music_intensity = intensity
 	
 	while int(Conductor.current_beat) % beats_per_measure != 0:

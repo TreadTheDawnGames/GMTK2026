@@ -1,5 +1,4 @@
 extends Control
-@onready var player_audio_handler: PlayerAudioHandler = $PlayerAudioHandler
 @onready var tab_container: TabContainer = $TabContainer
 @onready var v_sync_options: OptionButton = $TabContainer/Panel/VBoxContainer/HBoxContainer2/Control/VSyncOptions
 @onready var mute_bounce: CheckBox = %MuteBounce
