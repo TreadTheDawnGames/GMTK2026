@@ -6,6 +6,7 @@ extends CanvasLayer
 @export var depth_label: Label
 @export var bottom_eta_label: Label
 @export var fps_label: Label
+@export var options_scene : PackedScene
 @export_range(0.1, 2.0, 0.1) var eta_refresh_seconds: float = 0.25
 
 @onready var _game_state: RunState = RunState.get_global(self)
@@ -92,3 +93,9 @@ func _format_number(value: int) -> String:
 		result = "," + digits.right(3) + result
 		digits = digits.left(digits.length() - 3)
 	return digits + result
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey:
+		var keyvent : InputEventKey = event as InputEventKey
+		if keyvent.keycode == Key.KEY_ESCAPE:
+			add_child(options_scene.instantiate())

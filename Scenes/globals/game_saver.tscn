@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://6oo5u7jc351c"]
+
+[ext_resource type="Script" uid="uid://csw8rgec54bjo" path="res://Scripts/Global/global_settings.gd" id="1_7myd1"]
+
+[node name="GameSaver" type="Node" unique_id=1195168023]
+script = ExtResource("1_7myd1")
