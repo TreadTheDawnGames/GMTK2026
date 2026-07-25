@@ -16,15 +16,22 @@ until the bars settle on `bar_height_ratio`. Keep `StartFadeOverlay`'s colour
 matched to the bars or the handover will flash.
 
 Beats, in order: blackout splits open, hold, the bus drives in **right to left**
-and settles at centre screen on top of the stop, its door opens, the miner gets
-off out of sight behind it at his centre-screen dig spot, and the bus pulls away
-left so its trailing edge **wipes him into view** already beside the newspaper
-reader. Every duration is an Inspector property on the sequence root.
+and stops with its front at centre screen, its door opens, the miner gets off at
+that centre-screen dig spot, and the bus pulls away left with its leading
+section passing in front of him. He remains beside the newspaper reader. Every
+duration is an Inspector property on the sequence root.
 
-The reveal depends on draw order: `Bus` is `z_index 5`, in front of the whole
-cast, and parked at `BusStopAnchor` it covers the shelter completely. The miner
-is placed at `MinerDropOffAnchor` *while still hidden*, so the departure
-uncovers someone already standing there rather than popping him in afterwards.
+The exit reveal uses a split draw order. The full `BusSprite` is behind the
+cinematic miner, while `BusFrontOccluder` redraws only the leading section at
+absolute `z_index 5`. The miner is placed at `MinerDropOffAnchor` while hidden;
+when the bus departs, its front passes in front of him and reveals him over the
+remaining body, so he reads as exiting from the front rather than being wiped
+out from behind the bus.
+
+The bus root itself parks right of centre: `FrontEdgeAnchor`, measured at the
+leftmost edge of the left-facing art, lands at screen x 576 on
+`MinerDropOffAnchor`. The miner therefore stands at the bus's physical front
+while remaining at the fixed gameplay mining point.
 
 The bus art is mirrored with a negative `scale.x` to face left, and its sprite
 offset is mirrored with it so the body stays centred on the node. Wheel-shine
@@ -32,8 +39,11 @@ UVs are texture-space and unaffected, but the spin direction is corrected in
 script from `sign(scale.x)`.
 
 - Props are authored in viewport pixels against a ground line at **y = 262**.
-  The node re-anchors itself to the live ground line every frame, so the stop
-  stays planted and leaves the shot only as the miner actually descends.
+  The authored terrain-space surface centre begins at **(576, 262)**, and the
+  node re-anchors itself to that same world point on both axes every frame.
+  `ArrivalIntro` processes after the terrain view, eliminating one-frame scroll
+  lag during vertical and snaking movement, and remains under the shared
+  `Camera2D` so terrain and stop receive the exact same impact shake.
 - The letterbox top bar covers the first **91 px**. Keep every prop's art below
   that, and check `sun_screen_position` on `SurfacePresentation` against it too.
 - The bus, the station, and the door each expose a `Sprite2D` art slot
