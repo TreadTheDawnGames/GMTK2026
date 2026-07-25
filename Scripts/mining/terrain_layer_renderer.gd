@@ -25,6 +25,9 @@ class TerrainChunkVisual:
 	## owns no image and no texture, so streaming untouched rock allocates
 	## nothing; the bit is cleared the moment a stamp needs to write into it.
 	var shared_layers: int = 0
+	## A layer that just left any shared base must create private GPU tiles on
+	## its next publish. This bit prevents an update from mutating its sibling.
+	var needs_private_texture: int = 0
 
 
 class HoleMaskData:
@@ -87,6 +90,12 @@ class ImpactStampPreparation:
 	var image_preparation
 
 
+class ChunkTexturePublishWork:
+	var chunk: TerrainChunkVisual
+	var chunk_index: int
+	var layer_indices: PackedInt32Array
+
+
 const TerrainStampImageCache = preload(
 	"res://Scripts/mining/terrain_stamp_image_cache.gd"
 )
@@ -108,11 +117,19 @@ const FRACTURE_SUPPORT_VALUE_THRESHOLD: float = 0.9
 # configured materials instead of rebuilding both per crossed chunk boundary.
 # The window is three to five chunks tall, so a handful covers every crossing.
 const CHUNK_VISUAL_POOL_LIMIT: int = 4
+# A structural chunk needs at most two distinct base masks and six tiled
+# textures. One spare chunk's storage is retained so adjacent streaming updates
+# existing buffers instead of allocating multi-megabyte images at the boundary.
+const CHUNK_MASK_IMAGE_POOL_LIMIT: int = 4
+const CHUNK_MASK_TEXTURE_POOL_LIMIT: int = 12
 # Deferred web raster work is capped and pooled. The 192 slots cover the
 # configured fully-stacked hit (currently under 150 jobs). If mining ever fills
 # them, the oldest single layer completes before another is accepted, so memory
 # cannot grow with hit count and the renderer never drops an opening.
 const MAX_PENDING_IMPACT_WORK_ITEMS: int = 192
+# A run has far fewer authored structural groups than this. Stale work is
+# skipped if its chunk streams out, and descriptors are recycled after use.
+const MAX_PENDING_CHUNK_TEXTURE_PUBLISH_ITEMS: int = 64
 const MAX_PREDICTED_IMPACT_CANDIDATES: int = 5
 # Every terrain mask is published as three 128-cell GPU tiles. The usual mining
 # x=192 lies inside the middle tile rather than on a seam, and 16 px/cell stays
@@ -122,6 +139,10 @@ const MASK_TILE_GUTTER_PIXELS: int = 1
 const ALL_MASK_TILES_DIRTY: int = (
 	(1 << MASK_HORIZONTAL_TILE_COUNT) - 1
 )
+# The authored hole sheets are 512x384. Upsampling their packed erase/ink
+# channels once gives the shader finer diagonal coverage without raising every
+# streamed terrain mask or repeating interpolation on each predicted hit.
+const AUTHORED_MASK_SOURCE_SUPERSAMPLE: int = 2
 # Authored fracture spurs are optional detail inside the shader's continuous cut
 # outline. Cap them at a 32-cell radius so a theoretical fully-stacked impact
 # cannot turn sparse line art into a full-stamp blend whose area grows 4x.
@@ -155,7 +176,7 @@ const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 192
 ## The logical chamber taper already owns the continuous opening. One decorative
 ## stamp breaks up that edge without replaying eight impact-sized masks when a
 ## chamber streams in; the chunk benchmark protects the 12 ms crossing ceiling.
-@export_range(0, 32, 1) var chamber_circle_count: int = 1
+@export_range(0, 32, 1) var chamber_circle_count: int = 0
 @export_range(1, 16, 1) var chamber_circle_min_radius_cells: int = 5
 @export_range(1, 16, 1) var chamber_circle_max_radius_cells: int = 8
 @export_range(0.0, 8.0, 0.5) var chamber_circle_jitter_cells: float = 3.0
@@ -174,6 +195,8 @@ var _active_chunks: Dictionary[int, TerrainChunkVisual] = {}
 # Nodes, sprites, and materials of chunks the view has left, waiting to be
 # refilled by the next chunk it reaches.
 var _chunk_visual_pool: Array[TerrainChunkVisual] = []
+var _chunk_mask_image_pool: Array[Image] = []
+var _chunk_mask_texture_pool: Array[ImageTexture] = []
 # One solid mask every untouched stratum draws. Sharing it is what makes an
 # ordinary streamed chunk cost no image allocation and no texture upload.
 var _pristine_mask_image: Image
@@ -221,6 +244,9 @@ var _active_impact_combo: int = 0
 var _pending_impact_work: Array[ImpactRasterWork] = []
 var _pending_impact_work_head: int = 0
 var _impact_work_pool: Array[ImpactRasterWork] = []
+var _pending_chunk_texture_publishes: Array[ChunkTexturePublishWork] = []
+var _pending_chunk_texture_publish_head: int = 0
+var _chunk_texture_publish_pool: Array[ChunkTexturePublishWork] = []
 var _defer_impact_rasterization: bool = false
 # Five timing targets produce at most five candidates, each with one transform
 # per writable gameplay stratum. A new target batch replaces this bounded queue;
@@ -267,7 +293,10 @@ func _ready() -> void:
 			"TerrainLayerRenderer requires terrain_manager and profile."
 		)
 		return
-	_defer_impact_rasterization = OS.has_feature("web")
+	# One scheduler now owns impact work on every platform. Native/editor used
+	# to run an immediate legacy path, which hid web-only queue bugs and made
+	# the same sharp mask produce a contact hitch during local playtesting.
+	_defer_impact_rasterization = true
 	var layer_count: int = profile.get_layer_count()
 	if (
 		profile.layer_dirt_detail_scales_px.size() != layer_count
@@ -312,9 +341,14 @@ func _process(_delta: float) -> void:
 		_defer_impact_rasterization
 		and _pending_impact_work_head < _pending_impact_work.size()
 	)
+	var has_chunk_texture_publish := (
+		_pending_chunk_texture_publish_head
+		< _pending_chunk_texture_publishes.size()
+	)
 	if (
 		not has_preparation
 		and not has_impact_work
+		and not has_chunk_texture_publish
 	):
 		return
 	var frame_started_at: int = Time.get_ticks_usec()
@@ -335,6 +369,20 @@ func _process(_delta: float) -> void:
 		):
 			return
 	_compact_pending_impact_work()
+	# Streamed structure is already in CPU memory and may be below the visible
+	# margin. Publish one bounded copy-on-write group at a time before spending
+	# spare terrain time on predictions.
+	while (
+		_pending_chunk_texture_publish_head
+		< _pending_chunk_texture_publishes.size()
+	):
+		_process_next_chunk_texture_publish()
+		if (
+			Time.get_ticks_usec() - frame_started_at
+			>= frame_budget_usec
+		):
+			return
+	_compact_pending_chunk_texture_publishes()
 	# Only unused terrain time prepares future candidates. If contact arrives
 	# mid-calculation, the authoritative queue above takes ownership next frame.
 	while (
@@ -560,7 +608,8 @@ func _create_stamp_image_preparation(
 		layer_variation.x == 1,
 		layer_variation.y == 1,
 		layer_variation.z,
-		is_speculative
+		is_speculative,
+		AUTHORED_MASK_SOURCE_SUPERSAMPLE
 	)
 
 
@@ -653,6 +702,10 @@ func _prepare_stamp_layer_patch_band(
 		)
 		if not affected_rect.has_area():
 			return
+		# Leaving the shared pristine CPU image is itself density-scaled work.
+		# Do it during wind-up without changing any pixels or bound textures;
+		# ownership then remains bounded to this active chunk/layer on a miss.
+		_make_layer_writable(work.chunk, work.layer_index)
 		patch = PreparedLayerPatch.new()
 		patch.image = work.chunk.mask_images[
 			work.layer_index
@@ -1227,11 +1280,13 @@ func _refresh_active_chunks() -> void:
 ## view has already left one. Untouched rock starts on the shared intact mask and
 ## only allocates a stratum of its own when a stamp writes into it.
 func _load_chunk(chunk_index: int) -> void:
+	var trace_started_at := Time.get_ticks_usec()
 	var layer_count := profile.get_layer_count()
 	if layer_count <= 0:
 		return
 
 	var chunk := _acquire_chunk_visual(chunk_index, layer_count)
+	var trace_after_acquire := Time.get_ticks_usec()
 	_active_chunks[chunk_index] = chunk
 	var chunk_contains_chamber := _chunk_contains_chamber(chunk_index)
 	# A sculpted room may sit in a chunk the encounter schedule alone would call
@@ -1251,6 +1306,7 @@ func _load_chunk(chunk_index: int) -> void:
 			chunk_contains_chamber,
 			chunk_contains_sculpt
 		)
+	var trace_after_build := Time.get_ticks_usec()
 	# The authored reveal band belongs to the foreground alone, so a chunk whose
 	# only departure from intact rock is that band keeps three shared strata.
 	if not _get_chunk_floor_reveal_rects(chunk_index).is_empty():
@@ -1273,8 +1329,31 @@ func _load_chunk(chunk_index: int) -> void:
 	)
 	for saved_stamp: ImpactStamp in saved_stamps:
 		_apply_impact_stamp(chunk, chunk_index, saved_stamp)
+	var trace_after_stamps := Time.get_ticks_usec()
 	_clear_temporary_stamp_cache()
-	_publish_chunk_textures(chunk)
+	# The first window must be complete before it is shown. Later structural
+	# chunks enter below the viewport margin and publish through the frame
+	# scheduler so a sharp multi-layer room cannot monopolize one traversal.
+	if _loaded_first_chunk < 0:
+		_publish_chunk_textures(chunk)
+	else:
+		_queue_chunk_textures(chunk, chunk_index)
+	if (
+		OS.get_environment("BENCHMARK_TRACE_CHUNKS") == "1"
+		and Time.get_ticks_usec() - trace_started_at > 5_000
+	):
+		print(
+			"CHUNK_TRACE index=%d acquire=%.2f build=%.2f stamps=%.2f publish=%.2f chamber=%s sculpt=%s"
+			% [
+				chunk_index,
+				float(trace_after_acquire - trace_started_at) / 1000.0,
+				float(trace_after_build - trace_after_acquire) / 1000.0,
+				float(trace_after_stamps - trace_after_build) / 1000.0,
+				float(Time.get_ticks_usec() - trace_after_stamps) / 1000.0,
+				chunk_contains_chamber,
+				chunk_contains_sculpt,
+			]
+		)
 
 
 ## Reuses a retired chunk's nodes, or builds the strata this chunk needs once.
@@ -1407,9 +1486,12 @@ func _share_intact_masks(
 		chunk.dirty_mask_tiles[layer_index] = 0
 		chunk.layer_revisions[layer_index] = 0
 	chunk.shared_layers = (1 << layer_count) - 1
+	chunk.needs_private_texture = 0
 
 
 ## Builds this chunk's own strata for chambers, rooms, and the run's edges.
+## Identical starting strata share one CPU mask and GPU tile set copy-on-write;
+## this keeps sharp structural rooms from multiplying streaming work per layer.
 func _build_chunk_masks(
 	chunk: TerrainChunkVisual,
 	chunk_index: int,
@@ -1420,12 +1502,23 @@ func _build_chunk_masks(
 	var chunk_has_per_layer_sculpt := (
 		chunk_contains_sculpt and _chunk_has_per_layer_sculpt(chunk_index)
 	)
-	var base_mask := _build_chunk_base_mask(
-		chunk_index,
-		false,
-		chunk_contains_chamber,
-		chunk_contains_sculpt
-	)
+	var base_mask: Image
+	# Per-layer rooms replace every foreground source. A chamber backdrop has
+	# its own source below, so building the logical full-resolution mask here
+	# would allocate and fill an image no stratum ever consumes.
+	if (
+		not chunk_has_per_layer_sculpt
+		or (
+			profile.keep_back_layer_solid
+			and not chunk_contains_chamber
+		)
+	):
+		base_mask = _build_chunk_base_mask(
+			chunk_index,
+			false,
+			chunk_contains_chamber,
+			chunk_contains_sculpt
+		)
 	var back_layer_mask: Image
 	if profile.keep_back_layer_solid:
 		back_layer_mask = (
@@ -1448,24 +1541,12 @@ func _build_chunk_masks(
 			profile.keep_back_layer_solid
 			and layer_index >= first_backdrop_source_layer
 		)
-		# Only the deepest stratum is immutable and may use the shared-mask/
-		# one-pixel-fracture allocation optimization.
-		var uses_final_backing_optimization := (
-			profile.keep_back_layer_solid
-			and layer_index == layer_count - 1
-		)
 		var source_mask := (
 			back_layer_mask
 			if uses_backdrop_source
 			else base_mask
 		)
-		# The final reserved stratum is never stamped or used for support, so
-		# it can own the already-built backdrop instead of copying it again.
-		var layer_mask := (
-			source_mask
-			if uses_final_backing_optimization
-			else source_mask.duplicate()
-		)
+		var layer_mask := source_mask
 		# A room whose strata were sculpted apart needs its own rock per
 		# stratum. Only then is the extra build paid for, and only for the
 		# gameplay strata: the reserved back wall stays the shared backdrop.
@@ -1479,6 +1560,20 @@ func _build_chunk_masks(
 			)
 		chunk.mask_images[layer_index] = layer_mask
 		chunk.dirty_mask_tiles[layer_index] = ALL_MASK_TILES_DIRTY
+	# Mark every image used by more than one stratum as copy-on-write. A later
+	# impact detaches only the layer it changes.
+	for layer_index in range(layer_count):
+		for previous_layer_index in range(layer_index):
+			if (
+				chunk.mask_images[layer_index]
+				== chunk.mask_images[previous_layer_index]
+			):
+				chunk.shared_layers |= (
+					(1 << layer_index)
+					| (1 << previous_layer_index)
+				)
+				break
+	chunk.needs_private_texture = 0
 
 
 ## Gives one stratum an image of its own before a stamp writes into it.
@@ -1492,12 +1587,134 @@ func _make_layer_writable(
 		chunk.mask_images[layer_index].duplicate()
 	)
 	chunk.shared_layers &= ~(1 << layer_index)
+	chunk.needs_private_texture |= 1 << layer_index
 
 
-## Publishes every stratum's mask, creating a texture only where one is owned.
+## Publishes every distinct stratum mask once. Copy-on-write siblings bind the
+## same immutable tiles until one receives an impact.
 func _publish_chunk_textures(chunk: TerrainChunkVisual) -> void:
+	var shared_tiles_by_image_id: Dictionary[int, Array] = {}
 	for layer_index in range(chunk.mask_images.size()):
+		var mask_image: Image = chunk.mask_images[layer_index]
+		var image_id := mask_image.get_instance_id()
+		if (
+			chunk.shared_layers & (1 << layer_index) != 0
+			and shared_tiles_by_image_id.has(image_id)
+		):
+			var shared_tiles: Array = (
+				shared_tiles_by_image_id[image_id] as Array
+			)
+			chunk.mask_texture_tiles[layer_index] = (
+				shared_tiles.duplicate()
+			)
+			_set_sprite_mask_textures(
+				chunk.layer_sprites[layer_index],
+				chunk.mask_texture_tiles[layer_index]
+			)
+			chunk.dirty_mask_tiles[layer_index] = 0
+			continue
 		_publish_layer_texture(chunk, layer_index)
+		if chunk.shared_layers & (1 << layer_index) != 0:
+			shared_tiles_by_image_id[image_id] = (
+				chunk.mask_texture_tiles[layer_index]
+			)
+
+
+## Queues one upload per distinct copy-on-write mask in a streamed chunk.
+func _queue_chunk_textures(
+	chunk: TerrainChunkVisual,
+	chunk_index: int
+) -> void:
+	var layers_by_image_id: Dictionary[int, PackedInt32Array] = {}
+	for layer_index in range(chunk.mask_images.size()):
+		if chunk.dirty_mask_tiles[layer_index] == 0:
+			continue
+		var image_id := chunk.mask_images[layer_index].get_instance_id()
+		if chunk.shared_layers & (1 << layer_index) == 0:
+			image_id = -1 - layer_index
+		var layer_indices: PackedInt32Array = layers_by_image_id.get(
+			image_id,
+			PackedInt32Array()
+		)
+		layer_indices.append(layer_index)
+		layers_by_image_id[image_id] = layer_indices
+	for layer_indices in layers_by_image_id.values():
+		while (
+			_pending_chunk_texture_publishes.size()
+			- _pending_chunk_texture_publish_head
+			>= MAX_PENDING_CHUNK_TEXTURE_PUBLISH_ITEMS
+		):
+			_process_next_chunk_texture_publish()
+			_compact_pending_chunk_texture_publishes()
+		var work: ChunkTexturePublishWork = (
+			_chunk_texture_publish_pool.pop_back()
+			if not _chunk_texture_publish_pool.is_empty()
+			else ChunkTexturePublishWork.new()
+		)
+		work.chunk = chunk
+		work.chunk_index = chunk_index
+		work.layer_indices = layer_indices
+		_pending_chunk_texture_publishes.append(work)
+
+
+## Publishes one distinct mask and binds its immutable tiles to every sibling.
+func _process_next_chunk_texture_publish() -> void:
+	if (
+		_pending_chunk_texture_publish_head
+		>= _pending_chunk_texture_publishes.size()
+	):
+		return
+	var work := _pending_chunk_texture_publishes[
+		_pending_chunk_texture_publish_head
+	]
+	_pending_chunk_texture_publish_head += 1
+	if (
+		_active_chunks.get(work.chunk_index) == work.chunk
+		and not work.layer_indices.is_empty()
+	):
+		var source_layer_index := work.layer_indices[0]
+		_publish_layer_texture(work.chunk, source_layer_index)
+		var source_tiles: Array = work.chunk.mask_texture_tiles[
+			source_layer_index
+		]
+		for index in range(1, work.layer_indices.size()):
+			var layer_index := work.layer_indices[index]
+			work.chunk.mask_texture_tiles[layer_index] = (
+				source_tiles.duplicate()
+			)
+			_set_sprite_mask_textures(
+				work.chunk.layer_sprites[layer_index],
+				work.chunk.mask_texture_tiles[layer_index]
+			)
+			work.chunk.dirty_mask_tiles[layer_index] = 0
+	work.chunk = null
+	work.chunk_index = -1
+	work.layer_indices = PackedInt32Array()
+	if (
+		_chunk_texture_publish_pool.size()
+		< MAX_PENDING_CHUNK_TEXTURE_PUBLISH_ITEMS
+	):
+		_chunk_texture_publish_pool.append(work)
+
+
+func _compact_pending_chunk_texture_publishes() -> void:
+	if _pending_chunk_texture_publish_head <= 0:
+		return
+	if (
+		_pending_chunk_texture_publish_head
+		>= _pending_chunk_texture_publishes.size()
+	):
+		_pending_chunk_texture_publishes.clear()
+		_pending_chunk_texture_publish_head = 0
+		return
+	if _pending_chunk_texture_publish_head < 32:
+		return
+	_pending_chunk_texture_publishes = (
+		_pending_chunk_texture_publishes.slice(
+			_pending_chunk_texture_publish_head
+		)
+	)
+	_pending_chunk_texture_publish_head = 0
 
 
 ## Uploads one stratum, reusing its texture unless the mask it draws changed
@@ -1511,19 +1728,20 @@ func _publish_layer_texture(
 	if mask_image == null:
 		return
 	var sprite := chunk.layer_sprites[layer_index]
-	if chunk.shared_layers & (1 << layer_index) != 0:
-		if sprite.texture != _pristine_mask_texture:
-			var shared_tiles: Array[ImageTexture] = []
-			shared_tiles.resize(MASK_HORIZONTAL_TILE_COUNT)
-			shared_tiles.fill(_pristine_mask_texture)
-			chunk.mask_texture_tiles[layer_index] = shared_tiles
-			_set_sprite_mask_textures(sprite, shared_tiles)
-		chunk.dirty_mask_tiles[layer_index] = 0
+	if (
+		chunk.shared_layers & (1 << layer_index) != 0
+		and chunk.dirty_mask_tiles[layer_index] == 0
+	):
 		return
 	var dirty_tiles: int = chunk.dirty_mask_tiles[layer_index]
 	if dirty_tiles == 0:
 		return
 	var texture_tiles: Array = chunk.mask_texture_tiles[layer_index]
+	var requires_private_tiles := (
+		chunk.needs_private_texture & (1 << layer_index) != 0
+	)
+	if requires_private_tiles:
+		texture_tiles = texture_tiles.duplicate()
 	for tile_index in range(MASK_HORIZONTAL_TILE_COUNT):
 		if dirty_tiles & (1 << tile_index) == 0:
 			continue
@@ -1533,17 +1751,34 @@ func _publish_layer_texture(
 		if (
 			mask_texture == null
 			or mask_texture == _pristine_mask_texture
+			or requires_private_tiles
 			or Vector2i(mask_texture.get_size())
 				!= upload_image.get_size()
 		):
-			texture_tiles[tile_index] = ImageTexture.create_from_image(
-				upload_image
-			)
+			var reusable_texture: ImageTexture
+			for pool_index in range(
+				_chunk_mask_texture_pool.size() - 1,
+				-1,
+				-1
+			):
+				var candidate := _chunk_mask_texture_pool[pool_index]
+				if Vector2i(candidate.get_size()) == upload_image.get_size():
+					reusable_texture = candidate
+					_chunk_mask_texture_pool.remove_at(pool_index)
+					break
+			if reusable_texture == null:
+				reusable_texture = ImageTexture.create_from_image(
+					upload_image
+				)
+			else:
+				reusable_texture.update(upload_image)
+			texture_tiles[tile_index] = reusable_texture
 		else:
 			mask_texture.update(upload_image)
 	chunk.mask_texture_tiles[layer_index] = texture_tiles
 	_set_sprite_mask_textures(sprite, texture_tiles)
 	chunk.dirty_mask_tiles[layer_index] = 0
+	chunk.needs_private_texture &= ~(1 << layer_index)
 
 
 ## Binds one layer's fixed tile set to its single full-width sprite.
@@ -1717,6 +1952,39 @@ func _unload_chunk(chunk_index: int) -> void:
 
 ## Drops a retired chunk's owned masks back onto the shared intact mask.
 func _release_chunk_masks(chunk: TerrainChunkVisual) -> void:
+	var released_image_ids: Dictionary[int, bool] = {}
+	var released_texture_ids: Dictionary[int, bool] = {}
+	for layer_index in range(chunk.mask_images.size()):
+		var released_image: Image = chunk.mask_images[layer_index]
+		if (
+			released_image != null
+			and released_image != _pristine_mask_image
+			and not released_image_ids.has(
+				released_image.get_instance_id()
+			)
+			and (
+				_chunk_mask_image_pool.size()
+				< CHUNK_MASK_IMAGE_POOL_LIMIT
+			)
+		):
+			released_image_ids[released_image.get_instance_id()] = true
+			_chunk_mask_image_pool.append(released_image)
+		for released_texture in chunk.mask_texture_tiles[layer_index]:
+			if (
+				released_texture != null
+				and released_texture != _pristine_mask_texture
+				and not released_texture_ids.has(
+					released_texture.get_instance_id()
+				)
+				and (
+					_chunk_mask_texture_pool.size()
+					< CHUNK_MASK_TEXTURE_POOL_LIMIT
+				)
+			):
+				released_texture_ids[
+					released_texture.get_instance_id()
+				] = true
+				_chunk_mask_texture_pool.append(released_texture)
 	var intact_image := _get_pristine_mask_image()
 	for layer_index in range(chunk.mask_images.size()):
 		chunk.mask_images[layer_index] = intact_image
@@ -1731,6 +1999,7 @@ func _release_chunk_masks(chunk: TerrainChunkVisual) -> void:
 		chunk.dirty_mask_tiles[layer_index] = 0
 		chunk.layer_revisions[layer_index] = 0
 	chunk.shared_layers = (1 << chunk.mask_images.size()) - 1
+	chunk.needs_private_texture = 0
 
 
 ## Frees every retired chunk, so a profile or room edit cannot hand stale
@@ -1740,6 +2009,8 @@ func _clear_chunk_visual_pool() -> void:
 		if is_instance_valid(chunk.root):
 			chunk.root.free()
 	_chunk_visual_pool.clear()
+	_chunk_mask_image_pool.clear()
+	_chunk_mask_texture_pool.clear()
 
 
 ## Builds one layer's undamaged terrain before applying organic openings.
@@ -1753,16 +2024,23 @@ func _build_chunk_base_mask(
 	var config := terrain_manager.config
 	var mask_cell_size := profile.mask_pixels_per_cell
 	var mask_size := _get_chunk_mask_size()
-	var image := Image.create(
-		mask_size.x,
-		mask_size.y,
-		false,
-		Image.FORMAT_LA8
-	)
 	var chunk_start_row := chunk_index * config.chunk_height_cells
 	var chunk_end_row := (
 		chunk_start_row + config.chunk_height_cells - 1
 	)
+	var image: Image
+	while not _chunk_mask_image_pool.is_empty():
+		var candidate: Image = _chunk_mask_image_pool.pop_back()
+		if candidate.get_size() == mask_size:
+			image = candidate
+			break
+	if image == null:
+		image = Image.create(
+			mask_size.x,
+			mask_size.y,
+			false,
+			Image.FORMAT_LA8
+		)
 	if (
 		not chunk_contains_chamber
 		and not chunk_contains_sculpt
@@ -3509,7 +3787,8 @@ func _get_resized_stamp_images(
 		flip_x,
 		flip_y,
 		rotation_quarters,
-		is_preparation
+		is_preparation,
+		AUTHORED_MASK_SOURCE_SUPERSAMPLE
 	)
 
 

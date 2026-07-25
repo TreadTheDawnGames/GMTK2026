@@ -1,5 +1,9 @@
 extends RefCounted
 
+## Every incremental transform step is capped near 64 KiB of LA8 pixels. The
+## temporary source/result pair is released before the next channel begins.
+const MAX_RESIZE_PHASE_PIXELS: int = 65_536
+
 ## How it works:
 ## - Accepts authored erase/fracture images plus one requested orientation.
 ## - Resizes both channels with the filtering appropriate to their purpose.
@@ -25,9 +29,15 @@ class ImagePreparation:
 	var can_cache: bool
 	var is_speculative: bool
 	var stamp_size: Vector2i
+	var source_supersample: int = 1
 	var oriented: OrientedSources
 	var stamp_images: StampImages
+	var supersample_input: Image
+	var supersampled_source: Image
+	var next_source_row: int = 0
+	var horizontal_input: Image
 	var horizontal_source: Image
+	var next_column: int = 0
 	var next_row: int = 0
 	var phase: int = 0
 	var completed: bool = false
@@ -82,7 +92,8 @@ func get_images(
 	flip_x: bool,
 	flip_y: bool,
 	rotation_quarters: int,
-	is_preparation: bool = false
+	is_preparation: bool = false,
+	source_supersample: int = 1
 ) -> StampImages:
 	var preparation := start_image_preparation(
 		cache_id,
@@ -93,15 +104,16 @@ func get_images(
 		flip_x,
 		flip_y,
 		rotation_quarters,
-		is_preparation
+		is_preparation,
+		source_supersample
 	)
 	while not advance_image_preparation(preparation):
 		pass
 	return preparation.stamp_images
 
 
-## Starts one portable, incrementally resizable image set. Horizontal resize and
-## bounded row-copy phases let the renderer yield between pieces on web builds.
+## Starts one portable, incrementally resizable image set. Bounded column and
+## row-copy phases let the renderer yield between pieces on web builds.
 func start_image_preparation(
 	cache_id: int,
 	erase_mask: Image,
@@ -111,19 +123,22 @@ func start_image_preparation(
 	flip_x: bool,
 	flip_y: bool,
 	rotation_quarters: int,
-	is_preparation: bool = false
+	is_preparation: bool = false,
+	source_supersample: int = 1
 ) -> ImagePreparation:
+	source_supersample = maxi(source_supersample, 1)
 	var orientation_flags := (
 		(1 if flip_x else 0)
 		| (2 if flip_y else 0)
 		| (posmod(rotation_quarters, 4) << 2)
 		| (16 if include_fracture_lines else 0)
 	)
+	var cache_flags := orientation_flags | (source_supersample << 5)
 	var cache_key := Vector4i(
 		cache_id,
 		stamp_size.x,
 		stamp_size.y,
-		orientation_flags
+		cache_flags
 	)
 	var can_cache := (
 		_entry_limit > 0
@@ -156,6 +171,7 @@ func start_image_preparation(
 	preparation.can_cache = can_cache
 	preparation.is_speculative = is_preparation
 	preparation.stamp_size = stamp_size
+	preparation.source_supersample = source_supersample
 	preparation.oriented = _get_oriented_sources(
 		cache_id,
 		orientation_flags,
@@ -186,21 +202,41 @@ func advance_image_preparation(
 				false,
 				Image.FORMAT_LA8
 			)
-			preparation.horizontal_source = (
-				preparation.oriented.erase_mask.duplicate()
-			)
-			if (
-				preparation.horizontal_source.get_width()
-				!= preparation.stamp_size.x
-			):
-				preparation.horizontal_source.resize(
-					preparation.stamp_size.x,
-					preparation.horizontal_source.get_height(),
-					Image.INTERPOLATE_NEAREST
-				)
 			preparation.phase = 1
 			return false
 		1:
+			_begin_source_supersample(
+				preparation,
+				preparation.oriented.erase_mask
+			)
+			preparation.phase = 2
+			return false
+		2:
+			if not _advance_source_supersample(preparation):
+				return false
+			_begin_horizontal_resize(
+				preparation,
+				preparation.supersampled_source
+			)
+			preparation.supersample_input = null
+			preparation.supersampled_source = null
+			preparation.next_source_row = 0
+			preparation.phase = 3
+			return false
+		3:
+			preparation.next_column = _copy_resized_columns(
+				preparation.horizontal_input,
+				preparation.horizontal_source,
+				preparation.next_column,
+				row_budget
+			)
+			if preparation.next_column < preparation.stamp_size.x:
+				return false
+			preparation.horizontal_input = null
+			preparation.next_column = 0
+			preparation.phase = 4
+			return false
+		4:
 			preparation.next_row = _copy_resized_rows(
 				preparation.horizontal_source,
 				preparation.stamp_images.erase_mask,
@@ -211,11 +247,11 @@ func advance_image_preparation(
 				return false
 			preparation.horizontal_source = null
 			preparation.next_row = 0
-			preparation.phase = 2
+			preparation.phase = 5
 			return false
-		2:
+		5:
 			if preparation.oriented.fracture_source == null:
-				preparation.phase = 4
+				preparation.phase = 10
 				return false
 			preparation.stamp_images.fracture_source = Image.create(
 				preparation.stamp_size.x,
@@ -223,21 +259,41 @@ func advance_image_preparation(
 				false,
 				Image.FORMAT_LA8
 			)
-			preparation.horizontal_source = (
-				preparation.oriented.fracture_source.duplicate()
-			)
-			if (
-				preparation.horizontal_source.get_width()
-				!= preparation.stamp_size.x
-			):
-				preparation.horizontal_source.resize(
-					preparation.stamp_size.x,
-					preparation.horizontal_source.get_height(),
-					Image.INTERPOLATE_NEAREST
-				)
-			preparation.phase = 3
+			preparation.phase = 6
 			return false
-		3:
+		6:
+			_begin_source_supersample(
+				preparation,
+				preparation.oriented.fracture_source
+			)
+			preparation.phase = 7
+			return false
+		7:
+			if not _advance_source_supersample(preparation):
+				return false
+			_begin_horizontal_resize(
+				preparation,
+				preparation.supersampled_source
+			)
+			preparation.supersample_input = null
+			preparation.supersampled_source = null
+			preparation.next_source_row = 0
+			preparation.phase = 8
+			return false
+		8:
+			preparation.next_column = _copy_resized_columns(
+				preparation.horizontal_input,
+				preparation.horizontal_source,
+				preparation.next_column,
+				row_budget
+			)
+			if preparation.next_column < preparation.stamp_size.x:
+				return false
+			preparation.horizontal_input = null
+			preparation.next_column = 0
+			preparation.phase = 9
+			return false
+		9:
 			preparation.next_row = _copy_resized_rows(
 				preparation.horizontal_source,
 				preparation.stamp_images.fracture_source,
@@ -248,9 +304,9 @@ func advance_image_preparation(
 				return false
 			preparation.horizontal_source = null
 			preparation.next_row = 0
-			preparation.phase = 4
+			preparation.phase = 10
 			return false
-		4:
+		10:
 			preparation.stamp_images.transparent_source = Image.create(
 				preparation.stamp_size.x,
 				preparation.stamp_size.y,
@@ -274,6 +330,139 @@ func advance_image_preparation(
 	return false
 
 
+## Starts a strip-resizable source. Keeping authored sources compact makes
+## flip/rotation preparation bounded; the strips restore fractional coverage.
+func _begin_source_supersample(
+	preparation: ImagePreparation,
+	source: Image
+) -> void:
+	preparation.supersample_input = source
+	preparation.next_source_row = 0
+	if preparation.source_supersample <= 1:
+		preparation.supersampled_source = source
+		preparation.next_source_row = source.get_height()
+		return
+	preparation.supersampled_source = Image.create(
+		source.get_width() * preparation.source_supersample,
+		source.get_height() * preparation.source_supersample,
+		false,
+		Image.FORMAT_LA8
+	)
+
+
+## Advances one overlapped source strip. Integer supersampling keeps each
+## strip's sample grid aligned, and one source-row gutter on both sides makes
+## the copied center byte-identical to a whole-image bilinear resize.
+func _advance_source_supersample(
+	preparation: ImagePreparation
+) -> bool:
+	var source := preparation.supersample_input
+	if preparation.source_supersample <= 1:
+		return true
+	var scale := preparation.source_supersample
+	var source_rows_per_step := maxi(
+		MAX_RESIZE_PHASE_PIXELS
+			/ maxi(source.get_width() * scale * scale, 1),
+		1
+	)
+	var first_source_row := preparation.next_source_row
+	var last_source_row := mini(
+		first_source_row + source_rows_per_step,
+		source.get_height()
+	)
+	var sampled_first_row := maxi(first_source_row - 1, 0)
+	var sampled_last_row := mini(last_source_row + 1, source.get_height())
+	var strip := source.get_region(
+		Rect2i(
+			0,
+			sampled_first_row,
+			source.get_width(),
+			sampled_last_row - sampled_first_row
+		)
+	)
+	strip.resize(
+		strip.get_width() * scale,
+		strip.get_height() * scale,
+		Image.INTERPOLATE_BILINEAR
+	)
+	preparation.supersampled_source.blit_rect(
+		strip,
+		Rect2i(
+			0,
+			(first_source_row - sampled_first_row) * scale,
+			strip.get_width(),
+			(last_source_row - first_source_row) * scale
+		),
+		Vector2i(0, first_source_row * scale)
+	)
+	preparation.next_source_row = last_source_row
+	return last_source_row >= source.get_height()
+
+
+## Starts the horizontal half of an exact nearest resize without duplicating
+## an already-correct source. The output grows only to one stamp-sized row set
+## and is released before the fracture channel begins.
+func _begin_horizontal_resize(
+	preparation: ImagePreparation,
+	source: Image
+) -> void:
+	preparation.horizontal_input = source
+	if source.get_width() == preparation.stamp_size.x:
+		preparation.horizontal_source = source
+		preparation.next_column = preparation.stamp_size.x
+		return
+	preparation.horizontal_source = Image.create(
+		preparation.stamp_size.x,
+		source.get_height(),
+		false,
+		Image.FORMAT_LA8
+	)
+	preparation.next_column = 0
+
+
+## Copies exact nearest-neighbor columns. The pixel budget bounds supersampled
+## authored sheets independently of their height so one prediction cannot
+## monopolize a frame before the impact.
+func _copy_resized_columns(
+	source: Image,
+	destination: Image,
+	first_column: int,
+	column_limit: int
+) -> int:
+	if source == destination:
+		return destination.get_width()
+	var columns_by_pixel_budget := maxi(
+		MAX_RESIZE_PHASE_PIXELS / maxi(source.get_height(), 1),
+		1
+	)
+	var last_column := mini(
+		first_column + mini(maxi(column_limit, 1), columns_by_pixel_budget),
+		destination.get_width()
+	)
+	var source_width := source.get_width()
+	var destination_width := destination.get_width()
+	for destination_x in range(first_column, last_column):
+		var source_x := mini(
+			floori(
+				(float(destination_x) + 0.5)
+				* float(source_width)
+				/ float(destination_width)
+			),
+			source_width - 1
+		)
+		destination.blit_rect(
+			source,
+			Rect2i(
+				source_x,
+				0,
+				1,
+				source.get_height()
+			),
+			Vector2i(destination_x, 0)
+		)
+	return last_column
+
+
 ## Copies nearest-neighbor output rows from a horizontally resized source. This
 ## is byte-identical to the source-row mapping used by nearest Image.resize.
 func _copy_resized_rows(
@@ -291,7 +480,7 @@ func _copy_resized_rows(
 	for destination_y in range(first_row, last_row):
 		var source_y := mini(
 			floori(
-				float(destination_y)
+				(float(destination_y) + 0.5)
 				* float(source_height)
 				/ float(destination_height)
 			),
