@@ -236,9 +236,36 @@ func _forward_canvas_gui_input(event: InputEvent) -> bool:
 			# a flat floor or a straight wall gets cut without a steady hand.
 			_stroke_to(
 				_constrain_stroke(_hover_local, motion.shift_pressed),
-				motion.alt_pressed
+				motion.alt_pressed,
+				motion.ctrl_pressed
 			)
 			return true
+		return false
+
+	# Number keys pick a tool and the bracket keys resize the brush, the two
+	# bindings every painting tool has. They are claimed only while the brush
+	# is armed, so ordinary editor shortcuts are untouched the rest of the time.
+	var key := event as InputEventKey
+	if key != null and key.pressed and not key.echo:
+		match key.keycode:
+			KEY_1, KEY_2, KEY_3, KEY_4, KEY_5:
+				_sculpt_panel.select_operation(key.keycode - KEY_1)
+				update_overlays()
+				return true
+			KEY_BRACKETLEFT:
+				_sculpt_panel.step_brush_size(-1)
+				update_overlays()
+				return true
+			KEY_BRACKETRIGHT:
+				_sculpt_panel.step_brush_size(1)
+				update_overlays()
+				return true
+			KEY_X:
+				# Swap carve and fill outright, for when Alt-dragging is not
+				# the gesture wanted.
+				_sculpt_panel.toggle_carve_fill()
+				update_overlays()
+				return true
 		return false
 
 	var button := event as InputEventMouseButton
@@ -275,7 +302,7 @@ func _forward_canvas_gui_input(event: InputEvent) -> bool:
 			_dig_hit(_to_world_position(button.position), button.alt_pressed)
 		return true
 	if button.pressed:
-		_begin_stroke(local_cell, button.alt_pressed)
+		_begin_stroke(local_cell, button.alt_pressed, button.ctrl_pressed)
 		return true
 	_end_stroke()
 	return true
@@ -308,17 +335,25 @@ func _constrain_stroke(local_cell: Vector2, constrain: bool) -> Vector2:
 	return Vector2(_stroke_origin_local.x, local_cell.y)
 
 
-func _begin_stroke(local_cell: Vector2, invert: bool) -> void:
+func _begin_stroke(
+	local_cell: Vector2,
+	invert: bool,
+	smooth: bool
+) -> void:
 	_stroke_before = CutsceneTerrainSculpt.new()
 	_stroke_before.copy_shape_from(_context.sculpt)
 	_stroke_origin_local = local_cell
 	_is_stroking = true
 	_last_stroke_local = local_cell
-	_apply_operation(local_cell, local_cell, invert)
+	_apply_operation(local_cell, local_cell, invert, smooth)
 
 
-func _stroke_to(local_cell: Vector2, invert: bool) -> void:
-	_apply_operation(_last_stroke_local, local_cell, invert)
+func _stroke_to(
+	local_cell: Vector2,
+	invert: bool,
+	smooth: bool
+) -> void:
+	_apply_operation(_last_stroke_local, local_cell, invert, smooth)
 	_last_stroke_local = local_cell
 
 
@@ -349,10 +384,17 @@ func _end_stroke() -> void:
 func _apply_operation(
 	from_local: Vector2,
 	to_local: Vector2,
-	invert: bool
+	invert: bool,
+	smooth: bool
 ) -> void:
 	var operation := _sculpt_panel.get_operation()
-	if invert:
+	# Holding ctrl smooths whatever is under the brush without changing the
+	# armed tool, so a wall can be softened mid-cut and the cut resumed by
+	# letting go. Alt still swaps carve and fill; ctrl wins when both are held,
+	# because smoothing an inverted stroke means nothing.
+	if smooth:
+		operation = CutsceneSculptBrush.OP_SMOOTH
+	elif invert:
 		if operation == CutsceneSculptBrush.OP_CARVE:
 			operation = CutsceneSculptBrush.OP_FILL
 		elif operation == CutsceneSculptBrush.OP_FILL:
@@ -574,7 +616,8 @@ func _draw_readout(overlay: Control) -> void:
 		-1.0, 14, _sculpt_panel.get_active_layer_color()
 	)
 	var hint := (
-		"wheel size  ·  ctrl+wheel layer  ·  shift straight  ·  alt invert"
+		"1-5 tool  ·  [ ] or wheel size  ·  ctrl+wheel layer"
+		+ "  ·  shift straight  ·  ctrl smooth  ·  alt invert  ·  x swap"
 	)
 	overlay.draw_string(
 		font, origin + Vector2(0.0, 18.0), hint, HORIZONTAL_ALIGNMENT_LEFT,
