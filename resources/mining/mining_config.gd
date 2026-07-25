@@ -31,7 +31,7 @@ const MAX_PLAYABLE_DEPTH: int = 2_000_000_000
 # Twenty-two rows keep active sculpt expansion and high-density uploads below
 # the atomic web limit. Publication is queued by immutable layer group, so the
 # smaller streaming unit does not lower the 16-pixel world-space fidelity.
-@export_range(16, 256, 1) var chunk_height_cells: int = 22
+@export_range(16, 256, 1) var chunk_height_cells: int = 16
 ## Sets the world-space size of one gameplay terrain cell.
 @export_range(1, 32, 1) var terrain_cell_world_size: int = 8
 @export_range(1, 512, 1) var initial_surface_row: int = 38

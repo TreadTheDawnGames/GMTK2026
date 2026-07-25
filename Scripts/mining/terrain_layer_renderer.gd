@@ -2193,59 +2193,15 @@ func _build_chunk_base_mask(
 			mask_cell_size
 		)
 	if raster_size != mask_size:
-		var expanded_image: Image
-		while not _chunk_mask_image_pool.is_empty():
-			var pooled_image: Image = _chunk_mask_image_pool.pop_back()
-			if pooled_image.get_size() == mask_size:
-				expanded_image = pooled_image
-				break
-		if expanded_image == null:
-			expanded_image = Image.create(
-				mask_size.x,
-				mask_size.y,
-				false,
-				Image.FORMAT_LA8
-			)
-		expanded_image.fill(SOLID_MASK_COLOR)
-		var expansion: int = (
-			profile.mask_pixels_per_cell / mask_cell_size
+		# Structural masks are bounded to four authored samples per cell. Godot's
+		# native nearest expansion retains those alpha levels and is markedly
+		# cheaper than scanning the 16-pixel destination in GDScript; the expanded
+		# image is still owned by the active chunk and returned to its bounded pool.
+		image.resize(
+			mask_size.x,
+			mask_size.y,
+			Image.INTERPOLATE_NEAREST
 		)
-		# Copy equal-alpha runs as rectangles. This preserves partial authored
-		# edge_smoothing samples while avoiding a full multi-megabyte Image.resize;
-		# the vast solid interior is skipped and open interiors become one run.
-		for source_y in range(image.get_height()):
-			var run_start := 0
-			var run_alpha := roundi(
-				image.get_pixel(0, source_y).a * 255.0
-			)
-			for source_x in range(1, image.get_width() + 1):
-				var alpha := (
-					-1
-					if source_x == image.get_width()
-					else roundi(
-						image.get_pixel(source_x, source_y).a * 255.0
-					)
-				)
-				if alpha != run_alpha:
-					if run_alpha < 255:
-						var run_value := float(run_alpha) / 255.0
-						expanded_image.fill_rect(
-							Rect2i(
-								run_start * expansion,
-								source_y * expansion,
-								(source_x - run_start) * expansion,
-								expansion
-							),
-							Color(
-								1.0,
-								1.0,
-								1.0,
-								run_value
-							)
-						)
-					run_start = source_x
-					run_alpha = alpha
-		image = expanded_image
 	return image
 
 
