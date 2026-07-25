@@ -52,8 +52,10 @@ script from `sign(scale.x)`.
   His gameplay root, `RunState`, and mining depth are never touched, and
   `RunIntroController` hands grounding back with `show_intact_floor_grounding()`
   when control returns.
-- The attendant is a `CharacterPresenter` driven by `attendant_appearance` on
-  `RunIntroController`. It is placed with the stand-in's **feet on the ground**,
+- The attendant is a silent, unrelated newspaper reader, not the lantern-staff
+  man or another story character. A `CharacterPresenter` driven by
+  `attendant_appearance` on `RunIntroController` places him with the stand-in's
+  **feet on the ground**,
   because the current appearance is a standing 256 px frame: seating it on the
   bench would float it and push its head under the top bar. When seated art
   arrives, move the node to `AttendantSeatAnchor` and re-check the head.
@@ -120,6 +122,118 @@ can never disagree, and all of it scrolls away as the miner descends.
 There are no `Light2D` nodes. This is deliberate: engine lighting washes out the
 black linework baked into the character art, and the GL Compatibility web export
 is the primary target.
+
+## The cutscene editor
+
+`addons/cutscene_editor/` adds a **Cutscene** panel to the bottom dock and takes
+over the 2D viewport while one of its tools is armed. It replaces the old
+`cutscene_terrain_tools` dig toggle, which is gone.
+
+Open any scene holding an `EditorTerrainPreview` — `character_encounter_stage.tscn`
+or a stage inheriting it — and pick the encounter you are authoring from
+**Authoring encounter** at the top of the panel. Most encounters share one stage
+scene, so that dropdown, not the Inspector, is how you say which cutscene you
+are working on. The preview moves to that encounter's own depth and draws that
+encounter's room.
+
+### Sculpt: cutting the room out of real rock
+
+An encounter with no room uses the procedural chamber: a centred rectangle with
+a tapered ceiling, the same everywhere. **Create a room for this encounter**
+makes a `CutsceneTerrainSculpt`, saves it beside the encounter in
+`resources/cinematics/sculpts/`, and seeds it with exactly the chamber the game
+already generates — so your starting point is what you already have, not a wall
+of rock.
+
+From there the room is a grid of terrain cells you paint:
+
+- **Carve** opens rock, **Fill** closes it. **Alt** swaps the two mid-drag, which
+  is the fastest way to walk back an overshoot.
+- **Smooth** runs a majority filter over the cells under the brush, wearing a
+  wall down. **Roughen** flips only cells already on a solid/open edge, so it
+  jags a silhouette instead of punching holes through solid rock or filling the
+  middle of the room.
+- **Brush size**, **strength** and **edge falloff** shape the stroke. Every
+  decision is seeded from the cell coordinate, so the same stroke over the same
+  rock always gives the same result — a stroke you undo and redo comes back
+  identical.
+- **Dig hit** is the old marker workflow, kept because it is the only way to see
+  a room *after* the miner has broken into it: it adds an authored `Marker2D`
+  and digs it through the production `TerrainManager` exactly as a pickaxe hit
+  does. Alt-click heals one.
+
+A whole drag is one undo entry.
+
+**Sculpting** picks what a stroke changes. *Shape (all strata)* moves the rock
+and the ground the miner stands on together. *Stratum N only* changes what one
+layer draws and leaves collision alone, which is how a rim reads as receding
+rock rather than one silhouette stamped four times. **Rock smoothing** decides
+how much the drawn rock rounds off the cell grid: at zero a roughened wall stays
+hard-edged and jagged, at one every rim is interpolated.
+
+The room replaces the procedural chamber **inside its own footprint only**, so
+you can open rock the taper left solid and leave a pillar standing where it
+would have carved one away.
+
+### The landing line
+
+The miner reaches every cutscene by breaking the ceiling and falling, so the
+floor is load-bearing, not decoration. Two things protect it:
+
+- **Guarded floor rows** keeps that many rows at the encounter floor solid
+  whatever you paint over them, in both collision and the drawn rock. Carving
+  straight through the floor is the easiest mistake to make and the hardest to
+  notice, because the room still looks finished. Set it to zero only for a room
+  deliberately authored without a floor.
+- The green line drawn across the room is **where a falling miner actually
+  stops**, computed for every column the run's snaking path can arrive down. It
+  turns red where a ledge catches him above the floor or a column has nothing to
+  land on. Watch it while you carve; the panel says the same thing in words.
+
+### Cast and props
+
+The **Cast** tab places a `CutsceneActorPreview` for each character: an
+editor-only stand-in that draws a `CharacterAppearance` exactly as
+`CharacterPresenter` will at runtime, so you position the real character inside
+the real terrain. Its origin is the character's feet, because every marker in a
+stage is authored on the floor line. Its `actor_id` is what timeline beats
+refer to and what the runtime resolves to a live presenter.
+
+Props are `PackedScene` instances placed under `PropMarkers`, and new named
+`Marker2D`s can be added to any of the three marker roots from here. Everything
+added is owned by the edited scene, so it shows in the Scene dock and saves.
+
+Like the terrain preview, an actor stand-in frees itself in `_enter_tree` before
+a running game can pay for it.
+
+### Timeline
+
+The **Timeline** tab authors a `CutsceneSequence`: one lane per cast member,
+beats you drag to move and whose right edge you drag to change how long they
+take. It is a timeline, not a queue — two beats starting at the same second run
+in parallel.
+
+Beat kinds are MOVE, POSE, FACE, BOUNCE, WAIT, DIALOGUE, STAGE_CUE, PROP,
+STRIKE, SHOW and HIDE. A MOVE walks its actor over sampled terrain through the
+same `CharacterPresenter.move_grounded_to` the existing stages use, so a walk
+follows the floor you sculpted. A beat marked **blocks** holds the clock until it
+genuinely finishes, and everything after it slides — a walk that runs long over
+rough ground does not desynchronise the lines that follow it.
+
+Dragging the playhead moves the cast stand-ins, because the scrubber calls
+`CutsceneSequencePlayer.evaluate_at()` — the same path maths playback uses, with
+no side effects. What you scrub is what plays.
+
+Dialogue beats do not open dialogue themselves. They ask their owner to run a
+conversation and wait; `DialogueDirector` stays the only thing that presents a
+line.
+
+### Playtest
+
+**Playtest this cutscene** saves the room and runs the real game, breaking into
+this encounter's actual ceiling. It never opens the cutscene directly, so a room
+the miner cannot fall into fails here exactly as it would fail in a run. That is
+the point: the harness can only give a true answer.
 
 ## Authoring tools
 

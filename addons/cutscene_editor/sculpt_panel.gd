@@ -1,0 +1,492 @@
+@tool
+class_name CutsceneSculptPanel
+extends VBoxContainer
+
+## How it works:
+## - Owns the brush settings a designer sculpts a cutscene room with: which
+##   operation is armed, how big and soft the brush is, and which stratum it
+##   edits. The plugin reads that state when a click reaches the viewport.
+## - Owns nothing about terrain. Every edit goes through CutsceneSculptBrush
+##   onto the encounter's CutsceneTerrainSculpt, and the preview redraws itself
+##   from the resource's own `changed` signal.
+## - Reports the room's health back: authoring errors, how much is open, and
+##   where a falling miner would actually touch down.
+## The invariant is that arming a tool changes no terrain by itself; nothing
+## here writes a cell until the plugin forwards a real click.
+
+signal armed_changed(is_armed: bool)
+signal brush_settings_changed
+
+## A mined hit is not a brush stroke: it adds an authored impact marker and
+## digs it through the production TerrainManager, exactly as a pickaxe would.
+## It stays on this row because it is the same gesture — click the rock to
+## change it — and it is how a designer checks a room reads correctly once
+## the miner has broken into it.
+const OP_DIG_HIT: StringName = &"dig_hit"
+
+const OPERATION_LABELS: Array[String] = [
+	"Carve",
+	"Fill",
+	"Smooth",
+	"Roughen",
+	"Dig hit",
+]
+const OPERATIONS: Array[StringName] = [
+	CutsceneSculptBrush.OP_CARVE,
+	CutsceneSculptBrush.OP_FILL,
+	CutsceneSculptBrush.OP_SMOOTH,
+	CutsceneSculptBrush.OP_ROUGHEN,
+	OP_DIG_HIT,
+]
+
+var _context: CutsceneEditorContext
+var _brush := CutsceneSculptBrush.new()
+var _operation_index: int = 0
+var _is_armed: bool = false
+
+var _status_label: Label
+var _landing_label: Label
+var _arm_button: Button
+var _operation_buttons: Array[Button] = []
+var _radius_slider: HSlider
+var _strength_slider: HSlider
+var _falloff_slider: HSlider
+var _layer_selector: OptionButton
+var _smoothing_slider: HSlider
+var _floor_rows_spin: SpinBox
+var _create_button: Button
+var _missing_label: Label
+var _controls_root: VBoxContainer
+var _encounter_selector: OptionButton
+
+
+func _init() -> void:
+	name = "Sculpt"
+	_build_controls()
+
+
+## Rebinds every control to a newly opened scene.
+func set_context(context: CutsceneEditorContext) -> void:
+	_context = context
+	set_armed(false)
+	refresh()
+
+
+## Returns the brush the plugin applies on a viewport click.
+func get_brush() -> CutsceneSculptBrush:
+	return _brush
+
+
+## Returns which operation is armed.
+func get_operation() -> StringName:
+	return OPERATIONS[_operation_index]
+
+
+## Reports whether viewport clicks should sculpt instead of select.
+func is_armed() -> bool:
+	return _is_armed and _context != null and _context.can_sculpt()
+
+
+## Arms or disarms sculpting, so the plugin can drop the tool when the scene
+## changes without the panel and the viewport disagreeing about the mode.
+func set_armed(armed: bool) -> void:
+	var resolved := armed and _context != null and _context.can_sculpt()
+	if resolved == _is_armed:
+		return
+	_is_armed = resolved
+	if _arm_button != null:
+		_arm_button.button_pressed = _is_armed
+	armed_changed.emit(_is_armed)
+
+
+## Rereads the open scene and redraws the panel's reported state.
+func refresh() -> void:
+	var has_stage := _context != null and _context.is_valid()
+	_encounter_selector.get_parent().visible = has_stage
+	if has_stage:
+		_sync_encounter_selector()
+	var sculpt := _context.sculpt if has_stage else null
+	_controls_root.visible = sculpt != null
+	_create_button.visible = has_stage and sculpt == null
+	_missing_label.visible = not has_stage
+	if not has_stage:
+		_missing_label.text = (
+			"Open a cutscene stage scene to sculpt its room."
+		)
+		return
+	if sculpt == null:
+		_create_button.text = "Create a room for this encounter"
+		return
+	_sync_layer_selector()
+	_sync_sculpt_controls(sculpt)
+	_update_status(sculpt)
+
+
+func _build_controls() -> void:
+	var encounter_row := HBoxContainer.new()
+	var encounter_label := Label.new()
+	encounter_label.text = "Authoring encounter"
+	encounter_label.tooltip_text = (
+		"Most encounters share one stage scene, so this picks which one the "
+		+ "preview sits at. It moves the view to that encounter's depth and "
+		+ "shows that encounter's room."
+	)
+	encounter_row.add_child(encounter_label)
+	_encounter_selector = OptionButton.new()
+	_encounter_selector.item_selected.connect(_on_encounter_selected)
+	encounter_row.add_child(_encounter_selector)
+	add_child(encounter_row)
+
+	_missing_label = Label.new()
+	_missing_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	add_child(_missing_label)
+
+	_create_button = Button.new()
+	_create_button.pressed.connect(_on_create_pressed)
+	add_child(_create_button)
+
+	_controls_root = VBoxContainer.new()
+	add_child(_controls_root)
+
+	_arm_button = Button.new()
+	_arm_button.text = "Sculpt Terrain"
+	_arm_button.toggle_mode = true
+	_arm_button.tooltip_text = (
+		"Click and drag the previewed rock to sculpt it. "
+		+ "Hold Alt to invert carve and fill."
+	)
+	_arm_button.toggled.connect(_on_arm_toggled)
+	_controls_root.add_child(_arm_button)
+
+	var operation_row := HBoxContainer.new()
+	_controls_root.add_child(operation_row)
+	for operation_index in range(OPERATION_LABELS.size()):
+		var button := Button.new()
+		button.text = OPERATION_LABELS[operation_index]
+		button.toggle_mode = true
+		button.button_pressed = operation_index == 0
+		button.pressed.connect(_on_operation_pressed.bind(operation_index))
+		operation_row.add_child(button)
+		_operation_buttons.append(button)
+
+	_radius_slider = _add_slider("Brush size", 1.0, 40.0, 0.5, 6.0)
+	_strength_slider = _add_slider("Strength", 0.05, 1.0, 0.05, 1.0)
+	_falloff_slider = _add_slider("Edge falloff", 0.0, 1.0, 0.05, 0.5)
+
+	var layer_row := HBoxContainer.new()
+	var layer_label := Label.new()
+	layer_label.text = "Sculpting"
+	layer_row.add_child(layer_label)
+	_layer_selector = OptionButton.new()
+	_layer_selector.tooltip_text = (
+		"Shape edits every stratum and the ground the miner stands on. "
+		+ "A single stratum changes only what that layer draws."
+	)
+	_layer_selector.item_selected.connect(_on_layer_selected)
+	layer_row.add_child(_layer_selector)
+	_controls_root.add_child(layer_row)
+
+	_controls_root.add_child(HSeparator.new())
+
+	_smoothing_slider = _add_slider("Rock smoothing", 0.0, 1.0, 0.05, 0.65)
+	_smoothing_slider.value_changed.connect(_on_smoothing_changed)
+
+	var floor_row := HBoxContainer.new()
+	var floor_label := Label.new()
+	floor_label.text = "Guarded floor rows"
+	floor_label.tooltip_text = (
+		"Rows at the encounter floor that stay solid whatever is painted, "
+		+ "so the miner always lands in the room instead of falling past it."
+	)
+	floor_row.add_child(floor_label)
+	_floor_rows_spin = SpinBox.new()
+	_floor_rows_spin.min_value = 0
+	_floor_rows_spin.max_value = 16
+	_floor_rows_spin.value_changed.connect(_on_floor_rows_changed)
+	floor_row.add_child(_floor_rows_spin)
+	_controls_root.add_child(floor_row)
+
+	var action_row := HBoxContainer.new()
+	_controls_root.add_child(action_row)
+	_add_action(action_row, "Reset to chamber", _on_bake_pressed)
+	_add_action(action_row, "Fill solid", _on_fill_all_pressed)
+	_add_action(action_row, "Open all", _on_clear_all_pressed)
+
+	_controls_root.add_child(HSeparator.new())
+	_status_label = Label.new()
+	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_controls_root.add_child(_status_label)
+	_landing_label = Label.new()
+	_landing_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_controls_root.add_child(_landing_label)
+
+
+func _add_slider(
+	label_text: String,
+	minimum: float,
+	maximum: float,
+	step: float,
+	value: float
+) -> HSlider:
+	var row := HBoxContainer.new()
+	var label := Label.new()
+	label.text = label_text
+	label.custom_minimum_size.x = 120.0
+	row.add_child(label)
+	var slider := HSlider.new()
+	slider.min_value = minimum
+	slider.max_value = maximum
+	slider.step = step
+	slider.value = value
+	slider.custom_minimum_size.x = 160.0
+	row.add_child(slider)
+	var readout := Label.new()
+	readout.text = "%.2f" % value
+	row.add_child(readout)
+	slider.value_changed.connect(
+		func(new_value: float) -> void:
+			readout.text = "%.2f" % new_value
+			_on_brush_slider_changed()
+	)
+	_controls_root.add_child(row)
+	return slider
+
+
+func _add_action(
+	row: HBoxContainer,
+	label_text: String,
+	handler: Callable
+) -> void:
+	var button := Button.new()
+	button.text = label_text
+	button.pressed.connect(handler)
+	row.add_child(button)
+
+
+func _on_arm_toggled(pressed: bool) -> void:
+	set_armed(pressed)
+
+
+func _on_operation_pressed(operation_index: int) -> void:
+	_operation_index = operation_index
+	for button_index in range(_operation_buttons.size()):
+		_operation_buttons[button_index].button_pressed = (
+			button_index == operation_index
+		)
+	brush_settings_changed.emit()
+
+
+func _on_brush_slider_changed() -> void:
+	_brush.radius_cells = _radius_slider.value
+	_brush.strength = _strength_slider.value
+	_brush.falloff = _falloff_slider.value
+	brush_settings_changed.emit()
+
+
+func _on_layer_selected(selected_index: int) -> void:
+	# Index zero is the shape itself; every later entry is one stratum.
+	_brush.target_layer = selected_index - 1
+	if _brush.target_layer >= 0 and _context != null and _context.sculpt != null:
+		_context.sculpt.ensure_layer_masks(_brush.target_layer + 1)
+	brush_settings_changed.emit()
+
+
+func _on_smoothing_changed(value: float) -> void:
+	if _context == null or _context.sculpt == null:
+		return
+	_context.sculpt.edge_smoothing = value
+	_context.notify_authored_data_changed()
+
+
+func _on_floor_rows_changed(value: float) -> void:
+	if _context == null or _context.sculpt == null:
+		return
+	_context.sculpt.protected_floor_rows = int(value)
+	_context.notify_authored_data_changed()
+	_update_status(_context.sculpt)
+
+
+func _on_bake_pressed() -> void:
+	if _context == null or _context.sculpt == null:
+		return
+	CutsceneSculptBaker.bake_procedural_chamber(
+		_context.sculpt,
+		_context.preview.encounter_config,
+		_context.encounter,
+		_context.preview.terrain_manager.config
+	)
+	_context.notify_authored_data_changed()
+	refresh()
+
+
+func _on_fill_all_pressed() -> void:
+	_fill_room(true)
+
+
+func _on_clear_all_pressed() -> void:
+	_fill_room(false)
+
+
+func _fill_room(solid: bool) -> void:
+	if _context == null or _context.sculpt == null:
+		return
+	_context.sculpt.fill_all(solid)
+	_context.notify_authored_data_changed()
+	refresh()
+
+
+## Creates and saves a room for the open stage's encounter, seeded from the
+## chamber the game already generates so the first thing a designer sees is
+## the room they already have rather than a wall of rock.
+func _on_create_pressed() -> void:
+	if _context == null or _context.encounter == null:
+		_missing_label.visible = true
+		_missing_label.text = (
+			"This stage's terrain preview has no Encounter Config and "
+			+ "Encounter Id, so there is no encounter to build a room for."
+		)
+		return
+	var sculpt := CutsceneTerrainSculpt.new()
+	CutsceneSculptBaker.bake_procedural_chamber(
+		sculpt,
+		_context.preview.encounter_config,
+		_context.encounter,
+		_context.preview.terrain_manager.config
+	)
+	var directory := "res://resources/cinematics/sculpts"
+	DirAccess.make_dir_recursive_absolute(directory)
+	var sculpt_path := "%s/%s_room.tres" % [
+		directory,
+		String(_context.encounter.encounter_id),
+	]
+	if ResourceSaver.save(sculpt, sculpt_path) != OK:
+		_missing_label.visible = true
+		_missing_label.text = "Could not save the room to %s." % sculpt_path
+		return
+	sculpt.take_over_path(sculpt_path)
+	_context.encounter.terrain_sculpt = sculpt
+	if not _context.encounter.resource_path.is_empty():
+		ResourceSaver.save(_context.encounter, _context.encounter.resource_path)
+	_context.sculpt = sculpt
+	_context.notify_authored_data_changed()
+	refresh()
+
+
+## Lists the run's encounters in schedule order and marks which already have a
+## room, so a designer picking one can see what is authored and what is not.
+func _sync_encounter_selector() -> void:
+	var encounter_config: DepthEncounterConfig = (
+		_context.preview.encounter_config
+	)
+	_encounter_selector.clear()
+	if encounter_config == null:
+		_encounter_selector.add_item("No encounter schedule on this preview")
+		_encounter_selector.disabled = true
+		return
+	_encounter_selector.disabled = false
+	var selected_index := 0
+	for encounter in encounter_config.encounters:
+		if encounter == null:
+			continue
+		var item_index := _encounter_selector.item_count
+		_encounter_selector.add_item(
+			"%s  (depth %d)%s" % [
+				encounter.encounter_id,
+				encounter.depth_from_surface,
+				"  •room" if encounter.terrain_sculpt != null else "",
+			]
+		)
+		_encounter_selector.set_item_metadata(item_index, encounter.encounter_id)
+		if encounter.encounter_id == _context.preview.encounter_id:
+			selected_index = item_index
+	if _encounter_selector.item_count > 0:
+		_encounter_selector.select(selected_index)
+
+
+func _on_encounter_selected(item_index: int) -> void:
+	if _context == null or _context.preview == null:
+		return
+	_context.preview.encounter_id = _encounter_selector.get_item_metadata(
+		item_index
+	)
+	_context.encounter = _context.preview.get_encounter()
+	_context.sculpt = _context.preview.get_sculpt()
+	_context.notify_authored_data_changed()
+	refresh()
+
+
+func _sync_layer_selector() -> void:
+	var layer_count := 0
+	if (
+		_context.preview != null
+		and _context.preview.terrain_renderer != null
+		and _context.preview.terrain_renderer.profile != null
+	):
+		layer_count = (
+			_context.preview.terrain_renderer.profile.get_gameplay_layer_count()
+		)
+	if _layer_selector.item_count == layer_count + 1:
+		return
+	_layer_selector.clear()
+	_layer_selector.add_item("Shape (all strata)")
+	for layer_index in range(layer_count):
+		_layer_selector.add_item("Stratum %d only" % (layer_index + 1))
+	_layer_selector.select(clampi(_brush.target_layer + 1, 0, layer_count))
+
+
+func _sync_sculpt_controls(sculpt: CutsceneTerrainSculpt) -> void:
+	if not is_equal_approx(_smoothing_slider.value, sculpt.edge_smoothing):
+		_smoothing_slider.set_value_no_signal(sculpt.edge_smoothing)
+	if int(_floor_rows_spin.value) != sculpt.protected_floor_rows:
+		_floor_rows_spin.set_value_no_signal(sculpt.protected_floor_rows)
+
+
+## Reports the room's shape and, more importantly, where a falling miner would
+## actually stop. A room can look finished and still drop him onto a ledge
+## twenty rows above the cast.
+func _update_status(sculpt: CutsceneTerrainSculpt) -> void:
+	var sculpt_error := sculpt.get_sculpt_error()
+	if not sculpt_error.is_empty():
+		_status_label.text = sculpt_error
+		_landing_label.text = ""
+		return
+	var open_cells := sculpt.get_open_cell_count()
+	var total_cells := sculpt.grid_size.x * sculpt.grid_size.y
+	_status_label.text = "Room %d x %d cells, %d open (%d%%)." % [
+		sculpt.grid_size.x,
+		sculpt.grid_size.y,
+		open_cells,
+		roundi(100.0 * float(open_cells) / float(maxi(total_cells, 1))),
+	]
+	_landing_label.text = _describe_landing(sculpt)
+
+
+func _describe_landing(sculpt: CutsceneTerrainSculpt) -> String:
+	if _context.preview == null or _context.preview.terrain_manager == null:
+		return ""
+	var config: MiningConfig = _context.preview.terrain_manager.config
+	var landing_rows := sculpt.get_landing_local_rows(
+		config.snake_half_span_cells
+	)
+	if landing_rows.is_empty():
+		return "The room does not contain its own floor row."
+	var floor_row := sculpt.get_floor_local_row()
+	var highest_landing := floor_row
+	var bottomless_columns := 0
+	for landing_row in landing_rows:
+		if landing_row < 0:
+			bottomless_columns += 1
+			continue
+		highest_landing = mini(highest_landing, landing_row)
+	if bottomless_columns > 0:
+		return (
+			"%d of the columns the miner can fall down have nothing to land on."
+			% bottomless_columns
+		)
+	if highest_landing >= floor_row:
+		return "The miner lands on the room's floor from every entry column."
+	return (
+		"The miner lands up to %d rows above the floor on some columns; "
+		% (floor_row - highest_landing)
+		+ "that is a ledge catching him before the cast."
+	)
