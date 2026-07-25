@@ -1,16 +1,39 @@
 class_name DigNumberPresenter
 extends CanvasLayer
 
-## Creates floating depth numbers at successful hammer impacts.
+## How it works:
+## - Each successful impact may create one short-lived DigNumber child.
+## - Native and web builds use separate active-label budgets.
+## - At capacity, the oldest label is retired before a new one is added.
+## The invariant is that _active_numbers never exceeds the platform budget.
 
 const PRESENTER_GROUP: StringName = &"dig_number_presenter"
 
+@export_category("Content")
 @export var dig_number_scene: PackedScene
+@export var timing_window: TimingWindowTask
+@export var player_visual: Sprite2D
+## Includes the timing bar texture that expands above its Control rectangle.
+@export_range(0.0, 160.0, 1.0) var timing_bar_visual_overhang_px: float = 80.0
+## Authored visible bounds avoid treating transparent texture padding as body.
+@export var player_visual_size_px: Vector2 = Vector2(80.0, 144.0)
+@export var player_visual_center_offset_px: Vector2 = Vector2(0.0, 16.0)
+## Keeps the complete maximum-size label outside the current miner artwork.
+@export_range(0.0, 96.0, 1.0) var player_clearance_px: float = 6.0
+
+@export_category("Performance")
+## RichText effects and tweens make each active label relatively expensive.
+@export_range(1, 32, 1) var maximum_active_numbers: int = 8
+## Keeps animated RichText work within the itch.io web-export budget.
+@export_range(1, 16, 1) var web_maximum_active_numbers: int = 4
 
 var _random := RandomNumberGenerator.new()
+# Oldest-first references are pruned or retired on every spawn. This array's
+# growth is strictly bounded by the active platform cap above.
+var _active_numbers: Array[DigNumber] = []
 
 
-## Seeds launch direction and distance variation for this run.
+## Seeds travel-distance variation and direction fallback for standalone calls.
 func _ready() -> void:
 	_random.randomize()
 
@@ -20,14 +43,16 @@ func show_dig_number_at_impact(
 	impact_screen_position: Vector2,
 	depth_gained: int,
 	combo: int,
-	combo_strength: float
+	combo_strength: float,
+	mining_direction: int
 ) -> void:
 	create(
 		impact_screen_position,
 		depth_gained,
 		combo,
 		combo_strength,
-		get_tree()
+		get_tree(),
+		mining_direction
 	)
 
 
@@ -37,7 +62,8 @@ static func create(
 	depth_gained: int,
 	combo: int,
 	combo_strength: float,
-	scene_tree: SceneTree
+	scene_tree: SceneTree,
+	mining_direction: int = 0
 ) -> DigNumber:
 	if scene_tree == null:
 		push_error("A SceneTree is required to create a dig number.")
@@ -52,7 +78,8 @@ static func create(
 		impact_screen_position,
 		depth_gained,
 		combo,
-		combo_strength
+		combo_strength,
+		mining_direction
 	)
 
 
@@ -61,26 +88,89 @@ func _spawn_dig_number(
 	impact_screen_position: Vector2,
 	depth_gained: int,
 	combo: int,
-	combo_strength: float
+	combo_strength: float,
+	mining_direction: int
 ) -> DigNumber:
 	if depth_gained <= 0 or dig_number_scene == null:
 		return null
+
+	# Remove labels that completed between impacts without introducing a
+	# signal connection for this presenter-owned, bounded child collection.
+	for number_index in range(_active_numbers.size() - 1, -1, -1):
+		var active_number := _active_numbers[number_index]
+		if (
+			not is_instance_valid(active_number)
+			or active_number.is_queued_for_deletion()
+		):
+			_active_numbers.remove_at(number_index)
+
+	var active_budget := maximum_active_numbers
+	if OS.has_feature("web"):
+		active_budget = mini(
+			active_budget,
+			web_maximum_active_numbers
+		)
+	active_budget = maxi(active_budget, 1)
+	while _active_numbers.size() >= active_budget:
+		var oldest_number: DigNumber = _active_numbers.pop_front()
+		if is_instance_valid(oldest_number):
+			oldest_number.queue_free()
+
 	var dig_number := dig_number_scene.instantiate() as DigNumber
 	if dig_number == null:
 		push_error("The configured dig number scene is not a DigNumber.")
 		return null
 	add_child(dig_number)
-	var horizontal_direction := (
-		-1.0
-		if _random.randi_range(0, 1) == 0
-		else 1.0
+	_active_numbers.append(dig_number)
+	# Gameplay launches away from the mining side so the marker clears both the
+	# hammer and the new opening. Standalone previews retain a random fallback.
+	var horizontal_direction := -float(signi(mining_direction))
+	if mining_direction == 0:
+		horizontal_direction = (
+			-1.0
+			if _random.randi_range(0, 1) == 0
+			else 1.0
+		)
+	var bottom_screen_limit_y := (
+		get_viewport().get_visible_rect().end.y
 	)
+	var viewport_center_x := get_viewport().get_visible_rect().get_center().x
+	var player_visual_center := Vector2(
+		viewport_center_x,
+		impact_screen_position.y - player_visual_size_px.y * 0.5
+	)
+	var player_exclusion_rect := Rect2(
+		player_visual_center - player_visual_size_px * 0.5,
+		player_visual_size_px
+	)
+	if player_visual != null:
+		player_visual_center = (
+			player_visual.get_global_transform_with_canvas().origin
+			+ player_visual_center_offset_px
+		)
+		player_exclusion_rect.position = (
+			player_visual_center - player_visual_size_px * 0.5
+		)
+	player_exclusion_rect = player_exclusion_rect.grow(
+		player_clearance_px
+	)
+	if (
+		timing_window != null
+		and timing_window.visible
+		and timing_window.mining_window != null
+	):
+		bottom_screen_limit_y = (
+			timing_window.mining_window.get_global_rect().position.y
+			- timing_bar_visual_overhang_px
+		)
 	dig_number.present(
 		impact_screen_position,
 		depth_gained,
 		combo,
 		combo_strength,
 		horizontal_direction,
-		_random.randf_range(0.8, 1.2)
+		_random.randf_range(0.8, 1.2),
+		player_exclusion_rect,
+		bottom_screen_limit_y
 	)
 	return dig_number

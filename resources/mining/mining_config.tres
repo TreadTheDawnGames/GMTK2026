@@ -4,3 +4,5 @@
 
 [resource]
 script = ExtResource("1_config")
+base_mine_depth_rows = 12
+combo_mine_depth_rows_per_step = 2

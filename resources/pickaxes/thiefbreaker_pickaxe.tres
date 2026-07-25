@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="PickaxeDefinition" format=3 uid="uid://bugtmt2m018lu"]
+
+[ext_resource type="Script" uid="uid://bvbd25ebtqkh8" path="res://resources/pickaxes/pickaxe_definition.gd" id="1_definition"]
+[ext_resource type="PackedScene" uid="uid://cilpog06kwu7u" path="res://Scenes/targets/fade_target.tscn" id="3_fade"]
+[ext_resource type="PackedScene" uid="uid://gx2i6oqtq8fi" path="res://Scenes/targets/moving_target.tscn" id="4_gold"]
+[ext_resource type="PackedScene" uid="uid://bcoaf8y2mxx7" path="res://Scenes/targets/shrinking_target.tscn" id="5_shrinking"]
+
+[resource]
+script = ExtResource("1_definition")
+id = &"thiefbreaker_pickaxe"
+display_name = "Thiefbreaker Pickaxe"
+description = "The cast's final tool, built to carry every lesson below."
+power_multiplier = 1.08
+width_multiplier = 1.1
+swing_speed_multiplier = 1.05
+debris_multiplier = 1.1
+special_effect = 3
+lightning_max_crack_count = 3
+lightning_max_crack_length_cells = 14
+lightning_max_crack_depth_cells = 3
+hammer_head_color = Color(1, 0.3, 0.75, 1)
+target_unlock_combo = 90
+target_scenes = Array[PackedScene]([ExtResource("3_fade"), ExtResource("4_gold"), ExtResource("5_shrinking")])

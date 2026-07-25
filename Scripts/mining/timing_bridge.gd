@@ -3,7 +3,7 @@ extends Node
 
 ## Sends Caspian's timing results to the mining controller.
 
-signal attempt_resolved(success: bool, combo: int)
+signal attempt_resolved(success: bool, combo: int, hit_direction: int)
 
 @export var timing_window: TimingWindowTask
 
@@ -15,5 +15,9 @@ func _ready() -> void:
 
 
 ## Sends a timing-bar result to mining.
-func _on_timing_pressed(success: bool, combo: int) -> void:
-	attempt_resolved.emit(success, combo)
+func _on_timing_pressed(
+	success: bool,
+	combo: int,
+	hit_direction: int
+) -> void:
+	attempt_resolved.emit(success, combo, hit_direction)

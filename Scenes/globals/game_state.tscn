@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://b3qdwfp50rbw7"]
+
+[ext_resource type="Script" uid="uid://coay1iq5hk27p" path="res://Scripts/mining/run_state.gd" id="1_tgx42"]
+[ext_resource type="Resource" uid="uid://dhlm43rg16rkw" path="res://resources/mining/mining_config.tres" id="2_64vwy"]
+
+[node name="RunState" type="Node" unique_id=913097726]
+script = ExtResource("1_tgx42")
+config = ExtResource("2_64vwy")

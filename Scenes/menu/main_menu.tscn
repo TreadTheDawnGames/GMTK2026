@@ -1,23 +1,28 @@
 [gd_scene format=3 uid="uid://2pjknhxlb7ux"]
 
 [ext_resource type="Script" uid="uid://dvhdu1x8j8s3b" path="res://Scripts/menu/main_menu.gd" id="1_menu"]
+[ext_resource type="Theme" uid="uid://cy302o2vx18ng" path="res://resources/themes/Menus.tres" id="1_ufr4i"]
+[ext_resource type="PackedScene" uid="uid://ce2kgb3fjtjut" path="res://Scenes/Options.tscn" id="3_uffod"]
 
-[node name="MainMenu" type="Control" unique_id=633825169 node_paths=PackedStringArray("title_group", "subtitle_group", "button_group", "start_button", "exit_button", "exit_confirmation", "status_label")]
+[node name="MainMenu" type="Control" unique_id=633825169 node_paths=PackedStringArray("title_group", "subtitle_group", "button_group", "start_button", "options_button", "exit_button", "exit_confirmation", "status_label")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme = ExtResource("1_ufr4i")
 script = ExtResource("1_menu")
 game_scene_path = "res://Scenes/mining/mining_proof.tscn"
 title_group = NodePath("MenuLayout/Title")
 subtitle_group = NodePath("MenuLayout/Subtitle")
 button_group = NodePath("MenuLayout/ButtonCenter/Buttons")
 start_button = NodePath("MenuLayout/ButtonCenter/Buttons/StartButton")
+options_button = NodePath("MenuLayout/ButtonCenter/Buttons/Options")
 exit_button = NodePath("MenuLayout/ButtonCenter/Buttons/ExitButton")
 exit_confirmation = NodePath("ExitConfirmation")
 status_label = NodePath("MenuLayout/ButtonCenter/Buttons/Status")
+options_scene = ExtResource("3_uffod")
 section_fade_seconds = 0.0
 
 [node name="Background" type="ColorRect" parent="." unique_id=1064397230]
@@ -46,7 +51,7 @@ grow_vertical = 2
 custom_minimum_size = Vector2(0, 67)
 layout_mode = 2
 theme_override_font_sizes/font_size = 48
-text = "GMTK2026"
+text = "Why Are You Here?"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -71,6 +76,11 @@ theme_override_constants/separation = 16
 custom_minimum_size = Vector2(160, 44)
 layout_mode = 2
 text = "Start"
+
+[node name="Options" type="Button" parent="MenuLayout/ButtonCenter/Buttons" unique_id=2105095459]
+custom_minimum_size = Vector2(160, 44)
+layout_mode = 2
+text = "Options"
 
 [node name="ExitButton" type="Button" parent="MenuLayout/ButtonCenter/Buttons" unique_id=1875770563]
 custom_minimum_size = Vector2(160, 44)
@@ -99,6 +109,7 @@ text = "JAM BUILD"
 horizontal_alignment = 2
 
 [node name="ExitConfirmation" type="ConfirmationDialog" parent="." unique_id=129160021]
+oversampling_override = 1.0
 title = "Exit Game?"
 ok_button_text = "Exit"
 dialog_text = "Really exit the game?"

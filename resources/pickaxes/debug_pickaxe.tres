@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="PickaxeDefinition" format=3 uid="uid://bktf56q4v503t"]
+
+[ext_resource type="Script" uid="uid://bvbd25ebtqkh8" path="res://resources/pickaxes/pickaxe_definition.gd" id="1_vg1jj"]
+[ext_resource type="PackedScene" uid="uid://bcoaf8y2mxx7" path="res://Scenes/targets/shrinking_target.tscn" id="3_yfitg"]
+
+[resource]
+script = ExtResource("1_vg1jj")
+id = &"debug_pickaxe"
+display_name = "Debug Pickaxe"
+description = "The Dev Tool"
+power_multiplier = 5.0
+swing_speed_multiplier = 5.0
+debris_multiplier = 5.0
+special_effect = 2
+follow_up_power_scale = 2.0
+follow_up_speed_scale = 3.0
+follow_up_debris_scale = 2.0
+target_unlock_combo = 1
+target_scenes = Array[PackedScene]([ExtResource("3_yfitg")])
+metadata/_custom_type_script = "uid://bvbd25ebtqkh8"

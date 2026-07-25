@@ -29,7 +29,8 @@ func play_at_impact(
 	_impact_screen_position: Vector2,
 	cells_removed: int,
 	combo_strength: float,
-	_debris_multiplier: float
+	_debris_multiplier: float,
+	_swing_side: int = 1
 ) -> void:
 	if cells_removed <= 0:
 		return

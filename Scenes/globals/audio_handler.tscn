@@ -1,0 +1,16 @@
+[gd_scene format=3 uid="uid://b2mhajhoyn0n2"]
+
+[ext_resource type="Script" uid="uid://dpjj13onqvxe4" path="res://Scripts/ui/player_audio_handler.gd" id="1_moayn"]
+
+[sub_resource type="AudioStreamSynchronized" id="AudioStreamSynchronized_6ko1l"]
+stream_count = 4
+stream_0/volume = 0.0
+stream_1/volume = 0.0
+stream_2/volume = 0.0
+stream_3/volume = 0.0
+
+[node name="AudioHandler" type="Node2D" unique_id=1511878270]
+script = ExtResource("1_moayn")
+
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=559715938]
+stream = SubResource("AudioStreamSynchronized_6ko1l")

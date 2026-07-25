@@ -6,20 +6,21 @@ extends Node
 class SwingRequest:
 	## Retains one earned strike until its animation reaches the ground.
 	var combo: int
-	var pickaxe: PickaxeDefinition
-	var aim_direction: int
+	var pickaxes: Array[PickaxeDefinition]
 	var power_scale: float
 	var width_scale: float
 	var speed_scale: float
 	var debris_scale: float
 	var counts_as_timing_success: bool
+	var path_direction: int = 1
+	var target_cell_x: int
 
 
 	## Captures the tool and modifiers earned by one timing result.
 	func _init(
 		requested_combo: int,
-		requested_pickaxe: PickaxeDefinition,
-		requested_aim_direction: int = 0,
+		requested_pickaxes: Array[PickaxeDefinition],
+		requested_path_direction: int = 0,
 		requested_power_scale: float = 1.0,
 		requested_width_scale: float = 1.0,
 		requested_speed_scale: float = 1.0,
@@ -27,13 +28,15 @@ class SwingRequest:
 		requested_counts_as_timing_success: bool = true
 	) -> void:
 		combo = requested_combo
-		pickaxe = requested_pickaxe
-		aim_direction = clampi(requested_aim_direction, -1, 1)
+		# Progression replaces rather than mutates this array, so queued hits
+		# retain a stable <=10-item snapshot without another per-hit allocation.
+		pickaxes = requested_pickaxes
 		power_scale = requested_power_scale
 		width_scale = requested_width_scale
 		speed_scale = requested_speed_scale
 		debris_scale = requested_debris_scale
 		counts_as_timing_success = requested_counts_as_timing_success
+		path_direction = clampi(requested_path_direction, -1, 1)
 
 
 ## Reports the terrain and depth changed by a completed hit.
@@ -51,29 +54,37 @@ signal swing_requested(
 	combo_strength: float,
 	swing_speed_multiplier: float
 )
-## Requests particles and camera shake at the hammer contact point.
+## Reports combo before synchronous terrain damage chooses its layer masks.
+signal dig_presentation_started(combo: int)
+## Requests impact presentation at the hammer contact point.
 signal impact_resolved(
 	screen_position: Vector2,
 	cells_removed: int,
 	combo_strength: float,
-	debris_multiplier: float
+	debris_multiplier: float,
+	swing_side: int
 )
 ## Requests the hit's downward distance at the hammer contact point.
 signal dig_number_requested(
 	screen_position: Vector2,
 	depth_gained: int,
 	combo: int,
-	combo_strength: float
+	combo_strength: float,
+	swing_side: int
 )
+## Faces the miner toward the successful timing hit's side of the bar.
+signal path_direction_changed(direction: int)
 
 @export var config: MiningConfig
-@export var run_state: RunState
 @export var terrain_manager: TerrainManager
 @export var view_controller: ViewController
-@export var fall_origin: Marker2D
 
-var _equipped_pickaxe: PickaxeDefinition
-var _aim_direction: int = 0
+@onready var _game_state: RunState = RunState.get_global(self)
+
+# Authored progression contains exactly ten definitions; character grants only
+# replace this bounded snapshot and never grow it per hit.
+var _active_pickaxes: Array[PickaxeDefinition] = []
+var _path_direction: int = 1
 var _pending_swing: SwingRequest
 var _pending_combo_strength: float = 0.0
 var _is_swing_pending: bool = false
@@ -83,12 +94,16 @@ var _queued_swings: Array[SwingRequest] = []
 
 
 ## Starts a swing for a successful timing result or records a miss.
-func resolve_attempt(success: bool, resolved_combo: int) -> void:
+func resolve_attempt(
+	success: bool,
+	resolved_combo: int,
+	hit_direction: int = 0
+) -> void:
 	var safe_combo := maxi(resolved_combo, 0)
-	if run_state.has_reached_bottom:
+	if _game_state.has_reached_bottom:
 		return
 	if not success:
-		run_state.record_failure(safe_combo)
+		_game_state.record_failure(safe_combo)
 		# A miss stops retained future strikes, but an airborne hit still lands.
 		_queued_swings.clear()
 		# Keep an active successful swing intact; the timing UI already shows
@@ -98,8 +113,8 @@ func resolve_attempt(success: bool, resolved_combo: int) -> void:
 		return
 	var primary_swing := SwingRequest.new(
 		safe_combo,
-		_equipped_pickaxe,
-		_aim_direction
+		_active_pickaxes,
+		hit_direction
 	)
 	if (
 		_is_swing_pending
@@ -109,26 +124,67 @@ func resolve_attempt(success: bool, resolved_combo: int) -> void:
 	else:
 		_start_swing(primary_swing)
 
-	# Swift's bonus is tied to the earned timing result and cannot chain itself.
-	if (
-		_equipped_pickaxe != null
-		and _equipped_pickaxe.special_effect
-			== PickaxeDefinition.SpecialEffect.RAPID_FOLLOW_UP
-	):
+	# Every owned rapid-follow-up pickaxe adds one bonus swing. Bonus swings
+	# retain the complete stack but cannot recursively create more swings.
+	for definition in _active_pickaxes:
+		if (
+			definition == null
+			or definition.special_effect
+				!= PickaxeDefinition.SpecialEffect.RAPID_FOLLOW_UP
+		):
+			continue
 		_queued_swings.append(SwingRequest.new(
 			safe_combo,
-			_equipped_pickaxe,
-			_aim_direction,
-			_equipped_pickaxe.follow_up_power_scale,
-			_equipped_pickaxe.follow_up_width_scale,
-			_equipped_pickaxe.follow_up_speed_scale,
-			_equipped_pickaxe.follow_up_debris_scale,
+			_active_pickaxes,
+			hit_direction,
+			definition.follow_up_power_scale,
+			definition.follow_up_width_scale,
+			definition.follow_up_speed_scale,
+			definition.follow_up_debris_scale,
 			false
 		))
 
 
 ## Starts one retained success and waits for its animated contact frame.
 func _start_swing(swing: SwingRequest) -> void:
+	var center_cell_x := config.terrain_width_cells / 2
+	var requested_half_width_cells := (
+		_get_requested_half_width_cells(swing)
+	)
+	var available_half_span := (
+		center_cell_x - requested_half_width_cells - 1
+	)
+	if terrain_manager.encounter_config != null:
+		available_half_span = mini(
+			available_half_span,
+			terrain_manager.encounter_config.chamber_width_cells / 2
+				- requested_half_width_cells
+				- 1
+		)
+	var safe_half_span := maxi(
+		mini(config.snake_half_span_cells, available_half_span),
+		0
+	)
+	var left_turn_cell_x := center_cell_x - safe_half_span
+	var right_turn_cell_x := center_cell_x + safe_half_span
+	if _game_state.mining_x >= right_turn_cell_x:
+		_path_direction = -1
+	elif _game_state.mining_x <= left_turn_cell_x:
+		_path_direction = 1
+	elif swing.path_direction != 0:
+		_path_direction = swing.path_direction
+	swing.path_direction = _path_direction
+	var horizontal_step_cells := mini(
+		config.snake_horizontal_step_cells,
+		maxi(requested_half_width_cells, 1)
+	)
+	swing.target_cell_x = clampi(
+		_game_state.mining_x
+			+ swing.path_direction * horizontal_step_cells,
+		left_turn_cell_x,
+		right_turn_cell_x
+	)
+	path_direction_changed.emit(swing.path_direction)
 	_pending_swing = swing
 	_pending_combo_strength = clampf(
 		float(swing.combo) / float(config.maximum_effect_combo),
@@ -140,15 +196,19 @@ func _start_swing(swing: SwingRequest) -> void:
 	swing_requested.emit(
 		swing.combo,
 		_pending_combo_strength,
-		_pickaxe_multiplier(
-			swing.pickaxe,
-			&"swing_speed_multiplier"
+		_stack_multiplier(
+			swing.pickaxes,
+			&"swing_speed_multiplier",
+			config.maximum_stack_swing_speed_multiplier
 		) * swing.speed_scale
 	)
 
 
 ## Breaks terrain where the animated hammer reaches its contact keyframe.
-func resolve_impact(impact_screen_position: Vector2) -> void:
+func resolve_impact(
+	impact_screen_position: Vector2,
+	swing_side: int = 1
+) -> void:
 	if (
 		not _is_swing_pending
 		or _has_resolved_pending_impact
@@ -168,83 +228,123 @@ func resolve_impact(impact_screen_position: Vector2) -> void:
 	requested_depth_rows = maxi(
 		roundi(
 			float(requested_depth_rows)
-			* _pickaxe_multiplier(
-				_pending_swing.pickaxe,
-				&"power_multiplier"
+			* _stack_multiplier(
+				_pending_swing.pickaxes,
+				&"power_multiplier",
+				config.maximum_stack_power_multiplier
 			)
 			* _pending_swing.power_scale
 		),
 		1
 	)
 	var requested_half_width_cells := (
-		config.base_tunnel_half_width_cells
-		+ config.combo_tunnel_half_width_cells_per_step * combo_steps
-	)
-	requested_half_width_cells = maxi(
-		roundi(
-			float(requested_half_width_cells)
-			* _pickaxe_multiplier(
-				_pending_swing.pickaxe,
-				&"width_multiplier"
-			)
-			* _pending_swing.width_scale
-		),
-		0
+		_get_requested_half_width_cells(_pending_swing)
 	)
 	var impact_cell_x := terrain_manager.screen_x_to_terrain_cell_x(
 		impact_screen_position.x
 	)
 	var fall_cell := Vector2i(
-		terrain_manager.screen_x_to_terrain_cell_x(
-			fall_origin.global_position.x
-		),
-		run_state.mining_y
+		_game_state.mining_x,
+		_game_state.mining_y
 	)
+	# Presentation receives this before TerrainManager emits damage, so every
+	# stamp from the primary hit and its special effect shares one combo gate.
+	dig_presentation_started.emit(capped_combo)
 	var dig_result := terrain_manager.dig_tunnel(
 		fall_cell,
 		requested_depth_rows,
 		requested_half_width_cells,
 		impact_cell_x,
-		_pending_swing.aim_direction,
-		requested_half_width_cells
+		_pending_swing.target_cell_x
 	)
-	var surface_after_primary_hit_y := terrain_manager.find_surface_row(
-		fall_cell.x,
-		run_state.mining_y
+	var surface_after_primary_hit: Vector2i = (
+		terrain_manager.find_tunnel_surface_cell(
+			fall_cell,
+			_pending_swing.target_cell_x,
+			requested_depth_rows
+		)
 	)
+	var surface_after_primary_hit_y: int = surface_after_primary_hit.y
 	var crossed_open_chamber := (
 		surface_after_primary_hit_y
 		> fall_cell.y + requested_depth_rows
 	)
-	if (
-		_pending_swing.pickaxe != null
-		and _pending_swing.pickaxe.special_effect
-			== PickaxeDefinition.SpecialEffect.AFTERSHOCK
-		and _pending_swing.pickaxe.aftershock_depth_rows > 0
-		and dig_result.cells_removed > 0
-		and not crossed_open_chamber
-	):
-		var aftershock_result := terrain_manager.dig_tunnel(
-			Vector2i(fall_cell.x, surface_after_primary_hit_y),
-			_pending_swing.pickaxe.aftershock_depth_rows,
-			requested_half_width_cells,
-			-1,
-			_pending_swing.aim_direction,
-			requested_half_width_cells
+	if dig_result.cells_removed > 0 and not crossed_open_chamber:
+		for definition in _pending_swing.pickaxes:
+			if (
+				definition == null
+				or definition.special_effect
+					!= PickaxeDefinition.SpecialEffect.AFTERSHOCK
+				or definition.aftershock_depth_rows <= 0
+			):
+				continue
+			var aftershock_result := terrain_manager.dig_tunnel(
+				Vector2i(
+					_pending_swing.target_cell_x,
+					surface_after_primary_hit_y
+				),
+				definition.aftershock_depth_rows,
+				requested_half_width_cells,
+				-1,
+				_pending_swing.target_cell_x
+			)
+			dig_result.absorb(aftershock_result)
+			surface_after_primary_hit_y = terrain_manager.find_surface_row(
+				_pending_swing.target_cell_x,
+				_game_state.mining_y
+			)
+		for definition in _pending_swing.pickaxes:
+			if (
+				definition == null
+				or definition.special_effect
+					!= PickaxeDefinition.SpecialEffect.BRANCHING_LIGHTNING
+			):
+				continue
+			var maximum_crack_count := (
+				definition.lightning_max_crack_count
+			)
+			var maximum_crack_length := (
+				definition.lightning_max_crack_length_cells
+			)
+			var maximum_crack_depth := (
+				definition.lightning_max_crack_depth_cells
+			)
+			# Browser builds keep the same growth curve and layer taper with a
+			# smaller bounded mask workload on the impact hot path.
+			if OS.has_feature("web"):
+				maximum_crack_count = mini(maximum_crack_count, 3)
+				maximum_crack_length = mini(maximum_crack_length, 12)
+				maximum_crack_depth = mini(maximum_crack_depth, 3)
+			var lightning_result := terrain_manager.dig_branching_lightning(
+				Vector2i(
+					_pending_swing.target_cell_x,
+					surface_after_primary_hit_y
+				),
+				requested_half_width_cells,
+				_pending_combo_strength,
+				maximum_crack_count,
+				maximum_crack_length,
+				maximum_crack_depth
+			)
+			dig_result.absorb(lightning_result)
+	var new_mining_position: Vector2i = (
+		terrain_manager.find_tunnel_surface_cell(
+			fall_cell,
+			_pending_swing.target_cell_x,
+			requested_depth_rows
 		)
-		dig_result.absorb(aftershock_result)
-	var new_mining_y := terrain_manager.find_surface_row(
-		fall_cell.x,
-		run_state.mining_y
 	)
-	var depth_gained := maxi(new_mining_y - run_state.mining_y, 0)
-	run_state.record_success(
+	var new_mining_y: int = new_mining_position.y
+	var depth_gained := maxi(new_mining_y - _game_state.mining_y, 0)
+	_game_state.record_success(
 		depth_gained,
-		new_mining_y,
+		new_mining_position,
 		_pending_swing.combo,
 		_pending_swing.counts_as_timing_success
 	)
-	view_controller.follow_mining_y(run_state.mining_y)
+	view_controller.follow_mining_position(
+		Vector2i(_game_state.mining_x, _game_state.mining_y)
+	)
 	mine_resolved.emit(
 		depth_gained,
 		dig_result.cells_removed,
@@ -255,16 +355,19 @@ func resolve_impact(impact_screen_position: Vector2) -> void:
 		impact_screen_position,
 		dig_result.cells_removed,
 		_pending_combo_strength,
-		_pickaxe_multiplier(
-			_pending_swing.pickaxe,
-			&"debris_multiplier"
-		) * _pending_swing.debris_scale
+		_stack_multiplier(
+			_pending_swing.pickaxes,
+			&"debris_multiplier",
+			config.maximum_stack_debris_multiplier
+		) * _pending_swing.debris_scale,
+		signi(swing_side) if swing_side != 0 else 1
 	)
 	dig_number_requested.emit(
 		impact_screen_position,
 		depth_gained,
 		_pending_swing.combo,
-		_pending_combo_strength
+		_pending_combo_strength,
+		signi(swing_side) if swing_side != 0 else 1
 	)
 
 
@@ -275,7 +378,7 @@ func finish_swing() -> void:
 	_is_swing_pending = false
 	_has_resolved_pending_impact = false
 	_pending_swing = null
-	if run_state.has_reached_bottom:
+	if _game_state.has_reached_bottom:
 		_queued_swings.clear()
 		return
 	_try_start_queued_swing()
@@ -289,14 +392,18 @@ func set_swing_queue_paused(is_paused: bool) -> void:
 	_try_start_queued_swing()
 
 
-## Applies the pickaxe modifiers used by future swings.
-func set_equipped_pickaxe(definition: PickaxeDefinition) -> void:
-	_equipped_pickaxe = definition
+## Replaces the cumulative snapshot captured by future earned swings.
+func set_active_pickaxes(definitions: Array[PickaxeDefinition]) -> void:
+	_active_pickaxes = definitions.duplicate()
 
 
-## Selects the side captured by the next successful timing result.
-func set_aim_direction(direction: int) -> void:
-	_aim_direction = clampi(direction, -1, 1)
+## Reports whether the camera may leave without interrupting a strike.
+func can_start_view_review() -> bool:
+	return (
+		not _is_swing_pending
+		and not _is_swing_queue_paused
+		and _queued_swings.is_empty()
+	)
 
 
 ## Starts the next earned hit when animation and dialogue allow it.
@@ -305,17 +412,58 @@ func _try_start_queued_swing() -> void:
 		_is_swing_queue_paused
 		or _is_swing_pending
 		or _queued_swings.is_empty()
-		or run_state.has_reached_bottom
+		or _game_state.has_reached_bottom
 	):
 		return
 	_start_swing(_queued_swings.pop_front())
 
 
-## Returns one strike-pickaxe modifier or the neutral value.
-func _pickaxe_multiplier(
-	pickaxe: PickaxeDefinition,
-	property_name: StringName
+## Restores the initial rightward leg and drops stale retained swings.
+func _on_run_reset() -> void:
+	_path_direction = 1
+	_pending_swing = null
+	_is_swing_pending = false
+	_has_resolved_pending_impact = false
+	_queued_swings.clear()
+
+
+## Resolves the connected tunnel radius for planning and impact damage.
+func _get_requested_half_width_cells(swing: SwingRequest) -> int:
+	var capped_combo := mini(swing.combo, config.maximum_effect_combo)
+	var combo_steps := maxi(capped_combo - 1, 0)
+	var requested_half_width_cells := (
+		config.base_tunnel_half_width_cells
+		+ config.combo_tunnel_half_width_cells_per_step * combo_steps
+	)
+	return maxi(
+		roundi(
+			float(requested_half_width_cells)
+			* _stack_multiplier(
+				swing.pickaxes,
+				&"width_multiplier",
+				config.maximum_stack_width_multiplier
+			)
+			* swing.width_scale
+		),
+		0
+	)
+
+
+## Adds each definition's delta from neutral and caps cumulative run power.
+func _stack_multiplier(
+	pickaxes: Array[PickaxeDefinition],
+	property_name: StringName,
+	maximum_multiplier: float
 ) -> float:
-	if pickaxe == null:
-		return 1.0
-	return maxf(float(pickaxe.get(property_name)), 0.0)
+	var combined_multiplier := 1.0
+	for definition in pickaxes:
+		if definition == null:
+			continue
+		combined_multiplier += (
+			float(definition.get(property_name)) - 1.0
+		)
+	return clampf(
+		combined_multiplier,
+		0.1,
+		maxf(maximum_multiplier, 0.1)
+	)

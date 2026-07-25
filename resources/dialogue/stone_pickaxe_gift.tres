@@ -29,6 +29,11 @@ script = ExtResource("3_line")
 speaker_slot = &"traveler"
 text = "Here you go. It isn't much, but it should be faster than that wooden one."
 
+[sub_resource type="Resource" id="Line_friend"]
+script = ExtResource("3_line")
+speaker_slot = &"traveler"
+text = "My friend has a better pickaxe for you below."
+
 [sub_resource type="Resource" id="Line_thanks"]
 script = ExtResource("3_line")
 speaker_slot = &"miner"
@@ -48,4 +53,4 @@ display_name = "Traveler"
 script = ExtResource("1_conversation")
 conversation_id = &"stone_pickaxe_gift"
 participants = Array[ExtResource("2_participant")]([SubResource("Participant_miner"), SubResource("Participant_traveler")])
-lines = Array[ExtResource("3_line")]([SubResource("Line_offer"), SubResource("Line_question"), SubResource("Line_bag"), SubResource("Line_reveal"), SubResource("Line_gift"), SubResource("Line_thanks")])
+lines = Array[ExtResource("3_line")]([SubResource("Line_offer"), SubResource("Line_question"), SubResource("Line_bag"), SubResource("Line_reveal"), SubResource("Line_gift"), SubResource("Line_friend"), SubResource("Line_thanks")])

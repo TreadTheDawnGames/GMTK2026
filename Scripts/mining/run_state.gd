@@ -1,7 +1,7 @@
 class_name RunState
 extends Node
 
-## Stores gameplay depth, combo, and hit counts for one run.
+## Stores gameplay position, combo, and hit counts for one run.
 
 signal depth_changed(depth: int)
 signal bottom_reached
@@ -9,7 +9,10 @@ signal run_reset
 
 @export var config: MiningConfig
 
+var save_game : SaveGame
+
 var depth: int = 0 # Gameplay depth descended from the starting surface.
+var mining_x: int = 0 # Authoritative terrain column beneath the player.
 var mining_y: int = 0 # Authoritative terrain row beneath the player's feet.
 var combo: int = 0
 var successful_hits: int = 0
@@ -21,8 +24,18 @@ var remaining_depth: int:
 		return maxi(config.total_run_depth - depth, 0)
 
 
+## Returns the project autoload without coupling consumers to a bare global.
+static func get_global(context: Node) -> RunState:
+	var game_state: RunState = (
+		context.get_node_or_null("/root/GameState") as RunState
+	)
+	if game_state == null:
+		push_error("GameState autoload is unavailable.")
+	return game_state
+
 ## Starts a new run when the node loads.
 func _ready() -> void:
+	save_game = SaveGame.load_savegame()
 	reset_run()
 	Conductor.set_song(preload("uid://dcpd5v4iqgnoc"), 295, 4)
 	Conductor.play()
@@ -32,6 +45,7 @@ func _ready() -> void:
 ## Resets depth, combo, and hit counts.
 func reset_run() -> void:
 	depth = 0
+	mining_x = config.terrain_width_cells / 2
 	mining_y = config.initial_surface_row
 	combo = 0
 	successful_hits = 0
@@ -44,7 +58,7 @@ func reset_run() -> void:
 ## Records a successful hit and the player's new depth.
 func record_success(
 	depth_gained: int,
-	new_mining_y: int,
+	new_mining_position: Vector2i,
 	resolved_combo: int,
 	count_as_timing_success: bool = true
 ) -> void:
@@ -55,8 +69,13 @@ func record_success(
 		depth + maxi(depth_gained, 0),
 		config.total_run_depth
 	)
+	mining_x = clampi(
+		new_mining_position.x,
+		0,
+		config.terrain_width_cells - 1
+	)
 	mining_y = clampi(
-		maxi(new_mining_y, mining_y),
+		maxi(new_mining_position.y, mining_y),
 		config.initial_surface_row,
 		config.get_bottom_surface_row()
 	)

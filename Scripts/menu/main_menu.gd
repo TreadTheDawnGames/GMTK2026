@@ -10,9 +10,11 @@ extends Control
 @export var subtitle_group: CanvasItem
 @export var button_group: CanvasItem
 @export var start_button: Button
+@export var options_button: Button
 @export var exit_button: Button
 @export var exit_confirmation: ConfirmationDialog
 @export var status_label: Label
+@export var options_scene: PackedScene
 
 @export_category("Intro")
 @export_range(0.0, 3.0, 0.1) var section_fade_seconds: float = 0.8
@@ -31,12 +33,18 @@ func _ready() -> void:
 		_on_exit_button_pressed
 	):
 		exit_button.pressed.connect(_on_exit_button_pressed)
+	if not options_button.pressed.is_connected(_on_options_pressed):
+		options_button.pressed.connect(_on_options_pressed)
+	
 	if not exit_confirmation.confirmed.is_connected(
 		_on_exit_confirmation_confirmed
 	):
 		exit_confirmation.confirmed.connect(
 			_on_exit_confirmation_confirmed
 		)
+	
+	
+	
 	title_group.modulate.a = 0.0
 	subtitle_group.modulate.a = 0.0
 	button_group.modulate.a = 0.0
@@ -107,7 +115,10 @@ func _on_start_button_pressed() -> void:
 		% [game_scene_path, change_error]
 	)
 
-
+func _on_options_pressed():
+	var options := options_scene.instantiate()
+	add_child(options)
+	pass
 ## Asks for confirmation before closing a desktop build.
 func _on_exit_button_pressed() -> void:
 	exit_confirmation.popup_centered()

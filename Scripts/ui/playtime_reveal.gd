@@ -20,6 +20,7 @@ var _random := RandomNumberGenerator.new()
 
 ## Chooses the reveal time and keeps the timer absent until then.
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	_random.randomize()
 	var safe_earliest := minf(
 		earliest_reveal_seconds,

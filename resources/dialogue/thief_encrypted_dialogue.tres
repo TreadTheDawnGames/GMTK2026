@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="EncryptedDialogueConversation" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/dialogue/encrypted_dialogue_conversation.gd" id="1_encrypted"]
+
+; You made it this far into the source. Why?
+; What are you looking for?
+; What did the thief steal?
+[resource]
+script = ExtResource("1_encrypted")
