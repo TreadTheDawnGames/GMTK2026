@@ -35,25 +35,25 @@ class SparkFlash:
 
 @export_category("Burst")
 ## Shards thrown by a zero-combo hit and by a fully-maxed one.
-@export_range(0, 24, 1) var minimum_shard_amount: int = 3
-@export_range(0, 24, 1) var maximum_shard_amount: int = 9
-@export_range(0.02, 1.0, 0.01) var shard_lifetime: float = 0.22
-@export_range(0.02, 1.0, 0.01) var flash_lifetime: float = 0.1
+@export_range(0, 24, 1) var minimum_shard_amount: int = 7
+@export_range(0, 24, 1) var maximum_shard_amount: int = 22
+@export_range(0.02, 1.0, 0.01) var shard_lifetime: float = 0.3
+@export_range(0.02, 1.0, 0.01) var flash_lifetime: float = 0.13
 ## Half-height of the flash star at zero and at full combo strength.
-@export_range(2.0, 96.0, 1.0) var minimum_flash_radius_px: float = 11.0
-@export_range(2.0, 96.0, 1.0) var maximum_flash_radius_px: float = 26.0
+@export_range(2.0, 96.0, 1.0) var minimum_flash_radius_px: float = 16.0
+@export_range(2.0, 96.0, 1.0) var maximum_flash_radius_px: float = 40.0
 ## Points on the flash star. Six keeps it reading as a struck-rock spark.
 @export_range(3, 10, 1) var flash_point_count: int = 6
 
 @export_category("Motion")
-@export_range(0.0, 2_000.0, 10.0) var minimum_shard_speed: float = 260.0
-@export_range(0.0, 2_000.0, 10.0) var maximum_shard_speed: float = 520.0
+@export_range(0.0, 2_000.0, 10.0) var minimum_shard_speed: float = 300.0
+@export_range(0.0, 2_000.0, 10.0) var maximum_shard_speed: float = 680.0
 ## Shards leave along the rebound of the swing, spread over this cone.
 @export_range(10.0, 180.0, 1.0) var shard_spread_degrees: float = 108.0
 ## How far the cone tilts away from the side the pickaxe came down on.
 @export_range(0.0, 90.0, 1.0) var shard_rebound_degrees: float = 34.0
-@export_range(2.0, 60.0, 0.5) var minimum_shard_length_px: float = 9.0
-@export_range(2.0, 60.0, 0.5) var maximum_shard_length_px: float = 22.0
+@export_range(2.0, 60.0, 0.5) var minimum_shard_length_px: float = 10.0
+@export_range(2.0, 60.0, 0.5) var maximum_shard_length_px: float = 30.0
 @export_range(0.5, 12.0, 0.5) var shard_width_px: float = 3.0
 
 @export_category("Palette")
@@ -65,8 +65,8 @@ class SparkFlash:
 @export_category("Performance")
 ## Bounded per-hit accumulation: a burst that would exceed either budget drops
 ## the oldest marks first, so repeated hits never grow these arrays.
-@export_range(1, 128, 1) var maximum_active_shards: int = 32
-@export_range(1, 64, 1) var web_maximum_active_shards: int = 16
+@export_range(1, 128, 1) var maximum_active_shards: int = 72
+@export_range(1, 64, 1) var web_maximum_active_shards: int = 36
 @export_range(1, 8, 1) var maximum_active_flashes: int = 3
 
 var _shards: Array[SparkShard] = []
