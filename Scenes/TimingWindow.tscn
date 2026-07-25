@@ -58,7 +58,8 @@ horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="ComboLabel" type="Label" parent="." unique_id=1967208941]
-editor_description = "Seated inside the bar frame's upper-left interior rather than straddling its drawn top edge. It shares MiningWindow's bottom-centre anchors so it tracks the frame at any window size; the offsets are MiningWindow's own inset past the nine-slice border."
+editor_description = "Hidden: the combo is read from the charge gauge TimingBarFeedback draws along the bar's lower edge, which shows the effect ceiling and the quick-save threshold that a bare number cannot. The node stays so timing_window.gd keeps its combo_label target and so the readout can be switched back on for debugging."
+visible = false
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 7
