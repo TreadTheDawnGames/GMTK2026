@@ -45,6 +45,7 @@ var slider_position : float = 0.0:
 
 ## Creates the configured target baseline and prepares one-shot recovery bars.
 func _ready() -> void:
+	set_process(false)
 	while targets.size() < _starting_target_count:
 		add_target()
 	Utils.set_control_width(slider, slider_size)
@@ -56,6 +57,8 @@ func _ready() -> void:
 	reset_one_shot()
 	if one_shot:
 		stop()
+	else:
+		set_process(true)
 
 
 ## Returns the slider edge area including input grace.
