@@ -50,7 +50,7 @@ func present(
 	bottom_screen_limit_y: float
 ) -> void:
 	var safe_combo_strength := clampf(combo_strength, 0.0, 1.0)
-	var formatted_text := "-%d\nDEPTH" % depth_gained
+	var formatted_text := "-%d" % depth_gained
 	var selected_effect_threshold := -1
 	var selected_effect_tag := ""
 	for threshold: int in combo_effects:

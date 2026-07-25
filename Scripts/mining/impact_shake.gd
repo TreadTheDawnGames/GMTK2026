@@ -12,9 +12,19 @@ extends Node
 @export_range(0.01, 1.0, 0.01) var duration_seconds: float = 0.16
 @export_range(1.0, 120.0, 1.0) var samples_per_second: float = 45.0
 
+@export_category("Direction")
+## Portion of the shake spent as a kick away from the swing rather than as
+## jitter. A directional kick reads considerably harder than random jitter of
+## the same pixel size, which is why this defaults above half.
+@export_range(0.0, 1.0, 0.05) var directional_portion: float = 0.65
+## How much of the kick points down the pickaxe rather than sideways.
+@export_range(0.0, 2.0, 0.05) var downward_bias: float = 1.0
+
 var _remaining_seconds: float = 0.0
 var _current_strength_px: float = 0.0
 var _seconds_until_sample: float = 0.0
+var _kick_direction: Vector2 = Vector2.DOWN
+var _jitter_offset: Vector2 = Vector2.ZERO
 var _random := RandomNumberGenerator.new()
 
 
@@ -24,13 +34,14 @@ func _ready() -> void:
 	set_process(false)
 
 
-## Starts a subtle shake scaled by the hit's normalized combo strength.
+## Starts a subtle shake scaled by the hit's normalized combo strength, kicked
+## away from the side the pickaxe came down on.
 func play_at_impact(
 	_impact_screen_position: Vector2,
 	cells_removed: int,
 	combo_strength: float,
 	_debris_multiplier: float,
-	_swing_side: int = 1
+	swing_side: int = 1
 ) -> void:
 	if cells_removed <= 0:
 		return
@@ -39,8 +50,14 @@ func play_at_impact(
 		base_strength_px + combo_bonus_px,
 		clampf(combo_strength, 0.0, 1.0)
 	)
+	# A hit from the right drives the frame down and to the left.
+	_kick_direction = Vector2(
+		-signf(float(swing_side)) if swing_side != 0 else 0.0,
+		downward_bias
+	).normalized()
 	_remaining_seconds = duration_seconds
 	_seconds_until_sample = 0.0
+	_jitter_offset = Vector2.ZERO
 	set_process(true)
 
 
@@ -52,12 +69,17 @@ func _process(delta: float) -> void:
 		set_process(false)
 		return
 
-	_seconds_until_sample -= delta
-	if _seconds_until_sample > 0.0:
-		return
-	_seconds_until_sample = 1.0 / samples_per_second
 	var fade_weight := _remaining_seconds / duration_seconds
-	camera.offset = Vector2(
-		_random.randf_range(-1.0, 1.0),
-		_random.randf_range(-1.0, 1.0)
+	# The jitter is resampled on its own cadence, but the kick has to move every
+	# frame or the recoil reads as a second, softer shake instead of one hit.
+	_seconds_until_sample -= delta
+	if _seconds_until_sample <= 0.0:
+		_seconds_until_sample = 1.0 / samples_per_second
+		_jitter_offset = Vector2(
+			_random.randf_range(-1.0, 1.0),
+			_random.randf_range(-1.0, 1.0)
+		) * (1.0 - directional_portion)
+	camera.offset = (
+		_kick_direction * directional_portion * fade_weight
+		+ _jitter_offset
 	) * _current_strength_px * fade_weight
