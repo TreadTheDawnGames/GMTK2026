@@ -68,7 +68,7 @@ var _smoothing_slider: HSlider
 var _floor_rows_spin: SpinBox
 var _create_button: Button
 var _missing_label: Label
-var _controls_root: VBoxContainer
+var _controls_root: HBoxContainer
 var _encounter_selector: OptionButton
 var _focus_selector: OptionButton
 var _focus_mode_selector: OptionButton
