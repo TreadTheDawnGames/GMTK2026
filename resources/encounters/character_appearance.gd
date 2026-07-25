@@ -11,5 +11,10 @@ extends Resource
 @export var sprite_offset: Vector2 = Vector2.ZERO
 @export var tint: Color = Color.WHITE
 @export var flip_h: bool = false
+## Which way the source art already looks. Turning an actor to face its travel
+## assumes art drawn looking right, so art drawn looking left walks backwards
+## and ends a walk facing away from whoever it just approached. This says which
+## it is; it does not mirror anything on its own.
+@export var art_faces_left: bool = false
 ## Optional named idle/walk/speech poses; null preserves the current still sprite.
 @export var pose_set: ActorPoseSet

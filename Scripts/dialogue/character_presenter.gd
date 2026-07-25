@@ -18,6 +18,7 @@ const GroundWalkType = preload(
 
 var _base_sprite_position: Vector2
 var _departure_tween: Tween
+var _art_faces_left: bool = false
 
 
 ## Stores the authored sprite position before an appearance is assigned.
@@ -41,6 +42,7 @@ func apply_appearance(appearance: CharacterAppearance) -> void:
 	character_sprite.position = appearance.sprite_offset
 	character_sprite.modulate = appearance.tint
 	character_sprite.flip_h = appearance.flip_h
+	_art_faces_left = appearance.art_faces_left
 	_base_sprite_position = character_sprite.position
 	speech_reaction.capture_rest_position()
 	if actor_sprite_view != null:
@@ -77,11 +79,12 @@ func play_pose(pose_name: StringName) -> bool:
 	)
 
 
-## Faces the visible character along its current travel direction.
+## Faces the visible character along its current travel direction, mirroring
+## only when the art does not already look that way.
 func set_facing_direction(direction: int) -> void:
 	if not is_instance_valid(character_sprite) or direction == 0:
 		return
-	character_sprite.flip_h = direction < 0
+	character_sprite.flip_h = (direction < 0) != _art_faces_left
 
 
 ## Walks to one authored global position over sampled terrain.
