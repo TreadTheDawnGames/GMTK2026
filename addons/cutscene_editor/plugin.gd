@@ -2,8 +2,10 @@
 extends EditorPlugin
 
 ## How it works:
-## - Hosts the cutscene editor: a bottom panel of Sculpt, Cast and Timeline
-##   tabs, and the 2D viewport interaction that turns a drag into terrain.
+## - Hosts the cutscene editor: a bottom panel of Overview, Sculpt, Cast and
+##   Timeline tabs, and the 2D viewport interaction that turns a drag into
+##   terrain. Overview leads, because which of the run's cutscenes are authored
+##   is the first thing worth knowing.
 ## - Rebuilds one CutsceneEditorContext per opened scene and hands the same
 ##   instance to every panel, so no panel hunts the tree for what is being
 ##   edited.
@@ -28,6 +30,7 @@ const PREVIEW_HARNESS_SCENE := "res://Scenes/cinematics/cinematic_preview.tscn"
 
 var _dock: VBoxContainer
 var _playtest_button: Button
+var _manager_panel: CutsceneManagerPanel
 var _sculpt_panel: CutsceneSculptPanel
 var _cast_panel: CutsceneCastPanel
 var _timeline_panel: CutsceneTimelinePanel
@@ -44,6 +47,7 @@ var _outline_points := PackedVector2Array()
 
 
 func _enter_tree() -> void:
+	_manager_panel = CutsceneManagerPanel.new()
 	_sculpt_panel = CutsceneSculptPanel.new()
 	_cast_panel = CutsceneCastPanel.new()
 	_timeline_panel = CutsceneTimelinePanel.new()
@@ -56,6 +60,9 @@ func _enter_tree() -> void:
 
 	var tabs := TabContainer.new()
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# The overview comes first: a designer opening this panel wants to know
+	# which of the run's cutscenes are authored before working on one of them.
+	tabs.add_child(_manager_panel)
 	tabs.add_child(_sculpt_panel)
 	tabs.add_child(_cast_panel)
 	tabs.add_child(timeline_tab)
@@ -135,6 +142,7 @@ func _rebuild_context() -> void:
 		var stage_sequence: Variant = _context.stage.get(&"sequence")
 		if stage_sequence is CutsceneSequence:
 			_context.sequence = stage_sequence
+	_manager_panel.set_context(_context)
 	_sculpt_panel.set_context(_context)
 	_cast_panel.set_context(_context)
 	_timeline_panel.set_context(_context)
@@ -147,6 +155,7 @@ func _on_authored_data_changed() -> void:
 	if _context.preview != null:
 		_context.preview.build_preview()
 	_sculpt_panel.refresh()
+	_manager_panel.set_context(_context)
 	_rebuild_layer_outline()
 	update_overlays()
 
@@ -375,6 +384,7 @@ func _end_stroke() -> void:
 	if not sculpt.resource_path.is_empty():
 		ResourceSaver.save(sculpt, sculpt.resource_path)
 	_sculpt_panel.refresh()
+	_manager_panel.set_context(_context)
 	_rebuild_layer_outline()
 	update_overlays()
 
