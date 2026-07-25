@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="Digger's Remorse"
+config/name="Miner's Remorse"
 run/main_scene="res://Scenes/mining/mining_proof.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"

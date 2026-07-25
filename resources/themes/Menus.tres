@@ -10,7 +10,7 @@
 [ext_resource type="Texture2D" uid="uid://ni24owabpyc" path="res://Assets/UI/Kenney/progress_blue.png" id="7_er5k3"]
 [ext_resource type="Texture2D" uid="uid://cyrawoek2opco" path="res://Assets/UI/Kenney/panel_brown.png" id="7_okgy0"]
 [ext_resource type="Texture2D" uid="uid://c58c74om01fyj" path="res://Assets/UI/Kenney/Sprite-scrollbar_horizontal.png" id="8_gpvyk"]
-[ext_resource type="Texture2D" uid="uid://cgf82n2mr5tw6" path="res://Assets/UI/Kenney/progress_Long.png" id="8_okgy0"]
+[ext_resource type="Texture2D" uid="uid://c30ydfesje06b" path="res://Assets/UI/Kenney/progress_white.png" id="8_okgy0"]
 [ext_resource type="FontFile" uid="uid://yn3pahibw5ow" path="res://Assets/UI/ComicRelief-Bold.ttf" id="11_unykb"]
 [ext_resource type="Texture2D" uid="uid://dwximflfngpaf" path="res://Assets/UI/Kenney/progress_white-longt.png" id="12_gpvyk"]
 [ext_resource type="Texture2D" uid="uid://bykuvfj57ts48" path="res://Assets/UI/Kenney/progress_blue_full.png" id="12_r7wsn"]
