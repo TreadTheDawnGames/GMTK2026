@@ -8,9 +8,14 @@ extends Control
 ##   what colour it is, and how far its shapes reach. Every visual below is a
 ##   pure function of those four, so adding one is a single _draw_* helper plus
 ##   a single call in _draw.
-## - Strictly read-only against the timing bar: it reads the active bar's rect
-##   and slider position and never writes a property back, because
-##   Scenes/slider_timing_window.gd is adapt-only.
+## - The press flash redraws the bar's own StyleBox rather than outlining it, so
+##   the flash inherits the drawn frame's rounded corners and nine-slice margins
+##   for free. A rectangle around the bar ignored all of that and read as a box
+##   sitting on top of the art.
+## - Strictly read-only against the timing bar: it reads the active bar's rect,
+##   slider position, and StyleBox and never writes a property back, because
+##   Scenes/slider_timing_window.gd is adapt-only. The StyleBox is tinted on a
+##   cached duplicate, never on the bar's own resource.
 ## The invariant is that _marks never exceeds maximum_active_marks.
 
 ## One resolved press, fading out.
@@ -56,12 +61,15 @@ const RING_SEGMENTS: int = 24
 @export_range(0.05, 2.0, 0.05) var spoke_length_ratio: float = 0.28
 @export_range(0, 12, 1) var cold_spoke_count: int = 3
 @export_range(0, 12, 1) var hot_spoke_count: int = 7
-## One stroke weight for the ring, the spokes, and the recoil outline. Sharing
-## it is what makes the three read as one drawn mark instead of three effects.
+## One stroke weight for the ring, the spokes, and the slash. Sharing it is what
+## makes them read as one drawn mark instead of separate effects.
 @export_range(1.0, 16.0, 0.5) var stroke_width_px: float = 5.0
-## How far the recoil outline kicks off the bar's edge: outward on a hit,
-## inward on a miss. The bar itself never moves; only this outline does.
+## How far the flashed frame swells past the bar's own art: outward on a hit,
+## inward on a miss. The bar itself never moves; only this redraw does.
 @export_range(0.0, 40.0, 0.5) var frame_kick_px: float = 7.0
+## Peak brightness of the frame flash. It is drawn additively over the bar's own
+## art, so this is how hard the drawn texture lights up rather than a colour.
+@export_range(0.0, 2.0, 0.05) var shine_strength: float = 0.85
 
 @export_category("Performance")
 ## Bounded per-press accumulation: a press at capacity retires the oldest mark
@@ -70,6 +78,10 @@ const RING_SEGMENTS: int = 24
 
 var _marks: Array[Mark] = []
 var _random := RandomNumberGenerator.new()
+# Both caches are keyed by nodes and resources the timing scene already owns, so
+# each holds at most one entry per bar: two for the mining and recovery bars.
+var _shine_surfaces: Dictionary[SliderTimingWindow, Control] = {}
+var _tinted_styles: Dictionary[StyleBox, StyleBox] = {}
 
 
 ## Sleeps until MiningSceneWiring routes the first timing result here.
@@ -77,6 +89,11 @@ func _ready() -> void:
 	_random.randomize()
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_process(false)
+	# Additive, so every mark lights the bar's art up rather than painting over
+	# it. Alpha stays the strength dial; the drawn frame keeps its own colour.
+	var glow_material := CanvasItemMaterial.new()
+	glow_material.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	material = glow_material
 	if timing_window == null:
 		push_error("TimingBarFeedback requires a TimingWindowTask.")
 
@@ -152,10 +169,10 @@ func _draw() -> void:
 			_draw_ring(mark, mark_color)
 			_draw_spokes(mark, mark_color)
 
-	# The recoil outline belongs to the newest press alone. One per mark stacks
-	# outlines during a streak and reads as a flicker rather than as a kick.
+	# The frame flash belongs to the newest press alone. One per mark stacks
+	# redraws during a streak and reads as a flicker rather than as a kick.
 	if not _marks.is_empty():
-		_draw_recoil(_marks.back(), bar_rect)
+		_draw_frame_flash(_marks.back(), bar)
 
 
 ## Ring that grows as it dies, so a hit reads as an impact leaving the bar
@@ -211,18 +228,59 @@ func _draw_slash(mark: Mark, bar_rect: Rect2, mark_color: Color) -> void:
 	)
 
 
-## Outline kicked off the bar's edge, outward on a hit and inward on a miss, so
-## the bar reads as having recoiled without this node ever moving it.
-func _draw_recoil(mark: Mark, bar_rect: Rect2) -> void:
-	var mark_color := mark.color
-	mark_color.a = mark.life
+## Redraws the bar's own frame over itself, tinted and swelling with the kick.
+## Because it is the bar's StyleBox rather than a rectangle, the flash picks up
+## the drawn corners and nine-slice margins of Caspian's art for free, and a
+## later art change carries through here with no edit.
+func _draw_frame_flash(mark: Mark, bar: SliderTimingWindow) -> void:
+	var surface := _get_shine_surface(bar)
+	if surface == null:
+		return
+	var source_style := surface.get_theme_stylebox(&"panel")
+	if source_style == null:
+		return
+	var tint := mark.color
+	tint.a = mark.life * shine_strength
 	var kick := frame_kick_px * mark.life
-	draw_rect(
-		bar_rect.grow(-kick if mark.is_miss else kick),
-		mark_color,
-		false,
-		_stroke_width(mark)
+	_tinted_style(source_style, tint).draw(
+		get_canvas_item(),
+		_to_local_rect(surface.get_global_rect()).grow(
+			-kick if mark.is_miss else kick
+		)
 	)
+
+
+## The control whose StyleBox carries the bar's drawn frame. Found by searching
+## for a textured box rather than by a hard-coded path, so renaming a node
+## inside the adapt-only timing scene cannot silently drop the flash. Bars with
+## no drawn frame, like the recovery bar, flash their own plain box instead.
+func _get_shine_surface(bar: SliderTimingWindow) -> Control:
+	if _shine_surfaces.has(bar):
+		return _shine_surfaces[bar]
+	var surface: Control = bar
+	for candidate: Panel in bar.find_children("*", "Panel", true, false):
+		if candidate.get_theme_stylebox(&"panel") is StyleBoxTexture:
+			surface = candidate
+			break
+	_shine_surfaces[bar] = surface
+	return surface
+
+
+## Returns a tinted copy of one of the bar's styleboxes, duplicated once and
+## reused, so a press never allocates and the bar's own resource is never
+## written to. StyleBox has no shared tint property, so each kind sets its own.
+func _tinted_style(source_style: StyleBox, tint: Color) -> StyleBox:
+	var tinted: StyleBox = _tinted_styles.get(source_style)
+	if tinted == null:
+		tinted = source_style.duplicate()
+		_tinted_styles[source_style] = tinted
+	if tinted is StyleBoxTexture:
+		(tinted as StyleBoxTexture).modulate_color = tint
+	elif tinted is StyleBoxFlat:
+		var flat_style := tinted as StyleBoxFlat
+		flat_style.bg_color = Color(tint, tint.a * 0.3)
+		flat_style.border_color = tint
+	return tinted
 
 
 ## Stroke weight for one mark, thinning as it fades. Never below one pixel, or
