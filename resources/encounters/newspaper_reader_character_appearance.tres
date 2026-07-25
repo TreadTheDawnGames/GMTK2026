@@ -7,5 +7,5 @@
 resource_name = "Newspaper Reader Appearance"
 script = ExtResource("1_appearance")
 texture = ExtResource("2_texture")
-sprite_scale = Vector2(0.12, 0.12)
-sprite_offset = Vector2(0, -70)
+sprite_scale = Vector2(0.05, 0.05)
+sprite_offset = Vector2(0, -29)
