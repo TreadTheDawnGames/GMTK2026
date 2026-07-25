@@ -19,6 +19,14 @@ var successful_hits: int = 0
 var failed_hits: int = 0
 var has_reached_thief: bool = false
 
+# Backward-compatible name for callers that still treat reaching the thief as
+# reaching the run bottom. Keep both names backed by the same state.
+var has_reached_bottom: bool:
+	get:
+		return has_reached_thief
+	set(value):
+		has_reached_thief = value
+
 var remaining_depth: int:
 	get:
 		return maxi(config.total_run_depth - depth, 0)
