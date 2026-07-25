@@ -225,7 +225,7 @@ func _process(delta: float) -> void:
 	if hit_left_edge or hit_right_edge:
 		direction *= -1
 		if not GameState.save_game.mute_bounce:
-			AudioManager.play_sfx(&"LineHitEdge")
+			AudioHandler.play_sound(AudioLibrary.BOUNCE)
 		if one_shot:
 			pressed.emit(false, 0, consecutive_hits)
 			stop()

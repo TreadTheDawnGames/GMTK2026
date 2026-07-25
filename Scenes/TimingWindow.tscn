@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://bcafu266b27ml" path="res://Scripts/timing_windows/timing_window.gd" id="1_6wfpp"]
 [ext_resource type="PackedScene" uid="uid://cf8q7ylnplo6c" path="res://Scenes/slider_timing_window.tscn" id="2_73j0v"]
+[ext_resource type="AudioStream" uid="uid://cbv4v668aoluj" path="res://Assets/Audio/LineHitEdge.wav" id="4_8bo8b"]
 [ext_resource type="StyleBox" uid="uid://cxvty1lal1xjs" path="res://resources/themes/timing_backing.tres" id="12_sgvbc"]
 [ext_resource type="PackedScene" uid="uid://16edwc1adi0x" path="res://Scenes/targets/target_base.tscn" id="13_sgvbc"]
 [ext_resource type="Resource" uid="uid://dhlm43rg16rkw" path="res://resources/mining/mining_config.tres" id="14_mining_config"]
@@ -26,6 +27,11 @@ offset_left = -351.0
 offset_top = -128.0
 offset_right = 349.0
 offset_bottom = -47.0
+
+[node name="BounceSound" parent="MiningWindow" index="1" unique_id=1736793923]
+unique_name_in_owner = true
+stream = ExtResource("4_8bo8b")
+bus = &"SFX"
 
 [node name="Control" type="Control" parent="MiningWindow" unique_id=1770024605]
 show_behind_parent = true

@@ -8,4 +8,4 @@ func hit(_timing_window: SliderTimingWindow = null) -> void:
 	if _timing_window == null:
 		return
 	_timing_window.direction *= -1
-	AudioManager.play_sfx(&"LineHitEdge")
+	AudioHandler.play_sound(AudioLibrary.BOUNCE)
