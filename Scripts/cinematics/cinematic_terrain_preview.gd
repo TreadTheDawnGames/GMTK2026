@@ -204,24 +204,46 @@ func _apply_test_impacts() -> void:
 	if _tracked_impact_positions.is_empty():
 		return
 	var config := terrain_manager.config
-	var cell_size := float(config.terrain_cell_world_size)
 	# The renderer picks a hole size from the combo the hit resolved at, and
 	# that arrives by signal during play. In the editor there is no controller
 	# to send it, so the preview supplies the same value directly.
 	terrain_renderer._on_dig_presentation_started(preview_combo)
-	for screen_position in _tracked_impact_positions:
-		var terrain_position := terrain_manager.screen_to_terrain_position(
-			screen_position
-		)
-		var cell := Vector2i(
-			floori(terrain_position.x / cell_size),
-			floori(terrain_position.y / cell_size)
-		)
+	for marker_position in _tracked_impact_positions:
 		terrain_manager.dig_tunnel(
-			cell,
+			global_position_to_terrain_cell(marker_position),
 			config.base_mine_depth_rows,
 			config.base_tunnel_half_width_cells
 		)
+
+
+## Converts a position in the edited scene into the terrain cell drawn there.
+##
+## This has to go through the renderer's own transform. The renderer lays its
+## chunks out in its local space using screen coordinates, and this preview is
+## deliberately offset so the mining face lands on the stage origin. Reading a
+## global position as if it were already screen space therefore digs one screen
+## up and to the left of the click — the rock the designer aimed at stays
+## solid while an opening appears off-frame.
+func global_position_to_terrain_cell(global_point: Vector2) -> Vector2i:
+	var cell_size := float(terrain_manager.config.terrain_cell_world_size)
+	var terrain_position := terrain_manager.screen_to_terrain_position(
+		terrain_renderer.to_local(global_point)
+	)
+	return Vector2i(
+		floori(terrain_position.x / cell_size),
+		floori(terrain_position.y / cell_size)
+	)
+
+
+## Returns where one terrain cell's top-left corner is drawn in the edited
+## scene, so a tool can outline the cells it is about to change.
+func terrain_cell_to_global_position(cell: Vector2i) -> Vector2:
+	var cell_size := float(terrain_manager.config.terrain_cell_world_size)
+	return terrain_renderer.to_global(
+		terrain_manager.terrain_to_screen_position(
+			Vector2(cell) * cell_size
+		)
+	)
 
 
 func _get_test_impact_positions() -> PackedVector2Array:

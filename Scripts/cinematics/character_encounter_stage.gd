@@ -16,6 +16,10 @@ signal cue_started(cue_id: StringName, line_index: int)
 signal cue_finished(cue_id: StringName)
 signal closing_finished
 signal presentation_strike_requested(screen_position: Vector2)
+signal sequence_dialogue_requested(
+	conversation: DialogueConversation,
+	line_range: Vector2i
+)
 
 @export_category("Named Marker Roots")
 @export var actor_markers_root: Node2D
@@ -42,8 +46,11 @@ signal presentation_strike_requested(screen_position: Vector2)
 @export var closing_pose: StringName = &"walk"
 @export var rest_pose: StringName = &"idle"
 @export var hide_actor_after_closing: bool = false
+## Optional visual-editor timeline. Null preserves the legacy opening walk.
+@export var sequence: CutsceneSequence
 
 var _presenter: CharacterPresenter
+var _sequence_player: CutsceneSequencePlayer
 var _floor_sampler: Callable
 var _restore_position: Vector2
 var _restore_visible: bool = false
@@ -91,6 +98,9 @@ func prepare(
 ## Moves the actor into conversation while the authored opening clip plays.
 func play_opening() -> void:
 	if not _is_active:
+		return
+	if sequence != null:
+		await _play_sequence_opening()
 		return
 	_play_pose_if_available(opening_pose)
 	var movement := _presenter.move_grounded_to(
@@ -154,6 +164,8 @@ func play_closing() -> void:
 func cancel_and_restore() -> void:
 	if not _is_active:
 		return
+	if is_instance_valid(_sequence_player):
+		_sequence_player.stop()
 	if is_instance_valid(animation_player):
 		animation_player.stop()
 		if animation_player.has_animation(&"RESET"):
@@ -250,3 +262,57 @@ func _on_animation_finished(animation_name: StringName) -> void:
 	var finished_cue := _active_cue
 	_active_cue = &""
 	cue_finished.emit(finished_cue)
+
+
+func _play_sequence_opening() -> void:
+	_ensure_sequence_player()
+	_sequence_player.bind(
+		_resolve_sequence_actor,
+		_resolve_sequence_marker,
+		_floor_sampler,
+		self
+	)
+	_sequence_player.play(sequence)
+	while _is_active and _sequence_player.is_playing():
+		await get_tree().process_frame
+	if not _is_active:
+		return
+	opening_finished.emit()
+
+
+func _ensure_sequence_player() -> void:
+	if is_instance_valid(_sequence_player):
+		return
+	_sequence_player = CutsceneSequencePlayer.new()
+	_sequence_player.name = &"CutsceneSequencePlayer"
+	add_child(_sequence_player)
+	if not _sequence_player.dialogue_requested.is_connected(
+		_on_sequence_dialogue_requested
+	):
+		_sequence_player.dialogue_requested.connect(
+			_on_sequence_dialogue_requested
+		)
+
+
+func _resolve_sequence_actor(actor_id: StringName) -> Node2D:
+	if actor_id == &"miner":
+		return _presenter
+	return null
+
+
+func _resolve_sequence_marker(marker_name: StringName) -> Vector2:
+	var roots: Array[Node2D] = [actor_markers_root, prop_markers_root]
+	for root in roots:
+		if not is_instance_valid(root):
+			continue
+		var marker := root.get_node_or_null(NodePath(marker_name)) as Marker2D
+		if marker != null:
+			return marker.global_position
+	return Vector2(NAN, NAN)
+
+
+func _on_sequence_dialogue_requested(
+	conversation: DialogueConversation,
+	line_range: Vector2i
+) -> void:
+	sequence_dialogue_requested.emit(conversation, line_range)

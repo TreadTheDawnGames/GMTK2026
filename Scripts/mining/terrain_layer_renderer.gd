@@ -363,10 +363,17 @@ func _load_chunk(chunk_index: int) -> void:
 			):
 				chunk_contains_chamber = true
 				break
+	# A sculpted room may sit in a chunk the encounter schedule alone would call
+	# ordinary rock, so streaming has to ask about rooms as well as chambers.
+	var chunk_contains_sculpt := _chunk_contains_sculpt(chunk_index)
+	var chunk_has_per_layer_sculpt := (
+		chunk_contains_sculpt and _chunk_has_per_layer_sculpt(chunk_index)
+	)
 	var base_mask := _build_chunk_base_mask(
 		chunk_index,
 		false,
-		chunk_contains_chamber
+		chunk_contains_chamber,
+		chunk_contains_sculpt
 	)
 	var back_layer_mask: Image
 	if profile.keep_back_layer_solid:
@@ -374,7 +381,8 @@ func _load_chunk(chunk_index: int) -> void:
 			_build_chunk_base_mask(
 				chunk_index,
 				true,
-				chunk_contains_chamber
+				chunk_contains_chamber,
+				chunk_contains_sculpt
 			)
 			if chunk_contains_chamber
 			else base_mask
@@ -411,6 +419,17 @@ func _load_chunk(chunk_index: int) -> void:
 			if uses_final_backing_optimization
 			else source_mask.duplicate()
 		)
+		# A room whose strata were sculpted apart needs its own rock per
+		# stratum. Only then is the extra build paid for, and only for the
+		# gameplay strata: the reserved back wall stays the shared backdrop.
+		if chunk_has_per_layer_sculpt and not uses_backdrop_source:
+			layer_mask = _build_chunk_base_mask(
+				chunk_index,
+				false,
+				chunk_contains_chamber,
+				chunk_contains_sculpt,
+				layer_index
+			)
 		if layer_index == 0:
 			_clear_chamber_foreground_floor_bands(
 				layer_mask,
@@ -469,7 +488,9 @@ func _unload_chunk(chunk_index: int) -> void:
 func _build_chunk_base_mask(
 	chunk_index: int,
 	preserve_chamber_backdrop: bool,
-	chunk_contains_chamber: bool
+	chunk_contains_chamber: bool,
+	chunk_contains_sculpt: bool = false,
+	sculpt_layer_index: int = -1
 ) -> Image:
 	var config := terrain_manager.config
 	var mask_cell_size := profile.mask_pixels_per_cell
@@ -486,6 +507,7 @@ func _build_chunk_base_mask(
 	)
 	if (
 		not chunk_contains_chamber
+		and not chunk_contains_sculpt
 		and chunk_start_row >= config.initial_surface_row
 		and chunk_end_row <= config.get_bottom_surface_row()
 	):
@@ -520,6 +542,37 @@ func _build_chunk_base_mask(
 			)
 		)
 		var row_mask_y := local_row * mask_cell_size
+		# An authored room overrides the procedural taper inside its own
+		# footprint only, so the surrounding row is drawn first and the room is
+		# printed over it. The retained backdrop pass is left alone: the back
+		# wall is scenery behind every room, sculpted or not.
+		var sculpt_placement := (
+			terrain_manager.get_sculpt_placement_for_row(world_row)
+			if chunk_contains_sculpt and not preserve_chamber_backdrop
+			else null
+		)
+		if sculpt_placement != null:
+			if is_chamber_row:
+				_fill_chamber_side_mask(
+					image,
+					row_mask_y,
+					world_row,
+					mask_cell_size
+				)
+			else:
+				image.fill_rect(
+					Rect2i(0, row_mask_y, mask_size.x, mask_cell_size),
+					SOLID_MASK_COLOR
+				)
+			_fill_sculpt_row_mask(
+				image,
+				row_mask_y,
+				world_row,
+				mask_cell_size,
+				sculpt_placement,
+				sculpt_layer_index
+			)
+			continue
 		if not is_chamber_row:
 			image.fill_rect(
 				Rect2i(
@@ -567,6 +620,233 @@ func _build_chunk_base_mask(
 			mask_cell_size
 		)
 	return image
+
+
+## Reports whether any authored room reaches into a streamed chunk.
+func _chunk_contains_sculpt(chunk_index: int) -> bool:
+	var config: MiningConfig = terrain_manager.config
+	var chunk_start_row := chunk_index * config.chunk_height_cells
+	var chunk_end_row := chunk_start_row + config.chunk_height_cells
+	for placement in terrain_manager.get_sculpt_placements():
+		if (
+			placement.world_rect.position.y < chunk_end_row
+			and placement.world_rect.end.y > chunk_start_row
+		):
+			return true
+	return false
+
+
+## Reports whether a chunk holds a room whose strata were sculpted apart, which
+## is the only case that costs one mask build per stratum instead of one shared.
+func _chunk_has_per_layer_sculpt(chunk_index: int) -> bool:
+	var config: MiningConfig = terrain_manager.config
+	var chunk_start_row := chunk_index * config.chunk_height_cells
+	var chunk_end_row := chunk_start_row + config.chunk_height_cells
+	for placement in terrain_manager.get_sculpt_placements():
+		if (
+			placement.world_rect.position.y < chunk_end_row
+			and placement.world_rect.end.y > chunk_start_row
+			and placement.sculpt.has_layer_masks()
+		):
+			return true
+	return false
+
+
+## Prints one authored room row over the terrain already drawn beneath it.
+## Interior cells are filled in runs and only cells touching a solid/open
+## boundary pay per-pixel work, which is what keeps a sculpted chunk's build
+## cost in the same range as the procedural chamber it replaces.
+func _fill_sculpt_row_mask(
+	image: Image,
+	row_mask_y: int,
+	world_row: int,
+	mask_cell_size: int,
+	placement: TerrainManager.SculptPlacement,
+	sculpt_layer_index: int
+) -> void:
+	var config: MiningConfig = terrain_manager.config
+	var sculpt: CutsceneTerrainSculpt = placement.sculpt
+	var room_rect: Rect2i = placement.world_rect
+	var local_y: int = world_row - room_rect.position.y
+	var first_cell_x: int = maxi(room_rect.position.x, 0)
+	var last_cell_x: int = mini(
+		room_rect.end.x,
+		config.terrain_width_cells
+	) - 1
+	if last_cell_x < first_cell_x:
+		return
+
+	var run_start_cell_x: int = first_cell_x
+	var run_is_solid: bool = _is_sculpt_cell_solid(
+		sculpt,
+		sculpt_layer_index,
+		Vector2i(first_cell_x - room_rect.position.x, local_y)
+	)
+	for cell_x in range(first_cell_x, last_cell_x + 2):
+		var is_solid: bool = (
+			run_is_solid
+			if cell_x > last_cell_x
+			else _is_sculpt_cell_solid(
+				sculpt,
+				sculpt_layer_index,
+				Vector2i(cell_x - room_rect.position.x, local_y)
+			)
+		)
+		if is_solid == run_is_solid and cell_x <= last_cell_x:
+			continue
+		image.fill_rect(
+			Rect2i(
+				run_start_cell_x * mask_cell_size,
+				row_mask_y,
+				(cell_x - run_start_cell_x) * mask_cell_size,
+				mask_cell_size
+			),
+			SOLID_MASK_COLOR if run_is_solid else EMPTY_MASK_COLOR
+		)
+		run_start_cell_x = cell_x
+		run_is_solid = is_solid
+
+	if sculpt.edge_smoothing <= 0.0:
+		return
+	for cell_x in range(first_cell_x, last_cell_x + 1):
+		var local_cell := Vector2i(cell_x - room_rect.position.x, local_y)
+		if not _is_sculpt_boundary_cell(sculpt, sculpt_layer_index, local_cell):
+			continue
+		_write_sculpt_boundary_cell(
+			image,
+			cell_x * mask_cell_size,
+			row_mask_y,
+			mask_cell_size,
+			sculpt,
+			sculpt_layer_index,
+			local_cell
+		)
+
+
+## Reads one room cell, choosing the stratum's own rock when the strata were
+## sculpted apart and the shared collision shape otherwise.
+func _is_sculpt_cell_solid(
+	sculpt: CutsceneTerrainSculpt,
+	sculpt_layer_index: int,
+	local_cell: Vector2i
+) -> bool:
+	if sculpt_layer_index < 0:
+		return sculpt.is_solid_local(local_cell)
+	return sculpt.is_layer_solid_local(sculpt_layer_index, local_cell)
+
+
+## Reports whether a cell sits on a solid/open edge, the only place the drawn
+## rock departs from the authored cell grid.
+func _is_sculpt_boundary_cell(
+	sculpt: CutsceneTerrainSculpt,
+	sculpt_layer_index: int,
+	local_cell: Vector2i
+) -> bool:
+	var is_solid := _is_sculpt_cell_solid(
+		sculpt,
+		sculpt_layer_index,
+		local_cell
+	)
+	for offset_y in range(-1, 2):
+		for offset_x in range(-1, 2):
+			if offset_x == 0 and offset_y == 0:
+				continue
+			if _is_sculpt_cell_solid(
+				sculpt,
+				sculpt_layer_index,
+				local_cell + Vector2i(offset_x, offset_y)
+			) != is_solid:
+				return true
+	return false
+
+
+## Softens one rim cell toward its neighbours so a sculpted wall reads as rock
+## rather than as the stair-stepped grid it was painted on. edge_smoothing at
+## zero leaves the hard cell edge, which is what makes a roughened wall jagged.
+func _write_sculpt_boundary_cell(
+	image: Image,
+	cell_mask_x: int,
+	cell_mask_y: int,
+	mask_cell_size: int,
+	sculpt: CutsceneTerrainSculpt,
+	sculpt_layer_index: int,
+	local_cell: Vector2i
+) -> void:
+	var smoothing := sculpt.edge_smoothing
+	var hard_value := (
+		1.0
+		if _is_sculpt_cell_solid(sculpt, sculpt_layer_index, local_cell)
+		else 0.0
+	)
+	var image_width := image.get_width()
+	var image_height := image.get_height()
+	for sub_y in range(mask_cell_size):
+		var mask_y := cell_mask_y + sub_y
+		if mask_y < 0 or mask_y >= image_height:
+			continue
+		for sub_x in range(mask_cell_size):
+			var mask_x := cell_mask_x + sub_x
+			if mask_x < 0 or mask_x >= image_width:
+				continue
+			var coverage := _sample_sculpt_coverage(
+				sculpt,
+				sculpt_layer_index,
+				local_cell,
+				(float(sub_x) + 0.5) / float(mask_cell_size),
+				(float(sub_y) + 0.5) / float(mask_cell_size)
+			)
+			image.set_pixel(
+				mask_x,
+				mask_y,
+				Color(1.0, 1.0, 1.0, lerpf(hard_value, coverage, smoothing))
+			)
+
+
+## Interpolates the four room cells nearest one mask pixel. Sampling cell
+## centers rather than cell corners is what keeps a straight wall straight
+## instead of pulling it half a cell into the rock.
+func _sample_sculpt_coverage(
+	sculpt: CutsceneTerrainSculpt,
+	sculpt_layer_index: int,
+	local_cell: Vector2i,
+	sub_cell_x: float,
+	sub_cell_y: float
+) -> float:
+	var sample_x := float(local_cell.x) + sub_cell_x - 0.5
+	var sample_y := float(local_cell.y) + sub_cell_y - 0.5
+	var base_x := floori(sample_x)
+	var base_y := floori(sample_y)
+	var weight_x := sample_x - float(base_x)
+	var weight_y := sample_y - float(base_y)
+	var top_left := _get_sculpt_cell_value(
+		sculpt, sculpt_layer_index, Vector2i(base_x, base_y)
+	)
+	var top_right := _get_sculpt_cell_value(
+		sculpt, sculpt_layer_index, Vector2i(base_x + 1, base_y)
+	)
+	var bottom_left := _get_sculpt_cell_value(
+		sculpt, sculpt_layer_index, Vector2i(base_x, base_y + 1)
+	)
+	var bottom_right := _get_sculpt_cell_value(
+		sculpt, sculpt_layer_index, Vector2i(base_x + 1, base_y + 1)
+	)
+	return lerpf(
+		lerpf(top_left, top_right, weight_x),
+		lerpf(bottom_left, bottom_right, weight_x),
+		weight_y
+	)
+
+
+func _get_sculpt_cell_value(
+	sculpt: CutsceneTerrainSculpt,
+	sculpt_layer_index: int,
+	local_cell: Vector2i
+) -> float:
+	return (
+		1.0
+		if _is_sculpt_cell_solid(sculpt, sculpt_layer_index, local_cell)
+		else 0.0
+	)
 
 
 ## Lowers only layer one beneath each room's unchanged layer-two support.
