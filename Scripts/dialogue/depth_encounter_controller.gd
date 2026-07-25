@@ -355,6 +355,19 @@ func _begin_active_encounter() -> void:
 			.get_layer_opening_floor_support_screen_y
 			.bind(_game_state.mining_y, CAST_FLOOR_LAYER_INDEX)
 		)
+		# Stand the miner on the rock rather than on the row underneath it.
+		#
+		# Mining seats him against the intact floor line, which is right for a
+		# shaft he is standing inside: the ground closes over his boots and that
+		# is the read. A cutscene holds on him in the open, where the same offset
+		# buries him to the ankles in the loose rock the room's floor carries.
+		# The cast are already dropped onto that surface through this sampler; he
+		# is the one who was not. Only for the shot - _finish_cinematic_flow puts
+		# his mining grounding back, so the intro and ordinary digging are
+		# untouched.
+		miner_rig.seat_landing_foot_at_screen_y(
+			floor_sampler.call(miner_rig.get_landing_foot_screen_x())
+		)
 		if not _active_stage.prepare(presenter, floor_sampler):
 			push_error(
 				"Encounter '%s' could not prepare its stage."
@@ -678,6 +691,9 @@ func has_pending_or_active_interaction() -> bool:
 func _finish_cinematic_flow() -> void:
 	_reset_speech_reactions()
 	miner_rig.exit_cutscene_draw_order()
+	# Back to the mining grounding, so the shot's seating never follows him into
+	# the rest of the run.
+	miner_rig.show_intact_floor_grounding()
 	_exit_cast_cutscene_draw_order()
 	cinematic_flow.finish(FLOW_OWNER)
 
