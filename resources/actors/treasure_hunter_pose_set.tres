@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="ActorPoseSet" load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://resources/actors/actor_pose.gd" id="1_pose"]
+[ext_resource type="Script" path="res://resources/actors/actor_pose_set.gd" id="2_pose_set"]
+[ext_resource type="Texture2D" path="res://Assets/Characters/treasure_hunter/treasure_hunter_idle.png" id="3_idle"]
+[ext_resource type="Texture2D" path="res://Assets/Characters/treasure_hunter/treasure_hunter_hit.png" id="4_hit"]
+[ext_resource type="Texture2D" path="res://Assets/Characters/treasure_hunter/treasure_hunter_idle_no_pickaxe.png" id="5_no_pickaxe"]
+
+[sub_resource type="Resource" id="ActorPose_idle"]
+script = ExtResource("1_pose")
+pose_name = &"idle"
+texture = ExtResource("3_idle")
+
+[sub_resource type="Resource" id="ActorPose_walk"]
+script = ExtResource("1_pose")
+pose_name = &"walk"
+texture = ExtResource("3_idle")
+
+[sub_resource type="Resource" id="ActorPose_hit"]
+script = ExtResource("1_pose")
+pose_name = &"hit"
+texture = ExtResource("4_hit")
+
+[sub_resource type="Resource" id="ActorPose_no_pickaxe"]
+script = ExtResource("1_pose")
+pose_name = &"no_pickaxe"
+texture = ExtResource("5_no_pickaxe")
+
+[resource]
+script = ExtResource("2_pose_set")
+poses = Array[ExtResource("1_pose")]([SubResource("ActorPose_idle"), SubResource("ActorPose_walk"), SubResource("ActorPose_hit"), SubResource("ActorPose_no_pickaxe")])

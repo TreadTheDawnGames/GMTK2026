@@ -12,6 +12,18 @@ extends SceneTree
 const MINING_SCENE: PackedScene = preload(
 	"res://Scenes/mining/mining_proof.tscn"
 )
+const TREASURE_HUNTER_APPEARANCE: CharacterAppearance = preload(
+	"res://resources/encounters/treasure_hunter_character_appearance.tres"
+)
+const TREASURE_HUNTER_FIRST_SEQUENCE: CutsceneSequence = preload(
+	"res://resources/cinematics/sequences/treasure_hunter_first_sequence.tres"
+)
+const TREASURE_HUNTER_TREASURE_SEQUENCE: CutsceneSequence = preload(
+	"res://resources/cinematics/sequences/treasure_hunter_treasure_sequence.tres"
+)
+const TREASURE_HUNTER_TREASURE_CONVERSATION: DialogueConversation = preload(
+	"res://resources/dialogue/treasure_hunter_treasure_conversation.tres"
+)
 
 var _failures: Array[String] = []
 
@@ -151,6 +163,42 @@ func _verify_mining_scene() -> void:
 		timing_window != null
 		and timing_window._audio_handler == audio_handler,
 		"SceneWiring must inject AudioHandler into TimingWindowTask."
+	)
+	_expect(
+		TREASURE_HUNTER_APPEARANCE.pose_set != null
+		and TREASURE_HUNTER_APPEARANCE.pose_set.has_pose(&"idle")
+		and TREASURE_HUNTER_APPEARANCE.pose_set.has_pose(&"walk")
+		and TREASURE_HUNTER_APPEARANCE.pose_set.has_pose(&"hit")
+		and TREASURE_HUNTER_APPEARANCE.pose_set.has_pose(&"no_pickaxe"),
+		"Treasure Hunter must provide idle, walk, hit, and no-pickaxe poses."
+	)
+	var has_mining_contact_pose := false
+	for beat: CutsceneBeat in TREASURE_HUNTER_FIRST_SEQUENCE.beats:
+		if beat.kind == CutsceneBeat.Kind.POSE and beat.pose == &"hit":
+			has_mining_contact_pose = true
+			break
+	_expect(
+		has_mining_contact_pose,
+		"Treasure Hunter's first arrival must show his mining contact pose."
+	)
+	_expect(
+		not TREASURE_HUNTER_TREASURE_CONVERSATION.lines.is_empty()
+		and TREASURE_HUNTER_TREASURE_CONVERSATION.lines[-1].speaker_pose
+			== &"no_pickaxe",
+		"Treasure Hunter must give up his pickaxe on the handoff line."
+	)
+	var exits_without_pickaxe := false
+	for beat: CutsceneBeat in TREASURE_HUNTER_TREASURE_SEQUENCE.beats:
+		if (
+			beat.kind == CutsceneBeat.Kind.MOVE
+			and beat.target_marker == &"Exit"
+			and beat.pose == &"no_pickaxe"
+		):
+			exits_without_pickaxe = true
+			break
+	_expect(
+		exits_without_pickaxe,
+		"Treasure Hunter must leave and reach the cafe without his pickaxe."
 	)
 	_expect(
 		run_state != null

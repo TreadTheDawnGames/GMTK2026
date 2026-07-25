@@ -32,6 +32,7 @@ text = "It's mostly just heavy."
 [sub_resource type="Resource" id="Line_pickaxe"]
 script = ExtResource("3_line")
 speaker_slot = &"treasure_hunter"
+speaker_pose = &"no_pickaxe"
 text = "Take this. I don't need to dig anymore."
 
 [sub_resource type="Resource" id="Participant_miner"]
