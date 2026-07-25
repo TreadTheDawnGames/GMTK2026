@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://b4xrv6mg0tq3f"
-path="res://.godot/imported/Tween.png-295fff38d860ecf032619b751ca0dc97.ctex"
+path="res://.godot/imported/Tween.png-0517bd56ae32ec15fe12f72dc7988132.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://addons/conductor/icons/Tween.png"
-dest_files=["res://.godot/imported/Tween.png-295fff38d860ecf032619b751ca0dc97.ctex"]
+source_file="res://Addons/conductor/icons/Tween.png"
+dest_files=["res://.godot/imported/Tween.png-0517bd56ae32ec15fe12f72dc7988132.ctex"]
 
 [params]
 
