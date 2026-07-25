@@ -113,7 +113,7 @@ var _gem_count_by_chunk: Dictionary[int, int] = {}
 var _gem_count: int = 0
 var _first_visible_chunk: int = 0
 var _last_visible_chunk: int = 0
-var _game_state: RunState
+var _save_game: SaveGame
 
 
 ## Builds one drawing shelf per stratum a hit can expose.
@@ -131,10 +131,16 @@ func _ready() -> void:
 		shelf.z_index = terrain_profile.get_layer_z_index(layer_index)
 		add_child(shelf)
 		_shelves.append(shelf)
-	_game_state = RunState.get_global(self)
 	_restore_saved_gems()
 	_refresh_visible_chunk_range(terrain_manager.get_view_position())
 	set_process(false)
+
+
+## Supplies persistence after the composition root resolves the active save.
+func set_save_game(save_game: SaveGame) -> void:
+	_save_game = save_game
+	if is_node_ready():
+		_restore_saved_gems()
 
 
 ## Rolls for a crystal on newly opened ground.
@@ -183,9 +189,8 @@ func place_gem(
 ## Clears every placed crystal, so a restarted run does not inherit the last.
 func clear_gems() -> void:
 	var had_saved_gems := (
-		_game_state != null
-		and _game_state.save_game != null
-		and not _game_state.save_game.gem_outcrops.is_empty()
+		_save_game != null
+		and not _save_game.gem_outcrops.is_empty()
 	)
 	for shelf in _shelves:
 		shelf.gems_by_chunk.clear()
@@ -574,9 +579,9 @@ func _append_gem(
 ## Restores exact terrain-space records. Loaded gems are already emerged so a
 ## scene reload cannot replay their discovery animation.
 func _restore_saved_gems() -> void:
-	if _game_state == null or _game_state.save_game == null:
+	if _save_game == null:
 		return
-	for saved_gem: Dictionary in _game_state.save_game.gem_outcrops:
+	for saved_gem: Dictionary in _save_game.gem_outcrops:
 		var layer_index := clampi(
 			int(saved_gem.get("layer_index", 0)),
 			0,
@@ -618,7 +623,7 @@ func _restore_saved_gems() -> void:
 ## Serializes compact values only when a rare placement changes the map. Review
 ## scrolling never writes or rebuilds this complete list.
 func _persist_gems() -> void:
-	if _game_state == null or _game_state.save_game == null:
+	if _save_game == null:
 		return
 	var saved_gems: Array[Dictionary] = []
 	saved_gems.resize(_gem_count)
@@ -637,8 +642,8 @@ func _persist_gems() -> void:
 					"flip_x": gem.flip_x,
 				}
 				saved_index += 1
-	_game_state.save_game.gem_outcrops = saved_gems
-	_game_state.save_game.write_savegame()
+	_save_game.gem_outcrops = saved_gems
+	_save_game.write_savegame()
 
 
 ## Computes the bounded draw window without scanning stored gems.

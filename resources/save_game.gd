@@ -1,6 +1,8 @@
 extends Resource
 class_name SaveGame
 
+signal settings_applied(mute_bounce: bool)
+
 const SAVE_PATH: String = "user://savegame.tres"
 const MAX_VOLUME: float = 3.5
 const MASTER_BUS: StringName = &"Master"
@@ -73,6 +75,7 @@ func apply_runtime_settings() -> void:
 	_apply_audio_bus(MUSIC_BUS, music_volume, music_mute)
 	_apply_audio_bus(SFX_BUS, sfx_volume, sfx_mute)
 	apply_vsync_mode(vsync_mode)
+	settings_applied.emit(mute_bounce)
 
 
 ## Maps the settings menu index to Godot's non-matching enum order.

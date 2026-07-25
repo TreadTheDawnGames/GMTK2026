@@ -23,14 +23,13 @@ var stored_combo : int = 0
 @export var combo_saved_color: Color = Color.CYAN
 @export var combo_lost_color: Color = Color.RED
 
-@onready var _game_state: RunState = RunState.get_global(self)
-@onready var _audio_handler: PlayerAudioHandler = (
-	PlayerAudioHandler.get_global(self)
-)
+var _audio_handler: PlayerAudioHandler
 var _target_unlocks: Array[PickaxeDefinition] = []
 var _progression_target_scenes: Array[PackedScene] = []
 var _progression_bonus_target_combos := PackedInt32Array()
 var _uses_encounter_progression: bool = false
+var _bounce_muted: bool = false
+var _displayed_distance: int = 0
 
 ## Connects both timing bars to the combo flow.
 func _ready() -> void:
@@ -55,17 +54,32 @@ func _ready() -> void:
 	):
 		recovery_window.pressed.connect(_recovery_window_pressed)
 	
-	_update_depth_label(_game_state.depth)
-	if not _game_state.depth_changed.is_connected(_update_depth_label):
-		_game_state.depth_changed.connect(_update_depth_label)
 	if not _target_unlocks.is_empty():
 		_apply_pickaxe_target_unlocks()
-	
+	set_bounce_muted(_bounce_muted)
+	show_displayed_distance(_displayed_distance)
+
+
+## Supplies the cross-scene audio service at the composition boundary.
+func set_audio_handler(audio_handler: PlayerAudioHandler) -> void:
+	_audio_handler = audio_handler
+
+
+## Applies the saved bounce preference to both authored timing bars.
+func set_bounce_muted(is_muted: bool) -> void:
+	_bounce_muted = is_muted
+	if not is_node_ready():
+		return
+	mining_window.set_bounce_muted(is_muted)
+	recovery_window.set_bounce_muted(is_muted)
+
+
 ## Shows distance to the Thief, then distance travelled beyond the Thief.
-func _update_depth_label(_depth: int) -> void:
-	depth_label.text = Utils.format_number_with_commas(
-		_game_state.displayed_distance
-	)
+func show_displayed_distance(displayed_distance: int) -> void:
+	_displayed_distance = maxi(displayed_distance, 0)
+	if not is_node_ready():
+		return
+	depth_label.text = Utils.format_number_with_commas(_displayed_distance)
 
 
 ## Stores cumulative pickaxes and restores their zero-combo baseline scenes.

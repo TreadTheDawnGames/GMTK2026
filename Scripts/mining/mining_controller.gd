@@ -93,7 +93,7 @@ signal dig_number_requested(
 @export var terrain_manager: TerrainManager
 @export var view_controller: ViewController
 
-@onready var _game_state: RunState = RunState.get_global(self)
+var _game_state: RunState
 
 # Narrative pickaxe gifts replace this bounded snapshot. Encounter progression
 # overrides their legacy gameplay modifiers during the production run.
@@ -110,6 +110,11 @@ var _latest_candidate_directions := PackedInt32Array()
 # Each success adds at most its primary request and one authored double hit.
 # Swing completion pops requests; a miss or run reset clears the remainder.
 var _queued_swings: Array[SwingRequest] = []
+
+
+## Supplies the authoritative run model at the composition boundary.
+func set_run_state(run_state: RunState) -> void:
+	_game_state = run_state
 
 
 ## Starts a swing for a successful timing result or records a miss.

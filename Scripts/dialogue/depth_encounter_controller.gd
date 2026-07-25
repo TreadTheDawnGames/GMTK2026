@@ -61,7 +61,7 @@ var _latest_landing_world_y: int = -1
 var _active_conversation: DialogueConversation
 var _is_final_breakthrough_armed: bool = false
 var _is_final_breakthrough_resolving: bool = false
-@onready var _game_state: RunState = RunState.get_global(self)
+var _game_state: RunState
 
 
 ## Creates every authored character before the player reaches their room.
@@ -69,6 +69,11 @@ func _ready() -> void:
 	if not _prepare_authored_characters():
 		return
 	_is_initialized = true
+
+
+## Supplies the authoritative run model at the composition boundary.
+func set_run_state(run_state: RunState) -> void:
+	_game_state = run_state
 
 
 ## Captures the next cutscene when mining crosses its authored tunnel ceiling.

@@ -1,4 +1,11 @@
 extends Control
+class_name OptionsMenu
+
+## How it works:
+## - Its opener supplies the active SaveGame before this node enters the tree.
+## - Controls edit that resource and apply it when the menu closes.
+## - Owned state is limited to the currently displayed option values.
+## - The invariant is that this screen never locates global run state itself.
 
 @onready var tab_container: TabContainer = $TabContainer
 @onready var v_sync_options: OptionButton = (
@@ -17,26 +24,34 @@ extends Control
 @onready var return_to_settings_button: Button = (
 	$TabContainer/PanelContainer/VBoxContainer/ReturnToSettings
 )
-@onready var _game_state: RunState = RunState.get_global(self)
+var _save_game: SaveGame
+
+
+## Supplies the save resource owned by the current run.
+func set_save_game(save_game: SaveGame) -> void:
+	_save_game = save_game
 
 
 ## Loads options, connects their consumers, and pauses the game behind the menu.
 func _ready() -> void:
 	get_tree().paused = true
 	tab_container.current_tab = 0
-	if _game_state == null or _game_state.save_game == null:
+	if _save_game == null:
 		push_error("Options cannot load without an active SaveGame.")
 		return
 	_connect_controls()
-	_load_controls_from_save(_game_state.save_game)
+	_load_controls_from_save(_save_game)
 	mute_bounce.grab_focus()
 
 
 ## Copies every visible option back to the active save and closes the menu.
 func _on_back_button_pressed() -> void:
-	_copy_controls_to_save(_game_state.save_game)
-	_game_state.save_game.apply_runtime_settings()
-	_game_state.save_game.write_savegame()
+	if _save_game == null:
+		push_error("Options cannot save without an active SaveGame.")
+		return
+	_copy_controls_to_save(_save_game)
+	_save_game.apply_runtime_settings()
+	_save_game.write_savegame()
 	queue_free()
 	get_tree().paused = false
 

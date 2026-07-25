@@ -97,9 +97,12 @@ var _screen_offset: Vector2 = Vector2.ZERO
 var _walked_screen_x: float = 0.0
 var _walk_stride_progress: float = 0.0
 var _walk_step_lift: float = 0.0
-@onready var _audio_handler: PlayerAudioHandler = (
-	PlayerAudioHandler.get_global(self)
-)
+var _audio_handler: PlayerAudioHandler
+
+
+## Supplies the cross-scene audio service at the composition boundary.
+func set_audio_handler(audio_handler: PlayerAudioHandler) -> void:
+	_audio_handler = audio_handler
 
 
 ## Connects animation events and starts the idle animation.
@@ -168,7 +171,10 @@ func _show_success_wind_up() -> void:
 ## Reports the hammer-tip position when the animation reaches the ground.
 func _emit_success_impact() -> void:
 	_set_miner_texture(impact_miner_texture)
-	_audio_handler.play_sound(AudioLibrary.IMPACT)
+	if _audio_handler != null:
+		_audio_handler.play_sound(AudioLibrary.IMPACT)
+	else:
+		push_error("MinerRig requires an injected PlayerAudioHandler.")
 	impact_contact.emit(impact_point.global_position)
 
 

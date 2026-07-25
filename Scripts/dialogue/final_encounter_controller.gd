@@ -5,8 +5,10 @@ extends CanvasLayer
 ## - The bottom encounter keeps the shared cinematic gate and frame open.
 ## - This overlay supplies the production consumer for the final encounter.
 ## - Authored UI closes the run without reopening mining at maximum depth.
-## - Returning to title resets the global run before the scene changes.
+## - Returning to title asks the composition root to reset before scene change.
 ## The invariant is that reaching the thief always has a visible endpoint.
+
+signal run_reset_requested
 
 # The menu is an overlay inside the opening scene, so returning to the title
 # means reloading that scene rather than opening a menu scene of its own.
@@ -47,10 +49,8 @@ func show_finale(encounter_id: StringName) -> void:
 	return_to_title_button.grab_focus()
 
 
-## Starts the next run from a clean autoload state.
+## Requests a clean run, then reloads the live title scene.
 func _on_return_to_title_pressed() -> void:
-	var run_state := RunState.get_global(self)
-	if run_state != null:
-		run_state.reset_run()
+	run_reset_requested.emit()
 	get_tree().paused = false
 	get_tree().change_scene_to_file(TITLE_SCENE)

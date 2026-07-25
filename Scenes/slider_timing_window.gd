@@ -10,7 +10,6 @@ signal pressed(success: bool, hit_direction: int, combo : int)
 @onready var slider: Panel = %Slider
 @onready var backing: Control = %Backing
 @onready var bounce_sound: AudioStreamPlayer2D = %BounceSound
-@onready var _game_state: RunState = RunState.get_global(self)
 
 
 @export var speed: float = 500.0
@@ -36,6 +35,7 @@ var direction: float = 1.0
 var targets: Array[TimingTarget] = []
 var consecutive_hits : int = 0
 var _starting_target_count: int = 1
+var _bounce_muted: bool = false
 
 var slider_position : float = 0.0:
 	set(value):
@@ -117,6 +117,7 @@ func add_target() -> void:
 		push_error("The timing target scene must create a TimingTarget.")
 		return
 	new_target.initialize()
+	new_target.set_bounce_muted(_bounce_muted)
 	new_target.freeze.connect(on_freeze)
 	backing.add_child(new_target)
 	backing.move_child(new_target, desired_target_heirarchy_index)
@@ -233,18 +234,26 @@ func _process(delta: float) -> void:
 	)
 	if hit_left_edge or hit_right_edge:
 		direction *= -1
-		if (
-			_game_state == null
-			or _game_state.save_game == null
-			or not _game_state.save_game.mute_bounce
-		):
-			bounce_sound.play()
+		play_bounce_sound()
 		if one_shot:
 			pressed.emit(false, 0, consecutive_hits)
 			stop()
 	
 	#slider.position.x = slider_position
 	#queue_redraw()
+
+
+## Applies the saved preference to this bar and every dynamic target it owns.
+func set_bounce_muted(is_muted: bool) -> void:
+	_bounce_muted = is_muted
+	for target: TimingTarget in targets:
+		target.set_bounce_muted(is_muted)
+
+
+## Plays the bar's authored bounce sound unless the saved preference mutes it.
+func play_bounce_sound() -> void:
+	if not _bounce_muted:
+		bounce_sound.play()
 
 #func _draw():
 	#draw_line(backing.position + Vector2(slider_position, 0), (backing.position + Vector2(slider_position, 0)) + Vector2.UP * 50, Color.RED, 1.0)

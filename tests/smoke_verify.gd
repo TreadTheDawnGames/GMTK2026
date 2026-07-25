@@ -77,6 +77,28 @@ func _verify_mining_scene() -> void:
 	var mining_controller := game_root.get_node_or_null(
 		"MiningScene/Systems/MiningController"
 	) as MiningController
+	var encounter_controller := game_root.get_node_or_null(
+		"MiningScene/Systems/UpgradeEncounterController"
+	) as DepthEncounterController
+	var gem_outcrop_field := game_root.get_node_or_null(
+		"MiningScene/GemOutcropField"
+	) as GemOutcropField
+	var miner_rig := game_root.get_node_or_null(
+		"MiningScene/MinerRig"
+	) as MinerRig
+	var hud := game_root.get_node_or_null(
+		"MiningScene/HUD"
+	) as MiningHud
+	var timing_window := game_root.get_node_or_null(
+		"MiningScene/HUD/TimingWindow"
+	) as TimingWindowTask
+	var main_menu := game_root.get_node_or_null(
+		"MainMenuLayer/MainMenu"
+	) as GameMainMenu
+	var run_state := root.get_node_or_null("GameState") as RunState
+	var audio_handler := root.get_node_or_null(
+		"AudioHandler"
+	) as PlayerAudioHandler
 
 	_expect(mining_scene != null, "MiningScene root must exist.")
 	_expect(terrain_manager != null, "TerrainManager must exist.")
@@ -92,6 +114,67 @@ func _verify_mining_scene() -> void:
 		game_root.queue_free()
 		await process_frame
 		return
+	_expect(run_state != null, "GameState autoload must exist.")
+	_expect(audio_handler != null, "AudioHandler autoload must exist.")
+	_expect(
+		mining_controller._game_state == run_state,
+		"SceneWiring must inject GameState into MiningController."
+	)
+	_expect(
+		encounter_controller != null
+		and encounter_controller._game_state == run_state,
+		"SceneWiring must inject GameState into DepthEncounterController."
+	)
+	_expect(
+		gem_outcrop_field != null
+		and run_state != null
+		and gem_outcrop_field._save_game == run_state.save_game,
+		"SceneWiring must inject SaveGame into GemOutcropField."
+	)
+	_expect(
+		hud != null
+		and run_state != null
+		and hud._save_game == run_state.save_game,
+		"SceneWiring must inject SaveGame into MiningHud."
+	)
+	_expect(
+		main_menu != null
+		and run_state != null
+		and main_menu._save_game == run_state.save_game,
+		"SceneWiring must inject SaveGame into GameMainMenu."
+	)
+	_expect(
+		miner_rig != null and miner_rig._audio_handler == audio_handler,
+		"SceneWiring must inject AudioHandler into MinerRig."
+	)
+	_expect(
+		timing_window != null
+		and timing_window._audio_handler == audio_handler,
+		"SceneWiring must inject AudioHandler into TimingWindowTask."
+	)
+	_expect(
+		run_state != null
+		and run_state.depth_changed.is_connected(
+			scene_wiring._on_run_depth_changed
+		),
+		"Run progress must fan out through SceneWiring."
+	)
+	_expect(
+		main_menu != null
+		and main_menu.start_requested.is_connected(
+			scene_wiring._on_start_requested
+		),
+		"Starting a run must cross the searchable SceneWiring boundary."
+	)
+	_expect(
+		run_state != null
+		and run_state.save_game != null
+		and timing_window != null
+		and run_state.save_game.settings_applied.is_connected(
+			timing_window.set_bounce_muted
+		),
+		"Saved bounce settings must route explicitly to TimingWindowTask."
+	)
 
 	_expect(
 		scene_wiring.terrain_manager == terrain_manager,
