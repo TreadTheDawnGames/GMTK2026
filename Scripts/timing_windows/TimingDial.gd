@@ -70,7 +70,7 @@ func _is_needle_in_target_window() -> bool:
 func _process(delta):
 	if not active:
 		return
-	if Input.is_action_just_pressed("Space"):
+	if Input.is_action_just_pressed(&"primary_action"):
 		if _is_needle_in_target_window():
 			pressed.emit(true)
 		else:

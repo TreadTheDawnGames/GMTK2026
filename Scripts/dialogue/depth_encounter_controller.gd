@@ -4,6 +4,8 @@ extends Node
 ## How it works:
 ## - Each encounter resource places one mineable chamber at an authored depth.
 ## - Crossing its ceiling captures the interaction even when one hit skips rows.
+## - Dialogue begins only after the presentation miner lands on that floor.
+## - A blocked reservation retries when the previous cinematic releases.
 ## - Stable actor IDs reuse presenters across visits and the cafe gathering.
 ## - Optional encounter stages own reversible movement and named line cues.
 ## - MiningCinematicFlow gates input while this controller owns an interaction.
@@ -18,13 +20,12 @@ signal character_stage_strike_requested(screen_position: Vector2)
 
 const FLOW_OWNER: StringName = &"depth_encounter"
 const MINER_SPEAKER_SLOT: StringName = &"miner"
+const FINAL_BREAKTHROUGH_CUE: StringName = &"resume_mining"
 
 @export_category("Schedule")
 @export var encounter_config: DepthEncounterConfig
 @export var mining_config: MiningConfig
 
-@export_category("Character Placement")
-@export_range(-64, 64, 1) var horizontal_offset_cells: int = 22
 @export_category("References")
 @export var dialogue_director: DialogueDirector
 @export var character_scene: PackedScene
@@ -45,7 +46,10 @@ var _pending_encounter_index: int = -1
 var _active_encounter_index: int = -1
 var _is_initialized: bool = false
 var _credits_have_completed: bool = false
+var _latest_landing_world_y: int = -1
 var _active_conversation: DialogueConversation
+var _is_final_breakthrough_armed: bool = false
+var _is_final_breakthrough_resolving: bool = false
 @onready var _game_state: RunState = RunState.get_global(self)
 
 
@@ -67,8 +71,43 @@ func _on_depth_changed(depth: int) -> void:
 	)
 	if depth < ceiling_depth:
 		return
-	if _schedule_next_encounter():
-		_activate_pending_encounter()
+	_schedule_next_encounter()
+
+
+## Promotes a reserved encounter only after the visible fall reaches its floor.
+## Mining may report the crossed depth before ViewController receives its new
+## target, so activating from depth_changed can freeze focus at the old height.
+func _on_landing_reached(mining_y: int) -> void:
+	_latest_landing_world_y = maxi(_latest_landing_world_y, mining_y)
+	if _pending_encounter_index < 0 and _game_state != null:
+		_on_depth_changed(_game_state.depth)
+	_try_activate_pending_encounter()
+
+
+## Retries a crossed floor after another cinematic releases the shared gate.
+func _on_cinematic_flow_finished(finished_owner: StringName) -> void:
+	if finished_owner == FLOW_OWNER or _game_state == null:
+		return
+	_on_depth_changed(_game_state.depth)
+
+
+func _try_activate_pending_encounter() -> void:
+	if (
+		_pending_encounter_index < 0
+		or _active_encounter_index >= 0
+		or not cinematic_flow.is_owned_by(FLOW_OWNER)
+	):
+		return
+	var pending_encounter := encounter_config.encounters[
+		_pending_encounter_index
+	]
+	var encounter_floor_y := (
+		mining_config.initial_surface_row
+		+ pending_encounter.resolve_depth(mining_config.total_run_depth)
+	)
+	if _latest_landing_world_y < encounter_floor_y:
+		return
+	_activate_pending_encounter()
 
 
 func _can_schedule_next_encounter() -> bool:
@@ -96,6 +135,13 @@ func _on_credits_completed() -> void:
 ## Restores only the run-scoped credits prerequisite.
 func _on_run_reset() -> void:
 	_credits_have_completed = false
+	_is_final_breakthrough_armed = false
+	_is_final_breakthrough_resolving = false
+	_latest_landing_world_y = (
+		mining_config.initial_surface_row
+		if mining_config != null
+		else -1
+	)
 
 
 func _schedule_next_encounter() -> bool:
@@ -104,6 +150,7 @@ func _schedule_next_encounter() -> bool:
 	if not cinematic_flow.try_begin(FLOW_OWNER):
 		return false
 	_pending_encounter_index = _next_encounter_index
+	_try_activate_pending_encounter()
 	return true
 
 
@@ -124,6 +171,18 @@ func _activate_pending_encounter() -> void:
 	var stage := _stages[_active_encounter_index]
 	if stage != null:
 		stage.position = encounter_anchor
+		if stage.conversation_tracks_miner:
+			var conversation_position := (
+				stage.conversation_marker.global_position
+			)
+			conversation_position.x = (
+				miner_rig.get_cinematic_foot_screen_position().x
+				+ stage.conversation_root_offset_from_miner_x
+			)
+			stage.conversation_marker.global_position = conversation_position
+			var rest_position := stage.rest_marker.global_position
+			rest_position.x = conversation_position.x
+			stage.rest_marker.global_position = rest_position
 	cinematic_flow.focus(FLOW_OWNER)
 	_begin_active_encounter.call_deferred()
 
@@ -157,14 +216,23 @@ func _on_dialogue_line_presented(
 		or conversation_id != _active_conversation.conversation_id
 	):
 		return
+	var active_line := (
+		_active_conversation.lines[line_index]
+		if line_index >= 0 and line_index < _active_conversation.lines.size()
+		else null
+	)
+	if (
+		encounter.occurs_at_run_bottom
+		and active_line != null
+		and active_line.stage_cue == FINAL_BREAKTHROUGH_CUE
+	):
+		_arm_final_breakthrough()
 	if (
 		_active_stage != null
-		and line_index >= 0
-		and line_index < _active_conversation.lines.size()
+		and active_line != null
 	):
-		var line := _active_conversation.lines[line_index]
-		if line != null and not line.stage_cue.is_empty():
-			_active_stage.play_cue(line.stage_cue, line_index)
+		if not active_line.stage_cue.is_empty():
+			_active_stage.play_cue(active_line.stage_cue, line_index)
 	_reset_speech_reactions()
 	if speaker_slot == MINER_SPEAKER_SLOT:
 		miner_rig.react_to_presented_line()
@@ -268,7 +336,7 @@ func _gather_cafe_characters() -> void:
 	var gathering_y := _presenters[_active_encounter_index].position.y
 	var actor_count := encounter_config.gathering_actor_ids.size()
 	var edge_margin_cells := clampi(
-		absi(horizontal_offset_cells) / 2,
+		absi(encounter_config.encounter_horizontal_offset_cells) / 2,
 		4,
 		maxi(mining_config.terrain_width_cells / 4, 4)
 	)
@@ -333,6 +401,9 @@ func _on_conversation_finished(conversation_id: StringName) -> void:
 		coffee_speed_boost_requested.emit()
 	_reset_speech_reactions()
 	_active_conversation = null
+	if encounter.occurs_at_run_bottom and _is_final_breakthrough_resolving:
+		_complete_final_breakthrough()
+		return
 	if encounter.occurs_at_run_bottom:
 		final_encounter_reached.emit(encounter.encounter_id)
 		return
@@ -440,7 +511,7 @@ func _prepare_authored_characters() -> bool:
 		var encounter_position := Vector2(
 			(
 				float(mining_config.terrain_width_cells) * 0.5
-				+ float(horizontal_offset_cells)
+				+ float(encounter_config.encounter_horizontal_offset_cells)
 			) * cell_size,
 			float(
 				mining_config.initial_surface_row
@@ -521,6 +592,41 @@ func has_pending_or_active_interaction() -> bool:
 func _finish_cinematic_flow() -> void:
 	_reset_speech_reactions()
 	cinematic_flow.finish(FLOW_OWNER)
+
+
+## Turns the authored dialogue cue into a live target without hiding its line.
+func _arm_final_breakthrough() -> void:
+	if (
+		_is_final_breakthrough_armed
+		or not cinematic_flow.is_owned_by(FLOW_OWNER)
+		or not dialogue_director.begin_gameplay_handoff()
+	):
+		return
+	_is_final_breakthrough_armed = true
+	cinematic_flow.finish_with_presentation_fade(FLOW_OWNER, 0.35)
+
+
+## A real resolved hit breaks the held line and starts the endless descent.
+func _on_final_breakthrough_mined(
+	depth_gained: int,
+	_cells_removed: int,
+	_combo: int,
+	_combo_strength: float
+) -> void:
+	if not _is_final_breakthrough_armed or depth_gained <= 0:
+		return
+	_is_final_breakthrough_armed = false
+	_is_final_breakthrough_resolving = true
+	dialogue_director.finish_conversation()
+	_is_final_breakthrough_resolving = false
+
+
+func _complete_final_breakthrough() -> void:
+	_reset_speech_reactions()
+	dialogue_director.close_cinematic_frame()
+	_next_encounter_index = _active_encounter_index + 1
+	_active_encounter_index = -1
+	_active_stage = null
 
 
 func _reset_speech_reactions() -> void:

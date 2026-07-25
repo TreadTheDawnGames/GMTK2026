@@ -27,6 +27,15 @@ signal swing_finished
 ## Controls how many visible walking steps fit along a traversal segment.
 @export_range(8.0, 96.0, 1.0) var cinematic_walk_stride_pixels: float = 24.0
 
+@export_category("Draw Order")
+## Standing on the run's untouched surface, in front of terrain layer one
+## (z_index 2). He is on top of the ground there, not in it, so the foreground
+## stratum must not cut his legs off during the arrival shot.
+@export_range(0, 16, 1) var surface_draw_order: int = 3
+## Once he has dug in he is below the original surface, so layer one closes over
+## his legs again and every shot from there down looks as it always did.
+@export_range(0, 16, 1) var buried_draw_order: int = 1
+
 @export_category("References")
 @export var animation_player: AnimationPlayer
 @export var visual_root: Node2D
@@ -47,15 +56,23 @@ var _visual_root_rest_y: float
 var _cinematic_override_active: bool = false
 var _cinematic_rest_position: Vector2
 var _cinematic_rest_visual_scale: Vector2
-var _cinematic_rest_z_index: int
 var _cinematic_rest_z_as_relative: bool
+## True until he lands below the surface he started on. Nothing puts it back:
+## once the ground is open he is inside it for the rest of the run.
+var _is_on_surface: bool = true
 var _cinematic_tween: Tween
+@onready var _audio_handler: PlayerAudioHandler = (
+	PlayerAudioHandler.get_global(self)
+)
 
 
 ## Connects animation events and starts the idle animation.
 func _ready() -> void:
 	_rest_position = position
 	_visual_root_rest_y = visual_root.position.y
+	# The rig owns its own draw order from here on, so the two authored values
+	# above are the only place it is decided.
+	z_index = get_rest_draw_order()
 	_set_miner_texture(idle_miner_texture)
 	show_intact_floor_grounding()
 	if not animation_player.animation_finished.is_connected(
@@ -99,7 +116,7 @@ func _show_success_wind_up() -> void:
 ## Reports the hammer-tip position when the animation reaches the ground.
 func _emit_success_impact() -> void:
 	_set_miner_texture(impact_miner_texture)
-	AudioHandler.play_sound(AudioLibrary.IMPACT)
+	_audio_handler.play_sound(AudioLibrary.IMPACT)
 	impact_contact.emit(impact_point.global_position)
 
 
@@ -198,6 +215,24 @@ func react_to_presented_line() -> void:
 		speech_reaction.react_to_presented_line()
 
 
+## Reports the draw order the miner rests at right now, so a cutscene that
+## borrows his presentation can hand back the order he actually belongs at
+## instead of one captured before he moved.
+func get_rest_draw_order() -> int:
+	return surface_draw_order if _is_on_surface else buried_draw_order
+
+
+## Moves him off the starting surface and into the ground. The caller owns the
+## depth test; the rig owns what that means for its draw order.
+func leave_surface_draw_order() -> void:
+	if not _is_on_surface:
+		return
+	_is_on_surface = false
+	# A cutscene that owns the presentation restores the new order when it ends.
+	if not _cinematic_override_active:
+		z_index = get_rest_draw_order()
+
+
 ## Places the artwork above the first layer on an authored intact floor.
 func show_intact_floor_grounding() -> void:
 	_set_grounding_offset(intact_floor_grounding_offset_y)
@@ -241,7 +276,6 @@ func begin_cinematic_visual_override() -> bool:
 	_cinematic_override_active = true
 	_cinematic_rest_position = visual_root.position
 	_cinematic_rest_visual_scale = visual_root.scale
-	_cinematic_rest_z_index = z_index
 	_cinematic_rest_z_as_relative = z_as_relative
 	if _cinematic_tween != null and _cinematic_tween.is_valid():
 		_cinematic_tween.kill()
@@ -389,7 +423,10 @@ func _set_grounding_offset(offset_y: float) -> void:
 ## Releases presentation ownership after a completed or cancelled restore.
 func _finish_cinematic_visual_restore() -> void:
 	visual_root.scale = _cinematic_rest_visual_scale
-	z_index = _cinematic_rest_z_index
+	# Deliberately the live rest order, not one captured when the cutscene
+	# started: a shot can end at a depth the miner was not standing at when it
+	# began, and he must come back at the order that depth calls for.
+	z_index = get_rest_draw_order()
 	z_as_relative = _cinematic_rest_z_as_relative
 	_cinematic_override_active = false
 	_cinematic_tween = null

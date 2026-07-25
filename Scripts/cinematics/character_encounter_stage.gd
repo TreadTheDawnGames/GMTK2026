@@ -16,6 +16,10 @@ signal cue_started(cue_id: StringName, line_index: int)
 signal cue_finished(cue_id: StringName)
 signal closing_finished
 signal presentation_strike_requested(screen_position: Vector2)
+signal sequence_dialogue_requested(
+	conversation: DialogueConversation,
+	line_range: Vector2i
+)
 
 @export_category("Named Marker Roots")
 @export var actor_markers_root: Node2D
@@ -37,13 +41,21 @@ signal presentation_strike_requested(screen_position: Vector2)
 @export_category("Actor Motion")
 @export_range(0.01, 8.0, 0.01) var opening_move_seconds: float = 0.6
 @export_range(0.01, 8.0, 0.01) var closing_move_seconds: float = 0.6
+@export_range(0.0, 16.0, 0.5) var opening_step_height: float = 4.0
 @export var opening_pose: StringName = &"walk"
 @export var conversation_pose: StringName = &"idle"
 @export var closing_pose: StringName = &"walk"
 @export var rest_pose: StringName = &"idle"
 @export var hide_actor_after_closing: bool = false
+## Dynamically keeps this actor beside the miner regardless of landing column.
+@export var conversation_tracks_miner: bool = false
+## Presenter-root offset; actor sprite offsets remain authored by appearance.
+@export_range(-256.0, 256.0, 1.0) var conversation_root_offset_from_miner_x: float = 0.0
+## Optional visual-editor timeline. Null preserves the legacy opening walk.
+@export var sequence: CutsceneSequence
 
 var _presenter: CharacterPresenter
+var _sequence_player: CutsceneSequencePlayer
 var _floor_sampler: Callable
 var _restore_position: Vector2
 var _restore_visible: bool = false
@@ -92,11 +104,16 @@ func prepare(
 func play_opening() -> void:
 	if not _is_active:
 		return
+	if sequence != null:
+		await _play_sequence_opening()
+		return
 	_play_pose_if_available(opening_pose)
 	var movement := _presenter.move_grounded_to(
 		conversation_marker.global_position,
 		opening_move_seconds,
-		_floor_sampler
+		_sample_level_floor.bind(_presenter.global_position.y),
+		false,
+		opening_step_height
 	)
 	var animation_name := _play_named_animation(opening_animation)
 	if movement != null:
@@ -133,7 +150,7 @@ func play_closing() -> void:
 	var movement := _presenter.move_grounded_to(
 		target_marker.global_position,
 		closing_move_seconds,
-		_floor_sampler,
+		_sample_level_floor.bind(_presenter.global_position.y),
 		hide_actor_after_closing
 	)
 	var animation_name := _play_named_animation(closing_animation)
@@ -154,6 +171,8 @@ func play_closing() -> void:
 func cancel_and_restore() -> void:
 	if not _is_active:
 		return
+	if is_instance_valid(_sequence_player):
+		_sequence_player.stop()
 	if is_instance_valid(animation_player):
 		animation_player.stop()
 		if animation_player.has_animation(&"RESET"):
@@ -214,6 +233,20 @@ func validate_stage() -> String:
 	return ""
 
 
+## Samples the injected floor but refuses ground that falls away below where the
+## walk set out from. The miner arrives by breaking a crater through the room's
+## floor, and the shared sampler reports the bottom of that crater as support,
+## so an actor crossing it walks down into the hole and climbs back out. Rising
+## ground is still followed; only falling ground is refused.
+func _sample_level_floor(screen_x: float, walk_floor_y: float) -> float:
+	if not _floor_sampler.is_valid():
+		return NAN
+	var sampled_y := float(_floor_sampler.call(screen_x))
+	if is_nan(sampled_y):
+		return sampled_y
+	return minf(sampled_y, walk_floor_y)
+
+
 func _play_named_animation(animation_name: StringName) -> StringName:
 	if (
 		animation_name.is_empty()
@@ -250,3 +283,57 @@ func _on_animation_finished(animation_name: StringName) -> void:
 	var finished_cue := _active_cue
 	_active_cue = &""
 	cue_finished.emit(finished_cue)
+
+
+func _play_sequence_opening() -> void:
+	_ensure_sequence_player()
+	_sequence_player.bind(
+		_resolve_sequence_actor,
+		_resolve_sequence_marker,
+		_floor_sampler,
+		self
+	)
+	_sequence_player.play(sequence)
+	while _is_active and _sequence_player.is_playing():
+		await get_tree().process_frame
+	if not _is_active:
+		return
+	opening_finished.emit()
+
+
+func _ensure_sequence_player() -> void:
+	if is_instance_valid(_sequence_player):
+		return
+	_sequence_player = CutsceneSequencePlayer.new()
+	_sequence_player.name = &"CutsceneSequencePlayer"
+	add_child(_sequence_player)
+	if not _sequence_player.dialogue_requested.is_connected(
+		_on_sequence_dialogue_requested
+	):
+		_sequence_player.dialogue_requested.connect(
+			_on_sequence_dialogue_requested
+		)
+
+
+func _resolve_sequence_actor(actor_id: StringName) -> Node2D:
+	if actor_id == &"miner":
+		return _presenter
+	return null
+
+
+func _resolve_sequence_marker(marker_name: StringName) -> Vector2:
+	var roots: Array[Node2D] = [actor_markers_root, prop_markers_root]
+	for root in roots:
+		if not is_instance_valid(root):
+			continue
+		var marker := root.get_node_or_null(NodePath(marker_name)) as Marker2D
+		if marker != null:
+			return marker.global_position
+	return Vector2(NAN, NAN)
+
+
+func _on_sequence_dialogue_requested(
+	conversation: DialogueConversation,
+	line_range: Vector2i
+) -> void:
+	sequence_dialogue_requested.emit(conversation, line_range)

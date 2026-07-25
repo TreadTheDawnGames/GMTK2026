@@ -1,3 +1,4 @@
+@tool
 class_name DepthCharacterEncounter
 extends Resource
 
@@ -8,6 +9,8 @@ extends Resource
 ## - stage_scene optionally adds actor movement, props, and line-driven cues.
 ## - occurs_at_run_bottom pins the final encounter to any configured run length.
 ## - The invariant is that large hits cannot skip an encounter threshold.
+## @tool because the cutscene editor resolves encounter depth and authored room
+## data in editor context; non-tool resources become placeholder instances.
 
 @export var encounter_id: StringName
 ## Stable story identity; repeated visits reuse the same presenter.
@@ -21,6 +24,8 @@ extends Resource
 @export var conversation: DialogueConversation
 ## Optional inherited CharacterEncounterStage scene for actor/prop choreography.
 @export var stage_scene: PackedScene
+## Optional timeline played by the stage during its opening choreography.
+@export var sequence: CutsceneSequence
 ## Used only when story text should remain encrypted in source control.
 @export var encrypted_conversation: EncryptedDialogueConversation
 @export var speaker_slot: StringName
@@ -34,6 +39,9 @@ extends Resource
 @export var requires_credits_complete: bool = false
 ## Opens the chamber through its right wall for authored choreography.
 @export var opens_right_exit: bool = false
+## Replaces this encounter's procedural chamber with an authored sculpted room.
+## Leave it null and terrain generation is unchanged.
+@export var terrain_sculpt: CutsceneTerrainSculpt
 
 
 ## Returns the gameplay depth where this character waits.

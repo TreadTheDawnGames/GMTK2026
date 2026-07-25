@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="DialogueConversation" format=3 uid="uid://20b36hdg7moq"]
+[gd_resource type="Resource" script_class="DialogueConversation" format=3 uid="uid://bpovruhocqc5"]
 
 [ext_resource type="Script" uid="uid://c55utdbjdwaui" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
 [ext_resource type="Script" uid="uid://ivfntthetp0i" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
@@ -8,36 +8,36 @@
 script = ExtResource("3_line")
 speaker_slot = &"coffee_cat"
 speaker_pose = &"idle"
-text = "COFFEE!!!"
-
-[sub_resource type="Resource" id="Line_chug"]
-script = ExtResource("3_line")
-speaker_slot = &"coffee_cat"
-speaker_pose = &"drink"
-text = "(Quibble chugs an entire cup.)"
+text = "I'm Quib-Quib-Quibble!"
 
 [sub_resource type="Resource" id="Line_enough"]
 script = ExtResource("3_line")
 speaker_slot = &"coffee_cat"
 speaker_pose = &"idle"
-text = "I'm Quibble! I'm heading straight down to the Cheese Cafe for more coffee!"
+text = "Have you seen the cafe? Cafe. Coffee. Cafe coffee."
 
 [sub_resource type="Resource" id="Line_miner"]
 script = ExtResource("3_line")
 speaker_slot = &"miner"
 text = "..."
 
+[sub_resource type="Resource" id="Line_chug"]
+script = ExtResource("3_line")
+speaker_slot = &"coffee_cat"
+speaker_pose = &"drink"
+text = "(Quibble rapidly finishes another cup.)"
+
 [sub_resource type="Resource" id="Line_coffee_gift"]
 script = ExtResource("3_line")
 speaker_slot = &"coffee_cat"
 speaker_pose = &"hold_cup"
-text = "Take a cup for the road! This coffee will make you move faster!"
+text = "This is travel coffee. T-t-take it."
 
 [sub_resource type="Resource" id="Line_go"]
 script = ExtResource("3_line")
 speaker_slot = &"coffee_cat"
 speaker_pose = &"idle"
-text = "Now let's get to that cafe!"
+text = "It makes everything go f-f-faster!"
 
 [sub_resource type="Resource" id="Participant_miner"]
 script = ExtResource("2_participant")
@@ -53,4 +53,4 @@ display_name = "Quibble"
 script = ExtResource("1_conversation")
 conversation_id = &"coffee_cat_first"
 participants = Array[ExtResource("2_participant")]([SubResource("Participant_miner"), SubResource("Participant_coffee_cat")])
-lines = Array[ExtResource("3_line")]([SubResource("Line_coffee"), SubResource("Line_chug"), SubResource("Line_enough"), SubResource("Line_miner"), SubResource("Line_coffee_gift"), SubResource("Line_go")])
+lines = Array[ExtResource("3_line")]([SubResource("Line_coffee"), SubResource("Line_enough"), SubResource("Line_miner"), SubResource("Line_chug"), SubResource("Line_coffee_gift"), SubResource("Line_go")])

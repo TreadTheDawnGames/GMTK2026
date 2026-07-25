@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="ActorPoseSet" format=3 uid="uid://rwj57412rbbf"]
+[gd_resource type="Resource" script_class="ActorPoseSet" format=3 uid="uid://5qijuqa7nxwy"]
 
 [ext_resource type="Script" uid="uid://tsaiph1d8kq7" path="res://resources/actors/actor_pose.gd" id="1_pose"]
 [ext_resource type="Script" uid="uid://dxi74xec11dh3" path="res://resources/actors/actor_pose_set.gd" id="2_pose_set"]

@@ -42,7 +42,7 @@ enum IrisState {
 @export var starts_blacked_out: bool = false
 ## Half the viewport each, so the two bars meet exactly in the middle.
 @export_range(0.25, 0.5, 0.01) var blackout_bar_height_ratio: float = 0.5
-@export_range(0.0, 3.0, 0.05) var blackout_reveal_seconds: float = 0.8
+@export_range(0.0, 3.0, 0.05) var blackout_reveal_seconds: float = 0.35
 
 @export_category("Iris Focus")
 @export var iris_focus_radius: Vector2 = Vector2(170.0, 120.0)

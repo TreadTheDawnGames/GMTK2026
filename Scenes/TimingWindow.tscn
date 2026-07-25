@@ -58,25 +58,32 @@ horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="ComboLabel" type="Label" parent="." unique_id=1967208941]
+editor_description = "Hidden: the combo is read from the charge gauge TimingBarFeedback draws along the bar's lower edge, which shows the effect ceiling and the quick-save threshold that a bare number cannot. The node stays so timing_window.gd keeps its combo_label target and so the readout can be switched back on for debugging."
+visible = false
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -928.0
-offset_top = 493.0
-offset_right = -818.0
-offset_bottom = 516.0
-grow_horizontal = 0
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -327.0
+offset_top = -119.0
+offset_right = -177.0
+offset_bottom = -93.0
+grow_horizontal = 2
+grow_vertical = 0
 text = "Combo: "
+vertical_alignment = 1
 
 [node name="RecoveryWindow" parent="." unique_id=1324091204 instance=ExtResource("2_73j0v")]
+editor_description = "Lifted clear of the main bar's frame art. MiningWindow's nine-slice expand margin puts drawn wood 20 px above its own rect, reaching y -148, so at the old -151 this strip sat inside it and the two frames collided. The gap also leaves room for the frame TimingBarFeedback lends this strip while it is up."
 unique_name_in_owner = true
 layout_mode = 1
 offset_left = -351.0
-offset_top = -151.0
+offset_top = -178.0
 offset_right = 349.0
-offset_bottom = -134.0
+offset_bottom = -161.0
 target_packed_scenes = Array[PackedScene]([ExtResource("13_sgvbc")])
 grace = 3.0
 targets_use_image = false

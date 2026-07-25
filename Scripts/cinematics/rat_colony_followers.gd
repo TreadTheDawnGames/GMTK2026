@@ -4,7 +4,7 @@ extends Node2D
 ## How it works:
 ## - A fixed authored formation follows the miner's screen-space root.
 ## - The completed Rotini encounter activates the formation for normal gameplay.
-## - Each real terrain impact asks one available rat to strike beside the miner.
+## - Every real terrain impact restarts every visible rat's matching strike.
 ## - Rat contacts request shared feedback but never mutate logical terrain.
 ## - Run reset cancels every action and hides the complete formation.
 ## - Owned actors never grow: the scene has at most max_visible_followers.
@@ -27,7 +27,6 @@ signal presentation_strike_requested(screen_position: Vector2)
 @export_range(1, 8, 1) var web_max_visible_followers: int = 3
 
 var _is_active: bool = false
-var _next_striker_index: int = 0
 var _live_follower_count: int = 0
 
 
@@ -58,7 +57,6 @@ func _process(_delta: float) -> void:
 ## Makes the bounded formation persist beside the player after Rotini's beat.
 func activate_followers() -> void:
 	_is_active = true
-	_next_striker_index = 0
 	_live_follower_count = mini(
 		followers.size(),
 		_get_visible_follower_cap()
@@ -82,7 +80,6 @@ func activate_followers() -> void:
 ## Clears all persistent presentation when a run restarts.
 func deactivate_followers() -> void:
 	_is_active = false
-	_next_striker_index = 0
 	_live_follower_count = 0
 	for follower in followers:
 		if not is_instance_valid(follower):
@@ -101,23 +98,17 @@ func _on_player_impact_resolved(
 ) -> void:
 	if not _is_active or cells_removed <= 0 or _live_follower_count <= 0:
 		return
-	for candidate_offset in range(_live_follower_count):
-		var follower_index := (
-			_next_striker_index + candidate_offset
-		) % _live_follower_count
+	for follower_index in range(_live_follower_count):
 		var follower := followers[follower_index]
 		if not is_instance_valid(follower):
 			continue
+		follower.cancel_action()
 		follower.set_facing_direction(
 			signi(swing_side) if swing_side != 0 else 1
 		)
-		if follower.start_entry_breach(
+		follower.start_entry_breach(
 			follower.strike_anchor.global_position
-		):
-			_next_striker_index = (
-				follower_index + 1
-			) % _live_follower_count
-			return
+		)
 
 
 func _on_run_reset() -> void:

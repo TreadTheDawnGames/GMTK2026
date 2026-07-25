@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="DialogueConversation" format=3 uid="uid://5yfnr66jrk50"]
+[gd_resource type="Resource" script_class="DialogueConversation" format=3 uid="uid://dcyt4ietamaxn"]
 
 [ext_resource type="Script" uid="uid://c55utdbjdwaui" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
 [ext_resource type="Script" uid="uid://ivfntthetp0i" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
@@ -7,7 +7,7 @@
 [sub_resource type="Resource" id="Line_intro"]
 script = ExtResource("3_line")
 speaker_slot = &"cheese_girl"
-text = "Hi! I'm Cheese Girl. I'm taking these boxes down to the Cheese Cafe."
+text = "Hi! I'm Cheese Girl. I'm on my way down to the Cheese Cafe."
 
 [sub_resource type="Resource" id="Line_miner"]
 script = ExtResource("3_line")
@@ -17,12 +17,12 @@ text = "..."
 [sub_resource type="Resource" id="Line_thief"]
 script = ExtResource("3_line")
 speaker_slot = &"cheese_girl"
-text = "The cafe is straight down, near depth 14,000. You can't miss it!"
+text = "I see you like digging. Keep it up and you'll find it."
 
 [sub_resource type="Resource" id="Line_cafe"]
 script = ExtResource("3_line")
 speaker_slot = &"cheese_girl"
-text = "Maybe I'll see you there. The Cheese Café has the best cheese in all the land!"
+text = "Maybe I'll see you there!"
 
 [sub_resource type="Resource" id="Participant_miner"]
 script = ExtResource("2_participant")

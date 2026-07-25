@@ -13,6 +13,8 @@ extends Node
 @export var hit_particles: MiningHitParticles
 @export var gem_outcrop_field: GemOutcropField
 @export var impact_smoke: MiningImpactSmoke
+@export var impact_spark: ImpactSpark
+@export var combo_vignette: ComboImpactVignette
 @export var dig_number_presenter: DigNumberPresenter
 @export var impact_shake: ImpactShake
 @export var pickaxe_progression: PickaxeProgression
@@ -34,6 +36,7 @@ extends Node
 @export var hud: MiningHud
 @export var playtime_reveal: PlaytimeReveal
 @export var timing_window: TimingWindowTask
+@export var timing_bar_feedback: TimingBarFeedback
 @export var depth_review_control: DepthReviewControl
 @export var encounter_controller: DepthEncounterController
 @export var dialogue_director: DialogueDirector
@@ -91,6 +94,10 @@ func _ready() -> void:
 		run_timeline._on_cinematic_flow_finished
 	)
 	_connect_once(
+		cinematic_flow.flow_finished,
+		encounter_controller._on_cinematic_flow_finished
+	)
+	_connect_once(
 		run_timeline.run_time_changed,
 		hud._on_run_time_changed
 	)
@@ -124,6 +131,11 @@ func _ready() -> void:
 		Object.CONNECT_DEFERRED
 	)
 	_connect_once(
+		view_controller.landing_reached,
+		encounter_controller._on_landing_reached,
+		Object.CONNECT_DEFERRED
+	)
+	_connect_once(
 		cinematic_flow.camera_focus_requested,
 		_on_cinematic_camera_focus_requested
 	)
@@ -134,6 +146,10 @@ func _ready() -> void:
 	_connect_once(
 		terrain_manager.view_position_changed,
 		terrain_renderer._on_view_position_changed
+	)
+	_connect_once(
+		terrain_manager.view_position_changed,
+		credits_overlay._on_view_position_changed
 	)
 	_connect_once(
 		terrain_manager.view_position_changed,
@@ -150,6 +166,24 @@ func _ready() -> void:
 	_connect_once(
 		mining_controller.impact_resolved,
 		impact_smoke.play_at_impact
+	)
+	_connect_once(
+		mining_controller.impact_resolved,
+		impact_spark.play_at_impact
+	)
+	_connect_once(
+		mining_controller.impact_resolved,
+		combo_vignette.play_at_impact
+	)
+	# A lost streak gives the darkened frame straight back instead of letting it
+	# decay, so the release reads as part of losing the combo.
+	_connect_once(
+		mining_controller.mine_missed,
+		combo_vignette.release
+	)
+	_connect_once(
+		timing_window.pressed,
+		timing_bar_feedback._on_timing_pressed
 	)
 	_connect_once(
 		mining_controller.dig_number_requested,
@@ -170,6 +204,10 @@ func _ready() -> void:
 	_connect_once(
 		mining_controller.swing_requested,
 		miner_rig.play_success
+	)
+	_connect_once(
+		mining_controller.mine_resolved,
+		encounter_controller._on_final_breakthrough_mined
 	)
 	_connect_once(
 		dialogue_director.conversation_finished,
@@ -274,10 +312,22 @@ func _play_cinematic_strike_feedback(screen_position: Vector2) -> void:
 		0.0,
 		1
 	)
+	impact_spark.play_at_impact(
+		screen_position,
+		1,
+		0.2,
+		0.45,
+		1
+	)
 
 
 ## Seats authored floors on layer one and mined landings on visible layer two.
 func _on_miner_landing_grounding(mining_y: int) -> void:
+	# The first landing below the run's starting row is the moment he stops
+	# standing on the surface and starts standing in the hole, which is what
+	# decides whether the foreground stratum draws over him.
+	if mining_y > terrain_manager.config.initial_surface_row:
+		miner_rig.leave_surface_draw_order()
 	if terrain_manager.is_authored_landing_floor(mining_y):
 		miner_rig.show_intact_floor_grounding()
 		# An encounter floor is the frame a cutscene opens on, so kicking dirt
@@ -319,6 +369,13 @@ func _play_landing_impact_feedback() -> void:
 		landing_impact_cells,
 		landing_impact_strength,
 		0.0,
+		0
+	)
+	impact_spark.play_at_impact(
+		foot_position,
+		landing_impact_cells,
+		landing_impact_strength,
+		1.0,
 		0
 	)
 

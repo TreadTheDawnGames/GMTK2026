@@ -1,0 +1,36 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://Scripts/mining/combo_impact_vignette.gd" id="1_vignette"]
+[ext_resource type="Shader" path="res://Shaders/combo_vignette.gdshader" id="2_vignette_shader"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_vignette"]
+shader = ExtResource("2_vignette_shader")
+shader_parameter/strength = 0.0
+shader_parameter/pulse = 0.0
+shader_parameter/inner_radius = 0.58
+shader_parameter/outer_radius = 1.06
+shader_parameter/pulse_reach = 0.16
+shader_parameter/pulse_darkness = 0.35
+shader_parameter/band_steps = 4.0
+shader_parameter/viewport_aspect = 1.7777778
+shader_parameter/edge_color = Color(0.07, 0.05, 0.05, 1)
+shader_parameter/wobble_amount = 0.05
+shader_parameter/wobble_cells = 7.0
+
+[node name="ComboImpactVignette" type="CanvasLayer" node_paths=PackedStringArray("vignette_rect")]
+editor_description = "Darkens the screen edges while a large combo is running and kicks inward on each landed hit. Sits above the world and the gameplay HUD but below dig numbers and dialogue."
+process_mode = 3
+layer = 2
+script = ExtResource("1_vignette")
+vignette_rect = NodePath("VignetteRect")
+
+[node name="VignetteRect" type="ColorRect" parent="."]
+visible = false
+material = SubResource("ShaderMaterial_vignette")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(1, 1, 1, 1)
+mouse_filter = 2

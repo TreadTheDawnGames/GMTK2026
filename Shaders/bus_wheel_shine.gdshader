@@ -1,8 +1,13 @@
 shader_type canvas_item;
 
+#include "res://Shaders/sunset_prop_light.gdshaderinc"
+
 // How it works:
 // - The bus is one drawn sprite, so each wheel is located by an authored UV
 //   centre and radius rather than being its own node.
+// - The bus is also a prop standing in front of a setting sun, so it is relit
+//   through the shared sunset include before any of the wheel work happens. It
+//   carries both here because a CanvasItem only gets one material.
 // - Inside a wheel, a ring of glints is fixed to the tyre; subtracting
 //   wheel_spin_phase rotates them, so the wheel reads as turning.
 // - A glint only lights where it faces the sun, so highlights flare across the
@@ -75,13 +80,28 @@ float wheel_shine(vec2 uv, vec2 center) {
 void fragment() {
 	vec4 source = texture(TEXTURE, UV);
 	if (source.a > 0.01) {
-		float shine = wheel_shine(UV, wheel_one_uv)
-			+ wheel_shine(UV, wheel_two_uv);
-		// Only black rubber takes the highlight.
+		// The rubber test below has to run on the drawn art, not on the relit
+		// bus, or the twilight fill darkens the whole body into "rubber" and the
+		// glints spread off the wheels onto the panels.
 		float darkness = 1.0 - dot(
 			source.rgb,
 			vec3(0.299, 0.587, 0.114)
 		);
+
+		float sunward_coverage = texture(
+			TEXTURE,
+			UV + normalize(sun_direction + vec2(0.0001)) * rim_texels
+				* TEXTURE_PIXEL_SIZE
+		).a;
+		source.rgb = apply_sunset_prop_light(
+			source.rgb,
+			build_sunset_rim_mask(source.a, sunward_coverage),
+			UV.y
+		);
+
+		float shine = wheel_shine(UV, wheel_one_uv)
+			+ wheel_shine(UV, wheel_two_uv);
+		// Only black rubber takes the highlight.
 		shine *= smoothstep(0.55, 0.85, darkness);
 		source.rgb += sun_shine_color.rgb
 			* clamp(shine, 0.0, 1.0)

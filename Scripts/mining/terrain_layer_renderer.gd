@@ -74,7 +74,7 @@ const FRACTURE_SUPPORT_VALUE_THRESHOLD: float = 0.9
 
 @export_category("Web Performance")
 ## Limits reusable resized masks so repeated hit sizes avoid image allocations.
-@export_range(0, 48, 1) var resized_stamp_cache_limit: int = 12
+@export_range(0, 48, 1) var resized_stamp_cache_limit: int = 48
 ## Oversized combo openings are one-off and must not occupy the reusable cache.
 @export_range(1, 1_048_576, 1) var resized_stamp_cache_max_pixels: int = 65_536
 
@@ -119,6 +119,8 @@ var _latest_foreground_opening_rect := Rect2()
 var _latest_impact_stamp: ImpactStamp
 var _latest_support_world_position := Vector2(NAN, NAN)
 var _show_logical_overlay: bool = false
+# One entry per stratum, all 1.0 unless the editor is isolating a layer.
+var _layer_display_opacity: PackedFloat32Array = PackedFloat32Array()
 var _active_impact_combo: int = 0
 
 
@@ -363,10 +365,17 @@ func _load_chunk(chunk_index: int) -> void:
 			):
 				chunk_contains_chamber = true
 				break
+	# A sculpted room may sit in a chunk the encounter schedule alone would call
+	# ordinary rock, so streaming has to ask about rooms as well as chambers.
+	var chunk_contains_sculpt := _chunk_contains_sculpt(chunk_index)
+	var chunk_has_per_layer_sculpt := (
+		chunk_contains_sculpt and _chunk_has_per_layer_sculpt(chunk_index)
+	)
 	var base_mask := _build_chunk_base_mask(
 		chunk_index,
 		false,
-		chunk_contains_chamber
+		chunk_contains_chamber,
+		chunk_contains_sculpt
 	)
 	var back_layer_mask: Image
 	if profile.keep_back_layer_solid:
@@ -374,7 +383,8 @@ func _load_chunk(chunk_index: int) -> void:
 			_build_chunk_base_mask(
 				chunk_index,
 				true,
-				chunk_contains_chamber
+				chunk_contains_chamber,
+				chunk_contains_sculpt
 			)
 			if chunk_contains_chamber
 			else base_mask
@@ -411,6 +421,17 @@ func _load_chunk(chunk_index: int) -> void:
 			if uses_final_backing_optimization
 			else source_mask.duplicate()
 		)
+		# A room whose strata were sculpted apart needs its own rock per
+		# stratum. Only then is the extra build paid for, and only for the
+		# gameplay strata: the reserved back wall stays the shared backdrop.
+		if chunk_has_per_layer_sculpt and not uses_backdrop_source:
+			layer_mask = _build_chunk_base_mask(
+				chunk_index,
+				false,
+				chunk_contains_chamber,
+				chunk_contains_sculpt,
+				layer_index
+			)
 		if layer_index == 0:
 			_clear_chamber_foreground_floor_bands(
 				layer_mask,
@@ -444,6 +465,11 @@ func _load_chunk(chunk_index: int) -> void:
 			/ float(profile.mask_pixels_per_cell)
 		)
 		sprite.z_index = profile.get_layer_z_index(layer_index)
+		# Editor stratum isolation. Nothing at runtime sets an override, so
+		# this reads 1.0 during play and the sprite is untouched. Applying it
+		# here rather than only to live chunks is what makes an isolated
+		# stratum survive the rebuild every sculpt stroke causes.
+		sprite.modulate.a = get_layer_display_opacity(layer_index)
 		sprite.material = _create_layer_material(
 			layer_index,
 			world_origin,
@@ -453,6 +479,48 @@ func _load_chunk(chunk_index: int) -> void:
 		chunk.layer_sprites.append(sprite)
 		chunk.mask_textures.append(mask_texture)
 	_active_chunks[chunk_index] = chunk
+
+
+## Dims or hides one stratum everywhere it is drawn, so a designer sculpting a
+## buried layer can see it instead of the foreground rock covering it.
+##
+## Editor-only by convention rather than by a flag: nothing in a running game
+## calls this, so every stratum reads 1.0 and the game draws exactly as it did.
+## It changes no mask, no cell, and no z-order — only how visible a stratum is
+## while it is being worked on.
+func set_layer_display_opacity(layer_index: int, opacity: float) -> void:
+	if layer_index < 0 or layer_index >= profile.get_layer_count():
+		return
+	if _layer_display_opacity.size() < profile.get_layer_count():
+		_layer_display_opacity.resize(profile.get_layer_count())
+		_layer_display_opacity.fill(1.0)
+	_layer_display_opacity[layer_index] = clampf(opacity, 0.0, 1.0)
+	_apply_layer_display_opacity()
+
+
+## Returns how visible a stratum is currently drawn. Defaults to fully opaque,
+## which is the only value a running game ever sees.
+func get_layer_display_opacity(layer_index: int) -> float:
+	if layer_index < 0 or layer_index >= _layer_display_opacity.size():
+		return 1.0
+	return _layer_display_opacity[layer_index]
+
+
+## Restores every stratum to fully visible.
+func clear_layer_display_overrides() -> void:
+	if _layer_display_opacity.is_empty():
+		return
+	_layer_display_opacity.fill(1.0)
+	_apply_layer_display_opacity()
+
+
+func _apply_layer_display_opacity() -> void:
+	for chunk_index: int in _active_chunks:
+		var chunk := _active_chunks[chunk_index]
+		for layer_index in range(chunk.layer_sprites.size()):
+			chunk.layer_sprites[layer_index].modulate.a = (
+				get_layer_display_opacity(layer_index)
+			)
 
 
 ## Removes rendered chunk nodes while retaining their impact records.
@@ -469,7 +537,9 @@ func _unload_chunk(chunk_index: int) -> void:
 func _build_chunk_base_mask(
 	chunk_index: int,
 	preserve_chamber_backdrop: bool,
-	chunk_contains_chamber: bool
+	chunk_contains_chamber: bool,
+	chunk_contains_sculpt: bool = false,
+	sculpt_layer_index: int = -1
 ) -> Image:
 	var config := terrain_manager.config
 	var mask_cell_size := profile.mask_pixels_per_cell
@@ -486,6 +556,7 @@ func _build_chunk_base_mask(
 	)
 	if (
 		not chunk_contains_chamber
+		and not chunk_contains_sculpt
 		and chunk_start_row >= config.initial_surface_row
 		and chunk_end_row <= config.get_bottom_surface_row()
 	):
@@ -520,6 +591,37 @@ func _build_chunk_base_mask(
 			)
 		)
 		var row_mask_y := local_row * mask_cell_size
+		# An authored room overrides the procedural taper inside its own
+		# footprint only, so the surrounding row is drawn first and the room is
+		# printed over it. The retained backdrop pass is left alone: the back
+		# wall is scenery behind every room, sculpted or not.
+		var sculpt_placement := (
+			terrain_manager.get_sculpt_placement_for_row(world_row)
+			if chunk_contains_sculpt and not preserve_chamber_backdrop
+			else null
+		)
+		if sculpt_placement != null:
+			if is_chamber_row:
+				_fill_chamber_side_mask(
+					image,
+					row_mask_y,
+					world_row,
+					mask_cell_size
+				)
+			else:
+				image.fill_rect(
+					Rect2i(0, row_mask_y, mask_size.x, mask_cell_size),
+					SOLID_MASK_COLOR
+				)
+			_fill_sculpt_row_mask(
+				image,
+				row_mask_y,
+				world_row,
+				mask_cell_size,
+				sculpt_placement,
+				sculpt_layer_index
+			)
+			continue
 		if not is_chamber_row:
 			image.fill_rect(
 				Rect2i(
@@ -567,6 +669,233 @@ func _build_chunk_base_mask(
 			mask_cell_size
 		)
 	return image
+
+
+## Reports whether any authored room reaches into a streamed chunk.
+func _chunk_contains_sculpt(chunk_index: int) -> bool:
+	var config: MiningConfig = terrain_manager.config
+	var chunk_start_row := chunk_index * config.chunk_height_cells
+	var chunk_end_row := chunk_start_row + config.chunk_height_cells
+	for placement in terrain_manager.get_sculpt_placements():
+		if (
+			placement.world_rect.position.y < chunk_end_row
+			and placement.world_rect.end.y > chunk_start_row
+		):
+			return true
+	return false
+
+
+## Reports whether a chunk holds a room whose strata were sculpted apart, which
+## is the only case that costs one mask build per stratum instead of one shared.
+func _chunk_has_per_layer_sculpt(chunk_index: int) -> bool:
+	var config: MiningConfig = terrain_manager.config
+	var chunk_start_row := chunk_index * config.chunk_height_cells
+	var chunk_end_row := chunk_start_row + config.chunk_height_cells
+	for placement in terrain_manager.get_sculpt_placements():
+		if (
+			placement.world_rect.position.y < chunk_end_row
+			and placement.world_rect.end.y > chunk_start_row
+			and placement.sculpt.has_layer_masks()
+		):
+			return true
+	return false
+
+
+## Prints one authored room row over the terrain already drawn beneath it.
+## Interior cells are filled in runs and only cells touching a solid/open
+## boundary pay per-pixel work, which is what keeps a sculpted chunk's build
+## cost in the same range as the procedural chamber it replaces.
+func _fill_sculpt_row_mask(
+	image: Image,
+	row_mask_y: int,
+	world_row: int,
+	mask_cell_size: int,
+	placement: TerrainManager.SculptPlacement,
+	sculpt_layer_index: int
+) -> void:
+	var config: MiningConfig = terrain_manager.config
+	var sculpt: CutsceneTerrainSculpt = placement.sculpt
+	var room_rect: Rect2i = placement.world_rect
+	var local_y: int = world_row - room_rect.position.y
+	var first_cell_x: int = maxi(room_rect.position.x, 0)
+	var last_cell_x: int = mini(
+		room_rect.end.x,
+		config.terrain_width_cells
+	) - 1
+	if last_cell_x < first_cell_x:
+		return
+
+	var run_start_cell_x: int = first_cell_x
+	var run_is_solid: bool = _is_sculpt_cell_solid(
+		sculpt,
+		sculpt_layer_index,
+		Vector2i(first_cell_x - room_rect.position.x, local_y)
+	)
+	for cell_x in range(first_cell_x, last_cell_x + 2):
+		var is_solid: bool = (
+			run_is_solid
+			if cell_x > last_cell_x
+			else _is_sculpt_cell_solid(
+				sculpt,
+				sculpt_layer_index,
+				Vector2i(cell_x - room_rect.position.x, local_y)
+			)
+		)
+		if is_solid == run_is_solid and cell_x <= last_cell_x:
+			continue
+		image.fill_rect(
+			Rect2i(
+				run_start_cell_x * mask_cell_size,
+				row_mask_y,
+				(cell_x - run_start_cell_x) * mask_cell_size,
+				mask_cell_size
+			),
+			SOLID_MASK_COLOR if run_is_solid else EMPTY_MASK_COLOR
+		)
+		run_start_cell_x = cell_x
+		run_is_solid = is_solid
+
+	if sculpt.edge_smoothing <= 0.0:
+		return
+	for cell_x in range(first_cell_x, last_cell_x + 1):
+		var local_cell := Vector2i(cell_x - room_rect.position.x, local_y)
+		if not _is_sculpt_boundary_cell(sculpt, sculpt_layer_index, local_cell):
+			continue
+		_write_sculpt_boundary_cell(
+			image,
+			cell_x * mask_cell_size,
+			row_mask_y,
+			mask_cell_size,
+			sculpt,
+			sculpt_layer_index,
+			local_cell
+		)
+
+
+## Reads one room cell, choosing the stratum's own rock when the strata were
+## sculpted apart and the shared collision shape otherwise.
+func _is_sculpt_cell_solid(
+	sculpt: CutsceneTerrainSculpt,
+	sculpt_layer_index: int,
+	local_cell: Vector2i
+) -> bool:
+	if sculpt_layer_index < 0:
+		return sculpt.is_solid_local(local_cell)
+	return sculpt.is_layer_solid_local(sculpt_layer_index, local_cell)
+
+
+## Reports whether a cell sits on a solid/open edge, the only place the drawn
+## rock departs from the authored cell grid.
+func _is_sculpt_boundary_cell(
+	sculpt: CutsceneTerrainSculpt,
+	sculpt_layer_index: int,
+	local_cell: Vector2i
+) -> bool:
+	var is_solid := _is_sculpt_cell_solid(
+		sculpt,
+		sculpt_layer_index,
+		local_cell
+	)
+	for offset_y in range(-1, 2):
+		for offset_x in range(-1, 2):
+			if offset_x == 0 and offset_y == 0:
+				continue
+			if _is_sculpt_cell_solid(
+				sculpt,
+				sculpt_layer_index,
+				local_cell + Vector2i(offset_x, offset_y)
+			) != is_solid:
+				return true
+	return false
+
+
+## Softens one rim cell toward its neighbours so a sculpted wall reads as rock
+## rather than as the stair-stepped grid it was painted on. edge_smoothing at
+## zero leaves the hard cell edge, which is what makes a roughened wall jagged.
+func _write_sculpt_boundary_cell(
+	image: Image,
+	cell_mask_x: int,
+	cell_mask_y: int,
+	mask_cell_size: int,
+	sculpt: CutsceneTerrainSculpt,
+	sculpt_layer_index: int,
+	local_cell: Vector2i
+) -> void:
+	var smoothing := sculpt.edge_smoothing
+	var hard_value := (
+		1.0
+		if _is_sculpt_cell_solid(sculpt, sculpt_layer_index, local_cell)
+		else 0.0
+	)
+	var image_width := image.get_width()
+	var image_height := image.get_height()
+	for sub_y in range(mask_cell_size):
+		var mask_y := cell_mask_y + sub_y
+		if mask_y < 0 or mask_y >= image_height:
+			continue
+		for sub_x in range(mask_cell_size):
+			var mask_x := cell_mask_x + sub_x
+			if mask_x < 0 or mask_x >= image_width:
+				continue
+			var coverage := _sample_sculpt_coverage(
+				sculpt,
+				sculpt_layer_index,
+				local_cell,
+				(float(sub_x) + 0.5) / float(mask_cell_size),
+				(float(sub_y) + 0.5) / float(mask_cell_size)
+			)
+			image.set_pixel(
+				mask_x,
+				mask_y,
+				Color(1.0, 1.0, 1.0, lerpf(hard_value, coverage, smoothing))
+			)
+
+
+## Interpolates the four room cells nearest one mask pixel. Sampling cell
+## centers rather than cell corners is what keeps a straight wall straight
+## instead of pulling it half a cell into the rock.
+func _sample_sculpt_coverage(
+	sculpt: CutsceneTerrainSculpt,
+	sculpt_layer_index: int,
+	local_cell: Vector2i,
+	sub_cell_x: float,
+	sub_cell_y: float
+) -> float:
+	var sample_x := float(local_cell.x) + sub_cell_x - 0.5
+	var sample_y := float(local_cell.y) + sub_cell_y - 0.5
+	var base_x := floori(sample_x)
+	var base_y := floori(sample_y)
+	var weight_x := sample_x - float(base_x)
+	var weight_y := sample_y - float(base_y)
+	var top_left := _get_sculpt_cell_value(
+		sculpt, sculpt_layer_index, Vector2i(base_x, base_y)
+	)
+	var top_right := _get_sculpt_cell_value(
+		sculpt, sculpt_layer_index, Vector2i(base_x + 1, base_y)
+	)
+	var bottom_left := _get_sculpt_cell_value(
+		sculpt, sculpt_layer_index, Vector2i(base_x, base_y + 1)
+	)
+	var bottom_right := _get_sculpt_cell_value(
+		sculpt, sculpt_layer_index, Vector2i(base_x + 1, base_y + 1)
+	)
+	return lerpf(
+		lerpf(top_left, top_right, weight_x),
+		lerpf(bottom_left, bottom_right, weight_x),
+		weight_y
+	)
+
+
+func _get_sculpt_cell_value(
+	sculpt: CutsceneTerrainSculpt,
+	sculpt_layer_index: int,
+	local_cell: Vector2i
+) -> float:
+	return (
+		1.0
+		if _is_sculpt_cell_solid(sculpt, sculpt_layer_index, local_cell)
+		else 0.0
+	)
 
 
 ## Lowers only layer one beneath each room's unchanged layer-two support.
@@ -1634,19 +1963,28 @@ func _get_resized_stamp_images(
 		return cached_images
 
 	var stamp_images := ResizedStampImages.new()
+	# blit_rect_mask cuts wherever the mask alpha is not exactly zero, so an
+	# interpolated erase mask cuts its whole feathered skirt at full strength and
+	# the opening creeps about a third of a pixel past the drawing - taking the
+	# inked rim, which is only about one pixel wide at this scale, with it.
+	# Nearest keeps the cut on the silhouette the artist drew. Nothing is lost by
+	# it: the cut was already hard-edged, because that same test discards every
+	# partial value bilinear produced.
 	stamp_images.erase_mask = _transform_stamp_image(
 		mask_data.erase_mask,
 		stamp_size,
 		flip_x,
 		flip_y,
-		rotation_quarters
+		rotation_quarters,
+		Image.INTERPOLATE_NEAREST
 	)
 	stamp_images.fracture_source = _transform_stamp_image(
 		mask_data.fracture_source,
 		stamp_size,
 		flip_x,
 		flip_y,
-		rotation_quarters
+		rotation_quarters,
+		Image.INTERPOLATE_BILINEAR
 	)
 	stamp_images.transparent_source = Image.create(
 		stamp_size.x,
@@ -1678,18 +2016,22 @@ func _clear_temporary_stamp_cache() -> void:
 
 
 ## Applies one cached orientation identically to the hole and its drawn cracks.
+## The cavity and the strokes take different filters for the reason given at the
+## call site, so the caller states which one it wants rather than sharing a
+## default that is only correct for one of them.
 func _transform_stamp_image(
 	source: Image,
 	stamp_size: Vector2i,
 	flip_x: bool,
 	flip_y: bool,
-	rotation_quarters: int
+	rotation_quarters: int,
+	interpolation: Image.Interpolation
 ) -> Image:
 	var transformed := source.duplicate()
 	transformed.resize(
 		stamp_size.x,
 		stamp_size.y,
-		Image.INTERPOLATE_BILINEAR
+		interpolation
 	)
 	if flip_x:
 		transformed.flip_x()
@@ -1707,7 +2049,7 @@ func _transform_stamp_image(
 		transformed.resize(
 			stamp_size.x,
 			stamp_size.y,
-			Image.INTERPOLATE_BILINEAR
+			interpolation
 		)
 	return transformed
 
@@ -1805,22 +2147,38 @@ func _prepare_hole_masks() -> void:
 	_big_mask_data.clear()
 	_resized_stamp_cache.clear()
 	_resized_stamp_cache_order.clear()
+	var prepared_masks: Dictionary[String, HoleMaskData] = {}
 	for layer_index in range(profile.get_layer_count()):
+		if (
+			profile.keep_back_layer_solid
+			and layer_index == profile.get_gameplay_layer_count() - 1
+		):
+			# The immutable backing layer is never stamped, so preparing two
+			# masks for it only delays the opening scene.
+			_small_mask_data.append(null)
+			_big_mask_data.append(null)
+			continue
 		var line_scale := profile.get_fracture_line_layer_scale(layer_index)
-		_small_mask_data.append(
-			_create_hole_mask_data(
-				profile.get_hole_mask(layer_index, false),
-				layer_index * 2,
-				line_scale
+		for use_big_hole in [false, true]:
+			var texture := profile.get_hole_mask(
+				layer_index,
+				use_big_hole
 			)
-		)
-		_big_mask_data.append(
-			_create_hole_mask_data(
-				profile.get_hole_mask(layer_index, true),
-				layer_index * 2 + 1,
-				line_scale
-			)
-		)
+			var cache_key := "%s|%.4f" % [
+				texture.resource_path if texture != null else "",
+				line_scale,
+			]
+			if not prepared_masks.has(cache_key):
+				prepared_masks[cache_key] = _create_hole_mask_data(
+					texture,
+					prepared_masks.size(),
+					line_scale
+				)
+			var mask_data := prepared_masks[cache_key]
+			if use_big_hole:
+				_big_mask_data.append(mask_data)
+			else:
+				_small_mask_data.append(mask_data)
 
 
 ## Loads one mask and measures the opening the artist authored.
@@ -1856,21 +2214,30 @@ func _create_hole_mask_data(
 		false,
 		Image.FORMAT_LA8
 	)
-	fracture_source.fill(Color(1.0, 1.0, 1.0, 0.0))
+	# Carry the stroke value in the unwritten pixels too. Coverage lives in
+	# alpha, and the per-hit resize interpolates luminance and alpha separately,
+	# so a white backing would mix a shrinking stroke toward white before its
+	# coverage ever reached blend_rect - fading the same line twice.
+	var line_value := 1.0 - profile.fracture_line_strength
+	fracture_source.fill(Color(line_value, line_value, line_value, 0.0))
+	var writes_fracture_lines := fracture_line_scale > 0.0
 	# Three temporary buffers the size of one authored mask. They are local to
 	# this call and released with it; nothing accumulates per hit or per chunk.
 	var cell_count := mask_width * mask_height
 	var cavity_cells := PackedByteArray()
 	cavity_cells.resize(cell_count)
 	var stroke_cells := PackedByteArray()
-	stroke_cells.resize(cell_count)
 	var stroke_coverage := PackedFloat32Array()
-	stroke_coverage.resize(cell_count)
+	if writes_fracture_lines:
+		stroke_cells.resize(cell_count)
+		stroke_coverage.resize(cell_count)
 	for source_y in range(mask_height):
 		var cell_row := source_y * mask_width
 		for source_x in range(mask_width):
 			var source_pixel := image.get_pixel(source_x, source_y)
 			if source_pixel.a > profile.transparent_alpha_threshold:
+				if not writes_fracture_lines:
+					continue
 				var luminance := (
 					source_pixel.r * 0.2126
 					+ source_pixel.g * 0.7152
@@ -1912,7 +2279,7 @@ func _create_hole_mask_data(
 			)
 	if maximum.x < minimum.x or maximum.y < minimum.y:
 		return null
-	if fracture_line_scale > 0.0:
+	if writes_fracture_lines:
 		_write_fracture_lines(
 			fracture_source,
 			cavity_cells,
@@ -1963,9 +2330,9 @@ func _create_hole_mask_data(
 ## cavity, and loose scribbles standing off in the surrounding rock. The outline
 ## is the broken edge and matches the characters' inked silhouettes, so it is
 ## kept; the scribbles read as marks lying on top of the dirt, so anything
-## further out than the authored reach fades away. Strata behind the authored
-## depth print nothing, which is what stops one hit from stacking four
-## near-parallel bands into the worms this replaced.
+## further out than the authored reach fades away. Each configured cuttable
+## stratum prints the stroke against its own smaller opening, while strata
+## behind the authored depth print nothing.
 func _write_fracture_lines(
 	fracture_source: Image,
 	cavity_cells: PackedByteArray,
@@ -2182,12 +2549,13 @@ func _create_layer_material(
 		profile.rock_loner_scale
 	)
 	material.set_shader_parameter(
-		&"rock_depth_ramp_world_px",
-		profile.rock_depth_ramp_world_px
+		&"rock_run_world_px",
+		float(terrain_manager.config.total_run_depth)
+			* float(terrain_manager.config.terrain_cell_world_size)
 	)
 	material.set_shader_parameter(
-		&"rock_depth_ramp_gain",
-		profile.rock_depth_ramp_gain
+		&"rock_bottom_density_multiplier",
+		profile.rock_bottom_density_multiplier
 	)
 	material.set_shader_parameter(
 		&"use_rock_shadows",
@@ -2197,9 +2565,76 @@ func _create_layer_material(
 		&"rock_shadow_strength",
 		profile.rock_shadow_strength
 	)
+	# Foreground crystals are part of the intact face, not mined-out outcrops.
+	# Only layer zero pays the additional atlas read; its terrain mask clips the
+	# crystal automatically when that piece of rock is removed.
+	material.set_shader_parameter(
+		&"foreground_gem_texture",
+		profile.foreground_gem_texture
+	)
+	material.set_shader_parameter(
+		&"use_foreground_gems",
+		layer_index == 0
+			and profile.foreground_gem_texture != null
+			and profile.foreground_gem_density > 0.0
+	)
+	material.set_shader_parameter(
+		&"foreground_gem_atlas_count",
+		profile.foreground_gem_atlas_count
+	)
+	var foreground_gem_aspect := 1.0
+	if (
+		profile.foreground_gem_texture != null
+		and profile.foreground_gem_texture.get_height() > 0
+	):
+		foreground_gem_aspect = (
+			float(profile.foreground_gem_texture.get_width())
+			/ float(maxi(profile.foreground_gem_atlas_count, 1))
+			/ float(profile.foreground_gem_texture.get_height())
+		)
+	material.set_shader_parameter(
+		&"foreground_gem_cell_aspect",
+		foreground_gem_aspect
+	)
+	material.set_shader_parameter(
+		&"foreground_gem_density",
+		profile.foreground_gem_density
+	)
+	material.set_shader_parameter(
+		&"foreground_gem_cell_world_px",
+		profile.foreground_gem_cell_world_px
+	)
+	material.set_shader_parameter(
+		&"foreground_gem_minimum_height",
+		profile.foreground_gem_minimum_height
+	)
+	material.set_shader_parameter(
+		&"foreground_gem_maximum_height",
+		profile.foreground_gem_maximum_height
+	)
 	material.set_shader_parameter(
 		&"fracture_shade_color",
 		profile.fracture_shade_color
+	)
+	# The darkest stroke value this stratum can hold, which is what the shader
+	# normalises recovered ink against. Strata past fracture_line_layer_depth
+	# print nothing, so this is zero for them and the recovery block is skipped.
+	material.set_shader_parameter(
+		&"fracture_line_ink",
+		profile.fracture_line_strength
+			* profile.get_fracture_line_layer_scale(layer_index)
+	)
+	material.set_shader_parameter(
+		&"sharpen_fracture_lines",
+		profile.fracture_line_sharpen
+	)
+	material.set_shader_parameter(
+		&"fracture_line_gain",
+		profile.fracture_line_gain
+	)
+	material.set_shader_parameter(
+		&"fracture_line_weight_world_px",
+		profile.fracture_line_weight_world_px
 	)
 	material.set_shader_parameter(
 		&"dirt_shade_steps",

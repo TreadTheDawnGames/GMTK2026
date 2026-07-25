@@ -49,6 +49,8 @@ func _ready() -> void:
 	while targets.size() < _starting_target_count:
 		add_target()
 	Utils.set_control_width(slider, slider_size)
+	if not backing.resized.is_connected(on_backing_resized):
+		backing.resized.connect(on_backing_resized)
 	await get_tree().process_frame
 	#randomize_all_targets()
 	#for target in targets:
@@ -197,7 +199,7 @@ func reset_all_targets() -> void:
 
 ## Moves the slider and resolves one press against every visible target.
 func _process(delta: float) -> void:
-	if Input.is_action_just_pressed(&"Space"):
+	if Input.is_action_just_pressed(&"primary_action"):
 		var hit_targets: Array = targets.filter(
 			func(target: TimingTarget) -> bool:
 				return target.is_point_within_bounds(slider_position, grace))
@@ -334,6 +336,14 @@ func randomize_all_targets():
 		total_rerolls += 1
 	
 	pass
+
+## Targets anchor to the backing's center, so a position placed before the
+## backing has its real width re-resolves half a bar away once it lays out,
+## which leaves the drawn target outside its own hit bounds. Re-place them the
+## moment that width actually arrives.
+func on_backing_resized() -> void:
+	if is_node_ready():
+		randomize_all_targets()
 
 func on_freeze(stopped:bool):
 	if stopped:

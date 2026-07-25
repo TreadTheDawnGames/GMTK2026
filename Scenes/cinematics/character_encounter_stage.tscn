@@ -66,8 +66,8 @@ libraries/ = SubResource("AnimationLibrary_stage")
 
 [node name="EditorTerrainPreview" type="Node2D" parent="." node_paths=PackedStringArray("terrain_manager", "terrain_renderer", "test_impacts_root")]
 z_index = -100
-position = Vector2(-576, -260)
-editor_description = "Editor-only. Runs the production TerrainManager and TerrainLayerRenderer so every inheriting stage is authored inside the real encounter chamber instead of an empty canvas. The offset puts the terrain's mining face on this stage's origin, which is where the stage sits at runtime, so a marker at y = 0 is on the dig line. Set Preview Depth Rows to this stage's own encounter depth. It frees itself in a running game and nothing reads from it."
+position = Vector2(-752, -260)
+editor_description = "Editor-only. Runs the production TerrainManager and TerrainLayerRenderer so every inheriting stage is authored inside the real encounter chamber instead of an empty canvas. The offset puts this stage's origin exactly where DepthEncounterController places the stage at runtime: the terrain centre plus the schedule's Encounter Horizontal Offset Cells, on the dig line. The script derives it, so it cannot drift from the game. Set Preview Depth Rows to this stage's own encounter depth. It frees itself in a running game and nothing reads from it."
 script = ExtResource("2_preview")
 terrain_manager = NodePath("TerrainManager")
 terrain_renderer = NodePath("TerrainLayerRenderer")

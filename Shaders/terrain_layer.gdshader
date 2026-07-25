@@ -7,7 +7,11 @@ shader_type canvas_item;
 // - Shared world-space bedding fades in as strata become deeper.
 // - Three scatter passes place drawn rocks from one atlas, far to near, gated by
 //   a shared cluster field so stones arrive in piles instead of a sprinkle.
+// - One rare atlas pass embeds deterministic crystals in the foreground only.
 // - The mask luminance carries fracture strokes while alpha carries cutouts.
+// - Both are stored below world resolution, so both are re-thresholded here
+//   against their own screen gradient: the cut stays a crisp edge and the
+//   authored stroke stays a drawn line instead of a filtered smudge.
 // - The terrain mask affects only alpha; fracture art affects only shaded RGB.
 // - All work is loop-free and constant per fragment for GL Compatibility/web.
 
@@ -71,16 +75,27 @@ uniform float rock_cluster_coverage = 0.5;
 // Presence multiplier for a cell outside every cluster, so bare dirt still
 // carries the occasional loner instead of being perfectly clean.
 uniform float rock_loner_scale = 0.22;
-// Rock presence also ramps with how far below the original ground line a pixel
-// sits, so topsoil stays clean and the deep run becomes visibly stonier. The
-// ramp reaches its full gain rock_depth_ramp_world_px below the surface.
-uniform float rock_depth_ramp_world_px = 2600.0;
-uniform float rock_depth_ramp_gain = 2.4;
+// Rock presence ramps linearly across the entire run. A bottom multiplier of
+// 2.0 therefore produces 1.5x density at the halfway depth.
+uniform float rock_run_world_px = 800000.0;
+uniform float rock_bottom_density_multiplier = 2.0;
 // Seats the near rocks on the dirt by printing their own displaced silhouette
 // underneath them. This is the fourth and last atlas read; leave it off if a
 // web build ever needs the sample back.
 uniform bool use_rock_shadows = true;
 uniform float rock_shadow_strength = 0.45;
+
+// Rare foreground crystals. This pass is disabled on every buried stratum, so
+// only layer zero pays its one atlas read. The shared terrain mask later clips
+// each crystal with the intact rock, requiring no persistent spawn records.
+uniform sampler2D foreground_gem_texture : source_color, filter_linear;
+uniform bool use_foreground_gems = false;
+uniform int foreground_gem_atlas_count = 5;
+uniform float foreground_gem_cell_aspect = 0.5667;
+uniform float foreground_gem_density = 0.008;
+uniform float foreground_gem_cell_world_px = 96.0;
+uniform float foreground_gem_minimum_height = 24.0;
+uniform float foreground_gem_maximum_height = 42.0;
 
 // Cut-edge shading. Every stratum's mask is beveled against its own opening so
 // the rims read as one connected rock face receding backward, instead of flat
@@ -93,6 +108,20 @@ uniform bool use_layer_edge_shading = true;
 uniform float edge_shade_world_pixels = 6.0;
 uniform float edge_shade_strength = 0.45;
 uniform float edge_light_strength = 0.3;
+
+// Authored crack strokes. The renderer prints them into the mask's luminance,
+// but the mask is stored well below world resolution, so a stroke the artist
+// inked several pixels thick arrives about one mask pixel wide and is then
+// magnified with linear filtering into a grey smudge. These restore the drawn
+// line at screen resolution: widen it by a world-space weight so it does not
+// thin out as a hole is stamped larger, then re-threshold it against its own
+// screen gradient the same way sharpen_mask_edges does for the cut itself.
+// fracture_line_ink is this stratum's darkest authored stroke value, so zero
+// disables the whole block for the strata that print no strokes at all.
+uniform bool sharpen_fracture_lines = true;
+uniform float fracture_line_ink = 0.0;
+uniform float fracture_line_gain = 1.6;
+uniform float fracture_line_weight_world_px = 0.5;
 
 // Surface dressing. Grass and the packed crust belong to the foreground
 // stratum itself rather than to an overlay, so digging removes them for free:
@@ -117,10 +146,43 @@ uniform float grass_cell_aspect = 0.461;
 uniform float grass_cell_world_px = 16.0;
 // How far below the ground line the mask is probed to decide grass survives.
 uniform float grass_support_probe_px = 4.0;
+// The blades are drawn in flat daylight green. At the surface they stand
+// against the same low sun as every other prop, so they take a cool shade and a
+// warm tip light here, or the grass line reads as a sticker across the horizon.
+uniform vec4 grass_shade_color : source_color = vec4(0.44, 0.46, 0.58, 1.0);
+uniform float grass_shade_strength = 0.42;
+uniform vec4 grass_tip_light_color : source_color = vec4(1.0, 0.80, 0.44, 1.0);
+uniform float grass_tip_light_strength = 0.60;
+
 // Packed earth on the exposed top of the surface, in place of the old overlay.
 uniform float crust_depth_world_px = 10.0;
 uniform vec4 crust_color : source_color = vec4(0.46, 0.42, 0.36, 1.0);
 uniform float crust_strength = 0.5;
+
+// The ground the miner is standing on, between the grass and the cut face. It
+// is the only horizontal plane in a side-on shot, so it is the one band facing
+// the sky: lighting it warm and letting it fall away into the face below is
+// what stops the surface reading as a wall he is standing in front of.
+uniform float ground_shelf_depth_world_px = 44.0;
+// Fraction of that depth the plane holds full light before it rolls off. A
+// plane needs a far edge to read as a plane, so this deliberately does not
+// fade from the ground line: it stays lit, then turns down.
+uniform float ground_shelf_plateau : hint_range(0.0, 1.0) = 0.5;
+uniform vec4 ground_shelf_light_color : source_color = vec4(
+	1.0,
+	0.78,
+	0.52,
+	1.0
+);
+uniform float ground_shelf_light_strength = 0.34;
+// Shadow the shelf's far edge drops onto the cut face below it. This is the
+// band that actually turns the corner; without it the light just fades out.
+uniform float ground_face_shade_depth_world_px = 34.0;
+uniform float ground_face_shade_strength = 0.24;
+// Shade where the grass mat sits on the earth. Without it the blades look
+// printed on the dirt instead of growing out of it.
+uniform float ground_contact_depth_world_px = 6.0;
+uniform float ground_contact_strength = 0.42;
 
 // Darkens a solid pixel that sits near its own layer's cut edge and lights the
 // upward-facing lip, using four mask taps to find which way the edge faces.
@@ -291,10 +353,10 @@ vec4 sample_drawn_rock(
 	// Depth is measured from the cell center as well, for the same reason.
 	float depth_gain = mix(
 		1.0,
-		max(rock_depth_ramp_gain, 0.0),
+		max(rock_bottom_density_multiplier, 0.0),
 		clamp(
 			(cell_center_world.y - surface_world_y)
-				/ max(rock_depth_ramp_world_px, 1.0),
+				/ max(rock_run_world_px, 1.0),
 			0.0,
 			1.0
 		)
@@ -404,6 +466,92 @@ vec4 sample_drawn_rock(
 		mix(stone, dirt_surface * 0.94, depth_fade),
 		silhouette * footprint * rock_present
 	);
+}
+
+// Samples the one deterministic crystal candidate owned by this scatter cell.
+// The candidate's rotated bounding circle stays inside its cell, so no neighbor
+// search is needed and a crystal cannot be clipped by a procedural grid edge.
+vec4 sample_foreground_gem(vec2 world_position) {
+	float cell_world_px = max(foreground_gem_cell_world_px, 1.0);
+	vec2 grid_position = world_position / cell_world_px + vec2(19.7, 73.1);
+	vec2 gem_cell = floor(grid_position);
+	vec2 cell_local = fract(grid_position);
+	vec2 gem_seed = gem_cell + vec2(41.3, 7.9);
+	float gem_present = step(
+		1.0 - clamp(foreground_gem_density, 0.0, 1.0),
+		dirt_hash(gem_seed)
+	);
+
+	float minimum_height = min(
+		foreground_gem_minimum_height,
+		foreground_gem_maximum_height
+	);
+	float maximum_height = max(
+		foreground_gem_minimum_height,
+		foreground_gem_maximum_height
+	);
+	float height_fraction = mix(
+		minimum_height,
+		maximum_height,
+		dirt_hash(gem_seed + vec2(13.1, 61.7))
+	) / cell_world_px;
+	float aspect = max(foreground_gem_cell_aspect, 0.01);
+	float gem_angle = dirt_hash(gem_seed + vec2(29.3, 17.5)) * 6.2831853;
+	float gem_cosine = cos(gem_angle);
+	float gem_sine = sin(gem_angle);
+	float bounding_radius = height_fraction
+		* 0.5
+		* sqrt(1.0 + aspect * aspect);
+	float jitter_reach = max(0.5 - bounding_radius, 0.0);
+	vec2 gem_center = vec2(0.5) + jitter_reach * (
+		vec2(
+			dirt_hash(gem_seed + vec2(5.7, 47.9)),
+			dirt_hash(gem_seed + vec2(83.1, 3.7))
+		) * 2.0 - 1.0
+	);
+	vec2 gem_delta = cell_local - gem_center;
+	vec2 rotated_delta = vec2(
+		gem_cosine * gem_delta.x + gem_sine * gem_delta.y,
+		gem_cosine * gem_delta.y - gem_sine * gem_delta.x
+	);
+	vec2 gem_uv = rotated_delta / vec2(
+		height_fraction * aspect,
+		height_fraction
+	) + vec2(0.5);
+	vec2 inside_low = step(vec2(0.0), gem_uv);
+	vec2 inside_high = step(gem_uv, vec2(1.0));
+	float footprint = (
+		inside_low.x * inside_low.y * inside_high.x * inside_high.y
+	);
+
+	float atlas_count = float(max(foreground_gem_atlas_count, 1));
+	float atlas_index = min(
+		floor(
+			dirt_hash(gem_seed + vec2(71.9, 23.3))
+				* atlas_count
+		),
+		atlas_count - 1.0
+	);
+	float mirrored_u = mix(
+		gem_uv.x,
+		1.0 - gem_uv.x,
+		step(0.5, dirt_hash(gem_seed + vec2(37.7, 89.1)))
+	);
+	vec4 art = texture(
+		foreground_gem_texture,
+		vec2(
+			(atlas_index + clamp(mirrored_u, 0.0, 1.0))
+				/ atlas_count,
+			clamp(gem_uv.y, 0.0, 1.0)
+		)
+	);
+	float alpha_softness = max(fwidth(art.a), 0.0001);
+	float silhouette = smoothstep(
+		0.5 - alpha_softness,
+		0.5 + alpha_softness,
+		art.a
+	);
+	return vec4(art.rgb, silhouette * footprint * gem_present);
 }
 
 // Grass helpers. Godot will not let a user function take the built-in TEXTURE
@@ -599,11 +747,12 @@ vec3 apply_strata_texture(vec3 surface_color, vec2 world_position) {
 		ROCK_NEAR_PRESENCE,
 		0.0
 	);
-	return mix(
+	vec3 detailed_surface = mix(
 		clustered_surface,
 		near_rock.rgb,
 		near_rock.a * rock_strength
 	);
+	return detailed_surface;
 }
 
 // Composes optional art, tint, procedural strata detail, and the damage mask.
@@ -653,6 +802,19 @@ void fragment() {
 			world_position
 		);
 	}
+	// Keep the terrain beneath a gem so fracture ink can reveal that terrain
+	// instead of flattening every line into a new opaque color.
+	vec3 terrain_surface = surface_color;
+	float foreground_gem_coverage = 0.0;
+	if (use_foreground_gems) {
+		vec4 foreground_gem = sample_foreground_gem(world_position);
+		foreground_gem_coverage = foreground_gem.a;
+		surface_color = mix(
+			surface_color,
+			foreground_gem.rgb,
+			foreground_gem_coverage
+		);
+	}
 	// Bevel this stratum against its own opening before the cracks go on, so
 	// the rim shading reads as form and the strokes still sit on top of it.
 	if (use_layer_edge_shading && mask_alpha > 0.0) {
@@ -670,13 +832,59 @@ void fragment() {
 		);
 	}
 
-	// A stroke tints the rock toward its own deep-earth tone instead of printing
-	// neutral black over it, so a crack reads as this same material in shadow
-	// rather than as ink sitting on top of the painting.
+	// Recover the drawn stroke before it shades anything. Neighbour taps are
+	// gated on their own solidity: a cleared mask pixel carries luminance zero,
+	// which would otherwise read as maximum ink and ring every opening in the
+	// chunk with a line no artist drew.
+	if (sharpen_fracture_lines && fracture_line_ink > 0.0) {
+		float ink = 1.0 - fracture_value;
+		if (fracture_line_weight_world_px > 0.0) {
+			vec2 ink_step = vec2(fracture_line_weight_world_px)
+				/ max(chunk_world_size, vec2(1.0));
+			vec4 ink_left = texture(TEXTURE, UV - vec2(ink_step.x, 0.0));
+			vec4 ink_right = texture(TEXTURE, UV + vec2(ink_step.x, 0.0));
+			vec4 ink_up = texture(TEXTURE, UV - vec2(0.0, ink_step.y));
+			vec4 ink_down = texture(TEXTURE, UV + vec2(0.0, ink_step.y));
+			ink = max(ink, (1.0 - ink_left.r) * step(0.5, ink_left.a));
+			ink = max(ink, (1.0 - ink_right.r) * step(0.5, ink_right.a));
+			ink = max(ink, (1.0 - ink_up.r) * step(0.5, ink_up.a));
+			ink = max(ink, (1.0 - ink_down.r) * step(0.5, ink_down.a));
+		}
+		ink = clamp(ink / fracture_line_ink, 0.0, 1.0);
+		float ink_softness = max(fwidth(ink), 0.0001);
+		ink = smoothstep(
+			0.5 - ink_softness,
+			0.5 + ink_softness,
+			ink * fracture_line_gain
+		);
+		fracture_value = 1.0 - ink * fracture_line_ink;
+	}
+
+	// Preserve the original multiplicative fracture rendering everywhere. Only
+	// where a gem intersects ink does the shader substitute the dirt beneath it
+	// and normalize the authored line strength to fully occlude the crystal.
+	float fracture_mix = 1.0 - fracture_value;
+	float gem_fracture_mix = fracture_mix;
+	if (fracture_line_ink > 0.0) {
+		gem_fracture_mix = clamp(
+			fracture_mix / fracture_line_ink,
+			0.0,
+			1.0
+		);
+	}
+	vec3 fracture_surface = mix(
+		surface_color * fracture_shade_color.rgb,
+		terrain_surface * fracture_shade_color.rgb,
+		foreground_gem_coverage
+	);
 	surface_color = mix(
 		surface_color,
-		surface_color * fracture_shade_color.rgb,
-		1.0 - fracture_value
+		fracture_surface,
+		mix(
+			fracture_mix,
+			gem_fracture_mix,
+			foreground_gem_coverage
+		)
 	);
 
 	// Only alpha is cut by the streamed mask. Optional artwork alpha and layer
@@ -704,13 +912,76 @@ void fragment() {
 				vec4 blade = sample_surface_grass(world_position);
 				float grass = blade.a * grass_band * step(0.5, support_alpha);
 				if (grass > 0.0) {
-					surface_color = blade.rgb;
+					// Height inside the blade strip: 1 at the tip, 0 at the
+					// mat. The sun is at the horizon, so only what stands clear
+					// of the mat catches any of it.
+					float blade_height = clamp(
+						(surface_world_y - world_position.y)
+							/ max(grass_height_world_px, 1.0),
+						0.0,
+						1.0
+					);
+					surface_color = blade.rgb * mix(
+						vec3(1.0),
+						grass_shade_color.rgb * 2.0,
+						clamp(grass_shade_strength, 0.0, 1.0)
+					);
+					surface_color += grass_tip_light_color.rgb
+						* pow(blade_height, 2.2)
+						* max(grass_tip_light_strength, 0.0);
 					final_alpha = grass;
 				}
 			}
 		} else {
-			// Packed earth on the exposed top of the original ground line.
+			// The top of the ground, built from the widest band to the
+			// tightest so each one shades what the last laid down: the lit
+			// shelf, the shadow off its far edge, the packed lip on it, then
+			// the grass's contact shade over all of it. Read together they
+			// give the dirt a top face, a far edge, and a cut face below.
 			float depth_below_surface = world_position.y - surface_world_y;
+			float shelf_depth = max(ground_shelf_depth_world_px, 1.0);
+			float shelf_edge = shelf_depth
+				* clamp(ground_shelf_plateau, 0.0, 0.99);
+
+			// Sunlit top plane, held flat to its far edge and then turned
+			// down. Fading it from the ground line instead would read as a
+			// gradient painted on a wall rather than as a surface.
+			float shelf = step(-1.0, depth_below_surface) * (
+				1.0 - smoothstep(
+					shelf_edge,
+					shelf_depth,
+					depth_below_surface
+				)
+			);
+			surface_color = mix(
+				surface_color,
+				ground_shelf_light_color.rgb,
+				clamp(shelf * ground_shelf_light_strength, 0.0, 1.0)
+			);
+
+			// The corner itself: darkest just past the shelf's far edge, back
+			// to open dirt over its own depth.
+			float face_shade = smoothstep(
+				shelf_edge,
+				shelf_depth,
+				depth_below_surface
+			) * (
+				1.0 - smoothstep(
+					shelf_depth,
+					shelf_depth + max(
+						ground_face_shade_depth_world_px,
+						1.0
+					),
+					depth_below_surface
+				)
+			);
+			surface_color *= 1.0 - clamp(
+				face_shade * ground_face_shade_strength,
+				0.0,
+				0.9
+			);
+
+			// Packed earth on the exposed top of the original ground line.
 			float crust = step(-1.0, depth_below_surface) * (
 				1.0 - smoothstep(
 					0.0,
@@ -722,6 +993,22 @@ void fragment() {
 				surface_color,
 				crust_color.rgb,
 				clamp(crust * crust_strength, 0.0, 1.0)
+			);
+
+			// Contact shade last, so it darkens the finished lip rather than
+			// being covered by it. It is tighter than the crust, which leaves
+			// the order dark line, bright lip, falling face.
+			float contact = step(-1.0, depth_below_surface) * (
+				1.0 - smoothstep(
+					0.0,
+					max(ground_contact_depth_world_px, 1.0),
+					depth_below_surface
+				)
+			);
+			surface_color *= 1.0 - clamp(
+				contact * ground_contact_strength,
+				0.0,
+				0.9
 			);
 		}
 	}

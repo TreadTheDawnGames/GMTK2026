@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="DialogueConversation" format=3 uid="uid://ce05mtnlsh8yd"]
+[gd_resource type="Resource" script_class="DialogueConversation" format=3 uid="uid://yigtckpqgod"]
 
 [ext_resource type="Script" uid="uid://c55utdbjdwaui" path="res://resources/dialogue/dialogue_conversation.gd" id="1_conversation"]
 [ext_resource type="Script" uid="uid://ivfntthetp0i" path="res://resources/dialogue/dialogue_participant.gd" id="2_participant"]
@@ -7,12 +7,12 @@
 [sub_resource type="Resource" id="Line_cheer"]
 script = ExtResource("3_line")
 speaker_slot = &"treasure_hunter"
-text = "Yippee! Wahoo!"
+text = "I found it. More treasure than I could ever carry."
 
 [sub_resource type="Resource" id="Line_found"]
 script = ExtResource("3_line")
 speaker_slot = &"treasure_hunter"
-text = "I've found it! The legends were true!"
+text = "I spent so long wondering what it would look like."
 
 [sub_resource type="Resource" id="Line_miner"]
 script = ExtResource("3_line")
@@ -22,12 +22,12 @@ text = "..."
 [sub_resource type="Resource" id="Line_wish"]
 script = ExtResource("3_line")
 speaker_slot = &"treasure_hunter"
-text = "I hope you find what you're looking for!"
+text = "It's mostly just heavy."
 
 [sub_resource type="Resource" id="Line_pickaxe"]
 script = ExtResource("3_line")
 speaker_slot = &"treasure_hunter"
-text = "Here, I don't need this pickaxe anymore. You take it—it'll help with your journey."
+text = "Take this. I don't need to dig anymore."
 
 [sub_resource type="Resource" id="Participant_miner"]
 script = ExtResource("2_participant")

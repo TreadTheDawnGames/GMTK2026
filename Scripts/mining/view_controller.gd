@@ -7,6 +7,7 @@ extends Node
 ## - Smooth mode eases after the miner and closes its lag after contact.
 ## - Chunk mode holds one page until the miner crosses its halfway point.
 ## - Review mode moves the view only; returning uses its own fast free fall.
+## - Detached travel stays below one terrain chunk per rendered frame.
 ## - Encounter framing and release tween from the currently presented view.
 ## The invariant is that screen offset always equals miner position minus view.
 
@@ -20,6 +21,10 @@ enum ViewMode {
 	REVIEWING,
 	RETURNING,
 }
+
+## Prevents one slow web frame from feeding several synchronous chunk rebuilds
+## into the next frame while leaving healthy 60 FPS review motion unchanged.
+const MAX_STREAMING_FRAME_DELTA: float = 1.0 / 30.0
 
 @export var config: MiningConfig
 @export var terrain_manager: TerrainManager
@@ -409,15 +414,16 @@ func _move_review_view(delta: float) -> void:
 		config.review_scroll_speed,
 		speed_weight
 	)
+	var travel := _get_stream_safe_travel(scroll_speed, delta)
 	current_view_y = move_toward(
 		current_view_y,
 		_review_target_y,
-		scroll_speed * delta
+		travel
 	)
 	current_view_x = move_toward(
 		current_view_x,
 		target_view_position.x,
-		scroll_speed * delta
+		travel
 	)
 	if (
 		is_equal_approx(current_view_y, target_view_position.y)
@@ -437,24 +443,48 @@ func _fall_to_miner(delta: float) -> void:
 			== MiningConfig.MiningCameraStyle.CHUNK_SNAP
 	):
 		return_view_y = _get_chunk_camera_y(target_view_position.y)
+	var safe_delta := minf(
+		maxf(delta, 0.0),
+		MAX_STREAMING_FRAME_DELTA
+	)
 	_return_velocity = minf(
-		_return_velocity + config.return_fall_gravity * delta,
+		_return_velocity + config.return_fall_gravity * safe_delta,
 		config.return_max_fall_speed
 	)
+	var travel := _get_stream_safe_travel(
+		_return_velocity,
+		safe_delta
+	)
 	current_view_y = minf(
-		current_view_y + _return_velocity * delta,
+		current_view_y + travel,
 		return_view_y
 	)
 	current_view_x = move_toward(
 		current_view_x,
 		target_view_position.x,
-		_return_velocity * delta
+		travel
 	)
 	if (
 		current_view_y >= return_view_y
 		and is_equal_approx(current_view_x, target_view_position.x)
 	):
 		_finish_return_to_miner()
+
+
+## Caps detached movement so one frame can cross at most one chunk boundary.
+func _get_stream_safe_travel(speed: float, delta: float) -> float:
+	var safe_delta := minf(
+		maxf(delta, 0.0),
+		MAX_STREAMING_FRAME_DELTA
+	)
+	var chunk_travel_limit := maxf(
+		float(config.chunk_height_cells) - 0.001,
+		1.0
+	)
+	return minf(
+		maxf(speed, 0.0) * safe_delta,
+		chunk_travel_limit
+	)
 
 
 ## Reattaches the camera and reports that mining can resume.

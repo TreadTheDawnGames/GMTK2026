@@ -24,12 +24,14 @@ extends Control
 ## The menu fades into black here; the mining scene starts fully covered and
 ## splits that same black apart from the middle, so the handover reads as one
 ## continuous shot.
-@export_range(0.0, 3.0, 0.05) var start_fade_seconds: float = 0.6
+@export_range(0.0, 3.0, 0.05) var start_fade_seconds: float = 0.25
 
 var _intro_tween: Tween
 var _start_tween: Tween
 var _intro_complete: bool = false
 var _is_starting: bool = false
+var _game_scene_load_requested: bool = false
+var _loaded_game_scene: PackedScene
 
 
 ## Connects menu actions and starts the staged interface reveal.
@@ -60,6 +62,36 @@ func _ready() -> void:
 	if OS.has_feature("web"):
 		exit_button.hide()
 	_play_intro()
+	_request_game_scene_load.call_deferred()
+
+
+## Polls the menu-time load without blocking a rendered frame.
+func _process(_delta: float) -> void:
+	if not _game_scene_load_requested or _loaded_game_scene != null:
+		return
+	var load_status := ResourceLoader.load_threaded_get_status(game_scene_path)
+	if load_status == ResourceLoader.THREAD_LOAD_LOADED:
+		_loaded_game_scene = (
+			ResourceLoader.load_threaded_get(game_scene_path) as PackedScene
+		)
+		set_process(false)
+	elif (
+		load_status == ResourceLoader.THREAD_LOAD_FAILED
+		or load_status == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE
+	):
+		_game_scene_load_requested = false
+		set_process(false)
+
+
+## Warms the large gameplay scene while the player is reading the menu.
+func _request_game_scene_load() -> void:
+	if game_scene_path.is_empty() or _game_scene_load_requested:
+		return
+	var request_error := ResourceLoader.load_threaded_request(game_scene_path)
+	if request_error != OK:
+		return
+	_game_scene_load_requested = true
+	set_process(true)
 
 
 ## Lets any deliberate input skip the remaining menu reveal.
@@ -124,7 +156,7 @@ func _on_start_button_pressed() -> void:
 	if run_state != null:
 		run_state.reset_run()
 	await _fade_to_black()
-	_open_game_scene()
+	await _open_game_scene()
 
 
 ## Covers the menu so the mining scene can open out of the same black.
@@ -148,7 +180,18 @@ func _open_game_scene() -> void:
 	var run_state := RunState.get_global(self)
 	if run_state != null:
 		run_state.reset_run()
-	var change_error := get_tree().change_scene_to_file(game_scene_path)
+	while _game_scene_load_requested and _loaded_game_scene == null:
+		var load_status := ResourceLoader.load_threaded_get_status(
+			game_scene_path
+		)
+		if load_status != ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			break
+		await get_tree().process_frame
+	var change_error := ERR_CANT_OPEN
+	if _loaded_game_scene != null:
+		change_error = get_tree().change_scene_to_packed(_loaded_game_scene)
+	else:
+		change_error = get_tree().change_scene_to_file(game_scene_path)
 	if change_error == OK:
 		return
 	_is_starting = false
@@ -166,7 +209,14 @@ func _open_game_scene() -> void:
 
 ## Opens the authored settings screen over the menu.
 func _on_options_pressed() -> void:
-	var options := options_scene.instantiate()
+	var options := options_scene.instantiate() as Control
+	if options == null:
+		push_error("The configured options scene must instantiate a Control.")
+		return
+	options.tree_exited.connect(
+		options_button.grab_focus,
+		CONNECT_ONE_SHOT
+	)
 	add_child(options)
 
 

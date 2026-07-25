@@ -1,0 +1,260 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
+[ext_resource type="Texture2D" path="res://Assets/Props/gem_crystals.png" id="2_gems"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_yellow"]
+atlas = ExtResource("2_gems")
+region = Rect2(0, 0, 73, 124)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_purple"]
+atlas = ExtResource("2_gems")
+region = Rect2(73, 0, 72, 124)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_green"]
+atlas = ExtResource("2_gems")
+region = Rect2(145, 0, 73, 124)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_pink"]
+atlas = ExtResource("2_gems")
+region = Rect2(218, 0, 72, 124)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_blue"]
+atlas = ExtResource("2_gems")
+region = Rect2(290, 0, 73, 124)
+
+[node name="TreasureHunterHoardEncounterStage" instance=ExtResource("1_stage")]
+editor_description = "The Treasure Hunter stands beside a dense 36-crystal hoard that fills his encounter chamber."
+
+[node name="Conversation" parent="ActorMarkers" index="1"]
+position = Vector2(-160, 0)
+
+[node name="Rest" parent="ActorMarkers" index="3"]
+position = Vector2(-160, 0)
+
+[node name="GemPile" type="Node2D" parent="PropMarkers" index="0"]
+z_index = -1
+editor_description = "A fixed 36-crystal pile. Its count is bounded and creates no runtime accumulation."
+
+[node name="Gem01" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(-70, -22)
+rotation = -0.08
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_yellow")
+
+[node name="Gem02" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(-30, -22)
+rotation = 0.06
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_purple")
+
+[node name="Gem03" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(10, -22)
+rotation = -0.04
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_green")
+
+[node name="Gem04" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(50, -22)
+rotation = 0.09
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_pink")
+
+[node name="Gem05" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(90, -22)
+rotation = -0.07
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_blue")
+
+[node name="Gem06" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(130, -22)
+rotation = 0.04
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_yellow")
+
+[node name="Gem07" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(170, -22)
+rotation = -0.05
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_green")
+
+[node name="Gem08" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(210, -22)
+rotation = 0.08
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_purple")
+
+[node name="Gem09" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(-50, -44)
+rotation = 0.05
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_blue")
+
+[node name="Gem10" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(-10, -44)
+rotation = -0.09
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_pink")
+
+[node name="Gem11" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(30, -44)
+rotation = 0.07
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_yellow")
+
+[node name="Gem12" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(70, -44)
+rotation = -0.03
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_green")
+
+[node name="Gem13" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(110, -44)
+rotation = 0.08
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_purple")
+
+[node name="Gem14" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(150, -44)
+rotation = -0.06
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_blue")
+
+[node name="Gem15" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(190, -44)
+rotation = 0.04
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_pink")
+
+[node name="Gem16" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(-30, -66)
+rotation = -0.05
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_green")
+
+[node name="Gem17" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(10, -66)
+rotation = 0.09
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_blue")
+
+[node name="Gem18" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(50, -66)
+rotation = -0.07
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_yellow")
+
+[node name="Gem19" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(90, -66)
+rotation = 0.03
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_purple")
+
+[node name="Gem20" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(130, -66)
+rotation = -0.08
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_pink")
+
+[node name="Gem21" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(170, -66)
+rotation = 0.06
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_green")
+
+[node name="Gem22" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(-10, -88)
+rotation = 0.07
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_purple")
+
+[node name="Gem23" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(30, -88)
+rotation = -0.04
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_pink")
+
+[node name="Gem24" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(70, -88)
+rotation = 0.08
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_blue")
+
+[node name="Gem25" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(110, -88)
+rotation = -0.06
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_yellow")
+
+[node name="Gem26" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(150, -88)
+rotation = 0.04
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_green")
+
+[node name="Gem27" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(10, -110)
+rotation = -0.08
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_blue")
+
+[node name="Gem28" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(50, -110)
+rotation = 0.05
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_green")
+
+[node name="Gem29" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(90, -110)
+rotation = -0.03
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_purple")
+
+[node name="Gem30" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(130, -110)
+rotation = 0.08
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_pink")
+
+[node name="Gem31" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(30, -132)
+rotation = 0.06
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_yellow")
+
+[node name="Gem32" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(70, -132)
+rotation = -0.07
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_blue")
+
+[node name="Gem33" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(110, -132)
+rotation = 0.04
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_green")
+
+[node name="Gem34" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(50, -154)
+rotation = -0.05
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_pink")
+
+[node name="Gem35" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(90, -154)
+rotation = 0.07
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_purple")
+
+[node name="Gem36" type="Sprite2D" parent="PropMarkers/GemPile"]
+position = Vector2(70, -176)
+rotation = -0.03
+scale = Vector2(0.38, 0.38)
+texture = SubResource("AtlasTexture_yellow")
+
+[node name="EditorTerrainPreview" parent="." index="4"]
+editor_description = "Previews treasure_hunter_treasure at depth 7400 with its complete hoard."
+encounter_id = &"treasure_hunter_treasure"
+preview_depth_rows = 7400
+
+[editable path="ActorMarkers"]

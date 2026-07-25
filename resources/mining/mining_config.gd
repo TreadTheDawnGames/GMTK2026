@@ -13,6 +13,12 @@ enum MiningCameraStyle {
 	CHUNK_SNAP,
 }
 
+## Godot stores depth in a signed integer, so literal infinity is unavailable.
+## This ceiling is intentionally unreachable in normal play (well over a
+## century at ten rows per second) and exists only to keep terrain coordinates
+## inside a stable numeric range.
+const MAX_PLAYABLE_DEPTH: int = 2_000_000_000
+
 @export_category("Terrain")
 ## Covers the 1152px canvas while the autonomous path pans 24 cells sideways.
 @export_range(16, 512, 1) var terrain_width_cells: int = 192
@@ -20,6 +26,7 @@ enum MiningCameraStyle {
 ## Sets the world-space size of one gameplay terrain cell.
 @export_range(1, 32, 1) var terrain_cell_world_size: int = 8
 @export_range(1, 512, 1) var initial_surface_row: int = 38
+## Story milestone where the player reaches the Thief. Mining continues below.
 @export_range(1, 1_000_000, 1) var total_run_depth: int = 100_000
 ## Terrain rows cleared by a normal starting hit.
 @export_range(1, 64, 1) var base_mine_depth_rows: int = 6
@@ -88,6 +95,6 @@ enum MiningCameraStyle {
 @export_range(1.0, 10.0, 0.1) var maximum_stack_debris_multiplier: float = 3.0
 
 
-## Returns the final terrain row beneath the player's feet.
+## Returns the practical coordinate ceiling for the otherwise endless mine.
 func get_bottom_surface_row() -> int:
-	return initial_surface_row + total_run_depth
+	return initial_surface_row + MAX_PLAYABLE_DEPTH

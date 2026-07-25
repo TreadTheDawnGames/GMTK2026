@@ -1,5 +1,8 @@
 extends TimingTarget
 
+@onready var _audio_handler: PlayerAudioHandler = (
+	PlayerAudioHandler.get_global(self)
+)
 
 func hit(_timing_window: SliderTimingWindow = null) -> void:
 	super.hit(_timing_window)
@@ -8,4 +11,4 @@ func hit(_timing_window: SliderTimingWindow = null) -> void:
 	if _timing_window == null:
 		return
 	_timing_window.direction *= -1
-	AudioHandler.play_sound(AudioLibrary.BOUNCE)
+	_audio_handler.play_sound(AudioLibrary.BOUNCE)

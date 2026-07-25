@@ -20,21 +20,21 @@ rat_appearances = Array[ExtResource("3_appearance")]([ExtResource("4_brown"), Ex
 editor_description = "Fixed five-actor growth bound. Runtime hides the rear pair on web builds."
 
 [node name="RatLeftFar" parent="Formation" instance=ExtResource("2_rat")]
-position = Vector2(-126, 40)
+position = Vector2(-126, 52)
 z_index = 1
 
 [node name="RatLeftNear" parent="Formation" instance=ExtResource("2_rat")]
-position = Vector2(-76, 48)
+position = Vector2(-76, 32)
 z_index = 3
 
 [node name="RatRightNear" parent="Formation" instance=ExtResource("2_rat")]
-position = Vector2(78, 48)
+position = Vector2(78, 44)
 z_index = 3
 
 [node name="RatRightFar" parent="Formation" instance=ExtResource("2_rat")]
-position = Vector2(128, 40)
+position = Vector2(128, 20)
 z_index = 1
 
 [node name="RatRear" parent="Formation" instance=ExtResource("2_rat")]
-position = Vector2(-20, 24)
+position = Vector2(-20, 8)
 z_index = 0

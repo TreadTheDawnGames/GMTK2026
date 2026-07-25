@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="CreditEntry" format=3 uid="uid://chetsp2p07pg8"]
+
+[ext_resource type="Script" uid="uid://c66qkeqn8p820" path="res://resources/credits/credit_entry.gd" id="1_entry"]
+
+[resource]
+script = ExtResource("1_entry")
+heading = "DIGGER'S REMORSE"
+body = "A GMTK GAME JAM 2026 GAME"

@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="TerrainLayerProfile" load_steps=7 format=3]
+[gd_resource type="Resource" script_class="TerrainLayerProfile" load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://resources/mining/terrain_layer_profile.gd" id="1_profile"]
 [ext_resource type="Texture2D" path="res://Assets/Terrain/hole_mask_small.png" id="2_small"]
@@ -6,6 +6,7 @@
 [ext_resource type="Texture2D" path="res://Assets/Terrain/hole_mask_large.png" id="4_large"]
 [ext_resource type="Texture2D" path="res://Assets/Terrain/surface_grass.png" id="5_grass"]
 [ext_resource type="Texture2D" path="res://Assets/Terrain/drawn_rocks.png" id="6_rocks"]
+[ext_resource type="Texture2D" path="res://Assets/Props/gem_crystals.png" id="7_gems"]
 
 [resource]
 script = ExtResource("1_profile")
@@ -30,12 +31,17 @@ rock_atlas_count = 13
 rock_cluster_world_px = 176.0
 rock_cluster_coverage = 0.46
 rock_loner_scale = 0.15
-rock_depth_ramp_world_px = 2600.0
-rock_depth_ramp_gain = 2.4
+rock_bottom_density_multiplier = 2.0
 rock_shadows_enabled = true
 rock_shadow_strength = 0.45
 layer_rock_body_colors = PackedColorArray(0.6, 0.55, 0.48, 1, 0.47, 0.42, 0.37, 1, 0.35, 0.31, 0.28, 1, 0.24, 0.22, 0.21, 1)
 layer_rock_outline_colors = PackedColorArray(0.13, 0.1, 0.08, 1, 0.1, 0.08, 0.07, 1, 0.07, 0.06, 0.05, 1, 0.05, 0.04, 0.04, 1)
+foreground_gem_texture = ExtResource("7_gems")
+foreground_gem_atlas_count = 5
+foreground_gem_density = 0.008
+foreground_gem_cell_world_px = 96.0
+foreground_gem_minimum_height = 24.0
+foreground_gem_maximum_height = 42.0
 small_hole_masks = Array[Texture2D]([ExtResource("3_medium"), ExtResource("3_medium"), ExtResource("2_small"), ExtResource("2_small")])
 big_hole_masks = Array[Texture2D]([ExtResource("4_large"), ExtResource("3_medium"), ExtResource("2_small"), ExtResource("2_small")])
 rim_width = 16
@@ -45,9 +51,12 @@ keep_back_layer_solid = true
 fracture_line_luminance_threshold = 0.38
 fracture_line_strength = 0.85
 fracture_shade_color = Color(0.14, 0.11, 0.1, 1)
-fracture_line_layer_depth = 1
-fracture_line_depth_falloff = 0.4
-fracture_rim_reach_px = 9.0
+fracture_line_layer_depth = 3
+fracture_line_depth_falloff = 1.0
+fracture_rim_reach_px = 96.0
+fracture_line_sharpen = true
+fracture_line_gain = 1.6
+fracture_line_weight_world_px = 0.5
 chamber_layer_two_floor_reveal_px = 20.0
 impact_smoke_color = Color(0.52, 0.4, 0.3, 1)
 debris_colors = PackedColorArray(0.42, 0.32, 0.24, 1, 0.34, 0.25, 0.19, 1, 0.27, 0.2, 0.16, 1, 0.16, 0.13, 0.13, 1)
