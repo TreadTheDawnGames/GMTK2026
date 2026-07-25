@@ -15,6 +15,7 @@ const _MARKER_ROOT_NAMES: Array[StringName] = [
 	&"PropMarkers",
 	&"ActionMarkers",
 ]
+const _MINER_RIG_SCENE := preload("res://Scenes/mining/miner_rig.tscn")
 
 var _context: CutsceneEditorContext
 var _status_label: Label
@@ -25,6 +26,7 @@ var _prop_name_edit: LineEdit
 var _marker_root_selector: OptionButton
 var _marker_name_edit: LineEdit
 var _selected_preview: CutsceneActorPreview
+var _standalone_test_undo_redo: UndoRedo
 
 
 func _init() -> void:
@@ -51,6 +53,13 @@ func set_context(context: CutsceneEditorContext) -> void:
 		)
 	):
 		_context.authored_data_changed.connect(_on_authored_data_changed)
+	_rebuild()
+
+
+## Supplies the base UndoRedo used only by standalone verification, where the
+## editor's abstract manager cannot be constructed outside an editor process.
+func set_standalone_test_undo_redo(undo_redo: UndoRedo) -> void:
+	_standalone_test_undo_redo = undo_redo
 	_rebuild()
 
 
@@ -85,7 +94,7 @@ func _has_valid_context() -> bool:
 		and is_instance_valid(_context)
 		and _context.is_valid()
 		and is_instance_valid(_context.scene_root)
-		and _context.undo_redo != null
+		and _get_undo_redo() != null
 	)
 
 
@@ -98,6 +107,24 @@ func _build_controls() -> void:
 	_status_label = Label.new()
 	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(_status_label)
+
+	var populate_button := Button.new()
+	populate_button.text = "Populate from encounter"
+	populate_button.tooltip_text = (
+		"Add the encounter's real cast at the positions used by gameplay."
+	)
+	populate_button.pressed.connect(_on_populate_from_encounter_pressed)
+	add_child(populate_button)
+
+	var miner_button := Button.new()
+	miner_button.text = "Show the miner"
+	miner_button.tooltip_text = (
+		"Add the gameplay miner with his real art and draw order."
+	)
+	miner_button.pressed.connect(_on_show_miner_pressed)
+	add_child(miner_button)
+	if not Engine.is_editor_hint():
+		return
 
 	add_child(_make_section_label("Cast"))
 	var cast_scroll := ScrollContainer.new()
@@ -229,6 +256,288 @@ func _get_appearance_name(appearance: CharacterAppearance) -> String:
 	return "Unnamed appearance"
 
 
+## Adds the encounter's currently present actors without disturbing authored
+## stand-ins. The returned x/y values are added and already-placed counts.
+func populate_from_encounter() -> Vector2i:
+	if not _has_valid_context():
+		_set_status("Open a valid cutscene stage first.")
+		return Vector2i.ZERO
+	if _context.encounter == null:
+		_set_status("This stage has no encounter to populate.")
+		return Vector2i.ZERO
+	var mining_config := _get_stage_mining_config()
+	if mining_config == null:
+		_set_status("The stage has no mining config for cast placement.")
+		return Vector2i.ZERO
+
+	var encounter := _context.encounter
+	var encounter_config := _context.preview.get_encounter_config()
+	if encounter_config == null:
+		_set_status("The stage has no encounter schedule to populate from.")
+		return Vector2i.ZERO
+	var appearance_by_actor_id: Dictionary[StringName, CharacterAppearance] = {}
+	for scheduled_encounter: DepthCharacterEncounter in (
+		encounter_config.encounters
+	):
+		if (
+			scheduled_encounter != null
+			and not scheduled_encounter.actor_id.is_empty()
+			and not appearance_by_actor_id.has(scheduled_encounter.actor_id)
+		):
+			appearance_by_actor_id[scheduled_encounter.actor_id] = (
+				scheduled_encounter.appearance
+			)
+	if not appearance_by_actor_id.has(encounter.actor_id):
+		appearance_by_actor_id[encounter.actor_id] = encounter.appearance
+
+	var horizontal_offset_cells := _get_encounter_horizontal_offset_cells(
+		encounter_config
+	)
+	var actor_ids: Array[StringName] = []
+	var actor_positions: Dictionary[StringName, Vector2] = {}
+	if not encounter.actor_id.is_empty():
+		actor_ids.append(encounter.actor_id)
+		actor_positions[encounter.actor_id] = Vector2(
+			float(horizontal_offset_cells)
+				* float(mining_config.terrain_cell_world_size),
+			0.0
+		)
+	if encounter.gathers_cast:
+		var gathering_positions := _get_gathering_positions(
+			mining_config,
+			horizontal_offset_cells,
+			encounter_config.gathering_actor_ids.size()
+		)
+		for actor_index in range(
+			min(
+				encounter_config.gathering_actor_ids.size(),
+				gathering_positions.size()
+			)
+		):
+			var actor_id := encounter_config.gathering_actor_ids[actor_index]
+			if actor_id.is_empty():
+				continue
+			if not actor_ids.has(actor_id):
+				actor_ids.append(actor_id)
+			actor_positions[actor_id] = gathering_positions[actor_index]
+
+	var additions: Array[CutsceneActorPreview] = []
+	var already_placed := 0
+	for actor_id in actor_ids:
+		if _context.get_actor_preview(actor_id) != null:
+			already_placed += 1
+			continue
+		var actor := CutsceneActorPreview.new()
+		actor.name = _make_unique_child_name(_context.stage, String(actor_id))
+		actor.actor_id = actor_id
+		actor.appearance = appearance_by_actor_id.get(actor_id) as CharacterAppearance
+		actor.position = actor_positions.get(actor_id, Vector2.ZERO)
+		additions.append(actor)
+
+	if not additions.is_empty():
+		_commit_actor_additions(additions, "Populate cutscene cast")
+	_set_status(
+		"Added %d, left %d already placed."
+		% [additions.size(), already_placed]
+	)
+	return Vector2i(additions.size(), already_placed)
+
+
+## Adds the always-present miner once, preserving any designer placement.
+func show_miner() -> bool:
+	if not _has_valid_context():
+		_set_status("Open a valid cutscene stage first.")
+		return false
+	if _context.get_actor_preview(&"miner") != null:
+		_set_status("Miner already placed.")
+		return false
+	var miner_appearance := _build_miner_appearance()
+	if miner_appearance == null:
+		_set_status("The miner rig art could not be resolved for preview.")
+		return false
+	var miner_z_index := _get_miner_gameplay_z_index()
+	if miner_z_index < 0:
+		_set_status("The miner gameplay draw order could not be resolved.")
+		return false
+	var miner := CutsceneActorPreview.new()
+	miner.name = _make_unique_child_name(_context.stage, "Miner")
+	miner.actor_id = &"miner"
+	miner.appearance = miner_appearance
+	miner.position = Vector2.ZERO
+	# Gameplay MinerRig is z 1 while terrain stratum one is z 2, so the
+	# foreground rock still closes over the miner's legs in the editor.
+	miner.z_index = miner_z_index
+	_commit_actor_additions([miner], "Show cutscene miner")
+	_set_status("Added the miner.")
+	return true
+
+
+func _get_stage_mining_config() -> MiningConfig:
+	if _context.preview == null:
+		return null
+	var terrain_manager := _context.preview.terrain_manager
+	if not is_instance_valid(terrain_manager):
+		return null
+	return terrain_manager.config
+
+
+func _get_undo_redo() -> Variant:
+	if _context != null and _context.undo_redo != null:
+		return _context.undo_redo
+	return _standalone_test_undo_redo
+
+
+func _get_encounter_horizontal_offset_cells(
+	encounter_config: DepthEncounterConfig
+) -> int:
+	return encounter_config.encounter_horizontal_offset_cells
+
+
+func _get_gathering_positions(
+	mining_config: MiningConfig,
+	horizontal_offset_cells: int,
+	actor_count: int
+) -> Array[Vector2]:
+	# Mirrors DepthEncounterController._gather_cafe_characters in stage space.
+	var positions: Array[Vector2] = []
+	var edge_margin_cells := clampi(
+		absi(horizontal_offset_cells) / 2,
+		4,
+		maxi(mining_config.terrain_width_cells / 4, 4)
+	)
+	var minimum_cell_x := float(edge_margin_cells)
+	var maximum_cell_x := float(
+		maxi(
+			mining_config.terrain_width_cells - 1 - edge_margin_cells,
+			edge_margin_cells
+		)
+	)
+	var spacing_cells := (
+		0.0
+		if actor_count <= 1
+		else minf(
+			16.0,
+			(maximum_cell_x - minimum_cell_x)
+				/ float(actor_count - 1)
+		)
+	)
+	var group_span_cells := spacing_cells * float(maxi(actor_count - 1, 0))
+	var group_start_cell_x := clampf(
+		float(mining_config.terrain_width_cells) * 0.5
+			- group_span_cells * 0.5,
+		minimum_cell_x,
+		maxf(maximum_cell_x - group_span_cells, minimum_cell_x)
+	)
+	var terrain_center_cell_x := float(mining_config.terrain_width_cells) * 0.5
+	var cell_size := float(mining_config.terrain_cell_world_size)
+	for actor_index in range(actor_count):
+		positions.append(Vector2(
+			(
+				group_start_cell_x
+					+ float(actor_index) * spacing_cells
+					- terrain_center_cell_x
+			) * cell_size,
+			0.0
+		))
+	return positions
+
+
+func _commit_actor_additions(
+	additions: Array[CutsceneActorPreview],
+	action_name: String
+) -> void:
+	var undo_redo: Variant = _get_undo_redo()
+	undo_redo.create_action(action_name)
+	for actor: CutsceneActorPreview in additions:
+		if undo_redo is UndoRedo:
+			undo_redo.add_do_method(
+				Callable(_context.stage, &"add_child").bind(actor)
+			)
+		else:
+			undo_redo.add_do_method(_context.stage, &"add_child", actor)
+		undo_redo.add_do_property(actor, &"owner", _context.scene_root)
+		if undo_redo is UndoRedo:
+			undo_redo.add_do_method(Callable(actor, &"_sync_sprite_owner"))
+		else:
+			undo_redo.add_do_method(actor, &"_sync_sprite_owner")
+		if undo_redo is UndoRedo:
+			undo_redo.add_undo_method(
+				Callable(_context, &"notify_authored_data_changed")
+			)
+			undo_redo.add_undo_method(
+				Callable(_context.stage, &"remove_child").bind(actor)
+			)
+		else:
+			undo_redo.add_undo_method(
+				_context,
+				&"notify_authored_data_changed"
+			)
+			undo_redo.add_undo_method(_context.stage, &"remove_child", actor)
+		undo_redo.add_do_reference(actor)
+	if undo_redo is UndoRedo:
+		undo_redo.add_do_method(
+			Callable(_context, &"notify_authored_data_changed")
+		)
+	else:
+		undo_redo.add_do_method(
+			_context,
+			&"notify_authored_data_changed"
+		)
+	undo_redo.commit_action()
+
+
+func _build_miner_appearance() -> CharacterAppearance:
+	var rig_root := _MINER_RIG_SCENE.instantiate()
+	var rig := rig_root as MinerRig
+	var miner_sprite := rig_root.get_node_or_null(
+		"VisualRoot/DrawnMinerSprite"
+	) as Sprite2D
+	var landing_foot_anchor := rig_root.get_node_or_null(
+		"VisualRoot/LandingFootAnchor"
+	) as Marker2D
+	if rig == null or miner_sprite == null or landing_foot_anchor == null:
+		rig_root.free()
+		return null
+	var appearance := CharacterAppearance.new()
+	appearance.texture = miner_sprite.texture
+	if appearance.texture == null:
+		appearance.texture = rig.idle_miner_texture
+	appearance.horizontal_frames = miner_sprite.hframes
+	appearance.vertical_frames = miner_sprite.vframes
+	appearance.frame = miner_sprite.frame
+	appearance.sprite_scale = miner_sprite.scale
+	appearance.sprite_offset = (
+		miner_sprite.position - landing_foot_anchor.position
+	)
+	appearance.tint = miner_sprite.modulate
+	appearance.flip_h = miner_sprite.flip_h
+	rig_root.free()
+	return appearance
+
+
+func _get_miner_gameplay_z_index() -> int:
+	var rig_root := _MINER_RIG_SCENE.instantiate()
+	var rig := rig_root as MinerRig
+	if rig == null:
+		rig_root.free()
+		return -1
+	var buried_draw_order: Variant = rig.get("buried_draw_order")
+	if buried_draw_order == null:
+		rig_root.free()
+		return -1
+	var gameplay_z_index := int(buried_draw_order)
+	rig_root.free()
+	return gameplay_z_index
+
+
+func _on_populate_from_encounter_pressed() -> void:
+	populate_from_encounter()
+
+
+func _on_show_miner_pressed() -> void:
+	show_miner()
+
+
 func _on_authored_data_changed() -> void:
 	_rebuild()
 
@@ -268,7 +577,7 @@ func _on_add_actor_pressed() -> void:
 		actor.position = _context.stage.to_local(
 			conversation_marker.global_position
 		)
-	var undo_redo := _context.undo_redo
+	var undo_redo: Variant = _get_undo_redo()
 	undo_redo.create_action("Add cutscene actor")
 	undo_redo.add_do_method(
 		_context.stage,
@@ -276,6 +585,7 @@ func _on_add_actor_pressed() -> void:
 		actor
 	)
 	undo_redo.add_do_property(actor, &"owner", _context.scene_root)
+	undo_redo.add_do_method(actor, &"_sync_sprite_owner")
 	undo_redo.add_undo_method(
 		_context,
 		&"notify_authored_data_changed"
@@ -299,7 +609,7 @@ func _on_remove_actor_pressed() -> void:
 		_set_status("Select an actor stand-in to remove it.")
 		return
 	var parent := preview.get_parent()
-	var undo_redo := _context.undo_redo
+	var undo_redo: Variant = _get_undo_redo()
 	undo_redo.create_action("Remove cutscene actor")
 	undo_redo.add_do_method(parent, &"remove_child", preview)
 	undo_redo.add_do_method(
@@ -346,7 +656,7 @@ func _on_add_prop_pressed() -> void:
 		_set_status("The selected prop scene could not be instantiated.")
 		return
 	prop.name = _make_unique_child_name(prop_root, prop_name)
-	var undo_redo := _context.undo_redo
+	var undo_redo: Variant = _get_undo_redo()
 	undo_redo.create_action("Add cutscene prop")
 	undo_redo.add_do_method(prop_root, &"add_child", prop)
 	undo_redo.add_do_property(prop, &"owner", _context.scene_root)
@@ -377,7 +687,7 @@ func _on_add_marker_pressed() -> void:
 		return
 	var marker := Marker2D.new()
 	marker.name = _make_unique_child_name(marker_root, marker_name)
-	var undo_redo := _context.undo_redo
+	var undo_redo: Variant = _get_undo_redo()
 	undo_redo.create_action("Add cutscene marker")
 	undo_redo.add_do_method(marker_root, &"add_child", marker)
 	undo_redo.add_do_property(marker, &"owner", _context.scene_root)
