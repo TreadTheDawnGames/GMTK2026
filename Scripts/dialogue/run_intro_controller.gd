@@ -21,10 +21,10 @@ const MINER_SPEAKER_SLOT: StringName = &"miner"
 @export_category("Animation")
 ## Held after the blackout splits open, before the bus enters, so the player
 ## reads the empty stop first.
-@export_range(0.0, 3.0, 0.05) var hold_after_reveal_seconds: float = 0.35
+@export_range(0.0, 3.0, 0.05) var hold_after_reveal_seconds: float = 0.0
 ## The closing beat: how long the miner takes to plant into his dig stance.
 ## Long enough to read as a deliberate settle rather than a snap.
-@export_range(0.0, 2.0, 0.05) var miner_restore_seconds: float = 0.45
+@export_range(0.0, 2.0, 0.05) var miner_restore_seconds: float = 0.2
 
 @export_category("References")
 @export var dialogue_director: DialogueDirector
