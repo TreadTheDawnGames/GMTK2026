@@ -35,6 +35,12 @@ signal swing_finished
 ## Once he has dug in he is below the original surface, so layer one closes over
 ## his legs again and every shot from there down looks as it always did.
 @export_range(0, 16, 1) var buried_draw_order: int = 1
+## Standing in an authored cutscene room, in front of terrain layer one
+## (z_index 2) again. A cutscene frames the whole cast standing on the room's
+## floor and holds on it, so the foreground stratum cutting him off at the shins
+## reads as a bug there even though it is exactly right while mining the same
+## depth. Ordinary mining is untouched: only an active encounter asks for this.
+@export_range(0, 16, 1) var cutscene_draw_order: int = 3
 
 @export_category("References")
 @export var animation_player: AnimationPlayer
@@ -60,6 +66,7 @@ var _cinematic_rest_z_as_relative: bool
 ## True until he lands below the surface he started on. Nothing puts it back:
 ## once the ground is open he is inside it for the rest of the run.
 var _is_on_surface: bool = true
+var _is_in_cutscene: bool = false
 var _cinematic_tween: Tween
 @onready var _audio_handler: PlayerAudioHandler = (
 	PlayerAudioHandler.get_global(self)
@@ -219,7 +226,30 @@ func react_to_presented_line() -> void:
 ## borrows his presentation can hand back the order he actually belongs at
 ## instead of one captured before he moved.
 func get_rest_draw_order() -> int:
+	if _is_in_cutscene:
+		return cutscene_draw_order
 	return surface_draw_order if _is_on_surface else buried_draw_order
+
+
+## Frames him for an authored cutscene, in front of the foreground stratum.
+## Every path that restores draw order already routes through
+## get_rest_draw_order, so a shot that borrows his presentation mid-cutscene
+## still hands him back at the cutscene order rather than the mining one.
+func enter_cutscene_draw_order() -> void:
+	if _is_in_cutscene:
+		return
+	_is_in_cutscene = true
+	if not _cinematic_override_active:
+		z_index = get_rest_draw_order()
+
+
+## Returns him to the order his current depth calls for once the shot is over.
+func exit_cutscene_draw_order() -> void:
+	if not _is_in_cutscene:
+		return
+	_is_in_cutscene = false
+	if not _cinematic_override_active:
+		z_index = get_rest_draw_order()
 
 
 ## Moves him off the starting surface and into the ground. The caller owns the

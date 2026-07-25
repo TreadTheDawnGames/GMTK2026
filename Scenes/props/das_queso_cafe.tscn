@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Texture2D" path="res://Assets/Props/das_queso_cafe.png" id="1_cafe"]
+
+[node name="DasQuesoCafe" type="Sprite2D"]
+editor_description = "The cheese cafe the whole run is walking toward. Cheese Girl is drawn into the serving window, so a cutscene using this set piece must not also place her actor stand-in - she would appear twice. The offset stands the storefront on the node's origin, and z 3 keeps it in front of the foreground rock but behind the cast, which are added to the stage after PropMarkers and so draw over it at the same depth."
+texture = ExtResource("1_cafe")
+z_index = 3
+offset = Vector2(0, -779)
+scale = Vector2(0.12, 0.12)

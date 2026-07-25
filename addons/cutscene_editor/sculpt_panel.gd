@@ -51,16 +51,16 @@ const OPERATION_TOOLTIPS: Array[String] = [
 		+ "Alt-click heals one.",
 ]
 
-## One colour per stratum, foreground first. These are identity, not decoration:
-## the same colour marks a stratum's swatch, its outline in the viewport, and
-## the brush ring while that stratum is selected, so "which layer am I cutting"
-## is answered by colour rather than by reading a dropdown mid-stroke.
+## Fallback colours, foreground stratum first, used only before a stage is open
+## and its terrain profile can be read. The real swatch colour is the stratum's
+## own tint from that profile: a picker whose colours do not match the rock they
+## cut teaches the wrong thing about which layer is which. The run draws four
+## strata, so four entries is the whole set.
 const LAYER_COLORS: Array[Color] = [
-	Color(1.00, 0.78, 0.28),
-	Color(0.42, 0.82, 1.00),
-	Color(0.62, 1.00, 0.55),
-	Color(1.00, 0.55, 0.85),
-	Color(0.80, 0.70, 1.00),
+	Color(0.54, 0.41, 0.29),
+	Color(0.40, 0.29, 0.21),
+	Color(0.27, 0.19, 0.15),
+	Color(0.15, 0.12, 0.12),
 ]
 ## Colour used when the brush edits the shape itself rather than one stratum.
 const SHAPE_COLOR := Color(1.0, 1.0, 1.0, 0.95)
@@ -89,6 +89,9 @@ var _focus_mode_selector: OptionButton
 var _dim_slider: HSlider
 var _follow_sculpt_layer: CheckBox
 var _swatch_row: HBoxContainer
+var _copy_room_menu: MenuButton
+## Rooms the copy menu currently offers, parallel to its item ids.
+var _copy_room_sources: Array[CutsceneTerrainSculpt] = []
 # -1 shows every stratum; otherwise the one stratum left fully visible.
 var _focused_layer: int = -1
 
@@ -124,15 +127,57 @@ func get_operation() -> StringName:
 
 ## Returns the colour standing for whatever the brush is currently editing, so
 ## the viewport can draw the brush and the stratum outline in the same colour.
+##
+## Lifted to a readable luminance rather than used raw. A stratum's true colour
+## is what the swatch shows, but the deep strata are nearly black by design, and
+## a brush ring in that colour over unlit rock cannot be seen at all.
 func get_active_layer_color() -> Color:
-	return get_layer_color(_brush.target_layer)
+	var layer_color := get_layer_color(_brush.target_layer)
+	if _brush.target_layer < 0:
+		return layer_color
+	return _to_readable_marker_color(layer_color)
 
 
-## Returns one stratum's colour, or the shape colour for a negative index.
+## Returns one stratum's colour as the game actually draws that layer, or the
+## shape colour for a negative index.
+##
+## Read from the live terrain profile rather than an editor palette. A swatch
+## that does not match the rock it cuts teaches the wrong thing about which
+## layer is which, and the profile is the only place that truth lives.
 func get_layer_color(layer_index: int) -> Color:
 	if layer_index < 0:
 		return SHAPE_COLOR
+	var profile := _get_terrain_layer_profile()
+	if (
+		profile != null
+		and layer_index < profile.layer_tints.size()
+	):
+		var tint := profile.layer_tints[layer_index]
+		tint.a = 1.0
+		return tint
 	return LAYER_COLORS[layer_index % LAYER_COLORS.size()]
+
+
+## Returns the profile the open stage's terrain draws with, or null when no
+## stage is open yet.
+func _get_terrain_layer_profile() -> TerrainLayerProfile:
+	if (
+		_context == null
+		or not is_instance_valid(_context.preview)
+		or not is_instance_valid(_context.preview.terrain_renderer)
+	):
+		return null
+	return _context.preview.terrain_renderer.profile
+
+
+## Keeps a stratum's own hue while forcing enough brightness to read as a line
+## drawn over terrain.
+func _to_readable_marker_color(layer_color: Color) -> Color:
+	var readable := layer_color
+	readable.v = maxf(layer_color.v, 0.85)
+	readable.s = maxf(layer_color.s, 0.45)
+	readable.a = 0.9
+	return readable
 
 
 ## Returns the armed tool's human name, for the on-canvas readout.
@@ -285,7 +330,17 @@ func _build_controls() -> void:
 	_arm_button.toggle_mode = true
 	_arm_button.tooltip_text = (
 		"Arms the brush. While it is on, dragging in the 2D viewport sculpts "
-		+ "instead of selecting. Hold Alt to swap carve and fill mid-drag."
+		+ "instead of selecting; switch it off and the viewport selects and "
+		+ "moves nodes exactly as it always does.\n"
+		+ "\n"
+		+ "While armed, in the viewport:\n"
+		+ "  1-5  pick carve, fill, smooth, roughen, dig hit\n"
+		+ "  X  swap carve and fill\n"
+		+ "  [ and ]  or the wheel, resize the brush\n"
+		+ "  Ctrl+wheel  step between layers\n"
+		+ "  Alt-drag  invert the tool for one stroke\n"
+		+ "  Ctrl-drag  smooth while held\n"
+		+ "  Shift-drag  lock the stroke to one axis"
 	)
 	_arm_button.toggled.connect(_on_arm_toggled)
 	brush_column.add_child(_arm_button)
@@ -322,7 +377,7 @@ func _build_controls() -> void:
 	_layer_selector = _add_dropdown(
 		layer_column, "Sculpting",
 		"Shape moves the rock and the ground the miner stands on together. A "
-		+ "single stratum changes only what that layer draws."
+		+ "single layer changes only what that layer draws."
 	)
 	_layer_selector.item_selected.connect(_on_layer_selected)
 	_swatch_row = HBoxContainer.new()
@@ -333,21 +388,21 @@ func _build_controls() -> void:
 	layer_column.add_child(_swatch_row)
 	_focus_selector = _add_dropdown(
 		layer_column, "See only",
-		"Isolates one stratum while you work on it. The foreground rock covers "
+		"Isolates one layer while you work on it. The foreground rock covers "
 		+ "everything behind it, so a buried layer cannot be judged until the "
 		+ "layers in front get out of the way. Nothing the game draws changes."
 	)
 	_focus_selector.item_selected.connect(_on_focus_selected)
 	_focus_mode_selector = _add_dropdown(
 		layer_column, "Others",
-		"Whether the strata you are not looking at fade or disappear."
+		"Whether the layers you are not looking at fade or disappear."
 	)
 	_focus_mode_selector.add_item("dim")
 	_focus_mode_selector.add_item("hide")
 	_focus_mode_selector.item_selected.connect(_on_focus_mode_selected)
 	_dim_slider = _add_slider(
 		layer_column, "Dimmed to", 0.0, 1.0, 0.05, 0.15,
-		"How faint the other strata go. Dimming keeps them as context; hiding "
+		"How faint the other layers go. Dimming keeps them as context; hiding "
 		+ "removes them entirely."
 	)
 	_dim_slider.value_changed.connect(_on_dim_changed)
@@ -355,7 +410,7 @@ func _build_controls() -> void:
 	_follow_sculpt_layer.text = "Follow sculpted layer"
 	_follow_sculpt_layer.button_pressed = true
 	_follow_sculpt_layer.tooltip_text = (
-		"Picking a stratum to sculpt also isolates it."
+		"Picking a layer to sculpt also isolates it."
 	)
 	_follow_sculpt_layer.toggled.connect(_on_follow_toggled)
 	layer_column.add_child(_follow_sculpt_layer)
@@ -388,6 +443,12 @@ func _build_controls() -> void:
 	var action_row := HBoxContainer.new()
 	room_column.add_child(action_row)
 	_add_action(
+		action_row, "Tunnel", _on_level_tunnel_pressed,
+		"Recuts the whole room as one level tunnel running off both edges, "
+		+ "with a flat floor the cast stands on end to end. This is the shape "
+		+ "a cutscene wants, and the one to start authoring from."
+	)
+	_add_action(
 		action_row, "Reset", _on_bake_pressed,
 		"Throws the room away and rebuilds the chamber the game generates."
 	)
@@ -406,6 +467,20 @@ func _build_controls() -> void:
 		+ "leave the frame at the end of the scene. Press it again after "
 		+ "reshaping the wall and the mouth is recut to match."
 	)
+	# One menu rather than a row of buttons. Reusing a room another cutscene
+	# already got right is worth doing, but it is not something a designer does
+	# every minute, so it earns a single control that stays closed.
+	_copy_room_menu = MenuButton.new()
+	_copy_room_menu.text = "Copy room from"
+	_copy_room_menu.tooltip_text = (
+		"Replaces this room's shape with the one authored for another "
+		+ "cutscene. Only the shape is copied; this cutscene keeps its own "
+		+ "encounter, cast and timeline."
+	)
+	_copy_room_menu.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_copy_room_menu.about_to_popup.connect(_on_copy_room_menu_about_to_popup)
+	_copy_room_menu.get_popup().id_pressed.connect(_on_copy_room_selected)
+	action_row.add_child(_copy_room_menu)
 
 	_status_label = Label.new()
 	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -611,6 +686,60 @@ func _on_bake_pressed() -> void:
 	refresh()
 
 
+## Fills the copy menu at open time with the cutscenes that actually have a room
+## worth taking, so the list never offers an empty one or this cutscene itself.
+func _on_copy_room_menu_about_to_popup() -> void:
+	var popup := _copy_room_menu.get_popup()
+	popup.clear()
+	_copy_room_sources.clear()
+	if _context == null or not _context.is_valid():
+		popup.add_item("Open a cutscene stage first")
+		popup.set_item_disabled(0, true)
+		return
+	var schedule: DepthEncounterConfig = _context.preview.get_encounter_config()
+	if schedule == null:
+		popup.add_item("No schedule to read")
+		popup.set_item_disabled(0, true)
+		return
+	for encounter: DepthCharacterEncounter in schedule.encounters:
+		if encounter == null or encounter.terrain_sculpt == null:
+			continue
+		if encounter.terrain_sculpt == _context.sculpt:
+			continue
+		var label := String(encounter.encounter_id).replace("_", " ").capitalize()
+		popup.add_item(label, _copy_room_sources.size())
+		_copy_room_sources.append(encounter.terrain_sculpt)
+	if _copy_room_sources.is_empty():
+		popup.add_item("No other cutscene has a room yet")
+		popup.set_item_disabled(0, true)
+
+
+func _on_copy_room_selected(source_index: int) -> void:
+	if (
+		_context == null
+		or _context.sculpt == null
+		or source_index < 0
+		or source_index >= _copy_room_sources.size()
+	):
+		return
+	var source: CutsceneTerrainSculpt = _copy_room_sources[source_index]
+	if source == null:
+		return
+	# copy_shape_from keeps this room's own identity and resource path, so the
+	# encounter pointing at it does not have to be rewired.
+	_context.sculpt.copy_shape_from(source)
+	_context.notify_authored_data_changed()
+	refresh()
+
+
+func _on_level_tunnel_pressed() -> void:
+	if _context == null or _context.sculpt == null:
+		return
+	CutsceneSculptBaker.carve_level_tunnel(_context.sculpt)
+	_context.notify_authored_data_changed()
+	refresh()
+
+
 func _on_exit_tunnel_pressed() -> void:
 	if _context == null or _context.sculpt == null:
 		return
@@ -748,12 +877,12 @@ func _sync_layer_selector() -> void:
 	if _layer_selector.item_count == layer_count + 1:
 		return
 	_layer_selector.clear()
-	_layer_selector.add_item("Shape (all strata)")
+	_layer_selector.add_item("Shape (all layers)")
 	_focus_selector.clear()
-	_focus_selector.add_item("All strata")
+	_focus_selector.add_item("All layers")
 	for layer_index in range(layer_count):
-		_layer_selector.add_item("Stratum %d only" % (layer_index + 1))
-		_focus_selector.add_item("Stratum %d" % (layer_index + 1))
+		_layer_selector.add_item("Layer %d only" % (layer_index + 1))
+		_focus_selector.add_item("Layer %d" % (layer_index + 1))
 	_layer_selector.select(clampi(_brush.target_layer + 1, 0, layer_count))
 	_focus_selector.select(clampi(_focused_layer + 1, 0, layer_count))
 	_rebuild_swatches(layer_count)
@@ -769,17 +898,23 @@ func _rebuild_swatches(layer_count: int) -> void:
 		var swatch := Button.new()
 		swatch.custom_minimum_size = Vector2(22.0, 18.0)
 		swatch.tooltip_text = (
-			"Shape: cuts every stratum and the ground the miner stands on."
+			"Shape: cuts every layer and the ground the miner stands on."
 			if layer_index < 0
-			else "Stratum %d only: changes what this layer draws." % (
+			else "Layer %d only: changes what this layer draws." % (
 				layer_index + 1
 			)
 		)
 		var style := StyleBoxFlat.new()
 		style.bg_color = get_layer_color(layer_index)
+		# Every swatch is outlined, not just the armed one. The deep strata are
+		# nearly black, and an unbordered swatch in that colour is invisible
+		# against the editor's own dark panel: it stops reading as a button.
 		if layer_index == _brush.target_layer:
 			style.border_color = Color.WHITE
 			style.set_border_width_all(2)
+		else:
+			style.border_color = Color(1.0, 1.0, 1.0, 0.25)
+			style.set_border_width_all(1)
 		swatch.add_theme_stylebox_override("normal", style)
 		swatch.add_theme_stylebox_override("hover", style)
 		swatch.add_theme_stylebox_override("pressed", style)

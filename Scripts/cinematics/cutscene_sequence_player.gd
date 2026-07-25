@@ -540,7 +540,14 @@ func _evaluate_actor_at(
 				active_move.clear()
 		match beat.kind:
 			CutsceneBeat.Kind.MOVE, CutsceneBeat.Kind.PROP:
-				var start_position: Vector2 = state[&"position"]
+				# An authored start overrides where the actor was left, which is
+				# what lets a walk be staged on its own instead of inheriting
+				# whatever the beat before it happened to end on.
+				var start_position: Vector2 = (
+					_resolve_start_position(beat)
+					if beat.starts_from_authored_point
+					else state[&"position"]
+				)
 				var target_position := _resolve_target_position(beat)
 				var is_grounded := beat.kind == CutsceneBeat.Kind.MOVE
 				if is_grounded:
@@ -688,6 +695,21 @@ func _resolve_actor(actor_id: StringName) -> Node2D:
 	if not is_instance_valid(resolved):
 		return null
 	return resolved as Node2D
+
+
+## Resolves the authored point a MOVE starts from, the same way its target is
+## resolved: a marker plus an offset, falling back to a stage-local position
+## when no marker is named.
+func _resolve_start_position(beat: CutsceneBeat) -> Vector2:
+	if not beat.start_marker.is_empty() and _marker_resolver.is_valid():
+		var resolved: Variant = _marker_resolver.call(beat.start_marker)
+		if resolved is Vector2:
+			var marker_position := resolved as Vector2
+			if not is_nan(marker_position.x) and not is_nan(marker_position.y):
+				return marker_position + beat.start_offset
+	if is_instance_valid(_stage):
+		return _stage.to_global(beat.start_offset)
+	return beat.start_offset
 
 
 func _resolve_target_position(beat: CutsceneBeat) -> Vector2:

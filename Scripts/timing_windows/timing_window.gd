@@ -119,7 +119,7 @@ func _mining_window_pressed(
 				minf(1.0 + 0.03 * float(steps_past_ladder), 1.6)
 			)
 
-		var unlocked_pickaxe_target := false
+		var unlocked_target_scenes: Array[PackedScene] = []
 		for definition in _target_unlocks:
 			if (
 				definition == null
@@ -127,12 +127,18 @@ func _mining_window_pressed(
 				or definition.target_scenes.is_empty()
 			):
 				continue
+			for target_scene: PackedScene in definition.target_scenes:
+				if (
+					target_scene != null
+					and target_scene not in unlocked_target_scenes
+				):
+					unlocked_target_scenes.append(target_scene)
+		if not unlocked_target_scenes.is_empty():
 			mining_window.add_target_from_pool.call_deferred(
-				definition.target_scenes
+				unlocked_target_scenes
 			)
-			unlocked_pickaxe_target = true
 		if (
-			not unlocked_pickaxe_target
+			unlocked_target_scenes.is_empty()
 			and _target_unlocks.is_empty()
 			and combo
 				% mining_config.combo_hits_for_additional_target == 0

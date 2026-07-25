@@ -1,0 +1,33 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
+
+[node name="LanternWarningEncounterStage" instance=ExtResource("1_stage")]
+editor_description = "Story beat 6, depth 5,600: the lantern-staff man returns and gives a clearer warning about the Thief. He stands nearer than at his first appearance and leaves slower, so the return reads as the same man pressing a point rather than a repeat of the earlier shot. His art is drawn looking left, so he stays on the miner's right."
+opening_move_seconds = 1.4
+closing_move_seconds = 2.8
+opening_step_height = 6.0
+hide_actor_after_closing = true
+conversation_tracks_miner = true
+conversation_root_offset_from_miner_x = 72.0
+
+[node name="Entrance" parent="ActorMarkers" index="0"]
+editor_description = "Right of the miner, entering from the same side he did at depth 1,400."
+position = Vector2(248, 0)
+
+[node name="Conversation" parent="ActorMarkers" index="1"]
+position = Vector2(-96, 0)
+
+[node name="Rest" parent="ActorMarkers" index="3"]
+position = Vector2(-96, 0)
+
+[node name="Exit" parent="ActorMarkers" index="4"]
+editor_description = "Past the right edge of the frame, so he is out of shot well before he is hidden."
+position = Vector2(520, 0)
+
+[node name="EditorTerrainPreview" parent="." index="4"]
+editor_description = "Previews cloak_lantern_warning at its authored depth."
+encounter_id = &"cloak_lantern_warning"
+preview_depth_rows = 5600
+
+[editable path="ActorMarkers"]

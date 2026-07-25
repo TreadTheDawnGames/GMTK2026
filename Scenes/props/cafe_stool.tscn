@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Texture2D" path="res://Assets/Props/cafe_stool.png" id="1_stool"]
+
+[node name="CafeStool" type="Sprite2D"]
+editor_description = "Cafe stool. The offset puts the sprite's feet on the node's origin, so dropping one onto a stage marker stands it on the floor instead of burying it to the seat."
+texture = ExtResource("1_stool")
+offset = Vector2(0, -188.5)
+scale = Vector2(0.14, 0.14)

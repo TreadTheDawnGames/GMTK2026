@@ -14,8 +14,18 @@ extends RefCounted
 ## state, so a closed or swapped scene invalidates every panel at once.
 
 ## Emitted when a panel changes the sculpt or the sequence, so the other
-## panels and the terrain preview can refresh from one place.
+## panels and the terrain preview can refresh from one place. Listening to this
+## means rebuilding terrain, which is the expensive path.
 signal authored_data_changed
+
+## Emitted when a panel adds, removes or renames a cast member, prop or marker.
+##
+## Separate from authored_data_changed because nothing in that list is terrain:
+## an actor is a node standing in the room, not a cell of it. Sharing one signal
+## meant opening a stage rebuilt every chunk of a 384-cell-wide room three times
+## over — once on load, then again for the cast and again for the miner — and
+## the double-click that opens a cutscene wore all of it.
+signal cast_changed
 
 var stage: Node2D
 var preview: CinematicTerrainPreview
@@ -93,6 +103,12 @@ func get_marker_position(marker_name: StringName) -> Vector2:
 ## Announces an authored change once, after the caller has finished editing.
 func notify_authored_data_changed() -> void:
 	authored_data_changed.emit()
+
+
+## Announces a cast, prop or marker edit. Panels that draw the room's occupants
+## refresh; the terrain does not, because none of those touch a cell.
+func notify_cast_changed() -> void:
+	cast_changed.emit()
 
 
 func _collect_actor_previews() -> Array[CutsceneActorPreview]:

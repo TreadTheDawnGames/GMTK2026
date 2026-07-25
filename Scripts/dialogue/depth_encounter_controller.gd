@@ -271,6 +271,9 @@ func _begin_active_encounter() -> void:
 		_gather_cafe_characters()
 	_active_stage = _stages[_active_encounter_index]
 	if _active_stage != null:
+		# Before the frame opens, so the first drawn cutscene frame already has
+		# him in front of the foreground stratum instead of popping forward.
+		miner_rig.enter_cutscene_draw_order()
 		dialogue_director.open_cinematic_frame()
 		await dialogue_director.wait_until_frame_open()
 		if _active_encounter_index < 0:
@@ -591,6 +594,7 @@ func has_pending_or_active_interaction() -> bool:
 ## Releases only this encounter's named ownership of mining and camera state.
 func _finish_cinematic_flow() -> void:
 	_reset_speech_reactions()
+	miner_rig.exit_cutscene_draw_order()
 	cinematic_flow.finish(FLOW_OWNER)
 
 

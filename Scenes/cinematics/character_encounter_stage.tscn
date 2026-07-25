@@ -84,9 +84,9 @@ script = ExtResource("6_terrain_renderer")
 terrain_manager = NodePath("../TerrainManager")
 profile = ExtResource("4_profile")
 preview_in_editor = true
+editor_description = "Locked and grouped on purpose. This draws the whole room, so every click meant for an actor or a marker would otherwise land on a rock sprite and select the terrain instead. Locked here rather than on EditorTerrainPreview, which would have taken the draggable impact markers under TestImpacts with it."
+metadata/_edit_group_ = true
+metadata/_edit_lock_ = true
 
 [node name="TestImpacts" type="Node2D" parent="EditorTerrainPreview"]
-editor_description = "Each Marker2D here is dug with a real hit. Drag one to move the opening, or use the Dig Terrain toggle in the 2D toolbar to click new ones in."
-
-[node name="EntryImpact" type="Marker2D" parent="EditorTerrainPreview/TestImpacts"]
-position = Vector2(576, 260)
+editor_description = "Starts empty. Each Marker2D added here is dug with a real hit; use the Dig Terrain toggle in the 2D toolbar to click one in. A cutscene room is a cut tunnel, so nothing is dug by default: a stock impact crater would appear in every inheriting stage whether or not that cutscene wants one."

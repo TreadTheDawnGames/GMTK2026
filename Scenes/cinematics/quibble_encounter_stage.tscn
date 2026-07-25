@@ -9,5 +9,6 @@ script = ExtResource("2_quibble")
 hide_actor_after_closing = true
 
 [node name="EditorTerrainPreview" parent="." index="4"]
-editor_description = "Previews coffee_cat_first_encounter's own chamber at depth 9200."
+editor_description = "Previews coffee_cat_first at its authored depth."
+encounter_id = &"coffee_cat_first"
 preview_depth_rows = 9200

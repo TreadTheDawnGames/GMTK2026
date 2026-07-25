@@ -1,0 +1,59 @@
+[gd_resource type="Resource" script_class="CutsceneSequence" format=3]
+
+[ext_resource type="Script" path="res://resources/cinematics/cutscene_beat.gd" id="1_nte5p"]
+[ext_resource type="Resource" path="res://resources/dialogue/rutini_second_conversation.tres" id="2_d0men"]
+[ext_resource type="Script" path="res://resources/cinematics/cutscene_sequence.gd" id="3_tlrhe"]
+
+[sub_resource type="Resource" id="Resource_eqb57"]
+script = ExtResource("1_nte5p")
+kind = 9
+actor = &"rutini"
+
+[sub_resource type="Resource" id="Resource_gca6k"]
+script = ExtResource("1_nte5p")
+kind = 0
+actor = &"rutini"
+duration_seconds = 0.6
+target_marker = &"Conversation"
+pose = &"walk"
+
+[sub_resource type="Resource" id="Resource_hiybp"]
+script = ExtResource("1_nte5p")
+kind = 2
+actor = &"rutini"
+start_seconds = 0.6
+facing = -1
+
+[sub_resource type="Resource" id="Resource_1o3gy"]
+script = ExtResource("1_nte5p")
+kind = 1
+actor = &"rutini"
+start_seconds = 0.6
+pose = &"idle"
+
+[sub_resource type="Resource" id="Resource_qx7br"]
+script = ExtResource("1_nte5p")
+kind = 5
+start_seconds = 0.8
+duration_seconds = 6.0
+conversation = ExtResource("2_d0men")
+
+[sub_resource type="Resource" id="Resource_b02ta"]
+script = ExtResource("1_nte5p")
+kind = 0
+actor = &"rutini"
+start_seconds = 6.8
+duration_seconds = 0.6
+target_marker = &"Exit"
+pose = &"walk"
+
+[sub_resource type="Resource" id="Resource_63sku"]
+script = ExtResource("1_nte5p")
+kind = 10
+actor = &"rutini"
+start_seconds = 7.3999999999999995
+
+[resource]
+script = ExtResource("3_tlrhe")
+sequence_id = &"rutini_second_sequence"
+beats = Array[ExtResource("1_nte5p")]([SubResource("Resource_eqb57"), SubResource("Resource_gca6k"), SubResource("Resource_hiybp"), SubResource("Resource_1o3gy"), SubResource("Resource_qx7br"), SubResource("Resource_b02ta"), SubResource("Resource_63sku")])

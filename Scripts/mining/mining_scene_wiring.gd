@@ -55,6 +55,7 @@ extends Node
 @export var credits_overlay: CreditsOverlay
 
 @onready var _game_state: RunState = RunState.get_global(self)
+@onready var _music_manager: Node = get_node("/root/MusicManager")
 
 
 ## Establishes every signal that crosses a mining subsystem boundary.
@@ -218,19 +219,19 @@ func _ready() -> void:
 	)
 	_connect_once(
 		combo_director.intensity_changed,
-		MusicManager._on_intensity_changed
+		Callable(_music_manager, &"_on_intensity_changed")
 	)
 	_connect_once(
 		combo_director.combo_tier_changed,
-		MusicManager._on_combo_tier_changed
+		Callable(_music_manager, &"_on_combo_tier_changed")
 	)
 	_connect_once(
 		combo_director.streak_lost,
-		MusicManager._on_streak_lost
+		Callable(_music_manager, &"_on_streak_lost")
 	)
 	_connect_once(
 		_game_state.run_reset,
-		MusicManager._on_run_reset
+		Callable(_music_manager, &"_on_run_reset")
 	)
 	_connect_once(
 		combo_director.combo_tier_changed,

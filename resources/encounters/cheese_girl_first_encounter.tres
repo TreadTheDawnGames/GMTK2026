@@ -1,10 +1,68 @@
-[gd_resource type="Resource" script_class="DepthCharacterEncounter" format=3 uid="uid://bi6dnpfhd6y3m"]
+[gd_resource type="Resource" script_class="DepthCharacterEncounter" format=3]
 
-[ext_resource type="Script" uid="uid://sqs37vj87ep8" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
-[ext_resource type="Resource" uid="uid://cpqjkl4c3ygg2" path="res://resources/encounters/cheese_girl_character_appearance.tres" id="2_appearance"]
-[ext_resource type="Resource" uid="uid://dcyt4ietamaxn" path="res://resources/dialogue/cheese_girl_first_conversation.tres" id="3_dialogue"]
-[ext_resource type="Resource" uid="uid://fmu3mx22a3fu" path="res://resources/cinematics/sculpts/cheese_girl_first_room.tres" id="5_nacqn"]
+[ext_resource type="Script" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
+[ext_resource type="Resource" path="res://resources/encounters/cheese_girl_character_appearance.tres" id="2_appearance"]
+[ext_resource type="Resource" path="res://resources/dialogue/cheese_girl_first_conversation.tres" id="3_dialogue"]
+[ext_resource type="Script" path="res://resources/cinematics/cutscene_beat.gd" id="4_41g1r"]
+[ext_resource type="Resource" path="res://resources/cinematics/sculpts/cheese_girl_first_room.tres" id="5_nacqn"]
+[ext_resource type="Script" path="res://resources/cinematics/cutscene_sequence.gd" id="5_s2o7f"]
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/cheese_girl_encounter_stage.tscn" id="5_stage"]
+
+[sub_resource type="Resource" id="Resource_1o2qq"]
+script = ExtResource("4_41g1r")
+kind = 9
+actor = &"cheese_girl"
+
+[sub_resource type="Resource" id="Resource_uapg4"]
+script = ExtResource("4_41g1r")
+kind = 0
+actor = &"cheese_girl"
+duration_seconds = 1.2
+target_marker = &"Conversation"
+pose = &"walk"
+step_height = 8.0
+
+[sub_resource type="Resource" id="Resource_3nch5"]
+script = ExtResource("4_41g1r")
+kind = 2
+actor = &"cheese_girl"
+start_seconds = 1.2
+facing = -1
+
+[sub_resource type="Resource" id="Resource_ikdqr"]
+script = ExtResource("4_41g1r")
+kind = 1
+actor = &"cheese_girl"
+start_seconds = 1.2
+pose = &"idle"
+
+[sub_resource type="Resource" id="Resource_vixgb"]
+script = ExtResource("4_41g1r")
+kind = 5
+start_seconds = 1.4
+duration_seconds = 6.0
+conversation = ExtResource("3_dialogue")
+
+[sub_resource type="Resource" id="Resource_a5exc"]
+script = ExtResource("4_41g1r")
+kind = 0
+actor = &"cheese_girl"
+start_seconds = 7.4
+duration_seconds = 2.1
+target_marker = &"Exit"
+pose = &"walk"
+step_height = 8.0
+
+[sub_resource type="Resource" id="Resource_fq48r"]
+script = ExtResource("4_41g1r")
+kind = 10
+actor = &"cheese_girl"
+start_seconds = 9.5
+
+[sub_resource type="Resource" id="Resource_0ar8i"]
+script = ExtResource("5_s2o7f")
+sequence_id = &"cheese_girl_first_sequence"
+beats = Array[ExtResource("4_41g1r")]([SubResource("Resource_1o2qq"), SubResource("Resource_uapg4"), SubResource("Resource_3nch5"), SubResource("Resource_ikdqr"), SubResource("Resource_vixgb"), SubResource("Resource_a5exc"), SubResource("Resource_fq48r")])
 
 [resource]
 script = ExtResource("1_encounter")
@@ -14,5 +72,6 @@ depth_from_surface = 600
 appearance = ExtResource("2_appearance")
 conversation = ExtResource("3_dialogue")
 stage_scene = ExtResource("5_stage")
+sequence = SubResource("Resource_0ar8i")
 speaker_slot = &"cheese_girl"
 terrain_sculpt = ExtResource("5_nacqn")

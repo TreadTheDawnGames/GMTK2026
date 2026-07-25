@@ -17,7 +17,7 @@ followers = Array[NodePath]([NodePath("Formation/RatLeftFar"), NodePath("Formati
 rat_appearances = Array[ExtResource("3_appearance")]([ExtResource("4_brown"), ExtResource("5_grey"), ExtResource("6_white"), ExtResource("7_red")])
 
 [node name="Formation" type="Node2D" parent="."]
-editor_description = "Fixed five-actor growth bound. Runtime hides the rear pair on web builds."
+editor_description = "Fixed five-actor growth bound. Runtime hides the rear pair on web builds. Every rat is kept at least 56 pixels clear of the follow target's column: the colony draws in front of the miner, so a rat parked on his origin covers the character the player is actually controlling. Keep that clearance when moving anyone here."
 
 [node name="RatLeftFar" parent="Formation" instance=ExtResource("2_rat")]
 position = Vector2(-126, 52)
@@ -36,5 +36,6 @@ position = Vector2(128, 20)
 z_index = 1
 
 [node name="RatRear" parent="Formation" instance=ExtResource("2_rat")]
-position = Vector2(-20, 8)
+editor_description = "Trails behind and below the miner rather than sitting on him. At its old spot, twenty pixels off his origin, it drew straight over his legs the entire descent."
+position = Vector2(-58, 62)
 z_index = 0

@@ -19,8 +19,10 @@ const _MINER_RIG_SCENE := preload("res://Scenes/mining/miner_rig.tscn")
 
 var _context: CutsceneEditorContext
 var _status_label: Label
-var _actor_picker: EditorResourcePicker
-var _actor_id_edit: LineEdit
+var _actor_choice: OptionButton
+## Parallel to _actor_choice's items: {"actor_id": StringName, "appearance":
+## CharacterAppearance} per entry, so a pick resolves without reparsing labels.
+var _actor_choice_entries: Array[Dictionary] = []
 var _prop_picker: EditorResourcePicker
 var _prop_name_edit: LineEdit
 var _marker_root_selector: OptionButton
@@ -40,19 +42,19 @@ func set_context(context: CutsceneEditorContext) -> void:
 		_context != null
 		and is_instance_valid(_context)
 		and _context != context
-		and _context.authored_data_changed.is_connected(
-			_on_authored_data_changed
+		and _context.cast_changed.is_connected(
+			_on_cast_changed
 		)
 	):
-		_context.authored_data_changed.disconnect(_on_authored_data_changed)
+		_context.cast_changed.disconnect(_on_cast_changed)
 	_context = context
 	if (
 		_context != null
-		and not _context.authored_data_changed.is_connected(
-			_on_authored_data_changed
+		and not _context.cast_changed.is_connected(
+			_on_cast_changed
 		)
 	):
-		_context.authored_data_changed.connect(_on_authored_data_changed)
+		_context.cast_changed.connect(_on_cast_changed)
 	_rebuild()
 
 
@@ -80,8 +82,8 @@ func _clear_contents() -> void:
 		remove_child(child)
 		child.free()
 	_status_label = null
-	_actor_picker = null
-	_actor_id_edit = null
+	_actor_choice = null
+	_actor_choice_entries.clear()
 	_prop_picker = null
 	_prop_name_edit = null
 	_marker_root_selector = null
@@ -108,25 +110,14 @@ func _build_controls() -> void:
 	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(_status_label)
 
-	var populate_button := Button.new()
-	populate_button.text = "Populate from encounter"
-	populate_button.tooltip_text = (
-		"Add the encounter's real cast at the positions used by gameplay."
-	)
-	populate_button.pressed.connect(_on_populate_from_encounter_pressed)
-	add_child(populate_button)
-
-	var miner_button := Button.new()
-	miner_button.text = "Show the miner"
-	miner_button.tooltip_text = (
-		"Add the gameplay miner with his real art and draw order."
-	)
-	miner_button.pressed.connect(_on_show_miner_pressed)
-	add_child(miner_button)
+	# No "Populate from encounter" or "Show the miner" buttons: opening a stage
+	# now places the encounter's cast and the miner on its own, so a button to
+	# do it by hand only ever restates what already happened. Both calls are
+	# still public - the plugin makes them on scene_changed.
 	if not Engine.is_editor_hint():
 		return
 
-	add_child(_make_section_label("Cast"))
+	add_child(_make_section_label("In this cutscene"))
 	var cast_scroll := ScrollContainer.new()
 	cast_scroll.custom_minimum_size.y = 120.0
 	cast_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -142,19 +133,22 @@ func _build_controls() -> void:
 	add_child(remove_button)
 
 	add_child(HSeparator.new())
-	add_child(_make_section_label("Add Actor"))
-	_actor_id_edit = LineEdit.new()
-	_actor_id_edit.placeholder_text = "Stable actor id, for example miner"
-	_actor_id_edit.tooltip_text = (
-		"The timeline keys actor lanes by this stable id."
+	add_child(_make_section_label("Add someone to this cutscene"))
+	# A dropdown of the run's own characters rather than a typed id and a
+	# resource path. Adding Cheese Girl should not require knowing that she is
+	# "cheese_girl" and that her art lives in a .tres two folders away; picking
+	# her by name fills in both, and the ids the timeline keys its lanes by stay
+	# spelled correctly because nobody types them.
+	_actor_choice = OptionButton.new()
+	_actor_choice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_actor_choice.tooltip_text = (
+		"Everyone the run's schedule knows about. Picking a name brings their "
+		+ "real artwork with them."
 	)
-	_add_labeled_control("Actor id", _actor_id_edit)
-	_actor_picker = EditorResourcePicker.new()
-	_actor_picker.base_type = "CharacterAppearance"
-	_actor_picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_add_labeled_control("Appearance", _actor_picker)
+	_rebuild_actor_choices()
+	_add_labeled_control("Character", _actor_choice)
 	var add_actor_button := Button.new()
-	add_actor_button.text = "Add Actor"
+	add_actor_button.text = "Add to cutscene"
 	add_actor_button.pressed.connect(_on_add_actor_pressed)
 	add_child(add_actor_button)
 
@@ -186,6 +180,45 @@ func _build_controls() -> void:
 	add_marker_button.text = "Add Marker"
 	add_marker_button.pressed.connect(_on_add_marker_pressed)
 	add_child(add_marker_button)
+
+
+## Fills the character dropdown from the run's schedule, leaving out anyone
+## already standing in this cutscene so the list is only people you can add.
+##
+## Names come from the actor id with its underscores opened up, because the
+## schedule is the only place a character's identity is written down and a
+## second hand-kept table of display names would drift from it.
+func _rebuild_actor_choices() -> void:
+	_actor_choice.clear()
+	_actor_choice_entries.clear()
+	if not _has_valid_context():
+		return
+	var schedule: DepthEncounterConfig = _context.preview.get_encounter_config()
+	if schedule == null:
+		return
+	var placed := _context.get_stage_actor_ids()
+	var seen: Dictionary = {}
+	for scheduled: DepthCharacterEncounter in schedule.encounters:
+		if scheduled == null or String(scheduled.actor_id).is_empty():
+			continue
+		var actor_id := scheduled.actor_id
+		if seen.has(actor_id) or placed.has(String(actor_id)):
+			continue
+		seen[actor_id] = true
+		var label := String(actor_id).replace("_", " ").capitalize()
+		if scheduled.appearance == null:
+			label += "  (no artwork yet)"
+		_actor_choice.add_item(label)
+		_actor_choice_entries.append({
+			"actor_id": actor_id,
+			"appearance": scheduled.appearance,
+		})
+	if _actor_choice.item_count == 0:
+		_actor_choice.add_item("Everyone is already here")
+		_actor_choice.disabled = true
+	else:
+		_actor_choice.disabled = false
+		_actor_choice.select(0)
 
 
 func _make_section_label(text: String) -> Label:
@@ -321,9 +354,18 @@ func populate_from_encounter() -> Vector2i:
 				actor_ids.append(actor_id)
 			actor_positions[actor_id] = gathering_positions[actor_index]
 
+	# Anyone the stage's own artwork already draws. Placing their stand-in too
+	# would show the same character twice in the same shot.
+	var drawn_into_set: Array = []
+	var drawn_value: Variant = _context.stage.get(&"actors_drawn_into_set")
+	if drawn_value is Array:
+		drawn_into_set = drawn_value
+
 	var additions: Array[CutsceneActorPreview] = []
 	var already_placed := 0
 	for actor_id in actor_ids:
+		if drawn_into_set.has(actor_id):
+			continue
 		if _context.get_actor_preview(actor_id) != null:
 			already_placed += 1
 			continue
@@ -351,11 +393,14 @@ func show_miner() -> bool:
 	if _context.get_actor_preview(&"miner") != null:
 		_set_status("Miner already placed.")
 		return false
-	var miner_appearance := _build_miner_appearance()
+	# One instantiation for both answers. Building the rig twice to read two of
+	# its fields is work repeated on every scene the editor opens.
+	var miner_rig_facts := _read_miner_rig()
+	var miner_appearance: CharacterAppearance = miner_rig_facts.get("appearance")
 	if miner_appearance == null:
 		_set_status("The miner rig art could not be resolved for preview.")
 		return false
-	var miner_z_index := _get_miner_gameplay_z_index()
+	var miner_z_index: int = miner_rig_facts.get("draw_order", -1)
 	if miner_z_index < 0:
 		_set_status("The miner gameplay draw order could not be resolved.")
 		return false
@@ -364,8 +409,9 @@ func show_miner() -> bool:
 	miner.actor_id = &"miner"
 	miner.appearance = miner_appearance
 	miner.position = Vector2.ZERO
-	# Gameplay MinerRig is z 1 while terrain stratum one is z 2, so the
-	# foreground rock still closes over the miner's legs in the editor.
+	# MinerRig's cutscene order is z 3 while terrain stratum one is z 2, so the
+	# editor shows him standing clear of the foreground rock, which is what the
+	# encounter itself will draw.
 	miner.z_index = miner_z_index
 	_commit_actor_additions([miner], "Show cutscene miner")
 	_set_status("Added the miner.")
@@ -462,7 +508,7 @@ func _commit_actor_additions(
 			undo_redo.add_do_method(actor, &"_sync_sprite_owner")
 		if undo_redo is UndoRedo:
 			undo_redo.add_undo_method(
-				Callable(_context, &"notify_authored_data_changed")
+				Callable(_context, &"notify_cast_changed")
 			)
 			undo_redo.add_undo_method(
 				Callable(_context.stage, &"remove_child").bind(actor)
@@ -470,23 +516,31 @@ func _commit_actor_additions(
 		else:
 			undo_redo.add_undo_method(
 				_context,
-				&"notify_authored_data_changed"
+				&"notify_cast_changed"
 			)
 			undo_redo.add_undo_method(_context.stage, &"remove_child", actor)
 		undo_redo.add_do_reference(actor)
 	if undo_redo is UndoRedo:
 		undo_redo.add_do_method(
-			Callable(_context, &"notify_authored_data_changed")
+			Callable(_context, &"notify_cast_changed")
 		)
 	else:
 		undo_redo.add_do_method(
 			_context,
-			&"notify_authored_data_changed"
+			&"notify_cast_changed"
 		)
 	undo_redo.commit_action()
 
 
-func _build_miner_appearance() -> CharacterAppearance:
+## Reads everything the preview needs off one throwaway MinerRig: the artwork to
+## mirror, and the draw order a cutscene puts him at.
+##
+## Returns {"appearance": CharacterAppearance, "draw_order": int}, with a null
+## appearance and -1 order when the rig cannot answer. One instantiation for
+## both, because building the scene is the expensive half of this and it happens
+## every time a stage is opened.
+func _read_miner_rig() -> Dictionary:
+	var unresolved := {"appearance": null, "draw_order": -1}
 	var rig_root := _MINER_RIG_SCENE.instantiate()
 	var rig := rig_root as MinerRig
 	var miner_sprite := rig_root.get_node_or_null(
@@ -497,7 +551,8 @@ func _build_miner_appearance() -> CharacterAppearance:
 	) as Marker2D
 	if rig == null or miner_sprite == null or landing_foot_anchor == null:
 		rig_root.free()
-		return null
+		return unresolved
+
 	var appearance := CharacterAppearance.new()
 	appearance.texture = miner_sprite.texture
 	if appearance.texture == null:
@@ -511,23 +566,18 @@ func _build_miner_appearance() -> CharacterAppearance:
 	)
 	appearance.tint = miner_sprite.modulate
 	appearance.flip_h = miner_sprite.flip_h
-	rig_root.free()
-	return appearance
 
-
-func _get_miner_gameplay_z_index() -> int:
-	var rig_root := _MINER_RIG_SCENE.instantiate()
-	var rig := rig_root as MinerRig
-	if rig == null:
-		rig_root.free()
-		return -1
-	var buried_draw_order: Variant = rig.get("buried_draw_order")
-	if buried_draw_order == null:
-		rig_root.free()
-		return -1
-	var gameplay_z_index := int(buried_draw_order)
+	# The cutscene order, not the mining one: what the editor draws has to be
+	# what the encounter will actually show, and a cutscene lifts him in front
+	# of the foreground layer.
+	var cutscene_draw_order: Variant = rig.get("cutscene_draw_order")
 	rig_root.free()
-	return gameplay_z_index
+	if cutscene_draw_order == null:
+		return unresolved
+	return {
+		"appearance": appearance,
+		"draw_order": int(cutscene_draw_order),
+	}
 
 
 func _on_populate_from_encounter_pressed() -> void:
@@ -538,7 +588,7 @@ func _on_show_miner_pressed() -> void:
 	show_miner()
 
 
-func _on_authored_data_changed() -> void:
+func _on_cast_changed() -> void:
 	_rebuild()
 
 
@@ -556,16 +606,24 @@ func _on_actor_row_pressed(preview: CutsceneActorPreview) -> void:
 func _on_add_actor_pressed() -> void:
 	if not _has_valid_context():
 		return
-	var actor_id := StringName(_actor_id_edit.text.strip_edges())
-	if actor_id.is_empty():
-		_set_status("Actor id is required.")
+	var choice_index := _actor_choice.selected
+	if choice_index < 0 or choice_index >= _actor_choice_entries.size():
+		_set_status("Pick a character to add.")
 		return
-	if _context.get_stage_actor_ids().has(actor_id):
-		_set_status("Actor id '%s' is already in the cast." % actor_id)
+	var choice := _actor_choice_entries[choice_index]
+	var actor_id: StringName = choice.get("actor_id", &"")
+	if String(actor_id).is_empty():
+		_set_status("Pick a character to add.")
 		return
-	var appearance := _actor_picker.edited_resource as CharacterAppearance
+	if _context.get_stage_actor_ids().has(String(actor_id)):
+		_set_status("%s is already in this cutscene." % actor_id)
+		return
+	var appearance: CharacterAppearance = choice.get("appearance")
 	if appearance == null:
-		_set_status("Choose a CharacterAppearance before adding the actor.")
+		_set_status(
+			"%s has no artwork authored yet, so there is nothing to show."
+			% actor_id
+		)
 		return
 
 	var actor := CutsceneActorPreview.new()
@@ -588,13 +646,13 @@ func _on_add_actor_pressed() -> void:
 	undo_redo.add_do_method(actor, &"_sync_sprite_owner")
 	undo_redo.add_undo_method(
 		_context,
-		&"notify_authored_data_changed"
+		&"notify_cast_changed"
 	)
 	undo_redo.add_undo_method(_context.stage, &"remove_child", actor)
 	undo_redo.add_do_reference(actor)
 	undo_redo.add_do_method(
 		_context,
-		&"notify_authored_data_changed"
+		&"notify_cast_changed"
 	)
 	undo_redo.commit_action()
 	_selected_preview = actor
@@ -614,11 +672,11 @@ func _on_remove_actor_pressed() -> void:
 	undo_redo.add_do_method(parent, &"remove_child", preview)
 	undo_redo.add_do_method(
 		_context,
-		&"notify_authored_data_changed"
+		&"notify_cast_changed"
 	)
 	undo_redo.add_undo_method(
 		_context,
-		&"notify_authored_data_changed"
+		&"notify_cast_changed"
 	)
 	undo_redo.add_undo_method(parent, &"add_child", preview)
 	undo_redo.commit_action()
@@ -662,13 +720,13 @@ func _on_add_prop_pressed() -> void:
 	undo_redo.add_do_property(prop, &"owner", _context.scene_root)
 	undo_redo.add_undo_method(
 		_context,
-		&"notify_authored_data_changed"
+		&"notify_cast_changed"
 	)
 	undo_redo.add_undo_method(prop_root, &"remove_child", prop)
 	undo_redo.add_do_reference(prop)
 	undo_redo.add_do_method(
 		_context,
-		&"notify_authored_data_changed"
+		&"notify_cast_changed"
 	)
 	undo_redo.commit_action()
 
@@ -693,13 +751,13 @@ func _on_add_marker_pressed() -> void:
 	undo_redo.add_do_property(marker, &"owner", _context.scene_root)
 	undo_redo.add_undo_method(
 		_context,
-		&"notify_authored_data_changed"
+		&"notify_cast_changed"
 	)
 	undo_redo.add_undo_method(marker_root, &"remove_child", marker)
 	undo_redo.add_do_reference(marker)
 	undo_redo.add_do_method(
 		_context,
-		&"notify_authored_data_changed"
+		&"notify_cast_changed"
 	)
 	undo_redo.commit_action()
 

@@ -1,0 +1,57 @@
+[gd_resource type="Resource" script_class="CutsceneSequence" format=3]
+
+[ext_resource type="Script" path="res://resources/cinematics/cutscene_beat.gd" id="1_5p4la"]
+[ext_resource type="Script" path="res://resources/cinematics/cutscene_sequence.gd" id="2_cj0l1"]
+
+[sub_resource type="Resource" id="Resource_1si7t"]
+script = ExtResource("1_5p4la")
+kind = 9
+actor = &"thief"
+
+[sub_resource type="Resource" id="Resource_nftvh"]
+script = ExtResource("1_5p4la")
+kind = 0
+actor = &"thief"
+duration_seconds = 2.4
+target_marker = &"Conversation"
+pose = &"walk"
+
+[sub_resource type="Resource" id="Resource_t0b1r"]
+script = ExtResource("1_5p4la")
+kind = 2
+actor = &"thief"
+start_seconds = 2.4
+facing = -1
+
+[sub_resource type="Resource" id="Resource_378ld"]
+script = ExtResource("1_5p4la")
+kind = 1
+actor = &"thief"
+start_seconds = 2.4
+pose = &"idle"
+
+[sub_resource type="Resource" id="Resource_fymss"]
+script = ExtResource("1_5p4la")
+start_seconds = 2.6
+duration_seconds = 6.0
+notes = "Placeholder hold. This encounter has no authored conversation yet; replace this beat with a DIALOGUE one once it does."
+
+[sub_resource type="Resource" id="Resource_qbstf"]
+script = ExtResource("1_5p4la")
+kind = 0
+actor = &"thief"
+start_seconds = 8.6
+duration_seconds = 2.4
+target_marker = &"Exit"
+pose = &"walk"
+
+[sub_resource type="Resource" id="Resource_g34jx"]
+script = ExtResource("1_5p4la")
+kind = 10
+actor = &"thief"
+start_seconds = 11.0
+
+[resource]
+script = ExtResource("2_cj0l1")
+sequence_id = &"thief_finale_sequence"
+beats = Array[ExtResource("1_5p4la")]([SubResource("Resource_1si7t"), SubResource("Resource_nftvh"), SubResource("Resource_t0b1r"), SubResource("Resource_378ld"), SubResource("Resource_fymss"), SubResource("Resource_qbstf"), SubResource("Resource_g34jx")])

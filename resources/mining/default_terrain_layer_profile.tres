@@ -31,6 +31,7 @@ small_hole_masks = Array[Texture2D]([ExtResource("3_medium"), ExtResource("3_med
 big_hole_masks = Array[Texture2D]([ExtResource("4_large"), ExtResource("3_medium"), ExtResource("2_small"), ExtResource("2_small")])
 layer_impact_offsets = PackedVector2Array(0, 0, 0, 0, 0, 0, 0, 0)
 layer_impact_scales = PackedFloat32Array(1, 0.95, 0.8, 0.7)
+chamber_layer_two_floor_reveal_px = 0.0
 fracture_line_strength = 0.85
 fracture_line_layer_depth = 3
 fracture_line_depth_falloff = 1.0

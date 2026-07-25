@@ -1,0 +1,59 @@
+[gd_resource type="Resource" script_class="CutsceneSequence" format=3]
+
+[ext_resource type="Script" path="res://resources/cinematics/cutscene_beat.gd" id="1_ti7jl"]
+[ext_resource type="Resource" path="res://resources/dialogue/coffee_cat_first_conversation.tres" id="2_ehpe3"]
+[ext_resource type="Script" path="res://resources/cinematics/cutscene_sequence.gd" id="3_huvwr"]
+
+[sub_resource type="Resource" id="Resource_m7fue"]
+script = ExtResource("1_ti7jl")
+kind = 9
+actor = &"coffee_cat"
+
+[sub_resource type="Resource" id="Resource_2g18f"]
+script = ExtResource("1_ti7jl")
+kind = 0
+actor = &"coffee_cat"
+duration_seconds = 0.6
+target_marker = &"Conversation"
+pose = &"walk"
+
+[sub_resource type="Resource" id="Resource_fle6v"]
+script = ExtResource("1_ti7jl")
+kind = 2
+actor = &"coffee_cat"
+start_seconds = 0.6
+facing = -1
+
+[sub_resource type="Resource" id="Resource_cy8d2"]
+script = ExtResource("1_ti7jl")
+kind = 1
+actor = &"coffee_cat"
+start_seconds = 0.6
+pose = &"idle"
+
+[sub_resource type="Resource" id="Resource_sn48r"]
+script = ExtResource("1_ti7jl")
+kind = 5
+start_seconds = 0.8
+duration_seconds = 6.0
+conversation = ExtResource("2_ehpe3")
+
+[sub_resource type="Resource" id="Resource_5qxba"]
+script = ExtResource("1_ti7jl")
+kind = 0
+actor = &"coffee_cat"
+start_seconds = 6.8
+duration_seconds = 0.6
+target_marker = &"Exit"
+pose = &"walk"
+
+[sub_resource type="Resource" id="Resource_c4n17"]
+script = ExtResource("1_ti7jl")
+kind = 10
+actor = &"coffee_cat"
+start_seconds = 7.3999999999999995
+
+[resource]
+script = ExtResource("3_huvwr")
+sequence_id = &"coffee_cat_first_sequence"
+beats = Array[ExtResource("1_ti7jl")]([SubResource("Resource_m7fue"), SubResource("Resource_2g18f"), SubResource("Resource_fle6v"), SubResource("Resource_cy8d2"), SubResource("Resource_sn48r"), SubResource("Resource_5qxba"), SubResource("Resource_c4n17")])

@@ -48,13 +48,9 @@ class ImpactStamp:
 	## stamp so a chunk streamed back in redraws the exact same rims.
 	var variation_hash: int = 0
 
-class ResizedStampImages:
-	var erase_mask: Image
-	var transparent_source: Image
-	var fracture_source: Image
-
-
-
+const TerrainStampImageCache = preload(
+	"res://Scripts/mining/terrain_stamp_image_cache.gd"
+)
 const LAYER_SHADER: Shader = preload(
 	"res://Shaders/terrain_layer.gdshader"
 )
@@ -123,14 +119,13 @@ var _impact_stamps_by_chunk: Dictionary = {}
 var _chamber_stamps_by_chunk: Dictionary = {}
 var _small_mask_data: Array[HoleMaskData] = []
 var _big_mask_data: Array[HoleMaskData] = []
+var _stamp_image_cache := TerrainStampImageCache.new()
 # Stores at most resized_stamp_cache_limit transformed hole-and-line pairs,
 # each no larger than resized_stamp_cache_max_pixels; least-recently-used
 # entries are pruned before another pair is inserted.
-var _resized_stamp_cache: Dictionary[Vector4i, ResizedStampImages] = {}
-var _resized_stamp_cache_order: Array[Vector4i] = []
-# Oversized pairs live only for one synchronous impact or chunk rebuild. The
-# list is bounded by that operation's stamp count times its gameplay layers.
-var _temporary_stamp_cache_keys: Array[Vector4i] = []
+var _resized_stamp_cache: Dictionary:
+	get:
+		return _stamp_image_cache.entries
 var _current_view_x: float
 var _current_view_y: float
 var _loaded_first_chunk: int = -1
@@ -2184,122 +2179,21 @@ func _get_resized_stamp_images(
 	flip_x: bool,
 	flip_y: bool,
 	rotation_quarters: int
-) -> ResizedStampImages:
-	var orientation_flags := (
-		(1 if flip_x else 0)
-		| (2 if flip_y else 0)
-		| (posmod(rotation_quarters, 4) << 2)
-	)
-	var cache_key := Vector4i(
+) -> TerrainStampImageCache.StampImages:
+	return _stamp_image_cache.get_images(
 		mask_data.cache_id,
-		stamp_size.x,
-		stamp_size.y,
-		orientation_flags
-	)
-	var can_cache := (
-		resized_stamp_cache_limit > 0
-		and stamp_size.x * stamp_size.y
-			<= resized_stamp_cache_max_pixels
-	)
-	var cached_images: ResizedStampImages = _resized_stamp_cache.get(
-		cache_key
-	)
-	if cached_images != null:
-		if can_cache:
-			_resized_stamp_cache_order.erase(cache_key)
-			_resized_stamp_cache_order.append(cache_key)
-		return cached_images
-
-	var stamp_images := ResizedStampImages.new()
-	# blit_rect_mask cuts wherever the mask alpha is not exactly zero, so an
-	# interpolated erase mask cuts its whole feathered skirt at full strength and
-	# the opening creeps about a third of a pixel past the drawing - taking the
-	# inked rim, which is only about one pixel wide at this scale, with it.
-	# Nearest keeps the cut on the silhouette the artist drew. Nothing is lost by
-	# it: the cut was already hard-edged, because that same test discards every
-	# partial value bilinear produced.
-	stamp_images.erase_mask = _transform_stamp_image(
 		mask_data.erase_mask,
-		stamp_size,
-		flip_x,
-		flip_y,
-		rotation_quarters,
-		Image.INTERPOLATE_NEAREST
-	)
-	stamp_images.fracture_source = _transform_stamp_image(
 		mask_data.fracture_source,
 		stamp_size,
 		flip_x,
 		flip_y,
-		rotation_quarters,
-		Image.INTERPOLATE_BILINEAR
+		rotation_quarters
 	)
-	stamp_images.transparent_source = Image.create(
-		stamp_size.x,
-		stamp_size.y,
-		false,
-		Image.FORMAT_LA8
-	)
-	stamp_images.transparent_source.fill(EMPTY_MASK_COLOR)
-
-	if not can_cache:
-		_resized_stamp_cache[cache_key] = stamp_images
-		_temporary_stamp_cache_keys.append(cache_key)
-		return stamp_images
-	while _resized_stamp_cache_order.size() >= resized_stamp_cache_limit:
-		var expired_key: Vector4i = (
-			_resized_stamp_cache_order.pop_front()
-		)
-		_resized_stamp_cache.erase(expired_key)
-	_resized_stamp_cache[cache_key] = stamp_images
-	_resized_stamp_cache_order.append(cache_key)
-	return stamp_images
 
 
 ## Releases one-operation oversized masks after all touched chunks reuse them.
 func _clear_temporary_stamp_cache() -> void:
-	for cache_key: Vector4i in _temporary_stamp_cache_keys:
-		_resized_stamp_cache.erase(cache_key)
-	_temporary_stamp_cache_keys.clear()
-
-
-## Applies one cached orientation identically to the hole and its drawn cracks.
-## The cavity and the strokes take different filters for the reason given at the
-## call site, so the caller states which one it wants rather than sharing a
-## default that is only correct for one of them.
-func _transform_stamp_image(
-	source: Image,
-	stamp_size: Vector2i,
-	flip_x: bool,
-	flip_y: bool,
-	rotation_quarters: int,
-	interpolation: Image.Interpolation
-) -> Image:
-	var transformed := source.duplicate()
-	transformed.resize(
-		stamp_size.x,
-		stamp_size.y,
-		interpolation
-	)
-	if flip_x:
-		transformed.flip_x()
-	if flip_y:
-		transformed.flip_y()
-	var normalized_rotation := posmod(rotation_quarters, 4)
-	if normalized_rotation == 1:
-		transformed.rotate_90(CLOCKWISE)
-	elif normalized_rotation == 2:
-		transformed.flip_x()
-		transformed.flip_y()
-	elif normalized_rotation == 3:
-		transformed.rotate_90(COUNTERCLOCKWISE)
-	if transformed.get_size() != stamp_size:
-		transformed.resize(
-			stamp_size.x,
-			stamp_size.y,
-			interpolation
-		)
-	return transformed
+	_stamp_image_cache.clear_temporary()
 
 
 ## Precomputes stable organic openings around every chamber ceiling.
@@ -2393,8 +2287,10 @@ func _prepare_chamber_transition_stamps() -> void:
 func _prepare_hole_masks() -> void:
 	_small_mask_data.clear()
 	_big_mask_data.clear()
-	_resized_stamp_cache.clear()
-	_resized_stamp_cache_order.clear()
+	_stamp_image_cache.reset(
+		resized_stamp_cache_limit,
+		resized_stamp_cache_max_pixels
+	)
 	var prepared_masks: Dictionary[String, HoleMaskData] = {}
 	for layer_index in range(profile.get_layer_count()):
 		if (

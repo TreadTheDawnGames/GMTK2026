@@ -53,6 +53,13 @@ signal sequence_dialogue_requested(
 @export_range(-256.0, 256.0, 1.0) var conversation_root_offset_from_miner_x: float = 0.0
 ## Optional visual-editor timeline. Null preserves the legacy opening walk.
 @export var sequence: CutsceneSequence
+## Actors already painted into this stage's own artwork, by actor id.
+##
+## A set piece can have a character drawn into it - Cheese Girl is part of the
+## cafe storefront, not a figure standing in front of it - and placing her stand-in
+## as well would show her twice. The cutscene editor skips these when it populates
+## the cast, so the schedule can keep listing her as present in the scene.
+@export var actors_drawn_into_set: Array[StringName] = []
 
 var _presenter: CharacterPresenter
 var _sequence_player: CutsceneSequencePlayer

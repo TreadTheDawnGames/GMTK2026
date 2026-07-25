@@ -1,0 +1,61 @@
+[gd_resource type="Resource" script_class="CutsceneSequence" format=3]
+
+[ext_resource type="Script" path="res://resources/cinematics/cutscene_beat.gd" id="1_nh4gs"]
+[ext_resource type="Resource" path="res://resources/dialogue/cafe_gathering_conversation.tres" id="2_puacd"]
+[ext_resource type="Script" path="res://resources/cinematics/cutscene_sequence.gd" id="3_7coql"]
+
+[sub_resource type="Resource" id="Resource_sys8h"]
+script = ExtResource("1_nh4gs")
+kind = 9
+actor = &"cloak_lantern"
+
+[sub_resource type="Resource" id="Resource_f8n7n"]
+script = ExtResource("1_nh4gs")
+kind = 0
+actor = &"cloak_lantern"
+duration_seconds = 2.0
+target_marker = &"Conversation"
+pose = &"walk"
+step_height = 5.0
+
+[sub_resource type="Resource" id="Resource_qeygh"]
+script = ExtResource("1_nh4gs")
+kind = 2
+actor = &"cloak_lantern"
+start_seconds = 2.0
+facing = -1
+
+[sub_resource type="Resource" id="Resource_7pqn3"]
+script = ExtResource("1_nh4gs")
+kind = 1
+actor = &"cloak_lantern"
+start_seconds = 2.0
+pose = &"idle"
+
+[sub_resource type="Resource" id="Resource_lef3u"]
+script = ExtResource("1_nh4gs")
+kind = 5
+start_seconds = 2.2
+duration_seconds = 6.0
+conversation = ExtResource("2_puacd")
+
+[sub_resource type="Resource" id="Resource_xoc8n"]
+script = ExtResource("1_nh4gs")
+kind = 0
+actor = &"cloak_lantern"
+start_seconds = 8.2
+duration_seconds = 2.4
+target_marker = &"Exit"
+pose = &"walk"
+step_height = 5.0
+
+[sub_resource type="Resource" id="Resource_bgk7t"]
+script = ExtResource("1_nh4gs")
+kind = 10
+actor = &"cloak_lantern"
+start_seconds = 10.6
+
+[resource]
+script = ExtResource("3_7coql")
+sequence_id = &"cafe_gathering_sequence"
+beats = Array[ExtResource("1_nh4gs")]([SubResource("Resource_sys8h"), SubResource("Resource_f8n7n"), SubResource("Resource_qeygh"), SubResource("Resource_7pqn3"), SubResource("Resource_lef3u"), SubResource("Resource_xoc8n"), SubResource("Resource_bgk7t")])

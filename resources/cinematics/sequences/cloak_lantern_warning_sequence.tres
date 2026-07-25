@@ -1,0 +1,61 @@
+[gd_resource type="Resource" script_class="CutsceneSequence" format=3]
+
+[ext_resource type="Script" path="res://resources/cinematics/cutscene_beat.gd" id="1_duuv6"]
+[ext_resource type="Resource" path="res://resources/dialogue/cloak_lantern_warning_conversation.tres" id="2_qpjyh"]
+[ext_resource type="Script" path="res://resources/cinematics/cutscene_sequence.gd" id="3_k6b3r"]
+
+[sub_resource type="Resource" id="Resource_eb3br"]
+script = ExtResource("1_duuv6")
+kind = 9
+actor = &"cloak_lantern"
+
+[sub_resource type="Resource" id="Resource_k8h3i"]
+script = ExtResource("1_duuv6")
+kind = 0
+actor = &"cloak_lantern"
+duration_seconds = 1.4
+target_marker = &"Conversation"
+pose = &"walk"
+step_height = 6.0
+
+[sub_resource type="Resource" id="Resource_g2tww"]
+script = ExtResource("1_duuv6")
+kind = 2
+actor = &"cloak_lantern"
+start_seconds = 1.4
+facing = -1
+
+[sub_resource type="Resource" id="Resource_ev6e8"]
+script = ExtResource("1_duuv6")
+kind = 1
+actor = &"cloak_lantern"
+start_seconds = 1.4
+pose = &"idle"
+
+[sub_resource type="Resource" id="Resource_60yun"]
+script = ExtResource("1_duuv6")
+kind = 5
+start_seconds = 1.5999999999999999
+duration_seconds = 6.0
+conversation = ExtResource("2_qpjyh")
+
+[sub_resource type="Resource" id="Resource_nsp2h"]
+script = ExtResource("1_duuv6")
+kind = 0
+actor = &"cloak_lantern"
+start_seconds = 7.6
+duration_seconds = 2.8
+target_marker = &"Exit"
+pose = &"walk"
+step_height = 6.0
+
+[sub_resource type="Resource" id="Resource_bjt2e"]
+script = ExtResource("1_duuv6")
+kind = 10
+actor = &"cloak_lantern"
+start_seconds = 10.399999999999999
+
+[resource]
+script = ExtResource("3_k6b3r")
+sequence_id = &"cloak_lantern_warning_sequence"
+beats = Array[ExtResource("1_duuv6")]([SubResource("Resource_eb3br"), SubResource("Resource_k8h3i"), SubResource("Resource_g2tww"), SubResource("Resource_ev6e8"), SubResource("Resource_60yun"), SubResource("Resource_nsp2h"), SubResource("Resource_bjt2e")])

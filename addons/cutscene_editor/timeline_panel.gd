@@ -21,6 +21,9 @@ const MIN_PIXELS_PER_SECOND: float = 20.0
 const MAX_PIXELS_PER_SECOND: float = 240.0
 const DEFAULT_PIXELS_PER_SECOND: float = 80.0
 const DEFAULT_GRID_SECONDS: float = 0.1
+## How near, in screen pixels, a dragged edge has to come to another beat's edge
+## before it snaps onto it.
+const _NEIGHBOUR_SNAP_PIXELS: float = 8.0
 
 const KIND_COLORS: Dictionary = {
 	CutsceneBeat.Kind.MOVE: Color("#4b91d1"),
@@ -51,6 +54,10 @@ class _TimelineCanvas extends Control:
 		_input_handler = input_handler
 		_cursor_handler = cursor_handler
 		mouse_filter = Control.MOUSE_FILTER_STOP
+		# Click to focus, so the timeline's keys are live while you are working
+		# in it and dormant everywhere else. A panel that answered Delete
+		# whatever had focus would eat the Scene dock's own Delete.
+		focus_mode = Control.FOCUS_CLICK
 		set_process_input(true)
 
 	func _draw() -> void:
@@ -61,6 +68,15 @@ class _TimelineCanvas extends Control:
 		if event is InputEventMouseMotion:
 			var motion := event as InputEventMouseMotion
 			_update_cursor(motion.position)
+			return
+		var key := event as InputEventKey
+		if key != null:
+			if not key.pressed or key.echo:
+				return
+			if _input_handler.is_valid() and bool(
+				_input_handler.call(&"key", Vector2.ZERO, key)
+			):
+				accept_event()
 			return
 		if not event is InputEventMouseButton:
 			return
@@ -144,6 +160,9 @@ var _drag_preview_actor: StringName
 
 var _preview_player: CutsceneSequencePlayer
 var _preview_base_states: Dictionary = {}
+## The position this panel last wrote for each actor, so a later restore can
+## distinguish its own work from a node the designer moved by hand.
+var _preview_applied_states: Dictionary = {}
 
 
 func _init() -> void:
@@ -180,16 +199,25 @@ func set_context(context: CutsceneEditorContext) -> void:
 		_on_context_data_changed
 	):
 		_context.authored_data_changed.disconnect(_on_context_data_changed)
+	# The timeline draws one lane per cast member, so a cast edit has to reach
+	# it too - just without the terrain rebuild authored_data_changed carries.
+	if _context != null and _context.cast_changed.is_connected(
+		_on_context_data_changed
+	):
+		_context.cast_changed.disconnect(_on_context_data_changed)
 	_context = context
 	_selected_beat = null
 	_scrub_time = 0.0
 	_set_playing(false)
 	_preview_base_states.clear()
+	_preview_applied_states.clear()
 	if not _has_valid_context():
 		_show_empty_state()
 		return
 	if not _context.authored_data_changed.is_connected(_on_context_data_changed):
 		_context.authored_data_changed.connect(_on_context_data_changed)
+	if not _context.cast_changed.is_connected(_on_context_data_changed):
+		_context.cast_changed.connect(_on_context_data_changed)
 	_build_valid_panel()
 
 
@@ -263,6 +291,23 @@ func _build_valid_panel() -> void:
 	_canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_canvas.custom_minimum_size = Vector2(900.0, 180.0)
+	# Hovering the thing you are about to use is where a person looks for its
+	# keys, so the timeline's bindings are written on the timeline itself
+	# rather than only in a manual nobody opens.
+	_canvas.tooltip_text = (
+		"Drag a beat to move it, drag its edge to change how long it lasts, "
+		+ "and drag it onto another lane to hand it to a different character. "
+		+ "Drag the ruler to scrub.\n"
+		+ "\n"
+		+ "Click the timeline first, then:\n"
+		+ "  Space  play or pause\n"
+		+ "  Left and Right  step the playhead by one grid division\n"
+		+ "  Shift+arrows  step ten divisions\n"
+		+ "  Ctrl+arrows  move the selected beat instead of the playhead\n"
+		+ "  Home and End  jump to the start or the end\n"
+		+ "  Ctrl+D  duplicate the selected beat\n"
+		+ "  Delete  remove the selected beat"
+	)
 	var scroll := ScrollContainer.new()
 	scroll.name = "TimelineScroll"
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -313,14 +358,17 @@ func _build_toolbar() -> void:
 
 	var add_button := Button.new()
 	add_button.text = "+ Beat"
-	add_button.tooltip_text = "Add a beat at the current playhead time."
+	add_button.tooltip_text = (
+		"Add a beat at the current playhead time.\n"
+		+ "Ctrl+D duplicates the selected beat instead."
+	)
 	_toolbar.add_child(add_button)
 	if not add_button.pressed.is_connected(_add_beat):
 		add_button.pressed.connect(_add_beat)
 
 	var delete_button := Button.new()
 	delete_button.text = "Delete"
-	delete_button.tooltip_text = "Delete the selected beat."
+	delete_button.tooltip_text = "Delete the selected beat.  (Delete)"
 	_toolbar.add_child(delete_button)
 	if not delete_button.pressed.is_connected(_delete_selected):
 		delete_button.pressed.connect(_delete_selected)
@@ -567,6 +615,8 @@ func _handle_canvas_input(
 	if not _has_valid_context():
 		return false
 	match event_type:
+		&"key":
+			return _handle_canvas_key(event as InputEventKey)
 		&"press":
 			if position.y < RULER_HEIGHT and position.x >= LANE_LABEL_WIDTH:
 				_begin_scrub(pixels_to_time(position.x - LANE_LABEL_WIDTH))
@@ -608,6 +658,93 @@ func _cursor_for_position(position: Vector2) -> Control.CursorShape:
 	return Control.CURSOR_ARROW
 
 
+## The bindings an animation timeline is expected to answer: space transports,
+## Delete removes, Ctrl+D duplicates, the arrows step, and Home/End jump to the
+## ends. Shift multiplies a step by ten, and Ctrl moves the selected beat rather
+## than the playhead, which are the two modifiers this kind of editor always
+## carries.
+##
+## Returns whether the key was claimed, so anything unbound still reaches the
+## editor underneath instead of being swallowed by a focused timeline.
+func _handle_canvas_key(key: InputEventKey) -> bool:
+	if key == null:
+		return false
+	var step := _grid_seconds if _grid_seconds > 0.0 else DEFAULT_GRID_SECONDS
+	if key.shift_pressed:
+		step *= 10.0
+	match key.keycode:
+		KEY_SPACE:
+			_set_playing(not _is_playing)
+			return true
+		KEY_DELETE:
+			if _selected_beat == null:
+				return false
+			_delete_selected()
+			return true
+		KEY_D:
+			if not key.ctrl_pressed or _selected_beat == null:
+				return false
+			_duplicate_selected()
+			return true
+		KEY_LEFT:
+			if key.ctrl_pressed:
+				return _nudge_selected_beat(-step)
+			_set_scrub_time(_scrub_time - step, true)
+			return true
+		KEY_RIGHT:
+			if key.ctrl_pressed:
+				return _nudge_selected_beat(step)
+			_set_scrub_time(_scrub_time + step, true)
+			return true
+		KEY_HOME:
+			_set_scrub_time(0.0, true)
+			return true
+		KEY_END:
+			_set_scrub_time(_context.sequence.get_duration_seconds(), true)
+			return true
+	return false
+
+
+## Copies the selected beat one grid step later and selects the copy, so a
+## repeated action is authored by duplicating rather than by rebuilding it.
+func _duplicate_selected() -> void:
+	if not _has_valid_context() or _selected_beat == null:
+		return
+	var copy: CutsceneBeat = _selected_beat.duplicate()
+	var step := _grid_seconds if _grid_seconds > 0.0 else DEFAULT_GRID_SECONDS
+	copy.start_seconds = snap_time(
+		maxf(_selected_beat.start_seconds, 0.0)
+		+ maxf(_selected_beat.duration_seconds, step)
+	)
+	var beats: Array[CutsceneBeat] = _context.sequence.beats.duplicate()
+	beats.append(copy)
+	_commit_resource_changes(
+		_context.sequence,
+		{&"beats": beats},
+		"Duplicate cutscene beat"
+	)
+	_select_beat(copy)
+
+
+## Slides the selected beat along its lane by one step, clamped at zero so a
+## beat cannot be nudged to a negative start time.
+func _nudge_selected_beat(delta_seconds: float) -> bool:
+	if not _has_valid_context() or _selected_beat == null:
+		return false
+	var moved := maxf(
+		snap_time(maxf(_selected_beat.start_seconds, 0.0) + delta_seconds),
+		0.0
+	)
+	if is_equal_approx(moved, _selected_beat.start_seconds):
+		return true
+	_commit_resource_changes(
+		_selected_beat,
+		{&"start_seconds": moved},
+		"Nudge cutscene beat"
+	)
+	return true
+
+
 func _begin_scrub(seconds: float) -> void:
 	_drag_mode = &"scrub"
 	_set_scrub_time(seconds, true)
@@ -627,6 +764,37 @@ func _begin_drag(beat: CutsceneBeat, resize: bool, position: Vector2) -> void:
 			position.x - LANE_LABEL_WIDTH
 		)
 		_drag_pointer_offset_seconds = pointer_time - _drag_original_start
+
+
+## Pulls a dragged time onto the nearest other beat's start or end when it comes
+## within snapping distance, so beats butt together exactly instead of leaving a
+## hairline gap or overlapping by a hundredth of a second.
+##
+## The threshold is in pixels rather than seconds: at low zoom a whole second is
+## a few pixels wide and a seconds-based threshold would drag everything into a
+## magnet, while at high zoom it would never reach. Holding the grid-bypass
+## modifier turns this off with everything else, which is how a beat gets placed
+## deliberately close to a neighbour without touching it.
+func _snap_to_neighbour_edges(seconds: float, bypass: bool) -> float:
+	if bypass or not _has_valid_context():
+		return seconds
+	var threshold := _NEIGHBOUR_SNAP_PIXELS / maxf(_resolved_zoom(-1.0), 0.001)
+	var best := seconds
+	var best_distance := threshold
+	for beat in _context.sequence.beats:
+		if beat == null or beat == _drag_beat:
+			continue
+		var start := maxf(beat.start_seconds, 0.0)
+		for edge in [start, start + maxf(beat.duration_seconds, 0.0)]:
+			var distance := absf(edge - seconds)
+			if distance < best_distance:
+				best_distance = distance
+				best = edge
+	# Zero is an edge too: the sequence's own start is the one every opening
+	# beat wants to sit exactly on.
+	if absf(seconds) < best_distance:
+		best = 0.0
+	return maxf(best, 0.0)
 
 
 func _update_drag(position: Vector2, event: InputEvent) -> void:
@@ -650,18 +818,32 @@ func _update_drag(position: Vector2, event: InputEvent) -> void:
 		)
 		_drag_preview_duration = clamp_duration_after_resize(
 			_drag_original_start,
-			snapped_right_edge
+			_snap_to_neighbour_edges(snapped_right_edge, bypass_grid)
 		)
 	else:
 		var pointer_time := pixels_to_time(
 			position.x - LANE_LABEL_WIDTH
 		)
 		var proposed_start := pointer_time - _drag_pointer_offset_seconds
-		_drag_preview_start = snap_time(
+		var gridded_start := snap_time(
 			proposed_start,
 			_grid_seconds,
 			bypass_grid
 		)
+		# Snapping the beat's own end as well as its start, so a beat can be
+		# butted up against the one after it and not only the one before it.
+		var duration := maxf(_drag_original_duration, 0.0)
+		var snapped_start := _snap_to_neighbour_edges(
+			gridded_start,
+			bypass_grid
+		)
+		if is_equal_approx(snapped_start, gridded_start) and duration > 0.0:
+			var snapped_end := _snap_to_neighbour_edges(
+				gridded_start + duration,
+				bypass_grid
+			)
+			snapped_start = snapped_end - duration
+		_drag_preview_start = maxf(snapped_start, 0.0)
 		var lane_actor := _actor_for_lane_position(position.y)
 		if lane_actor != &"__outside__":
 			_drag_preview_actor = lane_actor
@@ -716,8 +898,16 @@ func _stop_drag_without_commit() -> void:
 		_canvas.queue_redraw()
 
 
+## Selects a beat and moves the playhead to the moment it begins.
+##
+## Clicking a beat is how a designer asks "what does this one do", and the
+## answer is in the viewport, not in this panel. Without the scrub the cast
+## stays frozen wherever the playhead happened to be, so the selected beat
+## highlights a box on a chart while the stage shows an unrelated instant.
 func _select_beat(beat: CutsceneBeat) -> void:
 	_selected_beat = beat
+	if beat != null and not _is_playing:
+		_set_scrub_time(maxf(beat.start_seconds, 0.0), true)
 	beat_selected.emit(beat)
 	if _canvas != null:
 		_canvas.queue_redraw()
@@ -748,6 +938,17 @@ func _set_scrub_time(seconds: float, emit_signal: bool) -> void:
 		scrub_time_changed.emit(_scrub_time)
 
 
+## Re-places the stand-ins for the current playhead time. Public so the viewport
+## can call it while a walk's destination is being dragged, and see the cast
+## follow the pointer instead of waiting for the drag to finish.
+func refresh_preview() -> void:
+	if not _has_valid_context():
+		return
+	_apply_preview_at_time()
+	if _canvas != null:
+		_canvas.queue_redraw()
+
+
 func _apply_preview_at_time() -> void:
 	if not _has_valid_context():
 		return
@@ -768,6 +969,9 @@ func _apply_preview_at_time() -> void:
 		var state: Dictionary = actor_states[actor_id]
 		if state.has(&"position"):
 			preview.global_position = state[&"position"]
+			# Remembered so the next restore can tell a position this panel
+			# wrote from one the designer dragged.
+			_preview_applied_states[actor_id] = preview.global_position
 		if state.has(&"visible"):
 			preview.visible = bool(state[&"visible"])
 		if state.has(&"facing") and preview.has_method(&"set_facing_direction"):
@@ -779,6 +983,7 @@ func _apply_preview_at_time() -> void:
 
 func _capture_preview_states() -> void:
 	_preview_base_states.clear()
+	_preview_applied_states.clear()
 	if not _has_valid_context():
 		return
 	for actor_id_text in _context.get_stage_actor_ids():
@@ -794,6 +999,14 @@ func _capture_preview_states() -> void:
 		}
 
 
+## Puts the cast back where they stood before the playhead moved them.
+##
+## An actor the designer has since dragged is left alone and adopted as the new
+## resting place instead. The base states are captured once when the panel is
+## built, so without this check the first scrub after moving somebody snapped
+## them back to where they were minutes ago and the move looked like it had
+## silently failed. Anything the preview itself wrote is known, so a position
+## that no longer matches can only have come from the designer.
 func _restore_preview_states() -> void:
 	if _context == null:
 		return
@@ -803,6 +1016,13 @@ func _restore_preview_states() -> void:
 		if not is_instance_valid(preview):
 			continue
 		var base_state: Dictionary = _preview_base_states[actor_id_variant]
+		if _preview_applied_states.has(actor_id):
+			var applied: Vector2 = _preview_applied_states[actor_id]
+			if not preview.global_position.is_equal_approx(applied):
+				base_state["position"] = preview.global_position
+				_preview_base_states[actor_id_variant] = base_state
+				_preview_applied_states.erase(actor_id)
+				continue
 		preview.global_position = base_state["position"]
 		preview.scale = base_state["scale"]
 		preview.pose = base_state["pose"]
@@ -1137,6 +1357,13 @@ func _refresh_validation() -> void:
 func _on_context_data_changed() -> void:
 	if not _has_valid_context():
 		_show_empty_state()
+		return
+	# Coming back from the empty state, there is nothing to refresh: the empty
+	# message replaced the toolbar, canvas and status bar, so every update below
+	# would write to controls that no longer exist. Selecting a cutscene that
+	# has a timeline has to build the panel, not repaint it.
+	if _canvas == null:
+		_build_valid_panel()
 		return
 	_rebuild_lane_data()
 	_refresh_validation()

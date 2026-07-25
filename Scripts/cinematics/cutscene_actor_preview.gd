@@ -50,6 +50,14 @@ func _enter_tree() -> void:
 func _ready() -> void:
 	if not Engine.is_editor_hint() and remove_in_running_game:
 		return
+	# Clicking the artwork has to select this node, not the Sprite2D under it.
+	# The node's origin is the character's feet while the sprite is offset up
+	# and away from it - badly so for the miner, whose art is placed relative to
+	# his rig's foot anchor - so selecting the sprite hands the designer a child
+	# whose position means nothing to the stage and leaves the point they were
+	# aiming for untouched.
+	if Engine.is_editor_hint():
+		set_meta(&"_edit_group_", true)
 	_ensure_sprite()
 	_sync_sprite_owner()
 	_connect_appearance_resources()

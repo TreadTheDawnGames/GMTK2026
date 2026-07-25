@@ -12,6 +12,37 @@ extends RefCounted
 ## The invariant is that a baked cell uses the same two config queries as
 ## procedural terrain, so an untouched bake has identical logical collision.
 
+## Clear height of the rectangle the tunnel starts as, in terrain cells. The
+## finished ceiling sits higher than this: the strikes that scallop it bite
+## upward by their own radius, which lands the real clear height around 22 to 27
+## cells, or 176 to 216 world units. That is tall enough to hold the cast with
+## headroom and low enough to still read as a tunnel rather than as the open
+## chamber it replaces. Raise this and the strike radius together, or the roof
+## goes up without the scallops following it.
+const LEVEL_TUNNEL_HEIGHT_CELLS: int = 16
+## How far the tunnel roof rises and falls along the room, and how many times.
+## A ruler-straight roof is the one thing that reads as cut by a tool rather
+## than worn by water.
+const LEVEL_TUNNEL_ROOF_WAVE_CELLS: float = 3.0
+const LEVEL_TUNNEL_ROOF_WAVE_COUNT: float = 3.0
+## The bite one pickaxe strike takes out of the ceiling, and how far apart the
+## strikes fall. Spacing under twice the radius is what makes them overlap into
+## a continuous scalloped roof instead of a row of separate holes.
+const LEVEL_TUNNEL_STRIKE_RADIUS_CELLS: float = 6.0
+const LEVEL_TUNNEL_STRIKE_SPACING_CELLS: float = 7.0
+## Extra reach on the occasional harder swing.
+const LEVEL_TUNNEL_STRIKE_DEEP_BITE_CELLS: float = 2.5
+## The rim-jagging pass. Strength is well under one so it breaks the arcs up
+## rather than chewing the whole edge away, and the spacing is tight enough that
+## no stretch of roof is left with a clean swept curve.
+const LEVEL_TUNNEL_ROUGHEN_RADIUS_CELLS: float = 5.0
+const LEVEL_TUNNEL_ROUGHEN_SPACING_CELLS: float = 4.0
+const LEVEL_TUNNEL_ROUGHEN_STRENGTH: float = 0.45
+## Depth of the band under the ceiling that is allowed to keep jagged rock. It
+## has to clear the roughen radius, or a lump the pass left hanging survives
+## into the space the cast walks through.
+const LEVEL_TUNNEL_ROOF_JAG_BAND_CELLS: int = 7
+
 ## Corridor height in terrain cells. Twelve cells is 96 world units, which
 ## clears the tallest authored actor with room to read as a tunnel rather than
 ## a slot cut through the wall.
@@ -73,6 +104,114 @@ static func bake_procedural_chamber(
 				and world_cell.x < chamber_bounds.y
 			)
 			sculpt.set_solid_local(local_cell, not is_open)
+	sculpt.end_edit()
+
+
+## Cuts the whole room as one level tunnel running off both edges, with a flat
+## floor the cast stands on end to end.
+##
+## This is the shape a cutscene room wants. A procedural chamber bulges in the
+## middle and pinches at the sides, which puts the cast on a curved ledge and
+## leaves the miner standing in a dip with rock at his shoulders; a designer
+## then fights the brush to flatten it back. Cutting the tunnel outright means
+## the authored work starts from a stage rather than from a cave.
+##
+## The roof waves gently so the tunnel still reads as worn rather than bored,
+## but the floor is exactly the room's floor row across every column: that is
+## what makes the miner land at the same height wherever he breaks through, and
+## what stops a ledge catching him short of the room.
+static func carve_level_tunnel(
+	sculpt: CutsceneTerrainSculpt,
+	height_cells: int = LEVEL_TUNNEL_HEIGHT_CELLS
+) -> void:
+	if sculpt == null:
+		return
+	var floor_row := sculpt.get_floor_local_row()
+	if floor_row <= 0 or floor_row >= sculpt.grid_size.y:
+		return
+	# Solid first. A tunnel is the room's whole shape, not an edit on top of
+	# whatever was cut before, so anything previously carved outside it has to
+	# close or the old chamber's pockets survive as holes in the new walls.
+	sculpt.begin_edit()
+	sculpt.fill_all(true)
+	var clear_height := maxi(height_cells, 4)
+	for local_x in range(sculpt.grid_size.x):
+		# Open upward from the row directly above the floor. The floor row and
+		# the guarded rows under it are never touched, so the ground the cast
+		# stands on is the same row in every column.
+		var highest_open_row := maxi(floor_row - clear_height, 0)
+		for local_y in range(highest_open_row, floor_row):
+			sculpt.set_solid_local(Vector2i(local_x, local_y), false)
+
+	# The ceiling is bitten out by overlapping strikes rather than left as the
+	# straight edge of that rectangle. A cutscene room is a tunnel the miner dug
+	# to get here, and a flat roof is the one detail that says it was not: the
+	# scallops are the shape a swung pickaxe leaves, so the outline the renderer
+	# draws along the rock rim reads as digging all the way across.
+	var brush := CutsceneSculptBrush.new()
+	brush.falloff = 0.25
+	var roof_row := float(maxi(floor_row - clear_height, 0))
+	var strike_x := -LEVEL_TUNNEL_STRIKE_RADIUS_CELLS
+	var strike_index := 0
+	while strike_x <= float(sculpt.grid_size.x) + LEVEL_TUNNEL_STRIKE_RADIUS_CELLS:
+		var strike_progress := (
+			strike_x / maxf(float(sculpt.grid_size.x - 1), 1.0)
+		)
+		# A wave under the strikes keeps the ceiling from settling at one
+		# height, so the tunnel rises and falls the way a dug one does.
+		var roof_wave := LEVEL_TUNNEL_ROOF_WAVE_CELLS * 0.5 * (
+			1.0 - cos(strike_progress * TAU * LEVEL_TUNNEL_ROOF_WAVE_COUNT)
+		)
+		# Every third strike bites deeper, so the scallops read as a person
+		# swinging rather than as a machine with one stroke length.
+		var deep_bite := (
+			LEVEL_TUNNEL_STRIKE_DEEP_BITE_CELLS
+			if strike_index % 3 == 0
+			else 0.0
+		)
+		brush.radius_cells = LEVEL_TUNNEL_STRIKE_RADIUS_CELLS + deep_bite
+		brush.carve(sculpt, Vector2(strike_x, roof_row - roof_wave))
+		strike_x += LEVEL_TUNNEL_STRIKE_SPACING_CELLS
+		strike_index += 1
+
+	# One roughen pass along the rim. Roughen flips only boundary cells, so this
+	# breaks the arcs into jagged rock without opening a hole through the roof,
+	# and the guarded floor rows are unreachable by it either way.
+	brush.radius_cells = LEVEL_TUNNEL_ROUGHEN_RADIUS_CELLS
+	brush.strength = LEVEL_TUNNEL_ROUGHEN_STRENGTH
+	brush.falloff = 0.6
+	var roughen_x := 0.0
+	while roughen_x <= float(sculpt.grid_size.x):
+		var roughen_progress := (
+			roughen_x / maxf(float(sculpt.grid_size.x - 1), 1.0)
+		)
+		var roughen_wave := LEVEL_TUNNEL_ROOF_WAVE_CELLS * 0.5 * (
+			1.0 - cos(roughen_progress * TAU * LEVEL_TUNNEL_ROOF_WAVE_COUNT)
+		)
+		brush.seed_value = int(roughen_x)
+		brush.roughen(sculpt, Vector2(roughen_x, roof_row - roughen_wave))
+		roughen_x += LEVEL_TUNNEL_ROUGHEN_SPACING_CELLS
+
+	# Drop each column clear from its own ceiling to the floor. Both passes above
+	# leave rock hanging under the opening they cut: roughen flips cells inward,
+	# and a scallop can arch over a gap. Either way the column reads as ceiling,
+	# then air, then rock again — and the miner falling down it lands on that
+	# rock a few cells under the roof instead of on the floor with the cast.
+	#
+	# Opening from the topmost hole downward is what keeps the ceiling jagged
+	# while making the fall safe: the height the rock starts at still varies
+	# column by column, which is the whole silhouette, but nothing hangs beneath
+	# it any more.
+	for local_x in range(sculpt.grid_size.x):
+		var ceiling_row := -1
+		for local_y in range(0, floor_row):
+			if not sculpt.is_solid_local(Vector2i(local_x, local_y)):
+				ceiling_row = local_y
+				break
+		if ceiling_row < 0:
+			continue
+		for local_y in range(ceiling_row, floor_row):
+			sculpt.set_solid_local(Vector2i(local_x, local_y), false)
 	sculpt.end_edit()
 
 

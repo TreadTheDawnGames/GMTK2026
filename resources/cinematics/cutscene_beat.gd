@@ -36,6 +36,19 @@ enum Kind {
 @export var target_marker: StringName
 ## An offset from the marker, or a stage-local position when no marker is set.
 @export var target_offset: Vector2 = Vector2.ZERO
+## Whether this MOVE begins from an authored point rather than from wherever the
+## actor happens to be standing.
+##
+## Off by default, because chaining from the previous beat's end is what makes a
+## sequence read as one continuous performance. Turn it on for the beat that has
+## to begin somewhere exact - an entrance from off screen, or a walk re-staged
+## after an edit upstream moved everything after it.
+@export var starts_from_authored_point: bool = false
+## A direct child name under ActorMarkers or PropMarkers used as the start.
+## Ignored unless starts_from_authored_point is on.
+@export var start_marker: StringName
+## An offset from the start marker, or a stage-local position with no marker.
+@export var start_offset: Vector2 = Vector2.ZERO
 ## Pose used by POSE and held as the movement pose during MOVE.
 @export var pose: StringName
 ## AnimationPlayer clip for STAGE_CUE, or ActionMarkers child for STRIKE.

@@ -34,7 +34,8 @@ position = Vector2(700, 0)
 z_index = 7
 
 [node name="EditorTerrainPreview" parent="." index="5"]
-editor_description = "Previews rutini_second_encounter's own chamber at depth 11200."
+editor_description = "Previews rutini_second at its authored depth."
+encounter_id = &"rutini_second"
 preview_depth_rows = 11200
 
 [editable path="ActorMarkers"]

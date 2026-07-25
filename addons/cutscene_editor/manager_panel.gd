@@ -86,6 +86,8 @@ func _init() -> void:
 	_table.set_column_expand_ratio(_COLUMN_STATUS, 3)
 	if not _table.item_selected.is_connected(_on_row_selected):
 		_table.item_selected.connect(_on_row_selected)
+	if not _table.item_activated.is_connected(_on_row_activated):
+		_table.item_activated.connect(_on_row_activated)
 	add_child(_table)
 	_refresh()
 
@@ -421,6 +423,67 @@ func _on_row_selected() -> void:
 		_context.encounter.sequence if _context.encounter != null else null
 	)
 	_context.notify_authored_data_changed()
+
+
+## Opens the double-clicked cutscene's own stage scene, so the overview is how a
+## designer moves between cutscenes instead of a table they read and then go
+## hunting the FileSystem dock for the matching scene. Opening the scene is what
+## swaps the cast and the room: every panel rebuilds off scene_changed, so the
+## whole editor follows the double-click rather than just this table's selection.
+func _on_row_activated() -> void:
+	var selected: TreeItem = _table.get_selected()
+	if selected == null:
+		return
+	var metadata: Variant = selected.get_metadata(_COLUMN_CUTSCENE)
+	var encounter_id := StringName(String(metadata))
+	if encounter_id.is_empty():
+		return
+	var encounter := _find_scheduled_encounter(encounter_id)
+	if encounter == null:
+		return
+	if encounter.stage_scene == null:
+		_set_status(
+			"'%s' has no stage scene to open yet." % encounter_id
+		)
+		return
+	var scene_path := encounter.stage_scene.resource_path
+	if scene_path.is_empty():
+		_set_status(
+			"'%s' has a stage scene that was never saved to disk." % encounter_id
+		)
+		return
+	# Already open: reselecting it in the preview is all that is left to do, and
+	# reopening would throw away whatever is unsaved in it.
+	if EditorInterface.get_edited_scene_root() != null and (
+		EditorInterface.get_edited_scene_root().scene_file_path == scene_path
+	):
+		_on_row_selected()
+		return
+	EditorInterface.open_scene_from_path(scene_path)
+
+
+## Reports why a double-click could not open a cutscene. The next refresh
+## rewrites this line with the run summary, which is the right lifetime for it:
+## the message belongs to the click, not to the overview.
+func _set_status(message: String) -> void:
+	if is_instance_valid(_summary_label):
+		_summary_label.text = message
+
+
+## Returns one scheduled encounter by id, or null when the open stage's schedule
+## does not carry it.
+func _find_scheduled_encounter(
+	encounter_id: StringName
+) -> DepthCharacterEncounter:
+	if _context == null or not _context.is_valid():
+		return null
+	var schedule: DepthEncounterConfig = _context.preview.get_encounter_config()
+	if schedule == null:
+		return null
+	for encounter: DepthCharacterEncounter in schedule.encounters:
+		if encounter != null and encounter.encounter_id == encounter_id:
+			return encounter
+	return null
 
 
 func _on_authored_data_changed() -> void:

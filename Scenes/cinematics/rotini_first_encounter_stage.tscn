@@ -1,0 +1,33 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
+
+[node name="RotiniFirstEncounterStage" instance=ExtResource("1_stage")]
+editor_description = "Story beat 5, depth 4,000: Rotini is introduced on the cave path. He is a rat and reads much smaller than the miner, so he comes in quickly and stands close; at the other visitors' spacing he would be a speck at the edge of the frame. His art is drawn looking left, so he stays on the miner's right. The rutini_* resource names refer to Rotini until a coordinated rename is approved."
+opening_move_seconds = 0.9
+closing_move_seconds = 1.4
+opening_step_height = 3.0
+hide_actor_after_closing = true
+conversation_tracks_miner = true
+conversation_root_offset_from_miner_x = 56.0
+
+[node name="Entrance" parent="ActorMarkers" index="0"]
+editor_description = "Right of the miner and close in, because a rat crossing the full room reads as a long wait for very little movement."
+position = Vector2(176, 0)
+
+[node name="Conversation" parent="ActorMarkers" index="1"]
+position = Vector2(-96, 0)
+
+[node name="Rest" parent="ActorMarkers" index="3"]
+position = Vector2(-96, 0)
+
+[node name="Exit" parent="ActorMarkers" index="4"]
+editor_description = "Past the right edge of the frame, so he is out of shot well before he is hidden."
+position = Vector2(432, 0)
+
+[node name="EditorTerrainPreview" parent="." index="4"]
+editor_description = "Previews rutini_first at its authored depth."
+encounter_id = &"rutini_first"
+preview_depth_rows = 4000
+
+[editable path="ActorMarkers"]

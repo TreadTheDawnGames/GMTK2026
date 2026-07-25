@@ -42,6 +42,21 @@ var _stroke_before: CutsceneTerrainSculpt
 var _hover_local := Vector2.ZERO
 var _has_hover: bool = false
 var _stroke_origin_local := Vector2.ZERO
+## The beat the timeline has selected, so the viewport can draw its walk.
+var _selected_beat: CutsceneBeat
+## Which end of the selected walk is being dragged: "start", "target", or empty
+## for none.
+var _dragging_handle: StringName = &""
+## The offset that end had when the drag began. Captured because the beat is
+## written live during the drag, so by release it no longer remembers what undo
+## has to put back.
+var _move_offset_before_drag := Vector2.ZERO
+## Colours for the selected walk: the line it travels and the handle that ends
+## it. Green reads as "this is the path", matching the landing line's language.
+const MOVE_PATH_COLOR := Color(0.45, 0.9, 1.0, 0.85)
+const MOVE_HANDLE_COLOR := Color(1.0, 0.85, 0.3, 0.95)
+## How near the pointer has to be, in screen pixels, to grab the walk's end.
+const _MOVE_HANDLE_GRAB_PIXELS: float = 14.0
 # Outline segments cached in scene space; see _rebuild_layer_outline.
 var _outline_points := PackedVector2Array()
 
@@ -99,6 +114,7 @@ func _enter_tree() -> void:
 	_timeline_panel.beat_selected.connect(_on_beat_selected)
 	_timeline_panel.scrub_time_changed.connect(_on_scrub_time_changed)
 	_context.authored_data_changed.connect(_on_authored_data_changed)
+	_context.cast_changed.connect(_on_cast_changed)
 	scene_changed.connect(_on_scene_changed)
 	_on_scene_changed(EditorInterface.get_edited_scene_root())
 
@@ -120,6 +136,23 @@ func _handles(_object: Object) -> bool:
 
 func _on_scene_changed(_scene_root: Node) -> void:
 	_rebuild_context()
+	# Deferred because on scene_changed the stage's terrain preview has not
+	# resolved its mining config yet, and cast placement reads it.
+	_auto_populate_cast.call_deferred()
+
+
+## Places the encounter's own cast and the miner the moment a stage is opened.
+## Seeing who is in the room is the reason to open one, and a designer should
+## not have to know that the cast exists behind two buttons on another tab.
+##
+## Both calls skip anything already in the scene, so reopening a stage that is
+## already cast adds nothing, commits no undo action, and leaves the scene
+## unmodified. That is what makes this safe to run on every scene switch.
+func _auto_populate_cast() -> void:
+	if not _context.is_valid() or _context.encounter == null:
+		return
+	_cast_panel.populate_from_encounter()
+	_cast_panel.show_miner()
 
 
 ## Rereads the open scene into the one context every panel shares.
@@ -160,6 +193,13 @@ func _on_authored_data_changed() -> void:
 	update_overlays()
 
 
+## Handles a cast, prop or marker edit. Deliberately does not rebuild the
+## terrain preview or retrace the room outline: neither depends on who is
+## standing in the room, and both cost a full pass over the room's cells.
+func _on_cast_changed() -> void:
+	update_overlays()
+
+
 func _on_armed_changed(_is_armed: bool) -> void:
 	update_overlays()
 
@@ -172,7 +212,64 @@ func _on_brush_settings_changed() -> void:
 
 
 func _on_beat_selected(beat: CutsceneBeat) -> void:
+	_selected_beat = beat
 	_beat_inspector.show_beat(beat)
+	update_overlays()
+
+
+## Returns where the selected MOVE beat puts its actor, in scene space, or the
+## no-target sentinel when the selection is not a move at all.
+##
+## The destination is a marker plus an offset, which is two numbers in an
+## Inspector and nothing on screen. Resolving it here is what lets the viewport
+## show the walk as a line the designer can see and grab.
+func _get_selected_move_target() -> Variant:
+	if _selected_beat == null or not _context.is_valid():
+		return null
+	if _selected_beat.kind != CutsceneBeat.Kind.MOVE:
+		return null
+	var target := _selected_beat.target_offset
+	if not _selected_beat.target_marker.is_empty():
+		target += _context.get_marker_position(_selected_beat.target_marker)
+	elif _selected_beat.target_offset == Vector2.ZERO:
+		return null
+	return target
+
+
+## Returns where the selected beat's actor stands when that beat begins, so the
+## drawn path starts where the walk actually starts rather than at wherever the
+## stand-in was last parked.
+func _get_selected_move_origin() -> Variant:
+	if _selected_beat == null or _context.sequence == null:
+		return null
+	if not _context.is_valid() or _selected_beat.actor.is_empty():
+		return null
+	# An authored start is the answer outright: it is where the walk begins by
+	# definition, and evaluating the sequence would return the same point the
+	# long way round.
+	if _selected_beat.starts_from_authored_point:
+		var authored := _selected_beat.start_offset
+		if not _selected_beat.start_marker.is_empty():
+			authored += _context.get_marker_position(
+				_selected_beat.start_marker
+			)
+		return authored
+	var player := CutsceneSequencePlayer.new()
+	player.bind(
+		_context.get_actor_preview,
+		_context.get_marker_position,
+		Callable(),
+		null
+	)
+	var states: Dictionary = player.evaluate_at(
+		_context.sequence,
+		maxf(_selected_beat.start_seconds, 0.0)
+	)
+	var actor_states: Dictionary = states.get(&"actors", {})
+	if not actor_states.has(_selected_beat.actor):
+		return null
+	var state: Dictionary = actor_states[_selected_beat.actor]
+	return state.get(&"position")
 
 
 ## Places the cast where the sequence says they are at one instant, so
@@ -227,6 +324,11 @@ func _on_playtest_pressed() -> void:
 ## Sculpts along the drag while the tool is armed, and otherwise gets out of
 ## the way so ordinary selection keeps working.
 func _forward_canvas_gui_input(event: InputEvent) -> bool:
+	# Before the armed check: dragging a walk's destination is a selection-mode
+	# gesture, not a sculpting one. It only claims the click when the pointer is
+	# actually on the handle, so ordinary selection is untouched.
+	if _handle_move_target_input(event):
+		return true
 	if not _sculpt_panel.is_armed():
 		return false
 	var preview := _context.preview
@@ -418,6 +520,220 @@ func _apply_operation(
 
 
 ## Draws the room's bounds, the brush, and where a falling miner lands.
+## Drags the selected walk's destination, writing it back as the beat's offset
+## from its marker.
+##
+## The offset is what moves, never the marker: a marker is shared by every beat
+## that names it and by the stage's own opening walk, so dragging one walk's
+## end would silently move everyone else's. Shift snaps to the marker itself,
+## which is how an offset nudged by hand gets zeroed again.
+##
+## Returns whether the gesture was claimed.
+func _handle_move_target_input(event: InputEvent) -> bool:
+	var target_variant := _get_selected_move_target()
+	if target_variant == null:
+		_dragging_handle = &""
+		return false
+	var target: Vector2 = target_variant
+	var transform := _get_viewport_transform()
+
+	var button := event as InputEventMouseButton
+	if button != null and button.button_index == MOUSE_BUTTON_LEFT:
+		if button.pressed:
+			# The start is tested first: when a walk has not been given a length
+			# yet both ends sit on the same point, and grabbing the end you can
+			# still move is the useful outcome.
+			if _selected_beat.starts_from_authored_point:
+				var origin_variant := _get_selected_move_origin()
+				if origin_variant != null:
+					var origin_screen := transform * (origin_variant as Vector2)
+					if (
+						origin_screen.distance_to(button.position)
+						<= _MOVE_HANDLE_GRAB_PIXELS
+					):
+						_dragging_handle = &"start"
+						_move_offset_before_drag = _selected_beat.start_offset
+						return true
+			var handle_screen := transform * target
+			if (
+				handle_screen.distance_to(button.position)
+				> _MOVE_HANDLE_GRAB_PIXELS
+			):
+				return false
+			_dragging_handle = &"target"
+			_move_offset_before_drag = _selected_beat.target_offset
+			return true
+		if not _dragging_handle.is_empty():
+			# One undo entry for the whole drag, committed on release, rather
+			# than one per motion event.
+			_commit_move_handle_offset()
+			_dragging_handle = &""
+			return true
+		return false
+
+	var motion := event as InputEventMouseMotion
+	if motion == null or _dragging_handle.is_empty():
+		return false
+	var is_start := _dragging_handle == &"start"
+	var marker_name: StringName = (
+		_selected_beat.start_marker
+		if is_start
+		else _selected_beat.target_marker
+	)
+	var world := _to_world_position(motion.position)
+	var marker_origin := Vector2.ZERO
+	if not marker_name.is_empty():
+		marker_origin = _context.get_marker_position(marker_name)
+	var offset := world - marker_origin
+	if motion.shift_pressed:
+		offset = Vector2.ZERO
+	# Written straight onto the beat while dragging so the overlay and the
+	# stand-ins follow the pointer; the undo entry is created on release.
+	if is_start:
+		_selected_beat.start_offset = offset
+	else:
+		_selected_beat.target_offset = offset
+	_beat_inspector.show_beat(_selected_beat)
+	_timeline_panel.refresh_preview()
+	update_overlays()
+	return true
+
+
+## Records the finished drag as one undoable change.
+func _commit_move_handle_offset() -> void:
+	if _selected_beat == null or _context.undo_redo == null:
+		return
+	var property: StringName = (
+		&"start_offset" if _dragging_handle == &"start" else &"target_offset"
+	)
+	var final_offset: Vector2 = _selected_beat.get(property)
+	if final_offset.is_equal_approx(_move_offset_before_drag):
+		return
+	var undo_redo := _context.undo_redo
+	undo_redo.create_action(
+		"Move cutscene walk start"
+		if _dragging_handle == &"start"
+		else "Move cutscene walk target"
+	)
+	undo_redo.add_do_property(_selected_beat, property, final_offset)
+	undo_redo.add_undo_property(
+		_selected_beat, property, _move_offset_before_drag
+	)
+	undo_redo.commit_action()
+
+
+## Returns the selected beat's kind as a word for the overlay label.
+func _get_beat_kind_label() -> String:
+	if _selected_beat == null:
+		return ""
+	var kind_names := CutsceneBeat.Kind.keys()
+	if _selected_beat.kind < 0 or _selected_beat.kind >= kind_names.size():
+		return "beat"
+	return String(kind_names[_selected_beat.kind]).to_lower()
+
+
+## Rings whoever the selected beat acts on, for the kinds that have no path to
+## draw - a pose, a turn, a bounce, an appearance.
+##
+## Selecting a beat should always answer "who does this happen to" on the stage
+## itself. A MOVE gets its walk drawn instead; everything else at least gets its
+## subject picked out of the cast, which is the difference between reading a
+## chart and looking at the scene.
+func _draw_selected_actor_marker(
+	overlay: Control,
+	transform: Transform2D
+) -> void:
+	if _selected_beat == null or not _context.is_valid():
+		return
+	if _selected_beat.actor.is_empty():
+		return
+	var actor := _context.get_actor_preview(_selected_beat.actor)
+	if not is_instance_valid(actor):
+		return
+	var actor_screen := transform * actor.global_position
+	overlay.draw_arc(
+		actor_screen, 13.0, 0.0, TAU, 28, MOVE_HANDLE_COLOR, 2.0
+	)
+	var font := overlay.get_theme_default_font()
+	if font == null:
+		return
+	overlay.draw_string(
+		font,
+		actor_screen + Vector2(17.0, -14.0),
+		"%s: %s" % [_selected_beat.actor, _get_beat_kind_label()],
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1.0,
+		13,
+		MOVE_HANDLE_COLOR
+	)
+
+
+## Draws the selected walk: where the actor starts, the line they travel, and a
+## grabbable handle on the spot they finish at.
+##
+## Without this a MOVE beat is a marker name and an offset in the Inspector, and
+## the only way to find out where somebody actually ends up is to scrub the
+## playhead and watch. Drawing it makes the walk a thing on screen, and the
+## handle makes it a thing you can move.
+func _draw_selected_move_path(overlay: Control, transform: Transform2D) -> void:
+	var target_variant := _get_selected_move_target()
+	if target_variant == null:
+		_draw_selected_actor_marker(overlay, transform)
+		return
+	var target: Vector2 = target_variant
+	var target_screen := transform * target
+	var origin_variant := _get_selected_move_origin()
+	if origin_variant != null:
+		var origin: Vector2 = origin_variant
+		var origin_screen := transform * origin
+		overlay.draw_line(origin_screen, target_screen, MOVE_PATH_COLOR, 2.0)
+		if _selected_beat.starts_from_authored_point:
+			# An authored start is draggable, so it is drawn as a handle. An
+			# inherited one is just where the actor happened to be, and a handle
+			# there would invite a drag that does nothing.
+			overlay.draw_arc(
+				origin_screen, 8.0, 0.0, TAU, 22, MOVE_PATH_COLOR, 2.0
+			)
+			overlay.draw_circle(origin_screen, 3.0, MOVE_PATH_COLOR)
+			var start_font := overlay.get_theme_default_font()
+			if start_font != null:
+				overlay.draw_string(
+					start_font,
+					origin_screen + Vector2(12.0, 18.0),
+					"starts here",
+					HORIZONTAL_ALIGNMENT_LEFT,
+					-1.0,
+					12,
+					MOVE_PATH_COLOR
+				)
+		else:
+			overlay.draw_circle(origin_screen, 4.0, MOVE_PATH_COLOR)
+
+	# A ring rather than a dot: the destination sits on top of the actor once
+	# the playhead is past this beat, and a filled dot would hide them.
+	overlay.draw_arc(
+		target_screen, 9.0, 0.0, TAU, 24, MOVE_HANDLE_COLOR, 2.0
+	)
+	overlay.draw_arc(
+		target_screen, 3.0, 0.0, TAU, 12, MOVE_HANDLE_COLOR, 2.0
+	)
+	var font := overlay.get_theme_default_font()
+	if font == null:
+		return
+	var label := "%s walks here" % _selected_beat.actor
+	if not _selected_beat.target_marker.is_empty():
+		label += "  (%s)" % _selected_beat.target_marker
+	overlay.draw_string(
+		font,
+		target_screen + Vector2(14.0, -12.0),
+		label,
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1.0,
+		13,
+		MOVE_HANDLE_COLOR
+	)
+
+
 func _forward_canvas_draw_over_viewport(overlay: Control) -> void:
 	var preview := _context.preview
 	var sculpt := _context.sculpt
@@ -427,6 +743,7 @@ func _forward_canvas_draw_over_viewport(overlay: Control) -> void:
 	_draw_room_bounds(overlay, preview, sculpt, transform)
 	_draw_layer_outline(overlay, transform)
 	_draw_landing_line(overlay, preview, sculpt, transform)
+	_draw_selected_move_path(overlay, transform)
 	if _sculpt_panel.is_armed():
 		_draw_readout(overlay)
 		if _has_hover:
@@ -613,7 +930,7 @@ func _draw_readout(overlay: Control) -> void:
 		(
 			"shape"
 			if layer_index < 0
-			else "stratum %d" % (layer_index + 1)
+			else "layer %d" % (layer_index + 1)
 		),
 	]
 	var origin := Vector2(12.0, 22.0)

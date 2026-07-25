@@ -1,0 +1,32 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
+
+[node name="ThiefFinaleEncounterStage" instance=ExtResource("1_stage")]
+editor_description = "Story beat 13: the player finally reaches the Thief. The canonical story leaves the reveal and its dialogue intentionally unspecified and marks this a long-term objective, so this stage is deliberately a blank shot: markers placed, room cut, no beats authored. Do not invent the Thief's language here without narrative approval. Note the schedule currently carries depth 1,000 for this encounter while the story places it at 100,000 - that gap is unresolved, not a value to copy. His art is drawn looking left, so he stays on the miner's right."
+opening_move_seconds = 2.4
+closing_move_seconds = 2.4
+opening_step_height = 4.0
+hide_actor_after_closing = false
+conversation_tracks_miner = true
+conversation_root_offset_from_miner_x = 96.0
+
+[node name="Entrance" parent="ActorMarkers" index="0"]
+editor_description = "Far out to the right. The approach is long on purpose: this is the arrival the whole run points at."
+position = Vector2(360, 0)
+
+[node name="Conversation" parent="ActorMarkers" index="1"]
+position = Vector2(-96, 0)
+
+[node name="Rest" parent="ActorMarkers" index="3"]
+position = Vector2(-96, 0)
+
+[node name="Exit" parent="ActorMarkers" index="4"]
+position = Vector2(600, 0)
+
+[node name="EditorTerrainPreview" parent="." index="4"]
+editor_description = "Previews thief_finale at its scheduled depth."
+encounter_id = &"thief_finale"
+preview_depth_rows = 1000
+
+[editable path="ActorMarkers"]

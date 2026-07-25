@@ -1,0 +1,61 @@
+[gd_resource type="Resource" script_class="CutsceneSequence" format=3]
+
+[ext_resource type="Script" path="res://resources/cinematics/cutscene_beat.gd" id="1_j0luq"]
+[ext_resource type="Resource" path="res://resources/dialogue/cheese_girl_first_conversation.tres" id="2_1frda"]
+[ext_resource type="Script" path="res://resources/cinematics/cutscene_sequence.gd" id="3_5v7l3"]
+
+[sub_resource type="Resource" id="Resource_1o2qq"]
+script = ExtResource("1_j0luq")
+kind = 9
+actor = &"cheese_girl"
+
+[sub_resource type="Resource" id="Resource_uapg4"]
+script = ExtResource("1_j0luq")
+kind = 0
+actor = &"cheese_girl"
+duration_seconds = 1.2
+target_marker = &"Conversation"
+pose = &"walk"
+step_height = 8.0
+
+[sub_resource type="Resource" id="Resource_3nch5"]
+script = ExtResource("1_j0luq")
+kind = 2
+actor = &"cheese_girl"
+start_seconds = 1.2
+facing = -1
+
+[sub_resource type="Resource" id="Resource_ikdqr"]
+script = ExtResource("1_j0luq")
+kind = 1
+actor = &"cheese_girl"
+start_seconds = 1.2
+pose = &"idle"
+
+[sub_resource type="Resource" id="Resource_vixgb"]
+script = ExtResource("1_j0luq")
+kind = 5
+start_seconds = 1.4
+duration_seconds = 6.0
+conversation = ExtResource("2_1frda")
+
+[sub_resource type="Resource" id="Resource_a5exc"]
+script = ExtResource("1_j0luq")
+kind = 0
+actor = &"cheese_girl"
+start_seconds = 7.4
+duration_seconds = 2.1
+target_marker = &"Exit"
+pose = &"walk"
+step_height = 8.0
+
+[sub_resource type="Resource" id="Resource_fq48r"]
+script = ExtResource("1_j0luq")
+kind = 10
+actor = &"cheese_girl"
+start_seconds = 9.5
+
+[resource]
+script = ExtResource("3_5v7l3")
+sequence_id = &"cheese_girl_first_sequence"
+beats = Array[ExtResource("1_j0luq")]([SubResource("Resource_1o2qq"), SubResource("Resource_uapg4"), SubResource("Resource_3nch5"), SubResource("Resource_ikdqr"), SubResource("Resource_vixgb"), SubResource("Resource_a5exc"), SubResource("Resource_fq48r")])

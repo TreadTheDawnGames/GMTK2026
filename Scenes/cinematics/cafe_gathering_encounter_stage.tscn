@@ -1,0 +1,63 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
+[ext_resource type="PackedScene" path="res://Scenes/props/cafe_table.tscn" id="2_table"]
+[ext_resource type="PackedScene" path="res://Scenes/props/cafe_stool.tscn" id="3_stool"]
+[ext_resource type="PackedScene" path="res://Scenes/props/das_queso_cafe.tscn" id="4_cafe"]
+
+[node name="CafeGatheringEncounterStage" instance=ExtResource("1_stage")]
+editor_description = "Story beat 10, depth 14,000: the cafe gathering. Cheese Girl, the Treasure Hunter, Rotini and the rats, and Quibble are together and happy, and the lantern-staff man foreshadows the importance of time management. This is the one encounter that gathers its whole cast, so it is authored as a room the miner arrives into rather than a visitor who walks up to him: the cast holds its own spread across the tunnel and nobody tracks his landing column."
+opening_move_seconds = 2.0
+closing_move_seconds = 2.4
+opening_step_height = 5.0
+hide_actor_after_closing = false
+conversation_tracks_miner = false
+conversation_root_offset_from_miner_x = 0.0
+actors_drawn_into_set = Array[StringName]([&"cheese_girl"])
+
+[node name="Entrance" parent="ActorMarkers" index="0"]
+editor_description = "The lantern-staff man's approach. The rest of the cast is already standing when the miner breaks through."
+position = Vector2(288, 0)
+
+[node name="Conversation" parent="ActorMarkers" index="1"]
+editor_description = "Authored rather than tracked, so the gathering keeps its shape wherever the miner lands."
+position = Vector2(120, 0)
+
+[node name="Rest" parent="ActorMarkers" index="3"]
+position = Vector2(120, 0)
+
+[node name="Exit" parent="ActorMarkers" index="4"]
+editor_description = "Past the right edge of the frame. The gathering stays; only a departing speaker uses this."
+position = Vector2(560, 0)
+
+[node name="EditorTerrainPreview" parent="." index="4"]
+editor_description = "Previews cafe_gathering at its authored depth."
+encounter_id = &"cafe_gathering"
+preview_depth_rows = 14000
+
+[node name="DasQuesoCafe" parent="PropMarkers" index="0" instance=ExtResource("4_cafe")]
+editor_description = "The storefront itself, set left of centre so the miner breaks through into the open half of the room rather than through its roof. Cheese Girl is drawn in its window, which is why she is listed in Actors Drawn Into Set above and gets no stand-in."
+position = Vector2(-96, 0)
+
+[node name="CafeTableLeft" parent="PropMarkers" index="1" instance=ExtResource("2_table")]
+editor_description = "Left table of the cafe. Furniture sits on the floor line, y zero, the same line the cast stands on."
+position = Vector2(-232, 0)
+
+[node name="CafeStoolLeftOuter" parent="PropMarkers" index="2" instance=ExtResource("3_stool")]
+position = Vector2(-296, 0)
+
+[node name="CafeStoolLeftInner" parent="PropMarkers" index="3" instance=ExtResource("3_stool")]
+position = Vector2(-172, 0)
+
+[node name="CafeTableRight" parent="PropMarkers" index="4" instance=ExtResource("2_table")]
+editor_description = "Right table, set further out than the left so the gathering is not mirrored down the middle."
+position = Vector2(304, 0)
+
+[node name="CafeStoolRightOuter" parent="PropMarkers" index="5" instance=ExtResource("3_stool")]
+position = Vector2(372, 0)
+
+[node name="CafeStoolRightInner" parent="PropMarkers" index="6" instance=ExtResource("3_stool")]
+position = Vector2(244, 0)
+
+[editable path="ActorMarkers"]
+[editable path="PropMarkers"]

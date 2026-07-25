@@ -16,6 +16,11 @@ const FIELD_NOTES: StringName = &"notes"
 const FIELD_ACTOR: StringName = &"actor"
 const FIELD_TARGET_MARKER: StringName = &"target_marker"
 const FIELD_TARGET_OFFSET: StringName = &"target_offset"
+const FIELD_STARTS_FROM_AUTHORED_POINT: StringName = (
+	&"starts_from_authored_point"
+)
+const FIELD_START_MARKER: StringName = &"start_marker"
+const FIELD_START_OFFSET: StringName = &"start_offset"
 const FIELD_POSE: StringName = &"pose"
 const FIELD_STEP_HEIGHT: StringName = &"step_height"
 const FIELD_FACING: StringName = &"facing"
@@ -68,6 +73,9 @@ func get_visible_fields_for_kind(kind: int) -> PackedStringArray:
 		fields.append(str(FIELD_ACTOR))
 	match kind:
 		CutsceneBeat.Kind.MOVE:
+			fields.append(str(FIELD_STARTS_FROM_AUTHORED_POINT))
+			fields.append(str(FIELD_START_MARKER))
+			fields.append(str(FIELD_START_OFFSET))
 			fields.append(str(FIELD_TARGET_MARKER))
 			fields.append(str(FIELD_TARGET_OFFSET))
 			fields.append(str(FIELD_POSE))
@@ -138,6 +146,20 @@ func _rebuild() -> void:
 		_add_actor_field()
 	match _selected_beat.kind:
 		CutsceneBeat.Kind.MOVE:
+			# Start before target, because a walk reads as "from here to there"
+			# and the panel should ask for it in that order.
+			_add_check_field(
+				"Start from a set point",
+				FIELD_STARTS_FROM_AUTHORED_POINT,
+				_selected_beat.starts_from_authored_point
+			)
+			if _selected_beat.starts_from_authored_point:
+				_add_start_marker_field()
+				_add_vector_field(
+					"Start offset",
+					FIELD_START_OFFSET,
+					_selected_beat.start_offset
+				)
 			_add_marker_field()
 			_add_vector_field("Target offset", FIELD_TARGET_OFFSET, _selected_beat.target_offset)
 			_add_pose_field()
@@ -258,6 +280,34 @@ func _add_marker_field() -> void:
 	row.add_child(option)
 	if not option.item_selected.is_connected(_on_marker_changed):
 		option.item_selected.connect(_on_marker_changed)
+
+
+## The start's own marker dropdown. Same list as the target's, because a walk
+## can start from any point a walk can end at.
+func _add_start_marker_field() -> void:
+	var row := _make_row("Start marker")
+	var option := OptionButton.new()
+	option.name = String(FIELD_START_MARKER)
+	option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	option.add_item("No marker")
+	option.set_item_metadata(0, StringName())
+	var selected_index := 0
+	for marker_name_text in _context.get_marker_names():
+		var marker_name := StringName(marker_name_text)
+		option.add_item(marker_name_text)
+		option.set_item_metadata(option.item_count - 1, marker_name)
+		if marker_name == _selected_beat.start_marker:
+			selected_index = option.item_count - 1
+	if selected_index == 0 and not _selected_beat.start_marker.is_empty():
+		option.add_item(str(_selected_beat.start_marker) + " (unknown)")
+		option.set_item_metadata(
+			option.item_count - 1, _selected_beat.start_marker
+		)
+		selected_index = option.item_count - 1
+	option.select(selected_index)
+	row.add_child(option)
+	if not option.item_selected.is_connected(_on_start_marker_changed):
+		option.item_selected.connect(_on_start_marker_changed)
 
 
 func _add_pose_field() -> void:
@@ -487,6 +537,19 @@ func _on_marker_changed(index: int) -> void:
 		FIELD_TARGET_MARKER,
 		option.get_item_metadata(index),
 		"Edit target marker"
+	)
+
+
+func _on_start_marker_changed(index: int) -> void:
+	if _selected_beat == null:
+		return
+	var option := _find_control(String(FIELD_START_MARKER)) as OptionButton
+	if option == null or index < 0:
+		return
+	_commit_property(
+		FIELD_START_MARKER,
+		option.get_item_metadata(index),
+		"Edit start marker"
 	)
 
 
