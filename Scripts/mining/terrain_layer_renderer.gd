@@ -1164,8 +1164,25 @@ func rebuild_all_chunks() -> void:
 	_pending_impact_work.clear()
 	_pending_impact_work_head = 0
 	_clear_temporary_stamp_cache()
-	_prepared_layer_patches.clear()
-	_preparing_layer_patches.clear()
+	_on_dig_visuals_preparation_started(false)
+	# A rebuild invalidates the chunk identity captured by every unpublished
+	# structural upload. Recycle those descriptors now instead of retaining
+	# stale multi-megabyte chunk masks until later frames happen to skip them.
+	for work_index in range(
+		_pending_chunk_texture_publish_head,
+		_pending_chunk_texture_publishes.size()
+	):
+		var publish_work := _pending_chunk_texture_publishes[work_index]
+		publish_work.chunk = null
+		publish_work.chunk_index = -1
+		publish_work.layer_indices = PackedInt32Array()
+		if (
+			_chunk_texture_publish_pool.size()
+			< MAX_PENDING_CHUNK_TEXTURE_PUBLISH_ITEMS
+		):
+			_chunk_texture_publish_pool.append(publish_work)
+	_pending_chunk_texture_publishes.clear()
+	_pending_chunk_texture_publish_head = 0
 	for chunk_index in _active_chunks.keys():
 		_unload_chunk(chunk_index)
 	# A rebuild is how an authored edit reaches the screen, so nothing built from
