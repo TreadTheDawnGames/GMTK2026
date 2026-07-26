@@ -36,7 +36,7 @@ length = 0.01
 
 [sub_resource type="Animation" id="Animation_closing"]
 resource_name = "closing"
-length = 1.2
+length = 0.75
 tracks/0/type = "value"
 tracks/0/imported = false
 tracks/0/enabled = true
@@ -44,7 +44,7 @@ tracks/0/path = NodePath("PropMarkers/Bench:modulate:a")
 tracks/0/interp = 1
 tracks/0/loop_wrap = true
 tracks/0/keys = {
-"times": PackedFloat32Array(0, 1.2),
+"times": PackedFloat32Array(0, 0.75),
 "transitions": PackedFloat32Array(1, 1),
 "update": 0,
 "values": [1.0, 0.0]
@@ -70,10 +70,10 @@ He stands beside the bench rather than on it because he has exactly one texture 
 
 Reference: Zephan's IMG_1638, which is this beat. The vanishing bench is his own idea, from the planning aside at 00:29 - 'might be funny if the bench disappeared with him.' It is a staging gag and is NOT in canonical_story.md; it is awaiting Zephan's sign-off. To take it out, delete the Bench node: the closing and RESET tracks then animate nothing and every other part of the shot still plays."
 opening_move_seconds = 0.2
-closing_move_seconds = 1.2
+closing_move_seconds = 0.75
 opening_step_height = 6.0
 hide_actor_after_closing = true
-closing_fade_seconds = 1.2
+closing_fade_seconds = 0.75
 entrance_facing = -1
 conversation_facing = -1
 closing_facing = 1
@@ -98,7 +98,7 @@ position = Vector2(102.4, 0)
 position = Vector2(-15.6, 0)
 
 [node name="Exit" parent="ActorMarkers" index="4"]
-editor_description = "His own mark. He does not leave by walking: Closing Fade Seconds hops him once and fades him out where he stands, and the closing clip takes the bench with him over the same 1.2s."
+editor_description = "His own mark. He does not leave by walking: Closing Fade Seconds hops him once and fades him out where he stands, and the closing clip takes the bench with him over the same 0.75s. The shorter fade preserves Zephan's vanish-with-the-bench gag while honoring the requested quicker disappearance."
 position = Vector2(-15.6, 0)
 
 [node name="Bench" parent="PropMarkers" index="0" instance=ExtResource("6_bench")]
