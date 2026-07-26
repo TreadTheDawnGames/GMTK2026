@@ -78,7 +78,14 @@ signal sequence_dialogue_requested(
 ## Dynamically keeps this actor beside the miner regardless of landing column.
 @export var conversation_tracks_miner: bool = false
 ## Presenter-root offset; actor sprite offsets remain authored by appearance.
-@export_range(-256.0, 256.0, 1.0) var conversation_root_offset_from_miner_x: float = 0.0
+##
+## The range reaches most of the way to the frame edge because a conversation
+## partner is not always the nearest thing to the miner. The Treasure Hunter
+## stands on the far side of his own hoard, so the gap has to be wide enough to
+## hold a set piece and still leave both bodies in a 1152px frame centred on the
+## miner. Tracking keeps that gap constant, so a large offset costs nothing at
+## the extremes of the landing band the way a fixed marker would.
+@export_range(-512.0, 512.0, 1.0) var conversation_root_offset_from_miner_x: float = 0.0
 ## Slides this stage's props with its tracked cast instead of leaving them
 ## pinned to the room.
 ##
