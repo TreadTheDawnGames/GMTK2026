@@ -309,7 +309,8 @@ func _schedule_next_encounter() -> bool:
 			)
 			var entrance_floor_y := _sample_cutscene_floor(
 				entrance_position.x,
-				encounter_floor_row
+				encounter_floor_row,
+				_resolve_cast_floor_offset(encounter)
 			)
 			if not is_nan(entrance_floor_y) and not is_inf(entrance_floor_y):
 				entrance_position.y = entrance_floor_y
@@ -417,7 +418,11 @@ func _await_room_settled(floor_sampler: Callable) -> void:
 ## Everyone standing in a cutscene room resolves their footing through here - the
 ## miner when he is seated on arrival, and every visitor as they walk - so the
 ## cast can never end up on a different reading of the same floor.
-func _sample_cutscene_floor(screen_x: float, landing_world_row: int) -> float:
+func _sample_cutscene_floor(
+	screen_x: float,
+	landing_world_row: int,
+	cast_floor_offset_y: float = -CUTSCENE_FLOOR_LIFT_PIXELS
+) -> float:
 	var support: float = (
 		terrain_renderer.get_layer_opening_floor_support_screen_y(
 			screen_x,
@@ -433,7 +438,23 @@ func _sample_cutscene_floor(screen_x: float, landing_world_row: int) -> float:
 		)
 	if is_nan(support):
 		return support
-	return support - CUTSCENE_FLOOR_LIFT_PIXELS
+	return support + cast_floor_offset_y
+
+
+## Resolves the encounter's default-preserving visible sole offset.
+##
+## The ordinary cast remains lifted above the inked contour. An opted-in cast
+## instead receives the same overlap MinerRig applies after being seated on raw
+## support, so their measured soles coincide without moving scene markers.
+func _resolve_cast_floor_offset(
+	encounter: DepthCharacterEncounter
+) -> float:
+	if (
+		encounter != null
+		and encounter.cast_matches_miner_grounding
+	):
+		return miner_rig.grounding_overlap_y
+	return -CUTSCENE_FLOOR_LIFT_PIXELS
 
 
 ## Slides the whole actor marker set so the conversation stop lands the authored
@@ -582,8 +603,10 @@ func _begin_active_encounter() -> void:
 		# and sampling the one behind it found a support hundreds of pixels lower
 		# - which is where the cast were being walked to, well below the room and
 		# off the bottom of the frame.
+		var cast_floor_offset_y := _resolve_cast_floor_offset(encounter)
 		var floor_sampler := _sample_cutscene_floor.bind(
-			_game_state.mining_y
+			_game_state.mining_y,
+			cast_floor_offset_y
 		)
 		# Nobody is placed until the room has stopped moving under them.
 		#
@@ -615,7 +638,7 @@ func _begin_active_encounter() -> void:
 		)
 		miner_rig.seat_landing_foot_at_screen_y(
 			floor_sampler.call(miner_rig.get_landing_foot_screen_x())
-			+ CUTSCENE_FLOOR_LIFT_PIXELS
+			- cast_floor_offset_y
 			+ miner_depth_offset
 		)
 		if encounter.prestage_before_landing:

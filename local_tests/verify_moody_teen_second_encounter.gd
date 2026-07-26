@@ -54,6 +54,10 @@ func _verify_encounter(encounter: DepthCharacterEncounter) -> void:
 	)
 	_expect(encounter.plays_authored_timeline, "Timeline opt-in is missing.")
 	_expect(encounter.prestage_before_landing, "Fall discovery opt-in is missing.")
+	_expect(
+		encounter.cast_matches_miner_grounding,
+		"Ayden must share the miner's visible sole line."
+	)
 	_expect(encounter.dresses_trodden_floor, "Trodden-floor opt-in is missing.")
 	_expect(encounter.pickaxe_reward == null, "The encounter must grant no reward.")
 	_expect(not encounter.occurs_at_run_bottom, "The encounter must be depth-pinned.")

@@ -47,6 +47,13 @@ extends Resource
 ## Reveals an already-present actor and set before the miner lands. Reserve this
 ## for discoveries during the fall, not visitors who enter after landing.
 @export var prestage_before_landing: bool = false
+## Seats this visitor's measured sole on the same visible line as the miner.
+##
+## Off preserves the shared three-pixel cast lift. On is reserved for an actor
+## whose authored pose must share the miner's deliberate terrain overlap in both
+## prestaging and stage movement; the controller still derives both from the
+## same renderer support sample.
+@export var cast_matches_miner_grounding: bool = false
 ## Optional per-shot framing. Negative values preserve the shared presentation
 ## defaults, so one room can use more height without moving every encounter.
 @export_range(-1.0, 0.82, 0.01) var cinematic_focus_viewport_y_ratio: float = -1.0
