@@ -147,8 +147,10 @@ const FRACTURE_SUPPORT_HALF_WIDTH_MASK_PIXELS: int = 2
 const FRACTURE_SUPPORT_VALUE_THRESHOLD: float = 0.9
 # Retired chunk nodes are kept so streaming reuses their sprites and fully
 # configured materials instead of rebuilding both per crossed chunk boundary.
-# The window is three to five chunks tall, so a handful covers every crossing.
-const CHUNK_VISUAL_POOL_LIMIT: int = 4
+# Gameplay holds at most five chunks. Matching that bound prevents a deep jump
+# from rebuilding one five-layer material hierarchy every time; menu-only extra
+# coverage does not traverse, and every retired mask/texture is still released.
+const CHUNK_VISUAL_POOL_LIMIT: int = 5
 # A structural chunk needs at most two distinct base masks and six tiled
 # textures. One spare chunk's storage is retained so adjacent streaming updates
 # existing buffers instead of allocating multi-megabyte images at the boundary.
@@ -1583,7 +1585,10 @@ func _refresh_active_chunks() -> void:
 	if not is_inside_tree():
 		return
 	var config := terrain_manager.config
-	var viewport_height := get_viewport_rect().size.y
+	# CanvasItem.get_viewport_rect() is expressed through the live canvas
+	# transform and can report the landscape width as its vertical span. Chunk
+	# coverage needs the actual render-target pixels before camera conversion.
+	var viewport_height := get_viewport().get_visible_rect().size.y
 	var cell_size := float(config.terrain_cell_world_size)
 	var visible_world_top := 0.0
 	var visible_world_bottom := viewport_height
