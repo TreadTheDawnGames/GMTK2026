@@ -383,7 +383,7 @@ grow_horizontal = 2
 grow_vertical = 0
 tooltip_text = "Return to the miner"
 mouse_default_cursor_shape = 2
-text = "↓  RETURN"
+text = "V  RETURN  V"
 
 [node name="Layout" type="MarginContainer" parent="MiningScene/HUD" unique_id=1832449878]
 visible = false
