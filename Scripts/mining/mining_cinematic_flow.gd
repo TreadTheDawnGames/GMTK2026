@@ -4,6 +4,7 @@ extends Node
 ## How it works:
 ## - One named interaction owns gameplay HUD, input, and camera focus.
 ## - Acquisition preserves the timing window and swing-queue states it found.
+## - Acquisition also drops the strike it interrupts, which cannot report itself.
 ## - Focus remains a signal so MiningSceneWiring owns the camera connection.
 ## - Finish and cancel are idempotent and only release the matching owner.
 ## The invariant is that one cinematic can never unlock another cinematic.
@@ -51,6 +52,11 @@ func try_begin(owner: StringName, focus_camera: bool = false) -> bool:
 		_previous_impact_feedback_visible = impact_feedback_layer.visible
 		impact_feedback_layer.visible = false
 	mining_controller.set_swing_queue_paused(true)
+	# Claiming the gate also claims the miner's presentation, and every owner
+	# stops his animation to pose him. A swing caught mid-follow-through can never
+	# report that it finished, so it is released here rather than left pending
+	# across the cinematic for finish() to hand back as a stuck mining loop.
+	mining_controller.abandon_interrupted_swing()
 	timing_window.process_mode = Node.PROCESS_MODE_DISABLED
 	timing_window.hide()
 	flow_started.emit(_owner)

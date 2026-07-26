@@ -34,6 +34,7 @@ var targets: Array[TimingTarget] = []
 var consecutive_hits : int = 0
 var _starting_target_count: int = 1
 var _bounce_muted: bool = false
+var _audio_handler: PlayerAudioHandler
 
 var slider_position : float = 0.0:
 	set(value):
@@ -250,9 +251,15 @@ func set_bounce_muted(is_muted: bool) -> void:
 
 
 ## Plays the bar's authored bounce sound unless the saved preference mutes it.
+func set_audio_handler(audio_handler: PlayerAudioHandler) -> void:
+	_audio_handler = audio_handler
+
+
+## Plays the bar's authored bounce sound unless the saved preference mutes it.
 func play_bounce_sound() -> void:
-	if not _bounce_muted:
-		AudioHandler.play_sound(AudioLibrary.BOUNCE)
+	if _bounce_muted or _audio_handler == null:
+		return
+	_audio_handler.play_sound(AudioLibrary.BOUNCE)
 
 #func _draw():
 	#draw_line(backing.position + Vector2(slider_position, 0), (backing.position + Vector2(slider_position, 0)) + Vector2.UP * 50, Color.RED, 1.0)

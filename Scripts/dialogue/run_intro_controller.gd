@@ -3,7 +3,7 @@ extends Node
 
 ## How it works:
 ## - Scene readiness gates mining and hides the timing bar before anything moves.
-## - The scene boots into the title shot: the letterbox is already closed, the
+## - The scene boots into the title shot with the cinematic frame open: the
 ##   camera holds its wide framing, and the stop stands with the miner hidden.
 ##   That staged world is the menu's background, so nothing is loaded or
 ##   swapped when the player starts.
@@ -81,17 +81,22 @@ func begin_run() -> void:
 	# A menu that hands over on the same frame the scene is staged arrives
 	# before the deferred pass, so the shot is applied on demand here instead.
 	_apply_title_shot()
+	# Keep the title background full-height. The cinematic bars begin only at
+	# the Start handoff, while the interface fades and the arrival moves in.
+	dialogue_director.open_cinematic_frame()
 	_is_intro_active = true
 	_play_intro()
 
 
-## Holds the wide title framing behind the menu with the letterbox closed. It
-## runs once: a second pass would reset a transition already in progress.
+## Holds the wide title framing behind the menu without covering live terrain.
+## It runs once: a second pass would reset a transition already in progress.
 func _apply_title_shot() -> void:
 	if _title_shot_applied:
 		return
 	_title_shot_applied = true
-	dialogue_director.open_cinematic_frame(true)
+	# The menu must not open the cinematic frame here: its lower bar used to
+	# read as an unrendered grey strip beneath otherwise complete terrain.
+	dialogue_director.close_cinematic_frame(true)
 	opening_camera.apply_menu_framing()
 
 

@@ -3,7 +3,7 @@ extends CharacterEncounterStage
 
 ## How it works:
 ## - The encounter presenter is the lead rat already waiting by the miner.
-## - Opening starts a bounded stream of mouse actors across the normal tunnel.
+## - Opening, or a named cue, starts a bounded stream of mouse actors.
 ## - Each follower runs to the work marker, mines, then exits to the right.
 ## - Strike contacts reuse the shared terrain particles, smoke, and shake route.
 ## - Closing or cancellation stops timers and frees every transient follower.
@@ -41,18 +41,23 @@ signal stampede_finished
 ## passing through, and a rat that stops to swing at a wall on the way reads as
 ## a different scene. Everything else about the procession is shared.
 @export var procession_mines: bool = true
-## The dialogue line cue that releases the horde, or empty to run it from the
-## opening as before.
+## The cue that lets the colony in, instead of it arriving with the opening.
 ##
-## Empty is the default and preserves the old shape, where the colony is already
-## streaming when the frame opens. Rotini's introduction needs the other one: the
-## tunnel is EMPTY, he walks up out of nothing and says his piece, and the horde
-## only pours through on "Come on, boys!" - so the stampede is the answer to the
-## line rather than scenery that happened to be running behind it.
+## Empty, and the procession runs from the moment the shot opens. Named, and the
+## tunnel stays empty until that cue arrives: nothing is coming until somebody
+## calls them, and then everything does.
 ##
-## Set the same name on that DialogueLine's Stage Cue. Nothing else has to
-## change; the line the schedule presents is what starts the run.
-@export var stampede_cue: StringName = &""
+## Both of the shipped colony beats now use the named form. Rotini's introduction
+## was the empty one until Zefin's direction changed it to a stampede - the room
+## is empty, he walks up out of nothing, and the horde only pours through on
+## "Come on, boys!", so the flood is the answer to the line rather than scenery
+## that was already running behind it.
+##
+## The cue is whatever carries that name - a DialogueLine's Stage Cue, or a
+## timeline STAGE_CUE beat - so moving the flood means moving the cue rather than
+## editing this stage. It is a lower-case verb phrase and not an animation name;
+## an AnimationPlayer clip of the same name still plays if a stage authors one.
+@export var procession_cue: StringName
 ## How long the closing waits for the last of them to leave before it gives up
 ## and frees them where they stand. Only reached if a follower is stuck, which
 ## would otherwise hold the encounter open indefinitely.
@@ -77,30 +82,23 @@ func prepare(
 	return true
 
 
-## Starts the colony once the lead rat has reached the conversation spot, unless
-## a stampede cue is authored - then the tunnel stays empty until that line.
+## Starts the colony only after the lead rat has reached the conversation spot,
+## unless this stage waits for a cue to let them in.
 func play_opening() -> void:
 	await super.play_opening()
-	if not _is_active or not String(stampede_cue).is_empty():
+	if not _is_active or not procession_cue.is_empty():
 		return
 	_begin_procession()
 
 
-## Releases the horde on its authored line.
-##
-## Checked before the shared implementation rather than after, because that one
-## resolves a cue to an AnimationPlayer clip and answers false for a name it has
-## no animation for. A stampede is not a clip; it is a stream of actors, and it
-## has to be recognised here or the line passes with nothing happening.
+## Starts the colony on its authored cue, and otherwise defers to the shared
+## stage. Returning what the base returned keeps a caller's "did an animation
+## play" answer honest: starting rats is not playing a clip.
 func play_cue(cue_id: StringName, line_index: int) -> bool:
-	if (
-		_is_active
-		and not String(stampede_cue).is_empty()
-		and cue_id == stampede_cue
-	):
+	var played_animation := super.play_cue(cue_id, line_index)
+	if not procession_cue.is_empty() and cue_id == procession_cue:
 		_begin_procession()
-		return true
-	return super.play_cue(cue_id, line_index)
+	return played_animation
 
 
 func play_closing() -> void:
@@ -170,6 +168,16 @@ func validate_stage() -> String:
 	if rat_appearances.is_empty():
 		return "Rat colony stage requires at least one rat appearance."
 	return ""
+
+
+## Opens the stream. Idempotent, because a cue can be re-presented when a player
+## walks the dialogue back over the line that carries it.
+func _begin_procession() -> void:
+	if not _is_active or _is_spawning:
+		return
+	_is_spawning = true
+	_spawn_generation += 1
+	_spawn_next_follower(_spawn_generation)
 
 
 ## Reuses one timer at a time; the generation rejects stale callbacks.

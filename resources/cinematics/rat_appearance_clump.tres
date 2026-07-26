@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="CinematicRatAppearance" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://Scripts/cinematics/cinematic_rat_appearance.gd" id="1_appearance"]
+[ext_resource type="Texture2D" path="res://Assets/Characters/mice/mouse_clump.png" id="2_clump"]
+
+[resource]
+script = ExtResource("1_appearance")
+idle_texture = ExtResource("2_clump")
+strike_texture = ExtResource("2_clump")
+depicted_rat_count = 24

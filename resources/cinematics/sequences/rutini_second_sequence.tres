@@ -1,70 +1,69 @@
 [gd_resource type="Resource" script_class="CutsceneSequence" format=3 uid="uid://ceu0m4xhy6kfv"]
 
-[ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="1_nte5p"]
-[ext_resource type="Resource" uid="uid://b37tolurnfqhs" path="res://resources/dialogue/rutini_second_conversation.tres" id="2_d0men"]
-[ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="3_tlrhe"]
+[ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="1_beat"]
+[ext_resource type="Resource" uid="uid://b37tolurnfqhs" path="res://resources/dialogue/rutini_second_conversation.tres" id="2_conversation"]
+[ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="3_sequence"]
 
-[sub_resource type="Resource" id="Resource_eqb57"]
-script = ExtResource("1_nte5p")
+[sub_resource type="Resource" id="Resource_show"]
+script = ExtResource("1_beat")
 kind = 9
 actor = &"rutini"
+notes = "prepare() has already put him on the Entrance mark, 600px left of the conversation stop and so past the frame edge at every landing column. The tunnel is empty and still when the shot opens - no traffic, nothing moving - which is the whole difference from his introduction, where the mice were already streaming through before anybody spoke."
 
-[sub_resource type="Resource" id="Resource_gca6k"]
-script = ExtResource("1_nte5p")
+[sub_resource type="Resource" id="Resource_face_approach"]
+script = ExtResource("1_beat")
+kind = 2
+actor = &"rutini"
+facing = 1
+notes = "Aimed along the walk before it starts. His art rests mirrored, so without this he spends the first frame of the approach looking back the way he came."
+
+[sub_resource type="Resource" id="Resource_walk_in"]
+script = ExtResource("1_beat")
 kind = 0
 actor = &"rutini"
-duration_seconds = 0.8
+duration_seconds = 1.5
 target_marker = &"Conversation"
 starts_from_authored_point = true
 start_marker = &"Entrance"
 pose = &"walk"
+step_height = 3.0
+notes = "In from the LEFT. Zephan's clip is explicit about it - \"you're gonna come from this side this time\" - so the whole encounter is his introduction mirrored: he came from the right at 2,500 and comes from the left at 11,200. Staged from Entrance rather than chained off wherever he was left, so the approach begins on its exact mark however the beats above are retimed. 600px in 1.5s is the same pace he walks in at 2,500."
 
-[sub_resource type="Resource" id="Resource_hiybp"]
-script = ExtResource("1_nte5p")
+[sub_resource type="Resource" id="Resource_face_miner"]
+script = ExtResource("1_beat")
 kind = 2
 actor = &"rutini"
-start_seconds = 0.8
-facing = -1
+start_seconds = 1.5
+facing = 1
+notes = "After the walk, never before it. A MOVE aims the actor along its own travel, so a facing set earlier is overwritten by the approach. He stands on the miner's left this time, so looking at him means looking RIGHT - the opposite of the way he is aimed at 2,500."
 
-[sub_resource type="Resource" id="Resource_1o3gy"]
-script = ExtResource("1_nte5p")
+[sub_resource type="Resource" id="Resource_settle"]
+script = ExtResource("1_beat")
 kind = 1
 actor = &"rutini"
-start_seconds = 0.8
+start_seconds = 1.5
 pose = &"idle"
 
-[sub_resource type="Resource" id="Resource_qx7br"]
-script = ExtResource("1_nte5p")
+[sub_resource type="Resource" id="Resource_double_take"]
+script = ExtResource("1_beat")
 kind = 3
 actor = &"rutini"
-start_seconds = 0.8
+start_seconds = 1.5
 duration_seconds = 0.3
 bounce_count = 2
+notes = "Two bounces on arrival. This is the \"You again?\" - he recognises the man before the line appears, rather than reacting to his own dialogue. Two rather than one because it reads as a double take."
 
-[sub_resource type="Resource" id="Resource_b02ta"]
-script = ExtResource("1_nte5p")
+[sub_resource type="Resource" id="Resource_dialogue"]
+script = ExtResource("1_beat")
 kind = 5
-start_seconds = 1.1
+start_seconds = 1.8
 duration_seconds = 6.0
-conversation = ExtResource("2_d0men")
-notes = "He arrives with the colony behind him, so he settles sooner than at his introduction."
+conversation = ExtResource("2_conversation")
+notes = "The whole conversation, held for as long as the player takes to read it; the six seconds are nominal. The colony arrives inside this beat rather than after it: line four, \"Come on boys! Dig!\", carries the begin_colony_mining stage cue, and the stage's Procession Cue is what turns that name into a flood of mice. A timeline cannot address one line - the schedule ignores a beat's line_range - so the cue has to live on the line, which is also where a writer moving that call would move it.
 
-[sub_resource type="Resource" id="Resource_63sku"]
-script = ExtResource("1_nte5p")
-kind = 0
-actor = &"rutini"
-start_seconds = 7.1
-duration_seconds = 1.5
-target_marker = &"Exit"
-pose = &"walk"
-
-[sub_resource type="Resource" id="Resource_5xhx6"]
-script = ExtResource("1_nte5p")
-kind = 10
-actor = &"rutini"
-start_seconds = 8.6
+This is the last beat on purpose. The walk out belongs to the stage's own closing move, because play_closing() runs either way and a timeline that also walked him to Exit would move him twice. Closing is also what asks for the persistent colony, so the boys he just called arrive as he leaves."
 
 [resource]
-script = ExtResource("3_tlrhe")
+script = ExtResource("3_sequence")
 sequence_id = &"rutini_second_sequence"
-beats = Array[ExtResource("1_nte5p")]([SubResource("Resource_eqb57"), SubResource("Resource_gca6k"), SubResource("Resource_hiybp"), SubResource("Resource_1o3gy"), SubResource("Resource_qx7br"), SubResource("Resource_b02ta"), SubResource("Resource_63sku"), SubResource("Resource_5xhx6")])
+beats = Array[ExtResource("1_beat")]([SubResource("Resource_show"), SubResource("Resource_face_approach"), SubResource("Resource_walk_in"), SubResource("Resource_face_miner"), SubResource("Resource_settle"), SubResource("Resource_double_take"), SubResource("Resource_dialogue")])

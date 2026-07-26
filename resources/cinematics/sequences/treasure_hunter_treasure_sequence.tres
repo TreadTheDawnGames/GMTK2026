@@ -36,9 +36,25 @@ kind = 5
 start_seconds = 0.9
 duration_seconds = 6.0
 conversation = ExtResource("2_31prq")
-notes = "Blocks, so the clock holds here for as long as the player takes to read. Six seconds is the nominal length only. Nothing follows it: he gives the pickaxe away and stays with the treasure, and the stage's closing move has nowhere to take him. The generated placeholder this replaced walked him to Exit at 7.1s and hid him at 8.7s, which is why he vanished the moment the conversation ended."
+notes = "Blocks, so the clock holds here for as long as the player takes to read. Six seconds is the nominal length only. After giving away the pickaxe he leaves for the later cafe gathering in his no-pickaxe pose."
+
+[sub_resource type="Resource" id="Resource_leave"]
+script = ExtResource("1_g737l")
+kind = 0
+actor = &"treasure_hunter"
+start_seconds = 6.9
+duration_seconds = 1.6
+target_marker = &"Exit"
+pose = &"no_pickaxe"
+notes = "He has handed off the pickaxe and must leave the hoard to reach the later cafe gathering."
+
+[sub_resource type="Resource" id="Resource_hide"]
+script = ExtResource("1_g737l")
+kind = 10
+actor = &"treasure_hunter"
+start_seconds = 8.5
 
 [resource]
 script = ExtResource("3_fftny")
 sequence_id = &"treasure_hunter_treasure_sequence"
-beats = Array[ExtResource("1_g737l")]([SubResource("Resource_show"), SubResource("Resource_face"), SubResource("Resource_pose"), SubResource("Resource_celebrate"), SubResource("Resource_dialogue")])
+beats = Array[ExtResource("1_g737l")]([SubResource("Resource_show"), SubResource("Resource_face"), SubResource("Resource_pose"), SubResource("Resource_celebrate"), SubResource("Resource_dialogue"), SubResource("Resource_leave"), SubResource("Resource_hide")])

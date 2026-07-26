@@ -31,7 +31,7 @@ procession_mines = false
 spawn_interval_seconds = 0.3
 exit_seconds = 2.0
 floor_offset_y = 10.0
-stampede_cue = &"stampede"
+procession_cue = &"stampede"
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
 editor_description = "600px right of Conversation, which puts both Rotini and every mouse past the frame edge at any landing column: the frame is 1152 wide and centred on the miner, so anything closer than 480px would have them appear from nothing in open shot. The colony spawns here too."

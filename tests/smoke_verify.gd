@@ -5,6 +5,7 @@ extends SceneTree
 ## - Instantiates mining long enough for code-owned signal wiring to run.
 ## - Verifies the composition root's required gameplay dependencies.
 ## - Resolves one real terrain dig through the production TerrainManager.
+## - Confirms damaged terrain restores byte-exactly without replaying history.
 ## - Exits nonzero on any failed contract so agents get a fast merge gate.
 ## - This intentionally stays small; detailed behavior remains in local_tests.
 ## - The invariant is that a parseable game can complete one mining mutation.
@@ -83,6 +84,12 @@ func _verify_mining_scene() -> void:
 	var terrain_renderer := game_root.get_node_or_null(
 		"MiningScene/TerrainLayerRenderer"
 	) as TerrainLayerRenderer
+	var impact_camera := game_root.get_node_or_null(
+		"MiningScene/ImpactCamera"
+	) as Camera2D
+	var dialogue_director := game_root.get_node_or_null(
+		"DialogueDirector"
+	) as DialogueDirector
 	var scene_wiring := game_root.get_node_or_null(
 		"MiningScene/Systems/SceneWiring"
 	) as MiningSceneWiring
@@ -126,6 +133,71 @@ func _verify_mining_scene() -> void:
 		game_root.queue_free()
 		await process_frame
 		return
+	# The title camera is wider than gameplay. Cover its real world-space bottom
+	# and keep the cinematic bars out until Start, or the menu exposes grey.
+	if impact_camera != null and not is_zero_approx(impact_camera.zoom.y):
+		var visible_world_bottom := (
+			impact_camera.get_screen_center_position().y
+			+ root.get_visible_rect().size.y
+				* 0.5 / absf(impact_camera.zoom.y)
+		)
+		var loaded_world_bottom := (
+			terrain_manager.config.mining_face_screen_y
+			+ (
+				float(
+					(terrain_renderer._loaded_last_chunk + 1)
+					* terrain_manager.config.chunk_height_cells
+				)
+				- terrain_renderer._current_view_y
+			) * terrain_manager.config.terrain_cell_world_size
+		)
+		_expect(
+			loaded_world_bottom >= visible_world_bottom,
+			"Title camera must not see below the streamed terrain."
+		)
+	_expect(
+		dialogue_director != null
+		and dialogue_director.cinematic_frame != null
+		and dialogue_director.cinematic_frame.is_closed(),
+		"Title menu must keep the cinematic bars off the live terrain."
+	)
+	# Sculpt streaming now expands eight authored cells per packed byte. Compare
+	# complete representative rows to the authoritative resource so the faster
+	# bulk path cannot reverse bit order or change protected-floor collision.
+	var sculpt_placements := terrain_manager.get_sculpt_placements()
+	_expect(
+		not sculpt_placements.is_empty(),
+		"Terrain smoke verification requires one authored sculpt."
+	)
+	if not sculpt_placements.is_empty():
+		var sculpt: CutsceneTerrainSculpt = sculpt_placements[0].sculpt
+		var logical_mask := (
+			terrain_renderer._get_sculpt_logical_mask_image(sculpt, -1)
+		)
+		var logical_mask_matches := logical_mask != null
+		var sample_rows := PackedInt32Array([
+			0,
+			sculpt.grid_size.y >> 1,
+			sculpt.grid_size.y - 1,
+		])
+		if logical_mask_matches:
+			for local_y in sample_rows:
+				for local_x in range(sculpt.grid_size.x):
+					var expected_solid := sculpt.is_solid_local(
+						Vector2i(local_x, local_y)
+					)
+					var actual_solid := (
+						logical_mask.get_pixel(local_x, local_y).a >= 0.5
+					)
+					if actual_solid != expected_solid:
+						logical_mask_matches = false
+						break
+				if not logical_mask_matches:
+					break
+		_expect(
+			logical_mask_matches,
+			"Bulk sculpt decoding changed the authored logical room mask."
+		)
 	_expect(run_state != null, "GameState autoload must exist.")
 	_expect(audio_handler != null, "AudioHandler autoload must exist.")
 	_expect(
@@ -267,6 +339,50 @@ func _verify_mining_scene() -> void:
 		not terrain_manager.is_solid_cell(impact_cell),
 		"Removed terrain must become logically open."
 	)
+	# Drain only the bounded production scheduler, then retire and restore the
+	# impacted chunk. This catches stale or lossy snapshot changes; detailed
+	# timing remains in the non-blocking terrain benchmark so smoke stays fast.
+	var impact_chunk_index := terrain_renderer._world_row_to_chunk(
+		impact_cell.y
+	)
+	for _terrain_frame in range(64):
+		terrain_renderer._process(1.0 / 60.0)
+		if terrain_renderer._compressed_chunk_snapshots.has(
+			impact_chunk_index
+		):
+			break
+	var has_terrain_snapshot := (
+		terrain_renderer._compressed_chunk_snapshots.has(
+			impact_chunk_index
+		)
+	)
+	_expect(
+		has_terrain_snapshot,
+		"Settled damaged terrain must produce a bounded review snapshot."
+	)
+	if (
+		has_terrain_snapshot
+		and terrain_renderer._active_chunks.has(impact_chunk_index)
+	):
+		var original_mask_data: Array[PackedByteArray] = []
+		for mask_image: Image in terrain_renderer._active_chunks[
+			impact_chunk_index
+		].mask_images:
+			original_mask_data.append(mask_image.get_data())
+		terrain_renderer._unload_chunk(impact_chunk_index)
+		terrain_renderer._load_chunk(impact_chunk_index)
+		var restored_images: Array[Image] = terrain_renderer._active_chunks[
+			impact_chunk_index
+		].mask_images
+		for layer_index in range(original_mask_data.size()):
+			_expect(
+				restored_images[layer_index].get_data()
+					== original_mask_data[layer_index],
+				(
+					"Review snapshot restore must preserve every byte "
+					+ "of terrain layer %d."
+				) % layer_index
+			)
 
 	game_root.queue_free()
 	await process_frame

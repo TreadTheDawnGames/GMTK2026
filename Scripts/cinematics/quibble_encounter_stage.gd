@@ -4,14 +4,26 @@ extends CharacterEncounterStage
 ## How it works:
 ## - prepare() starts Quibble's presentation-only vibration and coffee clock.
 ## - The sprite snaps through a tiny fixed jitter pattern at a bounded rate.
-## - Rapidly repeats hold, gulp, hold, then returns briefly to idle.
+## - Every few seconds he raises the mug, chugs it, lowers it, and returns to idle.
 ## - Dialogue may still request poses; the next coffee phase resumes the loop.
 ## - Closing or cancellation restores the exact authored sprite position.
 ## - The invariant is that Quibble never moves the authoritative actor root.
 
-const DRINK_INTERVAL_SECONDS: float = 1.25
-const HOLD_CUP_SECONDS: float = 0.08
-const DRINK_SECONDS: float = 0.22
+## How long between one chug and the next.
+##
+## He used to sip every 1.25s for a fifth of a second each time, which at
+## playtest read as a twitch rather than as drinking: the pose changed too often
+## to register and never lasted long enough to be an action. Drinking less often
+## and committing to it when he does is what makes it read. The two numbers move
+## together - stretching the chug without spacing them out just makes him drink
+## continuously.
+const DRINK_INTERVAL_SECONDS: float = 3.0
+## The raise before the chug and the lower after it. Long enough to see the mug
+## travel, short enough that the chug is still the part you notice.
+const HOLD_CUP_SECONDS: float = 0.18
+## The chug itself: head back, mug upended, held. This is the beat that has to be
+## long enough to be an action rather than a frame that flickered past.
+const DRINK_SECONDS: float = 1.0
 const JITTER_STEP_SECONDS: float = 0.02
 const JITTER_OFFSETS := [
 	Vector2(-3.0, 0.0),
@@ -31,6 +43,10 @@ enum CoffeePhase {
 	RECOVERING,
 }
 
+## Which dialogue slot is Quibble's own. Exported rather than hard-coded so this
+## stays in step with the encounter resource if the slot is ever renamed.
+@export var speaking_slot: StringName = &"coffee_cat"
+
 var _motion_presenter: CharacterPresenter
 var _sprite_rest_position: Vector2
 var _jitter_elapsed_seconds: float = 0.0
@@ -38,6 +54,7 @@ var _drink_elapsed_seconds: float = 0.0
 var _phase_elapsed_seconds: float = 0.0
 var _jitter_index: int = 0
 var _coffee_phase: CoffeePhase = CoffeePhase.WAITING
+var _is_speaking: bool = false
 
 
 ## Takes stage ownership and starts the bounded actor-specific routine.
@@ -54,8 +71,45 @@ func prepare(
 	_phase_elapsed_seconds = 0.0
 	_jitter_index = 0
 	_coffee_phase = CoffeePhase.WAITING
+	_is_speaking = false
 	set_process(true)
 	return true
+
+
+## Stops the coffee while Quibble's own line is on screen, and lets it run again
+## the moment somebody else is talking.
+##
+## He cannot deliver a line with his face in a mug. The chug is a full second of
+## every three, so left alone it lands on top of a line often enough to be a
+## coin toss, and the line it ruins most is the one where he holds the coffee out
+## to give it away.
+##
+## Suppressed for the whole line rather than only while it types. The director
+## does not publish when the typewriter finishes, and the stricter rule is the
+## one that was asked for anyway: he is not drinking while he is talking, full
+## stop. The gaps are still his - the miner's "..." is a line by somebody else,
+## so the coffee starts again for it, which is the shot's best moment for a chug.
+##
+## The clock is reset rather than paused, so he never resumes into the middle of
+## a swig he began before the line went up.
+func on_dialogue_line_presented(
+	speaker_slot: StringName,
+	_line_index: int
+) -> void:
+	var is_his_line := speaker_slot == speaking_slot
+	if is_his_line == _is_speaking:
+		return
+	_is_speaking = is_his_line
+	if not _is_speaking:
+		return
+	_drink_elapsed_seconds = 0.0
+	_phase_elapsed_seconds = 0.0
+	_coffee_phase = CoffeePhase.WAITING
+	# Straight back to the cup-out frame, in case the line arrived mid-chug. The
+	# controller applies the line's own speaker pose right after this, so this
+	# only decides what he does on a line that names no pose.
+	if is_instance_valid(_motion_presenter):
+		_motion_presenter.play_pose(&"idle")
 
 
 ## Advances only fixed timers and reuses authored poses without allocations.
@@ -74,6 +128,12 @@ func _process(delta: float) -> void:
 		_motion_presenter.character_sprite.position = (
 			_sprite_rest_position + JITTER_OFFSETS[_jitter_index]
 		)
+
+	# The jitter above keeps running while he talks. That is the half of the
+	# caffeine that belongs under a line - he is vibrating the whole time, and
+	# only the drinking has to wait its turn.
+	if _is_speaking:
+		return
 
 	_drink_elapsed_seconds += delta
 	_phase_elapsed_seconds += delta
@@ -127,6 +187,7 @@ func _exit_tree() -> void:
 ## Releases the one retained presenter and restores its visual-only offset.
 func _stop_quibble_motion() -> void:
 	set_process(false)
+	_is_speaking = false
 	if is_instance_valid(_motion_presenter):
 		_motion_presenter.character_sprite.position = _sprite_rest_position
 	_motion_presenter = null

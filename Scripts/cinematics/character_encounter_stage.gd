@@ -84,14 +84,7 @@ signal sequence_dialogue_requested(
 ## Dynamically keeps this actor beside the miner regardless of landing column.
 @export var conversation_tracks_miner: bool = false
 ## Presenter-root offset; actor sprite offsets remain authored by appearance.
-##
-## The range reaches most of the way to the frame edge because a conversation
-## partner is not always the nearest thing to the miner. The Treasure Hunter
-## stands on the far side of his own hoard, so the gap has to be wide enough to
-## hold a set piece and still leave both bodies in a 1152px frame centred on the
-## miner. Tracking keeps that gap constant, so a large offset costs nothing at
-## the extremes of the landing band the way a fixed marker would.
-@export_range(-512.0, 512.0, 1.0) var conversation_root_offset_from_miner_x: float = 0.0
+@export_range(-256.0, 256.0, 1.0) var conversation_root_offset_from_miner_x: float = 0.0
 ## Slides this stage's props with its tracked cast instead of leaving them
 ## pinned to the room.
 ##
@@ -260,6 +253,28 @@ func play_opening() -> void:
 	# anything set earlier is overwritten by the approach.
 	_apply_facing(conversation_facing)
 	opening_finished.emit()
+
+
+## Tells a stage that a dialogue line has just gone up, and who is saying it.
+##
+## Does nothing here on purpose. Most stages hold still while people talk and
+## need no notice of it; this exists for the ones running a continuous routine of
+## their own, which otherwise have no way to know the shot is mid-sentence.
+## Quibble's caffeine loop is the case that asked for it - he cannot be seen
+## drinking his coffee while his own line is being typed out.
+##
+## The slot is passed rather than a bare "somebody is speaking", because whose
+## line it is decides the answer: a character is free to carry on with whatever
+## he is doing while the person opposite him talks.
+##
+## This is a notification, never permission. A stage may not present, advance, or
+## delay a line from here; DialogueDirector remains the only thing that runs a
+## conversation.
+func on_dialogue_line_presented(
+	_speaker_slot: StringName,
+	_line_index: int
+) -> void:
+	pass
 
 
 ## Plays one editor-authored animation named by the active dialogue line.

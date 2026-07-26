@@ -379,6 +379,10 @@ func _on_dialogue_line_presented(
 		_active_stage != null
 		and active_line != null
 	):
+		# Every line, not only the cued ones. A stage that runs an idle routine
+		# of its own has no other way to know somebody is mid-sentence, and a
+		# routine that keeps playing over a line fights the line.
+		_active_stage.on_dialogue_line_presented(speaker_slot, line_index)
 		if not active_line.stage_cue.is_empty():
 			_active_stage.play_cue(active_line.stage_cue, line_index)
 	_reset_speech_reactions()

@@ -1,6 +1,8 @@
 extends Node
 
-@export var tracks : Array[AudioStream] = []
+
+
+@export var tracks : Array[Intensity] = []
 @export var fills : Array[AudioStream] = []
 @export var fail_riffs : Array[AudioStream] = []
 
@@ -19,7 +21,7 @@ var current_intensity : int = 0
 var fill_playing : bool = false
 
 func _ready():
-	Conductor.set_song(tracks[0], bpm, beats_per_measure)
+	Conductor.set_song(tracks[0].first(), bpm, beats_per_measure)
 	Conductor.play()
 	Conductor.finished.connect(_transition_to)
 	Conductor.beat.connect(_play_fill)
@@ -35,7 +37,7 @@ func get_beats_remaining() -> int:
 
 func _transition_to():
 	Conductor.last_reported_beat = -1
-	Conductor.set_song(tracks[music_intensity], bpm, beats_per_measure)
+	Conductor.set_song(tracks[music_intensity].pick_random(), bpm, beats_per_measure)
 	Conductor.play()
 	current_intensity = music_intensity
 
@@ -103,7 +105,7 @@ func set_intensity_after_measure(intensity : int):
 	#force_play_fill(fail_riffs.pick_random() if fail_riffs.size() > 0 else null)
 	
 	Conductor.last_reported_beat = -1
-	Conductor.set_song(tracks[music_intensity], bpm, beats_per_measure)
+	Conductor.set_song(tracks[music_intensity].pick_random(), bpm, beats_per_measure)
 	Conductor.play()
 	current_intensity = music_intensity
 	pass
