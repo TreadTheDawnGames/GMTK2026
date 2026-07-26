@@ -20,9 +20,14 @@ const PLAYTEST_TARGET_PATH := "res://.cutscene_playtest_target"
 var _game_root: Node
 var _active_beat: StringName = &"intro"
 var _requested_encounter_id: StringName
+var _run_state: RunState
 
 
 func _ready() -> void:
+	_run_state = get_node_or_null("/root/GameState") as RunState
+	if _run_state == null:
+		push_error("CinematicPreviewHarness requires the GameState autoload.")
+		return
 	_requested_encounter_id = _read_requested_encounter_id()
 	if _requested_encounter_id.is_empty():
 		_restart_with_beat(&"intro")
@@ -71,9 +76,7 @@ func _restart_with_beat(beat: StringName) -> void:
 		_game_root = null
 	await get_tree().process_frame
 
-	var run_state := RunState.get_global(self)
-	if run_state != null:
-		run_state.reset_run()
+	_run_state.reset_run()
 
 	_game_root = MINING_SCENE.instantiate()
 	add_child(_game_root)
@@ -269,11 +272,8 @@ func _get_encounter_ceiling(
 ## own signal reaches, which is why this drives the real sequence rather than a
 ## shortcut around it.
 func _descend_to(depth_rows: int) -> void:
-	var game_state := RunState.get_global(self)
-	if game_state == null:
-		return
-	game_state.depth = depth_rows
-	game_state.depth_changed.emit(depth_rows)
+	_run_state.depth = depth_rows
+	_run_state.depth_changed.emit(depth_rows)
 
 
 ## Reports the fall finishing at a depth, which is the second half of what the
@@ -284,14 +284,13 @@ func _descend_to(depth_rows: int) -> void:
 ## and then waits forever for a fall that never lands, which is what left the
 ## harness sitting on the surface.
 func _land_at(depth_rows: int) -> void:
-	var game_state := RunState.get_global(self)
 	var encounter := _get_encounter_controller()
-	if game_state == null or encounter == null:
+	if encounter == null:
 		return
 	var mining_config: MiningConfig = encounter.mining_config
 	if mining_config == null:
 		return
-	game_state.mining_y = mining_config.initial_surface_row + depth_rows
+	_run_state.mining_y = mining_config.initial_surface_row + depth_rows
 	# The view is a separate authority from the run's depth. Setting depth alone
 	# left the camera and the terrain parked on the surface while the encounter
 	# ran underneath it, so the cutscene played out over a sunset and a bus stop.
@@ -301,7 +300,7 @@ func _land_at(depth_rows: int) -> void:
 	var view := _get_view_controller()
 	if view != null:
 		view.follow_mining_position(
-			Vector2i(game_state.mining_x, game_state.mining_y)
+			Vector2i(_run_state.mining_x, _run_state.mining_y)
 		)
 		# Let the fall finish before saying it landed.
 		#
@@ -320,7 +319,7 @@ func _land_at(depth_rows: int) -> void:
 				),
 			8.0
 		)
-	encounter._on_landing_reached(game_state.mining_y)
+	encounter._on_landing_reached(_run_state.mining_y)
 
 
 func _get_view_controller() -> ViewController:

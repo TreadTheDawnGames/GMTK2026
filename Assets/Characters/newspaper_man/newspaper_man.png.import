@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cj82abtiv5yns"
-path="res://.godot/imported/AnimationPlayer.png-e49715e6b62a71ea4b148fb36a86719c.ctex"
+uid="uid://bg01dnuf4rx4g"
+path="res://.godot/imported/newspaper_man.png-e0e7b8963dca1934d0ab52d1b8b0c3cf.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Addons/conductor/icons/AnimationPlayer.png"
-dest_files=["res://.godot/imported/AnimationPlayer.png-e49715e6b62a71ea4b148fb36a86719c.ctex"]
+source_file="res://Assets/Characters/newspaper_man/newspaper_man.png"
+dest_files=["res://.godot/imported/newspaper_man.png-e0e7b8963dca1934d0ab52d1b8b0c3cf.ctex"]
 
 [params]
 

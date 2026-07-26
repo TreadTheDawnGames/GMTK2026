@@ -11,6 +11,7 @@ var is_hit: bool = false
 @export var single_use : bool = false
 
 var target_position : float = 0
+var _bounce_muted: bool = false
 
 var use_image:bool=true:
 	set(value):
@@ -32,6 +33,11 @@ func get_right_extent():
 func initialize():
 	Utils.set_control_width(self, my_width)
 	pass
+
+
+## Receives the owning timing bar's saved bounce preference.
+func set_bounce_muted(is_muted: bool) -> void:
+	_bounce_muted = is_muted
 
 func is_point_within_bounds(point : float, grace : float = 0) -> bool:
 	return  get_left_extent() - grace < point and point < get_right_extent() + grace

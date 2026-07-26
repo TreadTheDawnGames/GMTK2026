@@ -9,10 +9,18 @@ script = ExtResource("1_al5fl")
 kind = 9
 actor = &"treasure_hunter"
 
+[sub_resource type="Resource" id="Resource_hit_pose"]
+script = ExtResource("1_al5fl")
+kind = 1
+actor = &"treasure_hunter"
+pose = &"hit"
+notes = "One visible mining contact before he steps through the side tunnel."
+
 [sub_resource type="Resource" id="Resource_hwkqq"]
 script = ExtResource("1_al5fl")
 kind = 0
 actor = &"treasure_hunter"
+start_seconds = 0.25
 duration_seconds = 0.9
 target_marker = &"Conversation"
 starts_from_authored_point = true
@@ -23,27 +31,27 @@ pose = &"walk"
 script = ExtResource("1_al5fl")
 kind = 2
 actor = &"treasure_hunter"
-start_seconds = 0.9
+start_seconds = 1.15
 facing = -1
 
 [sub_resource type="Resource" id="Resource_1nh83"]
 script = ExtResource("1_al5fl")
 kind = 1
 actor = &"treasure_hunter"
-start_seconds = 0.9
+start_seconds = 1.15
 pose = &"idle"
 
 [sub_resource type="Resource" id="Resource_7j7gd"]
 script = ExtResource("1_al5fl")
 kind = 3
 actor = &"treasure_hunter"
-start_seconds = 0.9
+start_seconds = 1.15
 duration_seconds = 0.3
 
 [sub_resource type="Resource" id="Resource_l8ac4"]
 script = ExtResource("1_al5fl")
 kind = 5
-start_seconds = 1.2
+start_seconds = 1.45
 duration_seconds = 6.0
 conversation = ExtResource("2_252o6")
 notes = "Brisk, barely stops. He has a pickaxe to hand over and the single bounce is him presenting it."
@@ -52,7 +60,7 @@ notes = "Brisk, barely stops. He has a pickaxe to hand over and the single bounc
 script = ExtResource("1_al5fl")
 kind = 0
 actor = &"treasure_hunter"
-start_seconds = 7.2
+start_seconds = 7.45
 duration_seconds = 1.8
 target_marker = &"Exit"
 pose = &"walk"
@@ -61,9 +69,9 @@ pose = &"walk"
 script = ExtResource("1_al5fl")
 kind = 10
 actor = &"treasure_hunter"
-start_seconds = 9.0
+start_seconds = 9.25
 
 [resource]
 script = ExtResource("3_l63c8")
 sequence_id = &"treasure_hunter_first_sequence"
-beats = Array[ExtResource("1_al5fl")]([SubResource("Resource_2k5s6"), SubResource("Resource_hwkqq"), SubResource("Resource_al13m"), SubResource("Resource_1nh83"), SubResource("Resource_7j7gd"), SubResource("Resource_l8ac4"), SubResource("Resource_yq1co"), SubResource("Resource_djxbr")])
+beats = Array[ExtResource("1_al5fl")]([SubResource("Resource_2k5s6"), SubResource("Resource_hit_pose"), SubResource("Resource_hwkqq"), SubResource("Resource_al13m"), SubResource("Resource_1nh83"), SubResource("Resource_7j7gd"), SubResource("Resource_l8ac4"), SubResource("Resource_yq1co"), SubResource("Resource_djxbr")])

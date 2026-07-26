@@ -56,7 +56,7 @@ actor = &"treasure_hunter"
 start_seconds = 7.1
 duration_seconds = 1.6
 target_marker = &"Exit"
-pose = &"walk"
+pose = &"no_pickaxe"
 
 [sub_resource type="Resource" id="Resource_xey6q"]
 script = ExtResource("1_g737l")

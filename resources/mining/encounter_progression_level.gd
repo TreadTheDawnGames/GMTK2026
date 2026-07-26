@@ -8,6 +8,7 @@ extends Resource
 ## - Timing reads its target pool, speed, baseline count, and combo bonuses.
 ## - The invariant is that a level is self-contained and never depends on an
 ##   earlier level having been applied.
+## Pickaxe/progression checklist: res://resources/pickaxes/pickaxe_authoring.md
 
 enum ImpactSize {
 	SMALL,
@@ -27,8 +28,11 @@ const _IMPACT_SIZE_MULTIPLIERS: Array[float] = [0.5, 1.0, 1.5]
 const _ANIMATION_SPEED_MULTIPLIERS: Array[float] = [1.0, 1.25, 1.5]
 
 @export_category("Mining")
+## Complete base width/depth tier; this replaces the previous level's value.
 @export var impact_size: ImpactSize = ImpactSize.SMALL
+## Queues one additional swing for each successful timing result.
 @export var double_hit: bool = false
+## Complete successful-swing speed tier; it does not stack with older levels.
 @export var mine_animation_speed: MineAnimationSpeed = (
 	MineAnimationSpeed.NORMAL
 )
@@ -36,9 +40,13 @@ const _ANIMATION_SPEED_MULTIPLIERS: Array[float] = [1.0, 1.25, 1.5]
 @export_range(0.1, 5.0, 0.05) var combo_impact_scale: float = 1.1
 
 @export_category("Timing")
+## Complete target pool for this level. It must contain no null scenes.
 @export var target_scenes: Array[PackedScene] = []
+## Main timing-bar travel speed in pixels per second.
 @export_range(1.0, 5_000.0, 1.0) var slider_speed: float = 500.0
+## Baseline targets restored after a lost streak; must be at least one.
 @export_range(1, 16, 1) var starting_target_count: int = 1
+## Positive combo thresholds in strictly increasing order.
 @export var bonus_target_combos: PackedInt32Array = PackedInt32Array()
 
 

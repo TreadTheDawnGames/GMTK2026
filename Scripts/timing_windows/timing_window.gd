@@ -23,14 +23,13 @@ var stored_combo : int = 0
 @export var combo_saved_color: Color = Color.CYAN
 @export var combo_lost_color: Color = Color.RED
 
-@onready var _game_state: RunState = RunState.get_global(self)
-@onready var _audio_handler: PlayerAudioHandler = (
-	PlayerAudioHandler.get_global(self)
-)
+var _audio_handler: PlayerAudioHandler
 var _target_unlocks: Array[PickaxeDefinition] = []
 var _progression_target_scenes: Array[PackedScene] = []
 var _progression_bonus_target_combos := PackedInt32Array()
 var _uses_encounter_progression: bool = false
+var _bounce_muted: bool = false
+var _displayed_distance: int = 0
 
 ## Connects both timing bars to the combo flow.
 func _ready() -> void:
@@ -55,17 +54,49 @@ func _ready() -> void:
 	):
 		recovery_window.pressed.connect(_recovery_window_pressed)
 	
-	_update_depth_label(_game_state.depth)
-	if not _game_state.depth_changed.is_connected(_update_depth_label):
-		_game_state.depth_changed.connect(_update_depth_label)
 	if not _target_unlocks.is_empty():
 		_apply_pickaxe_target_unlocks()
-	
-## Shows distance to the Thief, then distance travelled beyond the Thief.
-func _update_depth_label(_depth: int) -> void:
-	depth_label.text = Utils.format_number_with_commas(
-		_game_state.displayed_distance
+	set_bounce_muted(_bounce_muted)
+	show_displayed_distance(_displayed_distance)
+
+
+## Supplies the cross-scene audio service at the composition boundary.
+func set_audio_handler(audio_handler: PlayerAudioHandler) -> void:
+	_audio_handler = audio_handler
+
+
+## Plays optional feedback when this reusable timing scene has an audio owner.
+func _play_sound(
+	sound: AudioStream,
+	bus_name: String = "SFX",
+	do_pitch_scale: bool = false,
+	pitch_scale: float = 1.0
+) -> void:
+	if _audio_handler == null:
+		return
+	_audio_handler.play_sound(
+		sound,
+		bus_name,
+		do_pitch_scale,
+		pitch_scale
 	)
+
+
+## Applies the saved bounce preference to both authored timing bars.
+func set_bounce_muted(is_muted: bool) -> void:
+	_bounce_muted = is_muted
+	if not is_node_ready():
+		return
+	mining_window.set_bounce_muted(is_muted)
+	recovery_window.set_bounce_muted(is_muted)
+
+
+## Shows distance to the Thief, then distance travelled beyond the Thief.
+func show_displayed_distance(displayed_distance: int) -> void:
+	_displayed_distance = maxi(displayed_distance, 0)
+	if not is_node_ready():
+		return
+	depth_label.text = Utils.format_number_with_commas(_displayed_distance)
 
 
 ## Stores cumulative pickaxes and restores their zero-combo baseline scenes.
@@ -78,6 +109,8 @@ func set_pickaxe_target_unlocks(
 
 
 ## Applies the timing portion of one complete encounter-progression level.
+## New level-owned timing rules are added to this explicit contract and passed
+## by EncounterProgression.apply_level(), as documented in pickaxe_authoring.md.
 func set_progression_target_rules(
 	target_scenes: Array[PackedScene],
 	slider_speed: float,
@@ -131,7 +164,7 @@ func _mining_window_pressed(
 			var steps_past_ladder = maxi(
 				combo - AudioLibrary.MINE_SOUNDS.size(), 0
 			)
-			_audio_handler.play_sound(
+			_play_sound(
 				AudioLibrary.MINE_SOUNDS[
 					clampi(combo - 1, 0, AudioLibrary.MINE_SOUNDS.size() - 1)
 				],
@@ -177,10 +210,10 @@ func _mining_window_pressed(
 	else:
 		stored_combo = combo
 		if combo >= mining_config.recovery_combo_threshold:
-			_audio_handler.play_sound(AudioLibrary.MISS_WITH_SAVE)
+			_play_sound(AudioLibrary.MISS_WITH_SAVE)
 			await mining_window.pause(true)
 			recovery_window.start()
-			_audio_handler.play_sound(AudioLibrary.SAVE_BUILDUP)
+			_play_sound(AudioLibrary.SAVE_BUILDUP)
 		else:
 			var lost_combo := combo
 			pressed.emit(false, combo, 0)
@@ -190,7 +223,7 @@ func _mining_window_pressed(
 			mining_window.remove_all_extra_targets()
 			mining_window.speed_multiplier = 1.0
 			mining_window.play_animation(Color.RED)
-			_audio_handler.play_sound(AudioLibrary.STREAK_LOST)
+			_play_sound(AudioLibrary.STREAK_LOST)
 			mining_window.reset_all_targets()
 
 
@@ -207,7 +240,7 @@ func _recovery_window_pressed(
 		mining_window.reset_all_targets()
 		pressed.emit(false, combo, 0)
 		streak_ended.emit(lost_combo)
-		_audio_handler.play_sound(AudioLibrary.STREAK_LOST)
+		_play_sound(AudioLibrary.STREAK_LOST)
 		#recovery_window.stop()
 
 		mining_window.speed_multiplier = 1.0
@@ -219,7 +252,7 @@ func _recovery_window_pressed(
 		recovery_window.speed_multiplier *= (
 			(mining_config.recovery_speed_multiplier)
 		)
-		_audio_handler.play_sound(AudioLibrary.SAVE)
+		_play_sound(AudioLibrary.SAVE)
 		recovery_window.animation_color = combo_saved_color
 		
 	await recovery_window.pause(true)

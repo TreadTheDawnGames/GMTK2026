@@ -32,11 +32,14 @@ const MAX_LIGHTNING_CRACK_LENGTH: int = 32
 const MAX_LIGHTNING_CRACK_DEPTH: int = 8
 
 
-## Reports opened cells plus the pickaxe-contact center for their visual stamp.
+## Reports opened cells, their authoritative bounds, and the pickaxe contact.
+## Bounds are accumulated while cells are removed so visual consumers never
+## rescan a theoretical fully-stacked hit solely to recover its rectangle.
 signal terrain_damaged(
 	destroyed_cells: Array[Vector2i],
 	horizontal_direction: int,
-	impact_origin_cell: Vector2i
+	impact_origin_cell: Vector2i,
+	destroyed_bounds: Rect2i
 )
 ## Reports related narrow paths as one batch so presentation uploads once.
 signal terrain_paths_damaged(
@@ -86,6 +89,11 @@ func dig_tunnel(
 		return result
 
 	var destroyed_cells: Array[Vector2i] = []
+	var minimum_destroyed_cell := Vector2i(
+		config.terrain_width_cells,
+		config.get_bottom_surface_row() + 1
+	)
+	var maximum_destroyed_cell := Vector2i(-1, -1)
 	var final_mineable_row := config.get_bottom_surface_row()
 	var tunnel_end_row := mini(
 		start_cell.y + depth_rows,
@@ -128,18 +136,45 @@ func dig_tunnel(
 			# back to the player's feet keeps the new tunnel safely connected.
 			left_cell_x = mini(left_cell_x, start_cell.x)
 			right_cell_x = maxi(right_cell_x, start_cell.x)
-		result.cells_removed += _destroy_tunnel_row(
+		var first_new_cell_index := destroyed_cells.size()
+		var removed_in_row := _destroy_tunnel_row(
 			cell_y,
 			left_cell_x,
 			right_cell_x,
 			destroyed_cells
 		)
+		result.cells_removed += removed_in_row
+		if removed_in_row > 0:
+			var first_new_cell := destroyed_cells[first_new_cell_index]
+			var last_new_cell := destroyed_cells[-1]
+			minimum_destroyed_cell.x = mini(
+				minimum_destroyed_cell.x,
+				first_new_cell.x
+			)
+			minimum_destroyed_cell.y = mini(
+				minimum_destroyed_cell.y,
+				cell_y
+			)
+			maximum_destroyed_cell.x = maxi(
+				maximum_destroyed_cell.x,
+				last_new_cell.x
+			)
+			maximum_destroyed_cell.y = maxi(
+				maximum_destroyed_cell.y,
+				cell_y
+			)
 
 	if not destroyed_cells.is_empty():
 		terrain_damaged.emit(
 			destroyed_cells,
 			clampi(horizontal_direction, -1, 1),
-			Vector2i(path_start_cell_x, start_cell.y)
+			Vector2i(path_start_cell_x, start_cell.y),
+			Rect2i(
+				minimum_destroyed_cell,
+				maximum_destroyed_cell
+					- minimum_destroyed_cell
+					+ Vector2i.ONE
+			)
 		)
 	return result
 

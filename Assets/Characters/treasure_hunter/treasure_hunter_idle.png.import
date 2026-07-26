@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cj82abtiv5yns"
-path="res://.godot/imported/AnimationPlayer.png-e49715e6b62a71ea4b148fb36a86719c.ctex"
+uid="uid://btuk1mkburwoq"
+path="res://.godot/imported/treasure_hunter_idle.png-7fe7f9354fd5e0bb81e2c8f365d2ed89.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Addons/conductor/icons/AnimationPlayer.png"
-dest_files=["res://.godot/imported/AnimationPlayer.png-e49715e6b62a71ea4b148fb36a86719c.ctex"]
+source_file="res://Assets/Characters/treasure_hunter/treasure_hunter_idle.png"
+dest_files=["res://.godot/imported/treasure_hunter_idle.png-7fe7f9354fd5e0bb81e2c8f365d2ed89.ctex"]
 
 [params]
 

@@ -59,25 +59,37 @@ const MINER_FLOOR_LAYER_INDEX: int = 0
 @export var final_encounter_controller: FinalEncounterController
 @export var credits_overlay: CreditsOverlay
 
-@onready var _game_state: RunState = RunState.get_global(self)
+@onready var _game_state: RunState = (
+	get_node_or_null("/root/GameState") as RunState
+)
+@onready var _audio_handler: PlayerAudioHandler = (
+	get_node_or_null("/root/AudioHandler") as PlayerAudioHandler
+)
 @onready var _music_manager: Node = get_node("/root/MusicManager")
 
 
 ## Establishes every signal that crosses a mining subsystem boundary.
 func _ready() -> void:
+	if _game_state == null or _audio_handler == null:
+		push_error(
+			"MiningSceneWiring requires GameState and AudioHandler autoloads."
+		)
+		return
+	mining_controller.set_run_state(_game_state)
+	encounter_controller.set_run_state(_game_state)
+	gem_outcrop_field.set_save_game(_game_state.save_game)
+	main_menu.set_save_game(_game_state.save_game)
+	hud.set_save_game(_game_state.save_game)
+	miner_rig.set_audio_handler(_audio_handler)
+	timing_window.set_audio_handler(_audio_handler)
 	_connect_once(
 		main_menu.start_requested,
-		run_intro_controller.begin_run
+		_on_start_requested
 	)
 	_connect_once(
 		_game_state.depth_changed,
-		credits_overlay._on_depth_changed
+		_on_run_depth_changed
 	)
-	_connect_once(
-		_game_state.depth_changed,
-		encounter_controller._on_depth_changed
-	)
-	_connect_once(_game_state.depth_changed, hud._on_depth_changed)
 	_connect_once(
 		_game_state.run_reset,
 		mining_controller._on_run_reset
@@ -143,12 +155,24 @@ func _ready() -> void:
 		mining_controller.resolve_attempt
 	)
 	_connect_once(
+		timing_bridge.impact_candidates_changed,
+		mining_controller._on_impact_candidates_changed
+	)
+	_connect_once(
 		encounter_controller.encounter_completed,
 		encounter_progression._on_encounter_completed
 	)
 	_connect_once(
 		mining_controller.dig_presentation_started,
 		terrain_renderer._on_dig_presentation_started
+	)
+	_connect_once(
+		mining_controller.dig_visuals_preparation_started,
+		terrain_renderer._on_dig_visuals_preparation_started
+	)
+	_connect_once(
+		mining_controller.dig_visuals_preparation_requested,
+		terrain_renderer._on_dig_visuals_preparation_requested
 	)
 	_connect_once(
 		view_controller.landing_reached,
@@ -250,6 +274,10 @@ func _ready() -> void:
 		_game_state.run_reset,
 		combo_tier_punch._on_run_reset
 	)
+	_connect_once(
+		_game_state.save_game.settings_applied,
+		timing_window.set_bounce_muted
+	)
 	# A lost streak gives the darkened frame straight back instead of letting it
 	# decay, so the release reads as part of losing the combo.
 	_connect_once(
@@ -301,6 +329,10 @@ func _ready() -> void:
 		final_encounter_controller.show_finale
 	)
 	_connect_once(
+		final_encounter_controller.run_reset_requested,
+		_game_state.reset_run
+	)
+	_connect_once(
 		encounter_controller.coffee_speed_boost_requested,
 		coffee_speed_boost.award_boost
 	)
@@ -340,6 +372,27 @@ func _ready() -> void:
 		rat_colony_followers.presentation_strike_requested,
 		_on_character_stage_strike_requested
 	)
+	timing_window.set_bounce_muted(_game_state.save_game.mute_bounce)
+	_on_run_depth_changed(_game_state.depth)
+
+
+## Resets shared run state before handing the live title shot to its intro.
+func _on_start_requested() -> void:
+	_game_state.reset_run()
+	run_intro_controller.begin_run()
+
+
+## Fans one authoritative progress change into its explicit read-only consumers.
+func _on_run_depth_changed(depth: int) -> void:
+	credits_overlay._on_depth_changed(depth)
+	encounter_controller._on_depth_changed(depth)
+	hud.show_run_progress(
+		depth,
+		_game_state.remaining_depth,
+		_game_state.distance_since_thief,
+		_game_state.has_reached_thief
+	)
+	timing_window.show_displayed_distance(_game_state.displayed_distance)
 
 
 ## Frames the authored sole instead of the abstract mining-row coordinate.

@@ -14,6 +14,9 @@ class SwingRequest:
 	var counts_as_timing_success: bool
 	var path_direction: int = 1
 	var target_cell_x: int
+	var start_cell: Vector2i
+	var depth_rows: int
+	var half_width_cells: int
 
 
 	## Captures the tool and modifiers earned by one timing result.
@@ -57,6 +60,19 @@ signal swing_requested(
 )
 ## Reports combo before synchronous terrain damage chooses its layer masks.
 signal dig_presentation_started(combo: int)
+## Starts a bounded prediction batch. Exact swings retain any candidate images
+## that already match; a regenerated target set replaces obsolete candidates.
+signal dig_visuals_preparation_started(keep_completed: bool)
+## Gives terrain presentation the successful swing's deterministic primary hit
+## during wind-up. This prepares mask transforms only; impact still owns damage,
+## particles, texture publication, and every player-visible consequence.
+signal dig_visuals_preparation_requested(
+	start_cell: Vector2i,
+	depth_rows: int,
+	half_width_cells: int,
+	target_cell_x: int,
+	combo: int
+)
 ## Requests impact presentation at the hammer contact point.
 signal impact_resolved(
 	screen_position: Vector2,
@@ -77,7 +93,7 @@ signal dig_number_requested(
 @export var terrain_manager: TerrainManager
 @export var view_controller: ViewController
 
-@onready var _game_state: RunState = RunState.get_global(self)
+var _game_state: RunState
 
 # Narrative pickaxe gifts replace this bounded snapshot. Encounter progression
 # overrides their legacy gameplay modifiers during the production run.
@@ -89,9 +105,16 @@ var _pending_combo_strength: float = 0.0
 var _is_swing_pending: bool = false
 var _has_resolved_pending_impact: bool = false
 var _is_swing_queue_paused: bool = false
+var _latest_candidate_combo: int = 1
+var _latest_candidate_directions := PackedInt32Array()
 # Each success adds at most its primary request and one authored double hit.
 # Swing completion pops requests; a miss or run reset clears the remainder.
 var _queued_swings: Array[SwingRequest] = []
+
+
+## Supplies the authoritative run model at the composition boundary.
+func set_run_state(run_state: RunState) -> void:
+	_game_state = run_state
 
 
 ## Starts a swing for a successful timing result or records a miss.
@@ -158,43 +181,22 @@ func resolve_attempt(
 
 ## Starts one retained success and waits for its animated contact frame.
 func _start_swing(swing: SwingRequest) -> void:
-	var center_cell_x := config.terrain_width_cells / 2
 	var requested_half_width_cells := (
 		_get_requested_half_width_cells(swing)
 	)
-	var available_half_span := (
-		center_cell_x - requested_half_width_cells - 1
+	var path_plan := _get_swing_path_plan(
+		swing,
+		requested_half_width_cells
 	)
-	if terrain_manager.encounter_config != null:
-		available_half_span = mini(
-			available_half_span,
-			terrain_manager.encounter_config.chamber_width_cells / 2
-				- requested_half_width_cells
-				- 1
-		)
-	var safe_half_span := maxi(
-		mini(config.snake_half_span_cells, available_half_span),
-		0
+	_path_direction = path_plan.x
+	swing.path_direction = path_plan.x
+	swing.target_cell_x = path_plan.y
+	swing.start_cell = Vector2i(
+		_game_state.mining_x,
+		_game_state.mining_y
 	)
-	var left_turn_cell_x := center_cell_x - safe_half_span
-	var right_turn_cell_x := center_cell_x + safe_half_span
-	if _game_state.mining_x >= right_turn_cell_x:
-		_path_direction = -1
-	elif _game_state.mining_x <= left_turn_cell_x:
-		_path_direction = 1
-	elif swing.path_direction != 0:
-		_path_direction = swing.path_direction
-	swing.path_direction = _path_direction
-	var horizontal_step_cells := mini(
-		config.snake_horizontal_step_cells,
-		maxi(requested_half_width_cells, 1)
-	)
-	swing.target_cell_x = clampi(
-		_game_state.mining_x
-			+ swing.path_direction * horizontal_step_cells,
-		left_turn_cell_x,
-		right_turn_cell_x
-	)
+	swing.depth_rows = _get_requested_depth_rows(swing)
+	swing.half_width_cells = requested_half_width_cells
 	_pending_swing = swing
 	_pending_combo_strength = clampf(
 		float(swing.combo) / float(config.maximum_effect_combo),
@@ -203,6 +205,17 @@ func _start_swing(swing: SwingRequest) -> void:
 	)
 	_is_swing_pending = true
 	_has_resolved_pending_impact = false
+	# Once timing succeeds, the target column and impact dimensions cannot change
+	# before the authored contact frame. Spend that wind-up preparing the dense
+	# stamp, while keeping the logical terrain and particles untouched.
+	dig_visuals_preparation_started.emit(true)
+	dig_visuals_preparation_requested.emit(
+		swing.start_cell,
+		swing.depth_rows,
+		swing.half_width_cells,
+		swing.target_cell_x,
+		mini(swing.combo, config.maximum_effect_combo)
+	)
 	var authored_animation_speed := (
 		_progression_level.get_mine_animation_speed_multiplier()
 		if _progression_level != null
@@ -236,48 +249,13 @@ func resolve_impact(
 		_pending_swing.combo,
 		config.maximum_effect_combo
 	)
-	var combo_steps := maxi(capped_combo - 1, 0)
-	var combo_added_depth := (
-		config.combo_mine_depth_rows_per_step * combo_steps
-	)
-	var requested_depth_rows: int
-	if _progression_level != null:
-		requested_depth_rows = _progression_level.scale_impact(
-			float(config.base_mine_depth_rows),
-			float(combo_added_depth)
-		)
-	else:
-		requested_depth_rows = (
-			config.base_mine_depth_rows + combo_added_depth
-		)
-		requested_depth_rows = maxi(
-			roundi(
-				float(requested_depth_rows)
-				* _stack_multiplier(
-					_pending_swing.pickaxes,
-					&"power_multiplier",
-					config.maximum_stack_power_multiplier
-				)
-			),
-			1
-		)
-	requested_depth_rows = maxi(
-		roundi(
-			float(requested_depth_rows) * _pending_swing.power_scale
-		),
-		1
-	)
-	var requested_half_width_cells := (
-		_get_requested_half_width_cells(_pending_swing)
-	)
+	var requested_depth_rows := _pending_swing.depth_rows
+	var requested_half_width_cells := _pending_swing.half_width_cells
 	# The swing's planned target is the reachable pickaxe contact. The animated
 	# marker remains presentation-only because camera movement or a queued swing
 	# can briefly place its screen coordinate over terrain the miner cannot reach.
 	var impact_cell_x := _pending_swing.target_cell_x
-	var fall_cell := Vector2i(
-		_game_state.mining_x,
-		_game_state.mining_y
-	)
+	var fall_cell := _pending_swing.start_cell
 	# Presentation receives this before TerrainManager emits damage, so every
 	# stamp from the primary hit and its special effect shares one combo gate.
 	dig_presentation_started.emit(capped_combo)
@@ -447,6 +425,8 @@ func finish_swing() -> void:
 	_has_resolved_pending_impact = false
 	_pending_swing = null
 	_try_start_queued_swing()
+	if not _is_swing_pending:
+		_prepare_latest_impact_candidates()
 
 
 ## Pauses retained hits during dialogue floors and resumes them afterward.
@@ -499,6 +479,94 @@ func _on_run_reset() -> void:
 	_is_swing_pending = false
 	_has_resolved_pending_impact = false
 	_queued_swings.clear()
+	_latest_candidate_combo = 1
+	_latest_candidate_directions.clear()
+	dig_visuals_preparation_started.emit(false)
+
+
+## Stores Caspian's up-to-five target outcomes and prepares their unique impact
+## directions whenever no already-earned swing owns the prediction cache.
+func _on_impact_candidates_changed(
+	next_combo: int,
+	hit_directions: PackedInt32Array
+) -> void:
+	_latest_candidate_combo = maxi(next_combo, 1)
+	_latest_candidate_directions = hit_directions.duplicate()
+	if _is_swing_pending or _is_swing_queue_paused:
+		return
+	_prepare_latest_impact_candidates()
+
+
+## Expands the current target set into bounded terrain-transform candidates.
+func _prepare_latest_impact_candidates() -> void:
+	dig_visuals_preparation_started.emit(false)
+	if _latest_candidate_directions.is_empty():
+		return
+	var start_cell := Vector2i(
+		_game_state.mining_x,
+		_game_state.mining_y
+	)
+	for hit_direction in _latest_candidate_directions:
+		var swing := SwingRequest.new(
+			_latest_candidate_combo,
+			_active_pickaxes,
+			hit_direction
+		)
+		var half_width_cells := _get_requested_half_width_cells(swing)
+		var path_plan := _get_swing_path_plan(swing, half_width_cells)
+		dig_visuals_preparation_requested.emit(
+			start_cell,
+			_get_requested_depth_rows(swing),
+			half_width_cells,
+			path_plan.y,
+			mini(
+				_latest_candidate_combo,
+				config.maximum_effect_combo
+			)
+		)
+
+
+## Resolves the bounded snake direction and contact column without mutating the
+## live path, so up to five timing targets can be evaluated independently.
+func _get_swing_path_plan(
+	swing: SwingRequest,
+	requested_half_width_cells: int
+) -> Vector2i:
+	var center_cell_x := config.terrain_width_cells / 2
+	var available_half_span := (
+		center_cell_x - requested_half_width_cells - 1
+	)
+	if terrain_manager.encounter_config != null:
+		available_half_span = mini(
+			available_half_span,
+			terrain_manager.encounter_config.chamber_width_cells / 2
+				- requested_half_width_cells
+				- 1
+		)
+	var safe_half_span := maxi(
+		mini(config.snake_half_span_cells, available_half_span),
+		0
+	)
+	var left_turn_cell_x := center_cell_x - safe_half_span
+	var right_turn_cell_x := center_cell_x + safe_half_span
+	var resolved_direction := _path_direction
+	if _game_state.mining_x >= right_turn_cell_x:
+		resolved_direction = -1
+	elif _game_state.mining_x <= left_turn_cell_x:
+		resolved_direction = 1
+	elif swing.path_direction != 0:
+		resolved_direction = swing.path_direction
+	var horizontal_step_cells := mini(
+		config.snake_horizontal_step_cells,
+		maxi(requested_half_width_cells, 1)
+	)
+	var target_cell_x := clampi(
+		_game_state.mining_x
+			+ resolved_direction * horizontal_step_cells,
+		left_turn_cell_x,
+		right_turn_cell_x
+	)
+	return Vector2i(resolved_direction, target_cell_x)
 
 
 ## Resolves the connected tunnel radius for planning and impact damage.
@@ -534,6 +602,40 @@ func _get_requested_half_width_cells(swing: SwingRequest) -> int:
 			* swing.width_scale
 		),
 		0
+	)
+
+
+## Resolves the vertical impact size identically for wind-up and contact.
+func _get_requested_depth_rows(swing: SwingRequest) -> int:
+	var capped_combo := mini(swing.combo, config.maximum_effect_combo)
+	var combo_steps := maxi(capped_combo - 1, 0)
+	var combo_added_depth := (
+		config.combo_mine_depth_rows_per_step * combo_steps
+	)
+	var requested_depth_rows: int
+	if _progression_level != null:
+		requested_depth_rows = _progression_level.scale_impact(
+			float(config.base_mine_depth_rows),
+			float(combo_added_depth)
+		)
+	else:
+		requested_depth_rows = (
+			config.base_mine_depth_rows + combo_added_depth
+		)
+		requested_depth_rows = maxi(
+			roundi(
+				float(requested_depth_rows)
+				* _stack_multiplier(
+					swing.pickaxes,
+					&"power_multiplier",
+					config.maximum_stack_power_multiplier
+				)
+			),
+			1
+		)
+	return maxi(
+		roundi(float(requested_depth_rows) * swing.power_scale),
+		1
 	)
 
 

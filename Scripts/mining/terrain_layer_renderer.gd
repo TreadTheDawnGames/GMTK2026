@@ -17,17 +17,27 @@ extends Node2D
 class TerrainChunkVisual:
 	var root: Node2D
 	var mask_images: Array[Image] = []
-	var mask_textures: Array[ImageTexture] = []
+	var mask_texture_tiles: Array[Array] = []
+	var dirty_mask_tiles: PackedInt32Array = PackedInt32Array()
+	var layer_revisions: PackedInt32Array = PackedInt32Array()
 	var layer_sprites: Array[Sprite2D] = []
+	## True only while the binary logical room is standing in for a smoothed rim.
+	## The background run cache rebuilds this off-screen chunk once complete.
+	var pending_sculpt_refinement: bool = false
 	## One bit per stratum still drawing the shared intact mask. A shared stratum
 	## owns no image and no texture, so streaming untouched rock allocates
 	## nothing; the bit is cleared the moment a stamp needs to write into it.
 	var shared_layers: int = 0
+	## One tile bitmask per stratum. A layer leaving a shared base detaches each
+	## GPU tile lazily when that tile is first changed; pending bits must remain
+	## until their own tile publishes or a later hit could carve a sibling.
+	var needs_private_texture_tiles: PackedInt32Array = PackedInt32Array()
 
 
 class HoleMaskData:
 	var erase_mask: Image
 	var fracture_source: Image
+	var has_fracture_lines: bool = false
 	var transparent_bounds: Rect2i
 	var cache_id: int
 
@@ -44,9 +54,20 @@ class ImpactStamp:
 	var flip_y: bool
 	var rotation_quarters: int
 	var size_variation: float = 1.0
+	var include_fracture_lines: bool = true
 	## Seeds this hit's per-stratum orientation and size jitter. Kept on the
 	## stamp so a chunk streamed back in redraws the exact same rims.
 	var variation_hash: int = 0
+	## Exact logical inputs shared by prediction and authoritative damage. Only
+	## ordinary primary impacts set it; aftershocks always use the cold path.
+	var preparation_key: String = ""
+
+
+class PreparedLayerPatch:
+	var image: Image
+	var destination_position: Vector2i
+	var source_revision: int
+	var dirty_tile_bits: int
 
 
 class ImpactRasterWork:
@@ -56,6 +77,46 @@ class ImpactRasterWork:
 	var layer_index: int
 	var raster_band_index: int
 	var raster_band_count: int
+	var prepare_only: bool = false
+	var finish_preparation: bool = false
+	var prepared_patch: PreparedLayerPatch
+	var image_preparation
+
+
+class ImpactStampPreparation:
+	var stamp: ImpactStamp
+	var layer_index: int
+	var chunk: TerrainChunkVisual
+	var chunk_index: int = -1
+	var raster_band_index: int = 0
+	var raster_band_count: int = 1
+	var prepares_patch: bool = false
+	var image_preparation
+
+
+class ChunkTexturePublishWork:
+	var chunk: TerrainChunkVisual
+	var chunk_index: int
+	var layer_indices: PackedInt32Array
+
+
+class SculptRunPreparation:
+	var sculpt: CutsceneTerrainSculpt
+	var layer_index: int
+	var mask_cell_size: int = 1
+	var padded_size: Vector2i
+	var solid_bits: PackedByteArray
+	var protected_floor_start: int = 0
+	var protected_floor_end: int = 0
+	var cell_bytes: PackedByteArray
+	var next_cell_row: int = 0
+	var cell_image: Image
+	var room_mask: Image
+	var mask_data: PackedByteArray
+	var mask_runs: Array[PackedInt32Array] = []
+	var next_row: int = 0
+	var phase: int = 0
+	var finished: bool = false
 
 
 const TerrainStampImageCache = preload(
@@ -79,15 +140,51 @@ const FRACTURE_SUPPORT_VALUE_THRESHOLD: float = 0.9
 # configured materials instead of rebuilding both per crossed chunk boundary.
 # The window is three to five chunks tall, so a handful covers every crossing.
 const CHUNK_VISUAL_POOL_LIMIT: int = 4
+# A structural chunk needs at most two distinct base masks and six tiled
+# textures. One spare chunk's storage is retained so adjacent streaming updates
+# existing buffers instead of allocating multi-megabyte images at the boundary.
+const CHUNK_MASK_IMAGE_POOL_LIMIT: int = 4
+const CHUNK_MASK_TEXTURE_POOL_LIMIT: int = 12
+# Four authored samples per cell retain edge_smoothing at one quarter-cell
+# precision while bounding cached room memory independently of shipped density.
+const SCULPT_CACHE_PIXELS_PER_CELL: int = 4
+# A room begins incremental run preparation this many terrain rows before it
+# can enter the streamed window. Traversal also spends at most this bounded
+# slice per crossing, so even a no-frame benchmark reaches the room prepared.
+const SCULPT_RUN_PREFETCH_ROWS: int = 2_200
+const SCULPT_RUN_TRAVERSAL_BUDGET_USEC: int = 400
 # Deferred web raster work is capped and pooled. The 192 slots cover the
 # configured fully-stacked hit (currently under 150 jobs). If mining ever fills
 # them, the oldest single layer completes before another is accepted, so memory
 # cannot grow with hit count and the renderer never drops an opening.
 const MAX_PENDING_IMPACT_WORK_ITEMS: int = 192
-# The shipped six-pixel mask restores the authored silhouette. Sixty-four-row
-# bands keep its fully-stacked queue under 192 items while preserving a bounded
-# work unit; the deferred benchmark protects the existing 7 ms ceiling.
-const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 64
+# A run has far fewer authored structural groups than this. Stale work is
+# skipped if its chunk streams out, and descriptors are recycled after use.
+const MAX_PENDING_CHUNK_TEXTURE_PUBLISH_ITEMS: int = 192
+const MAX_PREDICTED_IMPACT_CANDIDATES: int = 5
+# Every terrain mask is published as three 128-cell GPU tiles. The usual mining
+# x=192 lies inside the middle tile rather than on a seam, and 16 px/cell stays
+# below 4096 while leaving one sampler free on minimum WebGL hardware.
+const MASK_HORIZONTAL_TILE_COUNT: int = 3
+const MASK_TILE_GUTTER_PIXELS: int = 1
+const ALL_MASK_TILES_DIRTY: int = (
+	(1 << MASK_HORIZONTAL_TILE_COUNT) - 1
+)
+# The authored hole sheets are 512x384. Upsampling their packed erase/ink
+# channels once gives the shader finer diagonal coverage without raising every
+# streamed terrain mask or repeating interpolation on each predicted hit.
+const AUTHORED_MASK_SOURCE_SUPERSAMPLE: int = 2
+# Authored fracture spurs are optional detail inside the shader's continuous cut
+# outline. Cap them at a 32-cell radius so a theoretical fully-stacked impact
+# cannot turn sparse line art into a full-stamp blend whose area grows 4x.
+const MAX_FRACTURE_RADIUS_CELLS: float = 32.0
+# High-density transform work is its own queue item. Raster bands remove
+# repeated setup while the deferred benchmark protects the unchanged 7 ms
+# atomic ceiling; their height remains benchmark-protected at every density.
+# Sixteen-pixel profiling leaves enough atomic headroom for 192 rows. The larger
+# band removes repeated clipping/blit setup while the 7 ms benchmark still
+# guards the final band plus its one dirty-tile upload.
+const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 192
 @export_category("References")
 @export var terrain_manager: TerrainManager
 @export var profile: TerrainLayerProfile
@@ -106,8 +203,10 @@ const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 64
 @export_range(1, 1_048_576, 1) var resized_stamp_cache_max_pixels: int = 65_536
 
 @export_category("Chamber Integration")
-## Places overlapping organic openings across each encounter-room ceiling.
-@export_range(0, 32, 1) var chamber_circle_count: int = 8
+## The sub-cell logical taper is the shipped chamber edge. Runtime decorative
+## circles are disabled because each one replays impact rasters while streaming;
+## authored sculpt contours provide variation without softening that sharp rim.
+@export_range(0, 32, 1) var chamber_circle_count: int = 0
 @export_range(1, 16, 1) var chamber_circle_min_radius_cells: int = 5
 @export_range(1, 16, 1) var chamber_circle_max_radius_cells: int = 8
 @export_range(0.0, 8.0, 0.5) var chamber_circle_jitter_cells: float = 3.0
@@ -126,14 +225,28 @@ var _active_chunks: Dictionary[int, TerrainChunkVisual] = {}
 # Nodes, sprites, and materials of chunks the view has left, waiting to be
 # refilled by the next chunk it reaches.
 var _chunk_visual_pool: Array[TerrainChunkVisual] = []
+var _chunk_mask_image_pool: Array[Image] = []
+var _chunk_mask_texture_pool: Array[ImageTexture] = []
 # One solid mask every untouched stratum draws. Sharing it is what makes an
 # ordinary streamed chunk cost no image allocation and no texture upload.
 var _pristine_mask_image: Image
 var _pristine_mask_texture: ImageTexture
 var _pristine_mask_size := Vector2i.ZERO
-# One authored room rasterized at mask resolution, keyed by its sculpt and
-# indexed by stratum plus one, where index zero is the shared logical shape.
+# The three upload images are reused for every stratum. Their one-pixel gutters
+# duplicate the neighboring CPU columns so shader filtering stays continuous at
+# all tile seams; memory is bounded by one tiled copy of a chunk mask.
+var _mask_upload_images: Array[Image] = []
+# One authored room rasterized at at most four samples per cell, keyed by its
+# sculpt and indexed by stratum plus one. The cache is bounded by the authored
+# sculpt count and layer count, not the shipped 16-pixel terrain density.
 var _sculpt_mask_images: Dictionary[CutsceneTerrainSculpt, Array] = {}
+# Matching one-sample logical rooms make streamed chunks pay one clipped blit
+# instead of querying resource bits per cell. The same sculpt/layer bound applies.
+var _sculpt_logical_mask_images: Dictionary[CutsceneTerrainSculpt, Array] = {}
+# Each four-sample row is cached as [start, end, alpha] runs per sculpt/layer.
+# The cache is bounded by authored mask pixels and replaces transient scaled
+# room-strip allocations during traversal.
+var _sculpt_mask_runs: Dictionary[CutsceneTerrainSculpt, Array] = {}
 # Historical stamps are retained so review mode can rebuild old terrain.
 # Growth is bounded by the configured run and accepted hit count; only the
 # viewport-sized _active_chunks set owns Image and ImageTexture allocations.
@@ -148,6 +261,11 @@ var _stamp_image_cache := TerrainStampImageCache.new()
 var _resized_stamp_cache: Dictionary:
 	get:
 		return _stamp_image_cache.entries
+# Two sequential LA8 scratch bands replace per-band Image.get_region
+# allocations. They grow only to one chunk width x the 192-row work ceiling
+# and every consumed rectangle is overwritten before blending.
+var _fracture_band_scratch: Image
+var _solid_band_scratch: Image
 var _current_view_x: float
 var _current_view_y: float
 var _loaded_first_chunk: int = -1
@@ -164,7 +282,28 @@ var _active_impact_combo: int = 0
 var _pending_impact_work: Array[ImpactRasterWork] = []
 var _pending_impact_work_head: int = 0
 var _impact_work_pool: Array[ImpactRasterWork] = []
+var _pending_chunk_texture_publishes: Array[ChunkTexturePublishWork] = []
+var _pending_chunk_texture_publish_head: int = 0
+var _chunk_texture_publish_pool: Array[ChunkTexturePublishWork] = []
+# Authored room run caches advance one source row at a time after scene boot.
+# Growth is bounded by authored sculpt count x visible layer count; completed
+# work moves into the equally bounded immutable _sculpt_mask_runs cache.
+var _pending_sculpt_run_preparations: Array[SculptRunPreparation] = []
+var _pending_sculpt_run_preparation_head: int = 0
+var _chunk_build_needs_sculpt_refinement: bool = false
 var _defer_impact_rasterization: bool = false
+# Five timing targets produce at most five candidates, each with one transform
+# per writable gameplay stratum. A new target batch replaces this bounded queue;
+# completed images live in the cache's equally bounded prepared generation.
+var _pending_stamp_preparation: Array[ImpactStampPreparation] = []
+var _pending_stamp_preparation_head: int = 0
+var _stamp_preparation_pool: Array[ImpactStampPreparation] = []
+var _preparation_candidate_count: int = 0
+# Candidate patches are keyed by exact swing plan, chunk, and layer. Partial
+# patches never enter this dictionary; cancellation drops their bounded working
+# images, while completed patches live only until contact or target replacement.
+var _prepared_layer_patches: Dictionary[String, PreparedLayerPatch] = {}
+var _preparing_layer_patches: Dictionary[String, PreparedLayerPatch] = {}
 
 
 ## Connects terrain events and loads the initial visible strata.
@@ -190,7 +329,6 @@ func _ready() -> void:
 		)
 		_prepare_hole_masks()
 		_prepare_chamber_transition_stamps()
-		_prepare_sculpt_masks()
 		_on_view_position_changed(terrain_manager.get_view_position())
 		return
 	if terrain_manager == null or profile == null:
@@ -198,7 +336,10 @@ func _ready() -> void:
 			"TerrainLayerRenderer requires terrain_manager and profile."
 		)
 		return
-	_defer_impact_rasterization = OS.has_feature("web")
+	# One scheduler now owns impact work on every platform. Native/editor used
+	# to run an immediate legacy path, which hid web-only queue bugs and made
+	# the same sharp mask produce a contact hitch during local playtesting.
+	_defer_impact_rasterization = true
 	var layer_count: int = profile.get_layer_count()
 	if (
 		profile.layer_dirt_detail_scales_px.size() != layer_count
@@ -227,43 +368,87 @@ func _ready() -> void:
 	)
 	_prepare_hole_masks()
 	_prepare_chamber_transition_stamps()
-	_prepare_sculpt_masks()
 	_on_view_position_changed(terrain_manager.get_view_position())
 
 
-## Spreads browser mask rasterization across rendered frames. Gameplay cells
-## change immediately; only the layered artwork catches up, one atomic stratum
-## at a time, under the configured CPU budget.
+## Spreads prediction and browser mask rasterization across rendered frames.
+## Prediction only fills CPU caches; gameplay cells and visible textures remain
+## unchanged until the real impact signal arrives.
 func _process(_delta: float) -> void:
+	var has_preparation := (
+		_pending_stamp_preparation_head
+		< _pending_stamp_preparation.size()
+	)
+	var has_impact_work := (
+		_defer_impact_rasterization
+		and _pending_impact_work_head < _pending_impact_work.size()
+	)
+	var has_chunk_texture_publish := (
+		_pending_chunk_texture_publish_head
+		< _pending_chunk_texture_publishes.size()
+	)
+	var has_sculpt_run_preparation := (
+		_pending_sculpt_run_preparation_head
+		< _pending_sculpt_run_preparations.size()
+	)
 	if (
-		not _defer_impact_rasterization
-		or _pending_impact_work_head >= _pending_impact_work.size()
+		not has_preparation
+		and not has_impact_work
+		and not has_chunk_texture_publish
+		and not has_sculpt_run_preparation
 	):
 		return
 	var frame_started_at: int = Time.get_ticks_usec()
 	var frame_budget_usec: int = roundi(
 		web_impact_frame_budget_ms * 1000.0
 	)
-	while _pending_impact_work_head < _pending_impact_work.size():
+	# Committed terrain always wins the shared budget. Authoritative preparation
+	# work is inserted into this same queue immediately before its raster bands,
+	# so a partial prediction can never delay an older visible hit.
+	while (
+		_defer_impact_rasterization
+		and _pending_impact_work_head < _pending_impact_work.size()
+	):
 		_process_next_pending_impact_work()
 		if (
 			Time.get_ticks_usec() - frame_started_at
 			>= frame_budget_usec
 		):
-			break
+			return
 	_compact_pending_impact_work()
-
-
-## Rasterizes every authored room before the run starts. Reaching one mid-run
-## then costs a clipped copy instead of the build, which is what keeps a room's
-## chunk streaming in at the same cost as the rock around it.
-func _prepare_sculpt_masks() -> void:
-	for placement in terrain_manager.get_sculpt_placements():
-		_get_sculpt_mask_image(placement.sculpt, -1)
-		if not placement.sculpt.has_layer_masks():
-			continue
-		for layer_index in range(profile.get_gameplay_layer_count()):
-			_get_sculpt_mask_image(placement.sculpt, layer_index)
+	# Streamed structure is already in CPU memory and may be below the visible
+	# margin. Publish one bounded copy-on-write group at a time before spending
+	# spare terrain time on predictions.
+	while (
+		_pending_chunk_texture_publish_head
+		< _pending_chunk_texture_publishes.size()
+	):
+		_process_next_chunk_texture_publish()
+		if (
+			Time.get_ticks_usec() - frame_started_at
+			>= frame_budget_usec
+		):
+			return
+	_compact_pending_chunk_texture_publishes()
+	# Only unused terrain time prepares future candidates. If contact arrives
+	# mid-calculation, the authoritative queue above takes ownership next frame.
+	while (
+		_pending_stamp_preparation_head
+		< _pending_stamp_preparation.size()
+	):
+		_prepare_next_pending_stamp_layer()
+		if (
+			Time.get_ticks_usec() - frame_started_at
+			>= frame_budget_usec
+		):
+			break
+	_compact_pending_stamp_preparation()
+	# Authored rooms are far below the starting surface, so their immutable row
+	# caches consume only terrain time left after visible and predictive work.
+	_advance_pending_sculpt_run_preparations(
+		frame_started_at + frame_budget_usec
+	)
+	_refresh_ready_sculpt_chunks()
 
 
 ## Captures the combo used by synchronous damage stamps for one resolved hit.
@@ -271,19 +456,428 @@ func _on_dig_presentation_started(combo: int) -> void:
 	_active_impact_combo = maxi(combo, 0)
 
 
+## Replaces unfinished candidate work. Exact success keeps completed candidate
+## images so contact can promote the matching keys without recomputing them.
+func _on_dig_visuals_preparation_started(
+	keep_completed: bool
+) -> void:
+	for work_index in range(
+		_pending_stamp_preparation_head,
+		_pending_stamp_preparation.size()
+	):
+		var work := _pending_stamp_preparation[work_index]
+		work.stamp = null
+		work.chunk = null
+		work.chunk_index = -1
+		work.raster_band_index = 0
+		work.raster_band_count = 1
+		work.prepares_patch = false
+		work.image_preparation = null
+		if (
+			_stamp_preparation_pool.size()
+			< MAX_PENDING_IMPACT_WORK_ITEMS
+		):
+			_stamp_preparation_pool.append(work)
+	_pending_stamp_preparation.clear()
+	_pending_stamp_preparation_head = 0
+	_preparation_candidate_count = 0
+	_stamp_image_cache.begin_preparation(not keep_completed)
+	_preparing_layer_patches.clear()
+	if not keep_completed:
+		_prepared_layer_patches.clear()
+
+
+## Adds one of at most five fresh primary openings to the current target batch.
+## Existing holes or encounter geometry may shorten authoritative damage; the
+## actual stamp then uses a different key and the queued contact path prepares it.
+func _on_dig_visuals_preparation_requested(
+	start_cell: Vector2i,
+	depth_rows: int,
+	half_width_cells: int,
+	target_cell_x: int,
+	combo: int
+) -> void:
+	if (
+		depth_rows <= 0
+		or _preparation_candidate_count
+			>= MAX_PREDICTED_IMPACT_CANDIDATES
+	):
+		return
+	var config := terrain_manager.config
+	var safe_target_cell_x := clampi(
+		target_cell_x,
+		0,
+		config.terrain_width_cells - 1
+	)
+	var safe_half_width := maxi(half_width_cells, 0)
+	var tunnel_end_row := mini(
+		start_cell.y + depth_rows,
+		config.get_bottom_surface_row()
+	)
+	var row_count := tunnel_end_row - start_cell.y
+	if row_count <= 0:
+		return
+	var row_left := maxi(safe_target_cell_x - safe_half_width, 0)
+	var row_right := mini(
+		safe_target_cell_x + safe_half_width,
+		config.terrain_width_cells - 1
+	)
+	var first_left := mini(row_left, start_cell.x)
+	var first_right := maxi(row_right, start_cell.x)
+	var predicted_cell_count := (
+		first_right - first_left + 1
+		+ maxi(row_count - 1, 0) * (row_right - row_left + 1)
+	)
+	var stamp := _create_ordinary_impact_stamp_from_bounds(
+		Vector2i(first_left, start_cell.y),
+		Vector2i(first_right, tunnel_end_row - 1),
+		predicted_cell_count,
+		signi(safe_target_cell_x - start_cell.x),
+		safe_target_cell_x,
+		maxi(combo, 0)
+	)
+	_preparation_candidate_count += 1
+	for layer_index in range(profile.get_gameplay_layer_count()):
+		if not _can_apply_impact_stamp_layer(stamp, layer_index):
+			continue
+		var work := _obtain_stamp_preparation_work()
+		work.stamp = stamp
+		work.layer_index = layer_index
+		_pending_stamp_preparation.append(work)
+
+
+## Prepares either one exact transform or one band of a composited candidate
+## patch. Only the completed patch is published to the candidate dictionary.
+func _prepare_next_pending_stamp_layer() -> void:
+	if (
+		_pending_stamp_preparation_head
+		>= _pending_stamp_preparation.size()
+	):
+		return
+	var work := _pending_stamp_preparation[
+		_pending_stamp_preparation_head
+	]
+	_pending_stamp_preparation_head += 1
+	var stamp := work.stamp
+	var layer_index := work.layer_index
+	if work.prepares_patch:
+		_prepare_stamp_layer_patch_band(work)
+		return
+	if not _advance_speculative_stamp_images(work):
+		_pending_stamp_preparation_head -= 1
+		return
+	for chunk_index in _get_stamp_chunk_indices(stamp):
+		if not _active_chunks.has(chunk_index):
+			continue
+		var chunk: TerrainChunkVisual = _active_chunks[chunk_index]
+		_queue_stamp_layer_patch_preparation(
+			stamp,
+			layer_index,
+			chunk,
+			chunk_index
+		)
+
+
+func _advance_speculative_stamp_images(
+	work: ImpactStampPreparation
+) -> bool:
+	if work.image_preparation == null:
+		work.image_preparation = _create_stamp_image_preparation(
+			work.stamp,
+			work.layer_index,
+			true
+		)
+	if work.image_preparation == null:
+		return true
+	return _stamp_image_cache.advance_image_preparation(
+		work.image_preparation,
+		MAX_IMPACT_RASTER_BAND_HEIGHT
+	)
+
+
+func _advance_committed_stamp_images(
+	work: ImpactRasterWork
+) -> bool:
+	if work.image_preparation == null:
+		work.image_preparation = _create_stamp_image_preparation(
+			work.stamp,
+			work.layer_index,
+			false
+		)
+	if work.image_preparation == null:
+		return true
+	return _stamp_image_cache.advance_image_preparation(
+		work.image_preparation,
+		MAX_IMPACT_RASTER_BAND_HEIGHT
+	)
+
+
+## Creates one destination-agnostic transform state shared by speculative and
+## authoritative queues. Each caller advances it under the same frame budget.
+func _create_stamp_image_preparation(
+	stamp: ImpactStamp,
+	layer_index: int,
+	is_speculative: bool
+) -> Variant:
+	var mask_data := _get_hole_mask_data(
+		layer_index,
+		stamp.use_big_hole
+	)
+	if mask_data == null:
+		return null
+	var opening_rect := _get_layer_opening_rect(stamp, layer_index)
+	var layer_variation := _get_layer_stamp_variation(
+		stamp,
+		layer_index
+	)
+	var full_stamp_rect := _get_full_stamp_world_rect(
+		opening_rect,
+		mask_data,
+		layer_variation.x == 1,
+		layer_variation.y == 1,
+		layer_variation.z
+	)
+	if not full_stamp_rect.has_area():
+		return null
+	return _stamp_image_cache.start_image_preparation(
+		mask_data.cache_id,
+		mask_data.erase_mask,
+		mask_data.fracture_source,
+		mask_data.has_fracture_lines
+			and stamp.include_fracture_lines,
+		_get_stamp_pixel_size(full_stamp_rect.size),
+		layer_variation.x == 1,
+		layer_variation.y == 1,
+		layer_variation.z,
+		is_speculative,
+		AUTHORED_MASK_SOURCE_SUPERSAMPLE
+	)
+
+
+## Reuses one bounded descriptor for transform and patch preparation.
+func _obtain_stamp_preparation_work() -> ImpactStampPreparation:
+	var work: ImpactStampPreparation = (
+		_stamp_preparation_pool.pop_back()
+		if not _stamp_preparation_pool.is_empty()
+		else ImpactStampPreparation.new()
+	)
+	work.chunk_index = -1
+	work.raster_band_index = 0
+	work.raster_band_count = 1
+	work.prepares_patch = false
+	work.image_preparation = null
+	return work
+
+
+## Queues the exact candidate pixels for one visible chunk/layer. Completed
+## patches at the current terrain revision are retained across the exact swing.
+func _queue_stamp_layer_patch_preparation(
+	stamp: ImpactStamp,
+	layer_index: int,
+	chunk: TerrainChunkVisual,
+	chunk_index: int
+) -> void:
+	var patch_key := _get_prepared_layer_patch_key(
+		stamp,
+		chunk_index,
+		layer_index
+	)
+	var completed_patch: PreparedLayerPatch = (
+		_prepared_layer_patches.get(patch_key)
+	)
+	if (
+		completed_patch != null
+		and completed_patch.source_revision
+			== chunk.layer_revisions[layer_index]
+	):
+		return
+	var affected_rect := _get_stamp_layer_chunk_mask_rect(
+		stamp,
+		layer_index,
+		chunk_index
+	)
+	if not affected_rect.has_area():
+		return
+	var raster_band_count := maxi(
+		ceili(
+			float(affected_rect.size.y)
+			/ float(MAX_IMPACT_RASTER_BAND_HEIGHT)
+		),
+		1
+	)
+	for raster_band_index in range(raster_band_count):
+		var work := _obtain_stamp_preparation_work()
+		work.stamp = stamp
+		work.layer_index = layer_index
+		work.chunk = chunk
+		work.chunk_index = chunk_index
+		work.raster_band_index = raster_band_index
+		work.raster_band_count = raster_band_count
+		work.prepares_patch = true
+		_pending_stamp_preparation.append(work)
+
+
+## Builds one immutable patch from a terrain revision. If contact or streaming
+## changes that revision mid-build, the partial image is discarded.
+func _prepare_stamp_layer_patch_band(
+	work: ImpactStampPreparation
+) -> void:
+	if (
+		_active_chunks.get(work.chunk_index) != work.chunk
+		or work.stamp.preparation_key.is_empty()
+	):
+		return
+	var patch_key := _get_prepared_layer_patch_key(
+		work.stamp,
+		work.chunk_index,
+		work.layer_index
+	)
+	var patch: PreparedLayerPatch = _preparing_layer_patches.get(
+		patch_key
+	)
+	if patch == null:
+		var affected_rect := _get_stamp_layer_chunk_mask_rect(
+			work.stamp,
+			work.layer_index,
+			work.chunk_index
+		)
+		if not affected_rect.has_area():
+			return
+		# Leaving the shared pristine CPU image is itself density-scaled work.
+		# Do it during wind-up without changing any pixels or bound textures;
+		# ownership then remains bounded to this active chunk/layer on a miss.
+		_make_layer_writable(work.chunk, work.layer_index)
+		patch = PreparedLayerPatch.new()
+		patch.image = work.chunk.mask_images[
+			work.layer_index
+		].get_region(affected_rect)
+		patch.destination_position = affected_rect.position
+		patch.source_revision = work.chunk.layer_revisions[
+			work.layer_index
+		]
+		patch.dirty_tile_bits = _get_stamp_dirty_tile_bits(
+			work.stamp,
+			work.layer_index
+		)
+		_preparing_layer_patches[patch_key] = patch
+	if (
+		patch.source_revision
+		!= work.chunk.layer_revisions[work.layer_index]
+	):
+		_preparing_layer_patches.erase(patch_key)
+		return
+	var mask_data := _get_hole_mask_data(
+		work.layer_index,
+		work.stamp.use_big_hole
+	)
+	if mask_data == null:
+		return
+	var opening_rect := _get_layer_opening_rect(
+		work.stamp,
+		work.layer_index
+	)
+	var layer_variation := _get_layer_stamp_variation(
+		work.stamp,
+		work.layer_index
+	)
+	_punch_hole(
+		patch.image,
+		work.chunk_index,
+		opening_rect,
+		mask_data,
+		layer_variation.x == 1,
+		layer_variation.y == 1,
+		layer_variation.z,
+		work.stamp.include_fracture_lines,
+		work.raster_band_index,
+		work.raster_band_count,
+		patch.destination_position
+	)
+	if work.raster_band_index == work.raster_band_count - 1:
+		_preparing_layer_patches.erase(patch_key)
+		_prepared_layer_patches[patch_key] = patch
+
+
+func _get_prepared_layer_patch_key(
+	stamp: ImpactStamp,
+	chunk_index: int,
+	layer_index: int
+) -> String:
+	return "%s|%d|%d" % [
+		stamp.preparation_key,
+		chunk_index,
+		layer_index,
+	]
+
+
+## Returns a candidate only while both its logical plan and source terrain
+## revision still match the authoritative chunk.
+func _get_valid_prepared_layer_patch(
+	stamp: ImpactStamp,
+	chunk: TerrainChunkVisual,
+	chunk_index: int,
+	layer_index: int
+) -> PreparedLayerPatch:
+	if stamp.preparation_key.is_empty():
+		return null
+	var patch: PreparedLayerPatch = _prepared_layer_patches.get(
+		_get_prepared_layer_patch_key(
+			stamp,
+			chunk_index,
+			layer_index
+		)
+	)
+	if (
+		patch == null
+		or patch.source_revision != chunk.layer_revisions[layer_index]
+	):
+		return null
+	return patch
+
+
+## Recycles completed candidate descriptors; transformed images remain in the
+## cache's bounded prepared generation until contact or a target regeneration.
+func _compact_pending_stamp_preparation() -> void:
+	if _pending_stamp_preparation_head <= 0:
+		return
+	for work_index in range(_pending_stamp_preparation_head):
+		var work := _pending_stamp_preparation[work_index]
+		work.stamp = null
+		work.chunk = null
+		work.chunk_index = -1
+		work.raster_band_index = 0
+		work.raster_band_count = 1
+		work.prepares_patch = false
+		work.image_preparation = null
+		if (
+			_stamp_preparation_pool.size()
+			< MAX_PENDING_IMPACT_WORK_ITEMS
+		):
+			_stamp_preparation_pool.append(work)
+	_pending_stamp_preparation = _pending_stamp_preparation.slice(
+		_pending_stamp_preparation_head
+	)
+	_pending_stamp_preparation_head = 0
+
+
 ## Saves and applies one organic opening for newly destroyed terrain.
 func _on_terrain_damaged(
 	destroyed_cells: Array[Vector2i],
 	horizontal_direction: int,
-	impact_origin_cell: Vector2i
+	impact_origin_cell: Vector2i,
+	destroyed_bounds: Rect2i
 ) -> void:
 	if destroyed_cells.is_empty():
 		return
+	# Contact owns the queue now. Completed speculative keys remain available for
+	# promotion, while unfinished candidates cannot run ahead of real terrain.
+	_on_dig_visuals_preparation_started(true)
 	var stamp := _create_impact_stamp(
 		destroyed_cells,
 		horizontal_direction,
 		false,
-		impact_origin_cell.x
+		impact_origin_cell.x,
+		destroyed_bounds
 	)
 	_latest_impact_stamp = stamp
 	_latest_foreground_opening_rect = _get_layer_opening_rect(stamp, 0)
@@ -314,38 +908,120 @@ func _on_terrain_paths_damaged(
 ## Stores related stamps and uploads each visible chunk only once.
 func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 	var affected_chunk_lookup: Dictionary[int, bool] = {}
+	var chunk_indices_by_stamp: Array[Array] = []
 	for stamp in stamps:
-		for chunk_index in _register_impact_stamp(stamp):
+		var stamp_chunk_indices: Array[int] = _register_impact_stamp(
+			stamp
+		)
+		chunk_indices_by_stamp.append(stamp_chunk_indices)
+		for chunk_index in stamp_chunk_indices:
 			affected_chunk_lookup[chunk_index] = true
 	if _defer_impact_rasterization:
 		var layer_count: int = profile.get_gameplay_layer_count()
+		var queued_authoritative_preparation := false
+		var prepared_patches_by_stamp: Array[Dictionary] = []
+		prepared_patches_by_stamp.resize(stamps.size())
+		for stamp_index in range(stamps.size()):
+			prepared_patches_by_stamp[stamp_index] = {}
+		# The authoritative transform is a first-class queue item immediately
+		# before fallback raster bands. Fully prepared layers skip both costs and
+		# promote their immutable terrain patch instead.
+		for stamp_index in range(stamps.size()):
+			var stamp := stamps[stamp_index]
+			if not stamp.narrow_path_points.is_empty():
+				continue
+			var preparation_layers: Array[int] = []
+			var prepared_patches: Dictionary = (
+				prepared_patches_by_stamp[stamp_index]
+			)
+			for layer_index in range(layer_count):
+				if not _can_apply_impact_stamp_layer(stamp, layer_index):
+					continue
+				for chunk_index in chunk_indices_by_stamp[stamp_index]:
+					if not _active_chunks.has(chunk_index):
+						continue
+					var chunk: TerrainChunkVisual = _active_chunks[
+						chunk_index
+					]
+					var prepared_patch := (
+						_get_valid_prepared_layer_patch(
+							stamp,
+							chunk,
+							chunk_index,
+							layer_index
+						)
+					)
+					if prepared_patch == null:
+						preparation_layers.append(layer_index)
+						break
+					prepared_patches[
+						chunk_index * layer_count + layer_index
+					] = prepared_patch
+			for preparation_index in range(preparation_layers.size()):
+				queued_authoritative_preparation = true
+				_append_impact_work(
+					stamp,
+					preparation_layers[preparation_index],
+					null,
+					-1,
+					0,
+					1,
+					true,
+					preparation_index
+						== preparation_layers.size() - 1
+				)
 		for chunk_index in affected_chunk_lookup:
 			if not _active_chunks.has(chunk_index):
 				continue
 			var chunk: TerrainChunkVisual = _active_chunks[chunk_index]
-			for stamp in stamps:
-				if chunk_index not in _get_stamp_chunk_indices(stamp):
+			for stamp_index in range(stamps.size()):
+				var stamp := stamps[stamp_index]
+				if (
+					chunk_index
+					not in chunk_indices_by_stamp[stamp_index]
+				):
 					continue
 				for layer_index in range(layer_count):
+					# Do not allocate queue capacity for strata the production
+					# stamp contract will reject. At high mask density these
+					# no-op bands otherwise create artificial queue backpressure.
+					if not _can_apply_impact_stamp_layer(
+						stamp,
+						layer_index
+					):
+						continue
+					var prepared_patch: PreparedLayerPatch = (
+						prepared_patches_by_stamp[stamp_index].get(
+							chunk_index * layer_count + layer_index
+						)
+					)
+					if prepared_patch != null:
+						_append_impact_work(
+							stamp,
+							layer_index,
+							chunk,
+							chunk_index,
+							0,
+							1,
+							false,
+							false,
+							prepared_patch
+						)
+						continue
 					var raster_band_count := 1
 					if stamp.narrow_path_points.is_empty():
-						var opening_rect := _get_layer_opening_rect(
-							stamp,
-							layer_index
-						)
-						var mask_pixels_per_world_unit := (
-							float(profile.mask_pixels_per_cell)
-							/ float(
-								terrain_manager.config.terrain_cell_world_size
+						var affected_rect := (
+							_get_stamp_layer_chunk_mask_rect(
+								stamp,
+								layer_index,
+								chunk_index
 							)
 						)
-						var opening_mask_height := ceili(
-							opening_rect.size.y
-							* mask_pixels_per_world_unit
-						)
+						if not affected_rect.has_area():
+							continue
 						raster_band_count = maxi(
 							ceili(
-								float(opening_mask_height)
+								float(affected_rect.size.y)
 								/ float(
 									MAX_IMPACT_RASTER_BAND_HEIGHT
 								)
@@ -353,25 +1029,18 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 							1
 						)
 					for raster_band_index in range(raster_band_count):
-						while (
-							_pending_impact_work.size()
-							- _pending_impact_work_head
-							>= MAX_PENDING_IMPACT_WORK_ITEMS
-						):
-							_process_next_pending_impact_work()
-							_compact_pending_impact_work()
-						var work: ImpactRasterWork = (
-							_impact_work_pool.pop_back()
-							if not _impact_work_pool.is_empty()
-							else ImpactRasterWork.new()
+						_append_impact_work(
+							stamp,
+							layer_index,
+							chunk,
+							chunk_index,
+							raster_band_index,
+							raster_band_count
 						)
-						work.chunk = chunk
-						work.chunk_index = chunk_index
-						work.stamp = stamp
-						work.layer_index = layer_index
-						work.raster_band_index = raster_band_index
-						work.raster_band_count = raster_band_count
-						_pending_impact_work.append(work)
+		_prepared_layer_patches.clear()
+		_preparing_layer_patches.clear()
+		if not queued_authoritative_preparation:
+			_stamp_image_cache.discard_prepared()
 		return
 	for chunk_index in affected_chunk_lookup:
 		if not _active_chunks.has(chunk_index):
@@ -388,6 +1057,45 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 			)
 		_upload_chunk_masks(chunk, changed_layers)
 	_clear_temporary_stamp_cache()
+	_stamp_image_cache.discard_prepared()
+
+
+## Appends one bounded authoritative item, applying queue backpressure without
+## dropping either preparation or pixels.
+func _append_impact_work(
+	stamp: ImpactStamp,
+	layer_index: int,
+	chunk: TerrainChunkVisual,
+	chunk_index: int,
+	raster_band_index: int,
+	raster_band_count: int,
+	prepare_only: bool = false,
+	finish_preparation: bool = false,
+	prepared_patch: PreparedLayerPatch = null
+) -> void:
+	while (
+		_pending_impact_work.size()
+		- _pending_impact_work_head
+		>= MAX_PENDING_IMPACT_WORK_ITEMS
+	):
+		_process_next_pending_impact_work()
+		_compact_pending_impact_work()
+	var work: ImpactRasterWork = (
+		_impact_work_pool.pop_back()
+		if not _impact_work_pool.is_empty()
+		else ImpactRasterWork.new()
+	)
+	work.chunk = chunk
+	work.chunk_index = chunk_index
+	work.stamp = stamp
+	work.layer_index = layer_index
+	work.raster_band_index = raster_band_index
+	work.raster_band_count = raster_band_count
+	work.prepare_only = prepare_only
+	work.finish_preparation = finish_preparation
+	work.prepared_patch = prepared_patch
+	work.image_preparation = null
+	_pending_impact_work.append(work)
 
 
 ## Completes one queued stratum and publishes only that texture. Work targeting
@@ -398,7 +1106,45 @@ func _process_next_pending_impact_work() -> void:
 		return
 	var work := _pending_impact_work[_pending_impact_work_head]
 	_pending_impact_work_head += 1
-	if _active_chunks.get(work.chunk_index) == work.chunk:
+	if work.prepared_patch != null:
+		if _active_chunks.get(work.chunk_index) == work.chunk:
+			_make_layer_writable(work.chunk, work.layer_index)
+			if (
+				work.prepared_patch.source_revision
+				== work.chunk.layer_revisions[work.layer_index]
+			):
+				work.chunk.mask_images[
+					work.layer_index
+				].blit_rect(
+					work.prepared_patch.image,
+					Rect2i(
+						Vector2i.ZERO,
+						work.prepared_patch.image.get_size()
+					),
+					work.prepared_patch.destination_position
+				)
+				work.chunk.dirty_mask_tiles[work.layer_index] |= (
+					work.prepared_patch.dirty_tile_bits
+				)
+				work.chunk.layer_revisions[work.layer_index] += 1
+				_publish_layer_texture(work.chunk, work.layer_index)
+			else:
+				# A non-mining terrain mutation invalidated the candidate after
+				# queue construction. This rare path stays authoritative.
+				_apply_impact_stamp_layer(
+					work.chunk,
+					work.chunk_index,
+					work.stamp,
+					work.layer_index
+				)
+				_publish_layer_texture(work.chunk, work.layer_index)
+	elif work.prepare_only:
+		if not _advance_committed_stamp_images(work):
+			_pending_impact_work_head -= 1
+			return
+		if work.finish_preparation:
+			_stamp_image_cache.discard_prepared()
+	elif _active_chunks.get(work.chunk_index) == work.chunk:
 		_apply_impact_stamp_layer(
 			work.chunk,
 			work.chunk_index,
@@ -413,13 +1159,56 @@ func _process_next_pending_impact_work() -> void:
 	work.stamp = null
 	work.raster_band_index = 0
 	work.raster_band_count = 1
+	work.prepare_only = false
+	work.finish_preparation = false
+	work.prepared_patch = null
+	work.image_preparation = null
 	if _impact_work_pool.size() < MAX_PENDING_IMPACT_WORK_ITEMS:
 		_impact_work_pool.append(work)
 
 
 ## Prunes completed queue slots and releases temporary oversized stamp images
-## as soon as every pending stratum has consumed them.
-func _compact_pending_impact_work() -> void:
+## as soon as every pending stratum has consumed them. Streaming may also
+## discard bounded stale work because chunk reload replays registered stamps.
+func _compact_pending_impact_work(
+	prune_streamed_out_work: bool = false
+) -> void:
+	if prune_streamed_out_work:
+		var write_index: int = 0
+		for read_index in range(
+			_pending_impact_work_head,
+			_pending_impact_work.size()
+		):
+			var work := _pending_impact_work[read_index]
+			var remains_visible := false
+			if work.prepare_only and work.stamp != null:
+				for chunk_index in _get_stamp_chunk_indices(work.stamp):
+					if _active_chunks.has(chunk_index):
+						remains_visible = true
+						break
+			else:
+				remains_visible = (
+					_active_chunks.get(work.chunk_index) == work.chunk
+				)
+			if remains_visible:
+				_pending_impact_work[write_index] = work
+				write_index += 1
+				continue
+			work.chunk = null
+			work.stamp = null
+			work.raster_band_index = 0
+			work.raster_band_count = 1
+			work.prepare_only = false
+			work.finish_preparation = false
+			work.prepared_patch = null
+			work.image_preparation = null
+			if _impact_work_pool.size() < MAX_PENDING_IMPACT_WORK_ITEMS:
+				_impact_work_pool.append(work)
+		_pending_impact_work.resize(write_index)
+		_pending_impact_work_head = 0
+		if _pending_impact_work.is_empty():
+			_clear_temporary_stamp_cache()
+		return
 	if _pending_impact_work_head <= 0:
 		return
 	if _pending_impact_work_head >= _pending_impact_work.size():
@@ -449,17 +1238,42 @@ func rebuild_all_chunks() -> void:
 		pending_work.stamp = null
 		pending_work.raster_band_index = 0
 		pending_work.raster_band_count = 1
+		pending_work.prepared_patch = null
+		pending_work.image_preparation = null
 		if _impact_work_pool.size() < MAX_PENDING_IMPACT_WORK_ITEMS:
 			_impact_work_pool.append(pending_work)
 	_pending_impact_work.clear()
 	_pending_impact_work_head = 0
 	_clear_temporary_stamp_cache()
+	_on_dig_visuals_preparation_started(false)
+	# A rebuild invalidates the chunk identity captured by every unpublished
+	# structural upload. Recycle those descriptors now instead of retaining
+	# stale multi-megabyte chunk masks until later frames happen to skip them.
+	for work_index in range(
+		_pending_chunk_texture_publish_head,
+		_pending_chunk_texture_publishes.size()
+	):
+		var publish_work := _pending_chunk_texture_publishes[work_index]
+		publish_work.chunk = null
+		publish_work.chunk_index = -1
+		publish_work.layer_indices = PackedInt32Array()
+		if (
+			_chunk_texture_publish_pool.size()
+			< MAX_PENDING_CHUNK_TEXTURE_PUBLISH_ITEMS
+		):
+			_chunk_texture_publish_pool.append(publish_work)
+	_pending_chunk_texture_publishes.clear()
+	_pending_chunk_texture_publish_head = 0
 	for chunk_index in _active_chunks.keys():
 		_unload_chunk(chunk_index)
 	# A rebuild is how an authored edit reaches the screen, so nothing built from
 	# the previous profile or room may survive it.
 	_clear_chunk_visual_pool()
 	_sculpt_mask_images.clear()
+	_sculpt_logical_mask_images.clear()
+	_sculpt_mask_runs.clear()
+	_pending_sculpt_run_preparations.clear()
+	_pending_sculpt_run_preparation_head = 0
 	_latest_impact_stamp = null
 	_latest_foreground_opening_rect = Rect2()
 	_loaded_first_chunk = -1
@@ -474,10 +1288,152 @@ func rebuild_all_chunks() -> void:
 func _on_view_position_changed(view_cell_position: Vector2) -> void:
 	_current_view_x = view_cell_position.x
 	_current_view_y = view_cell_position.y
+	_queue_nearby_sculpt_run_preparations(view_cell_position.y)
+	_advance_sculpt_run_preparations_for_traversal()
 	_refresh_active_chunks()
 	_position_active_chunks()
 	if _show_logical_overlay:
 		queue_redraw()
+
+
+## Starts only rooms close enough to enter the stream soon. Both directions are
+## covered because review mode may scroll upward through already mined terrain.
+func _queue_nearby_sculpt_run_preparations(view_y: float) -> void:
+	var view_row := roundi(view_y)
+	var nearby_placements: Array = []
+	var nearby_distances: Array[int] = []
+	for placement in terrain_manager.get_sculpt_placements():
+		var room_rect: Rect2i = placement.world_rect
+		var distance := (
+			room_rect.position.y - view_row
+			if view_row < room_rect.position.y
+			else (
+				view_row - room_rect.end.y
+				if view_row > room_rect.end.y
+				else 0
+			)
+		)
+		if distance > SCULPT_RUN_PREFETCH_ROWS:
+			continue
+		var insert_index := 0
+		while (
+			insert_index < nearby_distances.size()
+			and nearby_distances[insert_index] <= distance
+		):
+			insert_index += 1
+		nearby_distances.insert(insert_index, distance)
+		nearby_placements.insert(insert_index, placement)
+		if nearby_placements.size() > 2:
+			nearby_placements.pop_back()
+			nearby_distances.pop_back()
+	for placement in nearby_placements:
+		_queue_sculpt_run_preparation(placement.sculpt, -1)
+		if not placement.sculpt.has_layer_masks():
+			continue
+		for layer_index in range(profile.get_gameplay_layer_count()):
+			_queue_sculpt_run_preparation(
+				placement.sculpt,
+				layer_index
+			)
+
+
+## No-frame traversal tests and very fast review scrolling still contribute a
+## bounded preparation slice instead of forcing an entire room at its boundary.
+func _advance_sculpt_run_preparations_for_traversal() -> void:
+	_advance_pending_sculpt_run_preparations(
+		Time.get_ticks_usec() + SCULPT_RUN_TRAVERSAL_BUDGET_USEC,
+		true
+	)
+
+
+## Advances immutable room rows until the caller's absolute deadline.
+func _advance_pending_sculpt_run_preparations(
+	deadline_usec: int,
+	logical_only: bool = false
+) -> void:
+	while (
+		_pending_sculpt_run_preparation_head
+		< _pending_sculpt_run_preparations.size()
+	):
+		var head_preparation := _pending_sculpt_run_preparations[
+			_pending_sculpt_run_preparation_head
+		]
+		# Whole-cell logical masks unblock structural streaming. Finish every
+		# nearby logical phase before spending spare work on smoothed row runs.
+		if head_preparation.phase > 0:
+			for work_index in range(
+				_pending_sculpt_run_preparation_head + 1,
+				_pending_sculpt_run_preparations.size()
+			):
+				if _pending_sculpt_run_preparations[work_index].phase == 0:
+					_pending_sculpt_run_preparations[
+						_pending_sculpt_run_preparation_head
+					] = _pending_sculpt_run_preparations[work_index]
+					_pending_sculpt_run_preparations[work_index] = (
+						head_preparation
+					)
+					break
+		var preparation := _pending_sculpt_run_preparations[
+			_pending_sculpt_run_preparation_head
+		]
+		if logical_only and preparation.phase > 0:
+			break
+		if _advance_sculpt_run_preparation(preparation):
+			_pending_sculpt_run_preparation_head += 1
+		if Time.get_ticks_usec() >= deadline_usec:
+			break
+	if (
+		_pending_sculpt_run_preparation_head
+		>= _pending_sculpt_run_preparations.size()
+	):
+		_pending_sculpt_run_preparations.clear()
+		_pending_sculpt_run_preparation_head = 0
+
+
+## Rebuilds only active chunks whose complete smoothed room cache replaced the
+## temporary binary rim. Logical terrain never changes during this refinement.
+func _refresh_ready_sculpt_chunks() -> void:
+	var ready_chunk_indices: Array[int] = []
+	for chunk_index in _active_chunks:
+		var chunk: TerrainChunkVisual = _active_chunks[chunk_index]
+		if (
+			chunk.pending_sculpt_refinement
+			and _are_sculpt_runs_ready_for_chunk(chunk_index)
+		):
+			ready_chunk_indices.append(chunk_index)
+	for chunk_index in ready_chunk_indices:
+		_unload_chunk(chunk_index)
+		_load_chunk(chunk_index)
+
+
+## Reports whether every authored mask touching a chunk has immutable row runs.
+func _are_sculpt_runs_ready_for_chunk(chunk_index: int) -> bool:
+	var config: MiningConfig = terrain_manager.config
+	var chunk_start_row := chunk_index * config.chunk_height_cells
+	var chunk_end_row := chunk_start_row + config.chunk_height_cells
+	for placement in terrain_manager.get_sculpt_placements():
+		var room_rect: Rect2i = placement.world_rect
+		if (
+			room_rect.position.y >= chunk_end_row
+			or room_rect.end.y <= chunk_start_row
+		):
+			continue
+		var layer_runs: Array = _sculpt_mask_runs.get(
+			placement.sculpt,
+			[]
+		)
+		if layer_runs.is_empty() or layer_runs[0] == null:
+			return false
+		if not placement.sculpt.has_layer_masks():
+			continue
+		for layer_index in range(profile.get_gameplay_layer_count()):
+			var cache_index := layer_index + 1
+			if (
+				layer_runs.size() <= cache_index
+				or layer_runs[cache_index] == null
+			):
+				return false
+	return true
 
 
 ## Recalculates streamed coverage when the browser canvas changes size.
@@ -540,6 +1496,7 @@ func _refresh_active_chunks() -> void:
 
 	_loaded_first_chunk = first_chunk
 	_loaded_last_chunk = last_chunk
+	_compact_pending_impact_work(true)
 
 
 ## Fills one terrain chunk's strata, reusing a retired chunk's nodes when the
@@ -578,6 +1535,7 @@ func _load_chunk(chunk_index: int) -> void:
 			chunk.mask_images[0],
 			chunk_index
 		)
+		chunk.dirty_mask_tiles[0] = ALL_MASK_TILES_DIRTY
 
 	var chamber_stamps: Array = _chamber_stamps_by_chunk.get(
 		chunk_index,
@@ -592,7 +1550,13 @@ func _load_chunk(chunk_index: int) -> void:
 	for saved_stamp: ImpactStamp in saved_stamps:
 		_apply_impact_stamp(chunk, chunk_index, saved_stamp)
 	_clear_temporary_stamp_cache()
-	_publish_chunk_textures(chunk)
+	# The first window must be complete before it is shown. Later structural
+	# chunks enter below the viewport margin and publish through the frame
+	# scheduler so a sharp multi-layer room cannot monopolize one traversal.
+	if _loaded_first_chunk < 0:
+		_publish_chunk_textures(chunk)
+	else:
+		_queue_chunk_textures(chunk, chunk_index)
 
 
 ## Reuses a retired chunk's nodes, or builds the strata this chunk needs once.
@@ -640,12 +1604,23 @@ func _create_chunk_visual(layer_count: int) -> TerrainChunkVisual:
 	chunk.root = Node2D.new()
 	add_child(chunk.root)
 	var chunk_world_size := _get_chunk_world_size()
+	chunk.dirty_mask_tiles.resize(layer_count)
+	chunk.dirty_mask_tiles.fill(ALL_MASK_TILES_DIRTY)
+	chunk.needs_private_texture_tiles.resize(layer_count)
+	chunk.needs_private_texture_tiles.fill(0)
+	chunk.layer_revisions.resize(layer_count)
+	chunk.layer_revisions.fill(0)
 	for layer_index in range(layer_count):
 		var sprite := Sprite2D.new()
 		sprite.name = "TerrainLayer_%d" % layer_index
 		sprite.centered = false
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		sprite.scale = Vector2.ONE * (
+		# One sprite spans the full chunk while its two mask samplers each own
+		# half the pixels. Doubling only X preserves the exact world dimensions.
+		sprite.scale = Vector2(
+			float(MASK_HORIZONTAL_TILE_COUNT),
+			1.0
+		) * (
 			float(terrain_manager.config.terrain_cell_world_size)
 			/ float(profile.mask_pixels_per_cell)
 		)
@@ -658,7 +1633,9 @@ func _create_chunk_visual(layer_count: int) -> TerrainChunkVisual:
 		chunk.root.add_child(sprite)
 		chunk.layer_sprites.append(sprite)
 		chunk.mask_images.append(null)
-		chunk.mask_textures.append(null)
+		var texture_tiles: Array[ImageTexture] = []
+		texture_tiles.resize(MASK_HORIZONTAL_TILE_COUNT)
+		chunk.mask_texture_tiles.append(texture_tiles)
 	return chunk
 
 
@@ -703,12 +1680,24 @@ func _share_intact_masks(
 	var intact_image := _get_pristine_mask_image()
 	for layer_index in range(layer_count):
 		chunk.mask_images[layer_index] = intact_image
-		chunk.mask_textures[layer_index] = _pristine_mask_texture
-		chunk.layer_sprites[layer_index].texture = _pristine_mask_texture
+		var texture_tiles: Array[ImageTexture] = []
+		texture_tiles.resize(MASK_HORIZONTAL_TILE_COUNT)
+		texture_tiles.fill(_pristine_mask_texture)
+		chunk.mask_texture_tiles[layer_index] = texture_tiles
+		_set_sprite_mask_textures(
+			chunk.layer_sprites[layer_index],
+			texture_tiles
+		)
+		chunk.dirty_mask_tiles[layer_index] = 0
+		chunk.layer_revisions[layer_index] = 0
 	chunk.shared_layers = (1 << layer_count) - 1
+	chunk.needs_private_texture_tiles.fill(0)
+	chunk.pending_sculpt_refinement = false
 
 
 ## Builds this chunk's own strata for chambers, rooms, and the run's edges.
+## Identical starting strata share one CPU mask and GPU tile set copy-on-write;
+## this keeps sharp structural rooms from multiplying streaming work per layer.
 func _build_chunk_masks(
 	chunk: TerrainChunkVisual,
 	chunk_index: int,
@@ -716,15 +1705,27 @@ func _build_chunk_masks(
 	chunk_contains_chamber: bool,
 	chunk_contains_sculpt: bool
 ) -> void:
+	_chunk_build_needs_sculpt_refinement = false
 	var chunk_has_per_layer_sculpt := (
 		chunk_contains_sculpt and _chunk_has_per_layer_sculpt(chunk_index)
 	)
-	var base_mask := _build_chunk_base_mask(
-		chunk_index,
-		false,
-		chunk_contains_chamber,
-		chunk_contains_sculpt
-	)
+	var base_mask: Image
+	# Per-layer rooms replace every foreground source. A chamber backdrop has
+	# its own source below, so building the logical full-resolution mask here
+	# would allocate and fill an image no stratum ever consumes.
+	if (
+		not chunk_has_per_layer_sculpt
+		or (
+			profile.keep_back_layer_solid
+			and not chunk_contains_chamber
+		)
+	):
+		base_mask = _build_chunk_base_mask(
+			chunk_index,
+			false,
+			chunk_contains_chamber,
+			chunk_contains_sculpt
+		)
 	var back_layer_mask: Image
 	if profile.keep_back_layer_solid:
 		back_layer_mask = (
@@ -747,24 +1748,12 @@ func _build_chunk_masks(
 			profile.keep_back_layer_solid
 			and layer_index >= first_backdrop_source_layer
 		)
-		# Only the deepest stratum is immutable and may use the shared-mask/
-		# one-pixel-fracture allocation optimization.
-		var uses_final_backing_optimization := (
-			profile.keep_back_layer_solid
-			and layer_index == layer_count - 1
-		)
 		var source_mask := (
 			back_layer_mask
 			if uses_backdrop_source
 			else base_mask
 		)
-		# The final reserved stratum is never stamped or used for support, so
-		# it can own the already-built backdrop instead of copying it again.
-		var layer_mask := (
-			source_mask
-			if uses_final_backing_optimization
-			else source_mask.duplicate()
-		)
+		var layer_mask := source_mask
 		# A room whose strata were sculpted apart needs its own rock per
 		# stratum. Only then is the extra build paid for, and only for the
 		# gameplay strata: the reserved back wall stays the shared backdrop.
@@ -777,6 +1766,24 @@ func _build_chunk_masks(
 				layer_index
 			)
 		chunk.mask_images[layer_index] = layer_mask
+		chunk.dirty_mask_tiles[layer_index] = ALL_MASK_TILES_DIRTY
+	# Mark every image used by more than one stratum as copy-on-write. A later
+	# impact detaches only the layer it changes.
+	for layer_index in range(layer_count):
+		for previous_layer_index in range(layer_index):
+			if (
+				chunk.mask_images[layer_index]
+				== chunk.mask_images[previous_layer_index]
+			):
+				chunk.shared_layers |= (
+					(1 << layer_index)
+					| (1 << previous_layer_index)
+				)
+				break
+	chunk.needs_private_texture_tiles.fill(0)
+	chunk.pending_sculpt_refinement = (
+		_chunk_build_needs_sculpt_refinement
+	)
 
 
 ## Gives one stratum an image of its own before a stamp writes into it.
@@ -790,12 +1797,136 @@ func _make_layer_writable(
 		chunk.mask_images[layer_index].duplicate()
 	)
 	chunk.shared_layers &= ~(1 << layer_index)
+	chunk.needs_private_texture_tiles[layer_index] = (
+		ALL_MASK_TILES_DIRTY
+	)
 
 
-## Publishes every stratum's mask, creating a texture only where one is owned.
+## Publishes every distinct stratum mask once. Copy-on-write siblings bind the
+## same immutable tiles until one receives an impact.
 func _publish_chunk_textures(chunk: TerrainChunkVisual) -> void:
+	var shared_tiles_by_image_id: Dictionary[int, Array] = {}
 	for layer_index in range(chunk.mask_images.size()):
+		var mask_image: Image = chunk.mask_images[layer_index]
+		var image_id := mask_image.get_instance_id()
+		if (
+			chunk.shared_layers & (1 << layer_index) != 0
+			and shared_tiles_by_image_id.has(image_id)
+		):
+			var shared_tiles: Array = (
+				shared_tiles_by_image_id[image_id] as Array
+			)
+			chunk.mask_texture_tiles[layer_index] = (
+				shared_tiles.duplicate()
+			)
+			_set_sprite_mask_textures(
+				chunk.layer_sprites[layer_index],
+				chunk.mask_texture_tiles[layer_index]
+			)
+			chunk.dirty_mask_tiles[layer_index] = 0
+			continue
 		_publish_layer_texture(chunk, layer_index)
+		if chunk.shared_layers & (1 << layer_index) != 0:
+			shared_tiles_by_image_id[image_id] = (
+				chunk.mask_texture_tiles[layer_index]
+			)
+
+
+## Queues one upload per distinct copy-on-write mask in a streamed chunk.
+func _queue_chunk_textures(
+	chunk: TerrainChunkVisual,
+	chunk_index: int
+) -> void:
+	var layers_by_image_id: Dictionary[int, PackedInt32Array] = {}
+	for layer_index in range(chunk.mask_images.size()):
+		if chunk.dirty_mask_tiles[layer_index] == 0:
+			continue
+		var image_id := chunk.mask_images[layer_index].get_instance_id()
+		if chunk.shared_layers & (1 << layer_index) == 0:
+			image_id = -1 - layer_index
+		var layer_indices: PackedInt32Array = layers_by_image_id.get(
+			image_id,
+			PackedInt32Array()
+		)
+		layer_indices.append(layer_index)
+		layers_by_image_id[image_id] = layer_indices
+	for layer_indices in layers_by_image_id.values():
+		while (
+			_pending_chunk_texture_publishes.size()
+			- _pending_chunk_texture_publish_head
+			>= MAX_PENDING_CHUNK_TEXTURE_PUBLISH_ITEMS
+		):
+			_process_next_chunk_texture_publish()
+			_compact_pending_chunk_texture_publishes()
+		var work: ChunkTexturePublishWork = (
+			_chunk_texture_publish_pool.pop_back()
+			if not _chunk_texture_publish_pool.is_empty()
+			else ChunkTexturePublishWork.new()
+		)
+		work.chunk = chunk
+		work.chunk_index = chunk_index
+		work.layer_indices = layer_indices
+		_pending_chunk_texture_publishes.append(work)
+
+
+## Publishes one distinct mask and binds its immutable tiles to every sibling.
+func _process_next_chunk_texture_publish() -> void:
+	if (
+		_pending_chunk_texture_publish_head
+		>= _pending_chunk_texture_publishes.size()
+	):
+		return
+	var work := _pending_chunk_texture_publishes[
+		_pending_chunk_texture_publish_head
+	]
+	_pending_chunk_texture_publish_head += 1
+	if (
+		_active_chunks.get(work.chunk_index) == work.chunk
+		and not work.layer_indices.is_empty()
+	):
+		var source_layer_index := work.layer_indices[0]
+		_publish_layer_texture(work.chunk, source_layer_index)
+		var source_tiles: Array = work.chunk.mask_texture_tiles[
+			source_layer_index
+		]
+		for index in range(1, work.layer_indices.size()):
+			var layer_index := work.layer_indices[index]
+			work.chunk.mask_texture_tiles[layer_index] = (
+				source_tiles.duplicate()
+			)
+			_set_sprite_mask_textures(
+				work.chunk.layer_sprites[layer_index],
+				work.chunk.mask_texture_tiles[layer_index]
+			)
+			work.chunk.dirty_mask_tiles[layer_index] = 0
+	work.chunk = null
+	work.chunk_index = -1
+	work.layer_indices = PackedInt32Array()
+	if (
+		_chunk_texture_publish_pool.size()
+		< MAX_PENDING_CHUNK_TEXTURE_PUBLISH_ITEMS
+	):
+		_chunk_texture_publish_pool.append(work)
+
+
+func _compact_pending_chunk_texture_publishes() -> void:
+	if _pending_chunk_texture_publish_head <= 0:
+		return
+	if (
+		_pending_chunk_texture_publish_head
+		>= _pending_chunk_texture_publishes.size()
+	):
+		_pending_chunk_texture_publishes.clear()
+		_pending_chunk_texture_publish_head = 0
+		return
+	if _pending_chunk_texture_publish_head < 32:
+		return
+	_pending_chunk_texture_publishes = (
+		_pending_chunk_texture_publishes.slice(
+			_pending_chunk_texture_publish_head
+		)
+	)
+	_pending_chunk_texture_publish_head = 0
 
 
 ## Uploads one stratum, reusing its texture unless the mask it draws changed
@@ -809,24 +1940,147 @@ func _publish_layer_texture(
 	if mask_image == null:
 		return
 	var sprite := chunk.layer_sprites[layer_index]
-	if chunk.shared_layers & (1 << layer_index) != 0:
-		if sprite.texture != _pristine_mask_texture:
-			chunk.mask_textures[layer_index] = _pristine_mask_texture
-			sprite.texture = _pristine_mask_texture
-		return
-	var mask_texture: ImageTexture = chunk.mask_textures[layer_index]
 	if (
-		mask_texture == null
-		or mask_texture == _pristine_mask_texture
-		or Vector2i(mask_texture.get_size()) != mask_image.get_size()
+		chunk.shared_layers & (1 << layer_index) != 0
+		and chunk.dirty_mask_tiles[layer_index] == 0
 	):
-		mask_texture = ImageTexture.create_from_image(mask_image)
-		chunk.mask_textures[layer_index] = mask_texture
-		sprite.texture = mask_texture
 		return
-	mask_texture.update(mask_image)
-	if sprite.texture != mask_texture:
-		sprite.texture = mask_texture
+	var dirty_tiles: int = chunk.dirty_mask_tiles[layer_index]
+	if dirty_tiles == 0:
+		return
+	var texture_tiles: Array = chunk.mask_texture_tiles[layer_index]
+	var private_tile_bits := (
+		chunk.needs_private_texture_tiles[layer_index]
+	)
+	if dirty_tiles & private_tile_bits != 0:
+		texture_tiles = texture_tiles.duplicate()
+	for tile_index in range(MASK_HORIZONTAL_TILE_COUNT):
+		var tile_bit := 1 << tile_index
+		if dirty_tiles & tile_bit == 0:
+			continue
+		var requires_private_tile := private_tile_bits & tile_bit != 0
+		_prepare_mask_upload_tile(mask_image, tile_index)
+		var upload_image := _mask_upload_images[tile_index]
+		var mask_texture: ImageTexture = texture_tiles[tile_index]
+		if (
+			mask_texture == null
+			or mask_texture == _pristine_mask_texture
+			or requires_private_tile
+			or Vector2i(mask_texture.get_size())
+				!= upload_image.get_size()
+		):
+			var reusable_texture: ImageTexture
+			for pool_index in range(
+				_chunk_mask_texture_pool.size() - 1,
+				-1,
+				-1
+			):
+				var candidate := _chunk_mask_texture_pool[pool_index]
+				if Vector2i(candidate.get_size()) == upload_image.get_size():
+					reusable_texture = candidate
+					_chunk_mask_texture_pool.remove_at(pool_index)
+					break
+			if reusable_texture == null:
+				reusable_texture = ImageTexture.create_from_image(
+					upload_image
+				)
+			else:
+				reusable_texture.update(upload_image)
+			texture_tiles[tile_index] = reusable_texture
+		else:
+			mask_texture.update(upload_image)
+		chunk.needs_private_texture_tiles[layer_index] &= ~tile_bit
+	chunk.mask_texture_tiles[layer_index] = texture_tiles
+	_set_sprite_mask_textures(sprite, texture_tiles)
+	chunk.dirty_mask_tiles[layer_index] = 0
+
+
+## Binds one layer's fixed tile set to its single full-width sprite.
+func _set_sprite_mask_textures(
+	sprite: Sprite2D,
+	texture_tiles: Array
+) -> void:
+	sprite.texture = texture_tiles[0]
+	sprite.scale.x = (
+		_get_chunk_world_size().x
+		/ float((texture_tiles[0] as Texture2D).get_width())
+	)
+	var material := sprite.material as ShaderMaterial
+	for tile_index in range(MASK_HORIZONTAL_TILE_COUNT):
+		material.set_shader_parameter(
+			"mask_tile_%d" % tile_index,
+			texture_tiles[tile_index]
+		)
+
+
+## Copies one dirty CPU column into its reusable GPU upload image. Its gutters
+## carry neighboring authoritative columns, so updating one tile preserves
+## bilinear continuity without copying or uploading the other two.
+func _prepare_mask_upload_tile(
+	mask_image: Image,
+	tile_index: int
+) -> void:
+	assert(
+		mask_image.get_width() % MASK_HORIZONTAL_TILE_COUNT == 0,
+		"Terrain mask width must divide evenly across its GPU tiles."
+	)
+	var tile_content_width := (
+		mask_image.get_width() / MASK_HORIZONTAL_TILE_COUNT
+	)
+	var tile_size := Vector2i(
+		tile_content_width + MASK_TILE_GUTTER_PIXELS * 2,
+		mask_image.get_height()
+	)
+	if (
+		_mask_upload_images.size() != MASK_HORIZONTAL_TILE_COUNT
+		or _mask_upload_images[0] == null
+		or _mask_upload_images[0].get_size() != tile_size
+	):
+		_mask_upload_images.clear()
+		for _upload_index in range(MASK_HORIZONTAL_TILE_COUNT):
+			_mask_upload_images.append(
+				Image.create(
+					tile_size.x,
+					tile_size.y,
+					false,
+					Image.FORMAT_LA8
+				)
+			)
+	var tile_start_x := tile_index * tile_content_width
+	var upload_image := _mask_upload_images[tile_index]
+	upload_image.blit_rect(
+		mask_image,
+		Rect2i(
+			tile_start_x,
+			0,
+			tile_content_width,
+			tile_size.y
+		),
+		Vector2i(MASK_TILE_GUTTER_PIXELS, 0)
+	)
+	upload_image.blit_rect(
+		mask_image,
+		Rect2i(
+			maxi(tile_start_x - 1, 0),
+			0,
+			1,
+			tile_size.y
+		),
+		Vector2i.ZERO
+	)
+	upload_image.blit_rect(
+		mask_image,
+		Rect2i(
+			mini(
+				tile_start_x + tile_content_width,
+				mask_image.get_width() - 1
+			),
+			0,
+			1,
+			tile_size.y
+		),
+		Vector2i(tile_size.x - 1, 0)
+	)
 
 
 ## Returns the one solid mask every intact stratum draws.
@@ -842,8 +2096,9 @@ func _get_pristine_mask_image() -> Image:
 		Image.FORMAT_LA8
 	)
 	_pristine_mask_image.fill(SOLID_MASK_COLOR)
+	_prepare_mask_upload_tile(_pristine_mask_image, 0)
 	_pristine_mask_texture = ImageTexture.create_from_image(
-		_pristine_mask_image
+		_mask_upload_images[0]
 	)
 	return _pristine_mask_image
 
@@ -911,12 +2166,55 @@ func _unload_chunk(chunk_index: int) -> void:
 
 ## Drops a retired chunk's owned masks back onto the shared intact mask.
 func _release_chunk_masks(chunk: TerrainChunkVisual) -> void:
+	var released_image_ids: Dictionary[int, bool] = {}
+	var released_texture_ids: Dictionary[int, bool] = {}
+	for layer_index in range(chunk.mask_images.size()):
+		var released_image: Image = chunk.mask_images[layer_index]
+		if (
+			released_image != null
+			and released_image != _pristine_mask_image
+			and not released_image_ids.has(
+				released_image.get_instance_id()
+			)
+			and (
+				_chunk_mask_image_pool.size()
+				< CHUNK_MASK_IMAGE_POOL_LIMIT
+			)
+		):
+			released_image_ids[released_image.get_instance_id()] = true
+			_chunk_mask_image_pool.append(released_image)
+		for released_texture in chunk.mask_texture_tiles[layer_index]:
+			if (
+				released_texture != null
+				and released_texture != _pristine_mask_texture
+				and not released_texture_ids.has(
+					released_texture.get_instance_id()
+				)
+				and (
+					_chunk_mask_texture_pool.size()
+					< CHUNK_MASK_TEXTURE_POOL_LIMIT
+				)
+			):
+				released_texture_ids[
+					released_texture.get_instance_id()
+				] = true
+				_chunk_mask_texture_pool.append(released_texture)
 	var intact_image := _get_pristine_mask_image()
 	for layer_index in range(chunk.mask_images.size()):
 		chunk.mask_images[layer_index] = intact_image
-		chunk.mask_textures[layer_index] = _pristine_mask_texture
-		chunk.layer_sprites[layer_index].texture = _pristine_mask_texture
+		var texture_tiles: Array[ImageTexture] = []
+		texture_tiles.resize(MASK_HORIZONTAL_TILE_COUNT)
+		texture_tiles.fill(_pristine_mask_texture)
+		chunk.mask_texture_tiles[layer_index] = texture_tiles
+		_set_sprite_mask_textures(
+			chunk.layer_sprites[layer_index],
+			texture_tiles
+		)
+		chunk.dirty_mask_tiles[layer_index] = 0
+		chunk.layer_revisions[layer_index] = 0
 	chunk.shared_layers = (1 << chunk.mask_images.size()) - 1
+	chunk.needs_private_texture_tiles.fill(0)
+	chunk.pending_sculpt_refinement = false
 
 
 ## Frees every retired chunk, so a profile or room edit cannot hand stale
@@ -926,6 +2224,8 @@ func _clear_chunk_visual_pool() -> void:
 		if is_instance_valid(chunk.root):
 			chunk.root.free()
 	_chunk_visual_pool.clear()
+	_chunk_mask_image_pool.clear()
+	_chunk_mask_texture_pool.clear()
 
 
 ## Builds one layer's undamaged terrain before applying organic openings.
@@ -937,18 +2237,35 @@ func _build_chunk_base_mask(
 	sculpt_layer_index: int = -1
 ) -> Image:
 	var config := terrain_manager.config
-	var mask_cell_size := profile.mask_pixels_per_cell
-	var mask_size := _get_chunk_mask_size()
-	var image := Image.create(
-		mask_size.x,
-		mask_size.y,
-		false,
-		Image.FORMAT_LA8
+	# Sculpt chunks first build one logical sample per cell. Their binary bulk
+	# expands by runs; a bounded four-sample room strip restores edge_smoothing
+	# afterward without resizing the untouched width of the world.
+	var mask_cell_size := (
+		1 if chunk_contains_sculpt else profile.mask_pixels_per_cell
 	)
+	var mask_size := _get_chunk_mask_size()
 	var chunk_start_row := chunk_index * config.chunk_height_cells
 	var chunk_end_row := (
 		chunk_start_row + config.chunk_height_cells - 1
 	)
+	var raster_size := Vector2i(
+		config.terrain_width_cells * mask_cell_size,
+		config.chunk_height_cells * mask_cell_size
+	)
+	var image: Image
+	if raster_size == mask_size:
+		while not _chunk_mask_image_pool.is_empty():
+			var candidate: Image = _chunk_mask_image_pool.pop_back()
+			if candidate.get_size() == mask_size:
+				image = candidate
+				break
+	if image == null:
+		image = Image.create(
+			raster_size.x,
+			raster_size.y,
+			false,
+			Image.FORMAT_LA8
+		)
 	if (
 		not chunk_contains_chamber
 		and not chunk_contains_sculpt
@@ -1005,7 +2322,7 @@ func _build_chunk_base_mask(
 				)
 			else:
 				image.fill_rect(
-					Rect2i(0, row_mask_y, mask_size.x, mask_cell_size),
+					Rect2i(0, row_mask_y, raster_size.x, mask_cell_size),
 					SOLID_MASK_COLOR
 				)
 			continue
@@ -1014,7 +2331,7 @@ func _build_chunk_base_mask(
 				Rect2i(
 					0,
 					row_mask_y,
-					mask_size.x,
+					raster_size.x,
 					mask_cell_size
 				),
 				SOLID_MASK_COLOR
@@ -1056,7 +2373,65 @@ func _build_chunk_base_mask(
 			mask_cell_size
 		)
 	if chunk_contains_sculpt and not preserve_chamber_backdrop:
-		_blit_sculpt_rooms(image, chunk_index, sculpt_layer_index)
+		_blit_sculpt_rooms(
+			image,
+			chunk_index,
+			sculpt_layer_index,
+			mask_cell_size
+		)
+	if raster_size != mask_size:
+		var expanded_image: Image
+		while not _chunk_mask_image_pool.is_empty():
+			var pooled_image: Image = _chunk_mask_image_pool.pop_back()
+			if pooled_image.get_size() == mask_size:
+				expanded_image = pooled_image
+				break
+		if expanded_image == null:
+			expanded_image = Image.create(
+				mask_size.x,
+				mask_size.y,
+				false,
+				Image.FORMAT_LA8
+			)
+		expanded_image.fill(SOLID_MASK_COLOR)
+		var expansion := profile.mask_pixels_per_cell
+		# Binary room interiors expand as horizontal runs, keeping structural
+		# work proportional to logical rows instead of millions of mask pixels.
+		var source_width := image.get_width()
+		var source_data := image.get_data()
+		for source_y in range(image.get_height()):
+			var opening_run_start := -1
+			var row_byte_start := source_y * source_width * 2
+			for source_x in range(source_width + 1):
+				var is_opening := (
+					source_x < source_width
+					and source_data[
+						row_byte_start + source_x * 2 + 1
+					] <= 127
+				)
+				if is_opening and opening_run_start < 0:
+					opening_run_start = source_x
+				elif not is_opening and opening_run_start >= 0:
+					expanded_image.fill_rect(
+						Rect2i(
+							opening_run_start * expansion,
+							source_y * expansion,
+							(source_x - opening_run_start) * expansion,
+							expansion
+						),
+						EMPTY_MASK_COLOR
+					)
+					opening_run_start = -1
+		image = expanded_image
+		if chunk_contains_sculpt and not preserve_chamber_backdrop:
+			# A second clipped blit restores only the authored room's four-sample
+			# rim; it never resizes the full 384-cell terrain width.
+			_blit_sculpt_rooms(
+				image,
+				chunk_index,
+				sculpt_layer_index,
+				profile.mask_pixels_per_cell
+			)
 	return image
 
 
@@ -1090,18 +2465,20 @@ func _chunk_has_per_layer_sculpt(chunk_index: int) -> bool:
 	return false
 
 
-## Prints every authored room reaching into one chunk over the terrain already
-## drawn beneath it. The room arrives as a mask rasterized once, so a streamed
-## chunk pays a clipped copy rather than rebuilding the room's rim per row.
+## Prints every authored room reaching into one chunk over the terrain beneath.
+## The logical pass writes cheap whole-cell runs. The display-density pass
+## scales only the clipped four-sample room strip, preserving edge_smoothing
+## without resizing the full terrain width.
 func _blit_sculpt_rooms(
 	image: Image,
 	chunk_index: int,
-	sculpt_layer_index: int
+	sculpt_layer_index: int,
+	mask_cell_size: int
 ) -> void:
 	var config: MiningConfig = terrain_manager.config
-	var mask_cell_size := profile.mask_pixels_per_cell
 	var chunk_start_row := chunk_index * config.chunk_height_cells
 	var chunk_end_row := chunk_start_row + config.chunk_height_cells
+	var sculpt_cache_density := _get_sculpt_cache_pixels_per_cell()
 	for placement in terrain_manager.get_sculpt_placements():
 		var room_rect: Rect2i = placement.world_rect
 		if (
@@ -1109,38 +2486,100 @@ func _blit_sculpt_rooms(
 			or room_rect.end.y <= chunk_start_row
 		):
 			continue
-		var room_mask := _get_sculpt_mask_image(
+		var first_row := maxi(room_rect.position.y, chunk_start_row)
+		var last_row := mini(room_rect.end.y, chunk_end_row)
+		var first_column := maxi(room_rect.position.x, 0)
+		var last_column := mini(
+			room_rect.end.x,
+			config.terrain_width_cells
+		)
+		if first_column >= last_column or first_row >= last_row:
+			continue
+		if mask_cell_size == 1:
+			var logical_mask := _get_sculpt_logical_mask_image(
+				placement.sculpt,
+				sculpt_layer_index
+			)
+			var logical_source_rect := Rect2i(
+				Vector2i(
+					first_column - room_rect.position.x,
+					first_row - room_rect.position.y
+				),
+				Vector2i(
+					last_column - first_column,
+					last_row - first_row
+				)
+			)
+			image.blit_rect(
+				logical_mask,
+				logical_source_rect,
+				Vector2i(
+					first_column,
+					first_row - chunk_start_row
+				)
+			)
+			continue
+		var room_runs := _get_sculpt_mask_runs(
 			placement.sculpt,
 			sculpt_layer_index
 		)
-		if room_mask == null:
+		if room_runs.is_empty():
+			# The logical pass above is already correct. Keep this streamed build
+			# bounded and let the background cache replace only its visual rim.
+			_chunk_build_needs_sculpt_refinement = true
 			continue
-		var first_row := maxi(room_rect.position.y, chunk_start_row)
-		var last_row := mini(room_rect.end.y, chunk_end_row)
+		var clipped_cell_size := Vector2i(
+			last_column - first_column,
+			last_row - first_row
+		)
 		var source_rect := Rect2i(
-			0,
-			(first_row - room_rect.position.y) * mask_cell_size,
-			room_mask.get_width(),
-			(last_row - first_row) * mask_cell_size
+			Vector2i(
+				first_column - room_rect.position.x,
+				first_row - room_rect.position.y
+			) * sculpt_cache_density,
+			clipped_cell_size * sculpt_cache_density
 		)
 		var destination := Vector2i(
-			room_rect.position.x * mask_cell_size,
+			first_column * mask_cell_size,
 			(first_row - chunk_start_row) * mask_cell_size
 		)
-		# A room reaching past either edge of the run is clipped there rather
-		# than wrapped around to the opposite wall.
-		if destination.x < 0:
-			source_rect.position.x -= destination.x
-			source_rect.size.x += destination.x
-			destination.x = 0
-		var overflow_x := (
-			destination.x + source_rect.size.x - image.get_width()
-		)
-		if overflow_x > 0:
-			source_rect.size.x -= overflow_x
-		if source_rect.size.x <= 0 or source_rect.size.y <= 0:
-			continue
-		image.blit_rect(room_mask, source_rect, destination)
+		var run_scale: int = mask_cell_size / sculpt_cache_density
+		# Runs were prepared before play. Expanding only their clipped rectangles
+		# preserves the four-sample alpha exactly and performs no traversal-time
+		# image allocation or full-room resize.
+		for source_y in range(source_rect.position.y, source_rect.end.y):
+			var row_runs: PackedInt32Array = room_runs[source_y]
+			for run_index in range(0, row_runs.size(), 3):
+				var run_start := maxi(
+					row_runs[run_index],
+					source_rect.position.x
+				)
+				var run_end := mini(
+					row_runs[run_index + 1],
+					source_rect.end.x
+				)
+				if run_start >= run_end:
+					continue
+				var run_alpha := float(
+					row_runs[run_index + 2]
+				) / 255.0
+				image.fill_rect(
+					Rect2i(
+						destination.x
+							+ (
+								run_start
+								- source_rect.position.x
+							) * run_scale,
+						destination.y
+							+ (
+								source_y
+								- source_rect.position.y
+							) * run_scale,
+						(run_end - run_start) * run_scale,
+						run_scale
+					),
+					Color(1.0, 1.0, 1.0, run_alpha)
+				)
 
 
 ## Returns one room's rock at mask resolution, rasterizing it on first use.
@@ -1154,26 +2593,312 @@ func _get_sculpt_mask_image(
 	var layer_masks: Array = _sculpt_mask_images.get(sculpt, [])
 	if layer_masks.size() > cache_index and layer_masks[cache_index] != null:
 		return layer_masks[cache_index]
-	var room_mask := _rasterize_sculpt_mask(sculpt, sculpt_layer_index)
-	while layer_masks.size() <= cache_index:
-		layer_masks.append(null)
-	layer_masks[cache_index] = room_mask
-	_sculpt_mask_images[sculpt] = layer_masks
-	return room_mask
+	var preparation := _queue_sculpt_run_preparation(
+		sculpt,
+		sculpt_layer_index
+	)
+	while preparation != null and preparation.room_mask == null:
+		_advance_sculpt_run_preparation(preparation)
+	layer_masks = _sculpt_mask_images.get(sculpt, [])
+	return (
+		layer_masks[cache_index]
+		if layer_masks.size() > cache_index
+		else null
+	)
 
 
-## Draws one authored room once, at mask resolution.
+## Returns the same authored room as one binary sample per gameplay cell.
+## It is prepared beside the smoothed cache so streaming performs one clipped
+## blit and never calls the resource once per traversed cell.
+func _get_sculpt_logical_mask_image(
+	sculpt: CutsceneTerrainSculpt,
+	sculpt_layer_index: int
+) -> Image:
+	if sculpt == null:
+		return null
+	var cache_index := sculpt_layer_index + 1
+	var layer_masks: Array = _sculpt_logical_mask_images.get(
+		sculpt,
+		[]
+	)
+	if layer_masks.size() > cache_index and layer_masks[cache_index] != null:
+		return layer_masks[cache_index]
+	var preparation := _queue_sculpt_run_preparation(
+		sculpt,
+		sculpt_layer_index
+	)
+	while (
+		preparation != null
+		and (
+			layer_masks.size() <= cache_index
+			or layer_masks[cache_index] == null
+		)
+	):
+		_advance_sculpt_run_preparation(preparation)
+		layer_masks = _sculpt_logical_mask_images.get(sculpt, [])
+	return (
+		layer_masks[cache_index]
+		if layer_masks.size() > cache_index
+		else null
+	)
+
+
+## Returns immutable horizontal alpha runs for a smoothed authored room.
+## Normal play prepares them in bounded rows; a direct test teleport finishes
+## only its requested room synchronously before composing that room's chunk.
+func _get_sculpt_mask_runs(
+	sculpt: CutsceneTerrainSculpt,
+	sculpt_layer_index: int
+) -> Array:
+	if sculpt == null:
+		return []
+	var cache_index := sculpt_layer_index + 1
+	var layer_runs: Array = _sculpt_mask_runs.get(sculpt, [])
+	if layer_runs.size() > cache_index and layer_runs[cache_index] != null:
+		return layer_runs[cache_index]
+	var preparation := _queue_sculpt_run_preparation(
+		sculpt,
+		sculpt_layer_index
+	)
+	if preparation == null:
+		return []
+	# A cold review-mode teleport draws the correct binary logical room for a
+	# few frames instead of scanning the whole smoothed contour in one frame.
+	return []
+
+
+## Queues one immutable sculpt/layer cache, deduplicating background and forced
+## preparation so a room is never scanned twice.
+func _queue_sculpt_run_preparation(
+	sculpt: CutsceneTerrainSculpt,
+	sculpt_layer_index: int
+) -> SculptRunPreparation:
+	if sculpt == null:
+		return null
+	var cache_index := sculpt_layer_index + 1
+	var layer_runs: Array = _sculpt_mask_runs.get(sculpt, [])
+	if layer_runs.size() > cache_index and layer_runs[cache_index] != null:
+		return null
+	for work_index in range(
+		_pending_sculpt_run_preparation_head,
+		_pending_sculpt_run_preparations.size()
+	):
+		var pending := _pending_sculpt_run_preparations[work_index]
+		if (
+			pending.sculpt == sculpt
+			and pending.layer_index == sculpt_layer_index
+		):
+			return pending
+	var preparation := SculptRunPreparation.new()
+	preparation.sculpt = sculpt
+	preparation.layer_index = sculpt_layer_index
+	preparation.mask_cell_size = _get_sculpt_cache_pixels_per_cell()
+	preparation.padded_size = sculpt.grid_size + Vector2i(2, 2)
+	preparation.solid_bits = sculpt.solid_bits
+	var required_bytes := ceili(
+		float(sculpt.grid_size.x * sculpt.grid_size.y) / 8.0
+	)
+	if (
+		sculpt_layer_index >= 0
+		and sculpt_layer_index < sculpt.layer_solid_bits.size()
+		and sculpt.layer_solid_bits[sculpt_layer_index].size()
+			>= required_bytes
+	):
+		preparation.solid_bits = (
+			sculpt.layer_solid_bits[sculpt_layer_index]
+		)
+	preparation.protected_floor_start = sculpt.get_floor_local_row()
+	preparation.protected_floor_end = (
+		preparation.protected_floor_start
+		+ sculpt.protected_floor_rows
+	)
+	_pending_sculpt_run_preparations.append(preparation)
+	return preparation
+
+
+## Converts exactly one cached source row into [start, end, alpha] runs.
+func _advance_sculpt_run_preparation(
+	preparation: SculptRunPreparation
+) -> bool:
+	if preparation.finished:
+		return true
+	if preparation.phase == 0:
+		if preparation.cell_bytes.is_empty():
+			preparation.cell_bytes.resize(
+				preparation.padded_size.x
+				* preparation.padded_size.y
+				* 2
+			)
+		if preparation.next_cell_row < preparation.padded_size.y:
+			var padded_y := preparation.next_cell_row
+			var local_y := padded_y - 1
+			var grid := preparation.sculpt.grid_size
+			var row_is_solid := (
+				local_y < 0
+				or local_y >= grid.y
+				or (
+					local_y >= preparation.protected_floor_start
+					and local_y < preparation.protected_floor_end
+				)
+			)
+			var byte_index := (
+				padded_y * preparation.padded_size.x * 2
+			)
+			for padded_x in range(preparation.padded_size.x):
+				var local_x := padded_x - 1
+				var bit_index := local_y * grid.x + local_x
+				var cell_value := (
+					255
+					if (
+						row_is_solid
+						or local_x < 0
+						or local_x >= grid.x
+						or (
+							preparation.solid_bits[
+								bit_index >> 3
+							]
+							& (1 << (bit_index & 7))
+						) != 0
+					)
+					else 0
+				)
+				preparation.cell_bytes[byte_index] = cell_value
+				preparation.cell_bytes[byte_index + 1] = cell_value
+				byte_index += 2
+			preparation.next_cell_row += 1
+			return false
+		preparation.cell_image = Image.create_from_data(
+			preparation.padded_size.x,
+			preparation.padded_size.y,
+			false,
+			Image.FORMAT_LA8,
+			preparation.cell_bytes
+		)
+		var grid := preparation.sculpt.grid_size
+		var logical_mask := preparation.cell_image.get_region(
+			Rect2i(Vector2i.ONE, grid)
+		)
+		var cache_index := preparation.layer_index + 1
+		var logical_layers: Array = _sculpt_logical_mask_images.get(
+			preparation.sculpt,
+			[]
+		)
+		while logical_layers.size() <= cache_index:
+			logical_layers.append(null)
+		logical_layers[cache_index] = logical_mask
+		_sculpt_logical_mask_images[
+			preparation.sculpt
+		] = logical_layers
+		preparation.cell_bytes = PackedByteArray()
+		preparation.phase = 1
+		return false
+	if preparation.phase == 1:
+		var grid := preparation.sculpt.grid_size
+		preparation.cell_image.resize(
+			preparation.padded_size.x * preparation.mask_cell_size,
+			preparation.padded_size.y * preparation.mask_cell_size,
+			(
+				Image.INTERPOLATE_BILINEAR
+				if preparation.sculpt.edge_smoothing > 0.0
+				else Image.INTERPOLATE_NEAREST
+			)
+		)
+		preparation.room_mask = preparation.cell_image.get_region(
+			Rect2i(
+				Vector2i.ONE * preparation.mask_cell_size,
+				grid * preparation.mask_cell_size
+			)
+		)
+		if (
+			preparation.sculpt.edge_smoothing > 0.0
+			and preparation.sculpt.edge_smoothing < 1.0
+		):
+			_harden_sculpt_mask_rims(
+				preparation.room_mask,
+				preparation.sculpt,
+				preparation.layer_index
+			)
+		var room_layers: Array = _sculpt_mask_images.get(
+			preparation.sculpt,
+			[]
+		)
+		var cache_index := preparation.layer_index + 1
+		while room_layers.size() <= cache_index:
+			room_layers.append(null)
+		room_layers[cache_index] = preparation.room_mask
+		_sculpt_mask_images[preparation.sculpt] = room_layers
+		preparation.mask_runs.resize(
+			preparation.room_mask.get_height()
+		)
+		preparation.cell_image = null
+		preparation.phase = 2
+		return false
+	if preparation.phase == 2:
+		# The internal room raster stores coverage in luminance as well as alpha.
+		# Converting a temporary view to L8 packs four samples per decoded word,
+		# then the row scanner can skip long flat rock/air runs natively.
+		var alpha_image := preparation.room_mask.duplicate()
+		alpha_image.convert(Image.FORMAT_L8)
+		preparation.mask_data = alpha_image.get_data()
+		preparation.phase = 3
+		return false
+	var mask_width := preparation.room_mask.get_width()
+	var mask_y := preparation.next_row
+	var row_runs := PackedInt32Array()
+	var run_start := 0
+	var row_byte_start := mask_y * mask_width
+	var run_alpha := preparation.mask_data[row_byte_start]
+	var mask_x := 1
+	while mask_x <= mask_width:
+		if (
+			mask_x + 4 <= mask_width
+			and preparation.mask_data.decode_u32(
+				row_byte_start + mask_x
+			) == run_alpha * 0x01010101
+		):
+			mask_x += 4
+			continue
+		var alpha := (
+			-1
+			if mask_x == mask_width
+			else preparation.mask_data[row_byte_start + mask_x]
+		)
+		if alpha != run_alpha:
+			row_runs.append(run_start)
+			row_runs.append(mask_x)
+			row_runs.append(run_alpha)
+			run_start = mask_x
+			run_alpha = alpha
+		mask_x += 1
+	preparation.mask_runs[mask_y] = row_runs
+	preparation.next_row += 1
+	if preparation.next_row < preparation.room_mask.get_height():
+		return false
+	var cache_index := preparation.layer_index + 1
+	var layer_runs: Array = _sculpt_mask_runs.get(
+		preparation.sculpt,
+		[]
+	)
+	while layer_runs.size() <= cache_index:
+		layer_runs.append(null)
+	layer_runs[cache_index] = preparation.mask_runs
+	_sculpt_mask_runs[preparation.sculpt] = layer_runs
+	preparation.mask_data = PackedByteArray()
+	preparation.room_mask = null
+	preparation.finished = true
+	return true
+
+
+## Draws one authored room once at a density bounded independently of gameplay.
 ##
-## The room is written at one pixel per cell and then upscaled: Godot's bilinear
-## filter samples the same cell centers a hand-written rim sampler would, so the
-## visible contour is the sub-cell one, produced in a single pass instead of per
-## mask pixel. Luminance stays full across the room because the shader reads it
-## as crack ink; only alpha carries the shape the room was carved into.
+## Four samples per cell retain a sub-cell bilinear rim and make edge_smoothing
+## effective. Chunk expansion copies equal-alpha runs, so sharp 16-pixel terrain
+## does not multiply either cached room memory or full-room resize work.
 func _rasterize_sculpt_mask(
 	sculpt: CutsceneTerrainSculpt,
 	sculpt_layer_index: int
 ) -> Image:
-	var mask_cell_size := profile.mask_pixels_per_cell
+	var mask_cell_size := _get_sculpt_cache_pixels_per_cell()
 	var grid := sculpt.grid_size
 	if grid.x <= 0 or grid.y <= 0 or mask_cell_size <= 0:
 		return null
@@ -1185,8 +2910,7 @@ func _rasterize_sculpt_mask(
 	var byte_index := 0
 	for padded_y in range(padded_size.y):
 		for padded_x in range(padded_size.x):
-			cell_bytes[byte_index] = 255
-			cell_bytes[byte_index + 1] = (
+			var cell_value := (
 				255
 				if _is_sculpt_cell_solid(
 					sculpt,
@@ -1195,6 +2919,11 @@ func _rasterize_sculpt_mask(
 				)
 				else 0
 			)
+			# This cached raster is never uploaded directly. Mirroring coverage
+			# into luminance lets run preparation convert it to contiguous L8
+			# without a per-pixel alpha extraction pass.
+			cell_bytes[byte_index] = cell_value
+			cell_bytes[byte_index + 1] = cell_value
 			byte_index += 2
 	var cell_image := Image.create_from_data(
 		padded_size.x,
@@ -1223,6 +2952,20 @@ func _rasterize_sculpt_mask(
 	return room_mask
 
 
+## Chooses the highest bounded sculpt density that divides the shipped mask.
+## Both room caching and chunk expansion use this contract, so no resample can
+## shift a room edge differently between native and web builds.
+func _get_sculpt_cache_pixels_per_cell() -> int:
+	var gameplay_density := maxi(profile.mask_pixels_per_cell, 1)
+	var cache_density := mini(
+		SCULPT_CACHE_PIXELS_PER_CELL,
+		gameplay_density
+	)
+	while gameplay_density % cache_density != 0:
+		cache_density -= 1
+	return cache_density
+
+
 ## Pulls a partly smoothed room's rim back toward the cells it was painted on.
 ## Only cells on a solid/open boundary can differ from their own cell value, so
 ## only those pay per-pixel work, and only when a room asks for a harder edge.
@@ -1231,7 +2974,10 @@ func _harden_sculpt_mask_rims(
 	sculpt: CutsceneTerrainSculpt,
 	sculpt_layer_index: int
 ) -> void:
-	var mask_cell_size := profile.mask_pixels_per_cell
+	var mask_cell_size := maxi(
+		room_mask.get_width() / maxi(sculpt.grid_size.x, 1),
+		1
+	)
 	var smoothing := sculpt.edge_smoothing
 	for local_y in range(sculpt.grid_size.y):
 		for local_x in range(sculpt.grid_size.x):
@@ -1257,6 +3003,9 @@ func _harden_sculpt_mask_rims(
 					var mask_x := local_x * mask_cell_size + sub_x
 					var smoothed := room_mask.get_pixel(mask_x, mask_y)
 					smoothed.a = lerpf(hard_value, smoothed.a, smoothing)
+					smoothed.r = smoothed.a
+					smoothed.g = smoothed.a
+					smoothed.b = smoothed.a
 					room_mask.set_pixel(mask_x, mask_y, smoothed)
 
 
@@ -1471,15 +3220,34 @@ func _create_impact_stamp(
 	destroyed_cells: Array[Vector2i],
 	horizontal_direction: int,
 	is_narrow_path: bool = false,
-	impact_origin_cell_x: int = -1
+	impact_origin_cell_x: int = -1,
+	destroyed_bounds: Rect2i = Rect2i()
 ) -> ImpactStamp:
-	var minimum_cell := destroyed_cells[0]
-	var maximum_cell := destroyed_cells[0]
-	for cell in destroyed_cells:
-		minimum_cell.x = mini(minimum_cell.x, cell.x)
-		minimum_cell.y = mini(minimum_cell.y, cell.y)
-		maximum_cell.x = maxi(maximum_cell.x, cell.x)
-		maximum_cell.y = maxi(maximum_cell.y, cell.y)
+	var minimum_cell := (
+		destroyed_bounds.position
+		if destroyed_bounds.has_area()
+		else destroyed_cells[0]
+	)
+	var maximum_cell := (
+		destroyed_bounds.end - Vector2i.ONE
+		if destroyed_bounds.has_area()
+		else destroyed_cells[0]
+	)
+	if not destroyed_bounds.has_area():
+		for cell in destroyed_cells:
+			minimum_cell.x = mini(minimum_cell.x, cell.x)
+			minimum_cell.y = mini(minimum_cell.y, cell.y)
+			maximum_cell.x = maxi(maximum_cell.x, cell.x)
+			maximum_cell.y = maxi(maximum_cell.y, cell.y)
+	if not is_narrow_path:
+		return _create_ordinary_impact_stamp_from_bounds(
+			minimum_cell,
+			maximum_cell,
+			destroyed_cells.size(),
+			horizontal_direction,
+			impact_origin_cell_x,
+			_active_impact_combo
+		)
 
 	var cell_size := terrain_manager.config.terrain_cell_world_size
 	var stamp := ImpactStamp.new()
@@ -1565,6 +3333,71 @@ func _create_impact_stamp(
 	return stamp
 
 
+## Builds the one ordinary-stamp contract shared by candidates and real damage.
+func _create_ordinary_impact_stamp_from_bounds(
+	minimum_cell: Vector2i,
+	maximum_cell: Vector2i,
+	damaged_cell_count: int,
+	horizontal_direction: int,
+	impact_origin_cell_x: int,
+	impact_combo: int
+) -> ImpactStamp:
+	var cell_size := terrain_manager.config.terrain_cell_world_size
+	var stamp := ImpactStamp.new()
+	var damage_rect := Rect2(
+		Vector2(minimum_cell * cell_size),
+		Vector2(
+			(maximum_cell - minimum_cell + Vector2i.ONE)
+			* cell_size
+		)
+	)
+	stamp.center = damage_rect.get_center()
+	if impact_origin_cell_x >= 0:
+		stamp.center.x = (
+			float(impact_origin_cell_x) + 0.5
+		) * float(cell_size)
+	stamp.damage_bounds = damage_rect
+	stamp.core_radius = (
+		maxf(damage_rect.size.x, damage_rect.size.y) * 0.5
+	)
+	stamp.include_fracture_lines = (
+		stamp.core_radius
+		<= MAX_FRACTURE_RADIUS_CELLS * float(cell_size)
+	)
+	stamp.use_big_hole = (
+		impact_combo >= deepest_layer_combo_threshold
+		and stamp.core_radius * 2.0
+		>= float(profile.big_hole_minimum_size)
+	)
+	var variation_hash := (
+		minimum_cell.x * 73_856_093
+		^ minimum_cell.y * 19_349_663
+		^ damaged_cell_count * 83_492_791
+	)
+	stamp.flip_x = (
+		horizontal_direction < 0
+		or (horizontal_direction == 0 and variation_hash % 2 == 0)
+	)
+	stamp.flip_y = variation_hash % 3 == 0
+	stamp.rotation_quarters = posmod(variation_hash, 4)
+	stamp.size_variation = (
+		0.92
+		+ float(posmod(variation_hash / 4, 9)) * 0.02
+	)
+	stamp.variation_hash = variation_hash
+	stamp.preparation_key = "%d,%d:%d,%d:%d:%d:%d:%d" % [
+		minimum_cell.x,
+		minimum_cell.y,
+		maximum_cell.x,
+		maximum_cell.y,
+		damaged_cell_count,
+		horizontal_direction,
+		impact_origin_cell_x,
+		impact_combo,
+	]
+	return stamp
+
+
 ## Returns one stratum's own orientation and size jitter for a hit.
 ##
 ## Every layer used to punch the identical silhouette at a smaller scale, so a
@@ -1642,6 +3475,190 @@ func _apply_impact_stamp_layer(
 	raster_band_index: int = 0,
 	raster_band_count: int = 1
 ) -> bool:
+	if not _can_apply_impact_stamp_layer(stamp, layer_index):
+		return false
+	_make_layer_writable(chunk, layer_index)
+	var changed := false
+	if not stamp.narrow_path_points.is_empty():
+		changed = _punch_narrow_path(
+			chunk.mask_images[layer_index],
+			chunk_index,
+			stamp,
+			layer_index
+		)
+	else:
+		var mask_data := _get_hole_mask_data(
+			layer_index,
+			stamp.use_big_hole
+		)
+		if mask_data == null:
+			return false
+		var opening_rect := _get_layer_opening_rect(stamp, layer_index)
+		var layer_variation := _get_layer_stamp_variation(
+			stamp,
+			layer_index
+		)
+		changed = _punch_hole(
+			chunk.mask_images[layer_index],
+			chunk_index,
+			opening_rect,
+			mask_data,
+			layer_variation.x == 1,
+			layer_variation.y == 1,
+			layer_variation.z,
+			stamp.include_fracture_lines,
+			raster_band_index,
+			raster_band_count
+		)
+	if changed:
+		chunk.dirty_mask_tiles[layer_index] |= (
+			_get_stamp_dirty_tile_bits(stamp, layer_index)
+		)
+		chunk.layer_revisions[layer_index] += 1
+	return changed
+
+
+## Maps one stamp's authored extent onto the fixed tile lattice. Expanding by
+## one mask pixel marks both neighbors only when a gutter column can change.
+func _get_stamp_dirty_tile_bits(
+	stamp: ImpactStamp,
+	layer_index: int
+) -> int:
+	var stamp_rect := _get_stamp_broad_rect(stamp)
+	if stamp.narrow_path_points.is_empty():
+		var mask_data := _get_hole_mask_data(
+			layer_index,
+			stamp.use_big_hole
+		)
+		if mask_data == null:
+			return 0
+		var opening_rect := _get_layer_opening_rect(stamp, layer_index)
+		var layer_variation := _get_layer_stamp_variation(
+			stamp,
+			layer_index
+		)
+		stamp_rect = _get_full_stamp_world_rect(
+			opening_rect,
+			mask_data,
+			layer_variation.x == 1,
+			layer_variation.y == 1,
+			layer_variation.z
+		)
+	if not stamp_rect.has_area():
+		return 0
+	var mask_pixels_per_world_unit := (
+		float(profile.mask_pixels_per_cell)
+		/ float(terrain_manager.config.terrain_cell_world_size)
+	)
+	var mask_width := _get_chunk_mask_size().x
+	var tile_width := mask_width / MASK_HORIZONTAL_TILE_COUNT
+	var first_mask_x := clampi(
+		floori(stamp_rect.position.x * mask_pixels_per_world_unit) - 1,
+		0,
+		mask_width - 1
+	)
+	var last_mask_x := clampi(
+		ceili(stamp_rect.end.x * mask_pixels_per_world_unit),
+		0,
+		mask_width - 1
+	)
+	var first_tile := clampi(
+		floori(float(first_mask_x) / float(tile_width)),
+		0,
+		MASK_HORIZONTAL_TILE_COUNT - 1
+	)
+	var last_tile := clampi(
+		floori(float(last_mask_x) / float(tile_width)),
+		first_tile,
+		MASK_HORIZONTAL_TILE_COUNT - 1
+	)
+	var dirty_tiles := 0
+	for tile_index in range(first_tile, last_tile + 1):
+		dirty_tiles |= 1 << tile_index
+	return dirty_tiles
+
+
+## Returns the exact full-mask rectangle a primary stamp can change in one
+## chunk. Prediction crops this rect before rastering; the normal punch path
+## clips against the same integer lattice, so promoted pixels are byte-identical.
+func _get_stamp_layer_chunk_mask_rect(
+	stamp: ImpactStamp,
+	layer_index: int,
+	chunk_index: int
+) -> Rect2i:
+	if not stamp.narrow_path_points.is_empty():
+		return Rect2i()
+	var mask_data := _get_hole_mask_data(
+		layer_index,
+		stamp.use_big_hole
+	)
+	if mask_data == null:
+		return Rect2i()
+	var opening_rect := _get_layer_opening_rect(stamp, layer_index)
+	var layer_variation := _get_layer_stamp_variation(
+		stamp,
+		layer_index
+	)
+	var full_stamp_rect := _get_full_stamp_world_rect(
+		opening_rect,
+		mask_data,
+		layer_variation.x == 1,
+		layer_variation.y == 1,
+		layer_variation.z
+	)
+	if not full_stamp_rect.has_area():
+		return Rect2i()
+	var mask_pixels_per_world_unit := (
+		float(profile.mask_pixels_per_cell)
+		/ float(terrain_manager.config.terrain_cell_world_size)
+	)
+	var stamp_size := _get_stamp_pixel_size(full_stamp_rect.size)
+	var chunk_mask_top := (
+		chunk_index
+		* terrain_manager.config.chunk_height_cells
+		* profile.mask_pixels_per_cell
+	)
+	var destination_position := Vector2i(
+		floori(full_stamp_rect.position.x * mask_pixels_per_world_unit),
+		floori(full_stamp_rect.position.y * mask_pixels_per_world_unit)
+			- chunk_mask_top
+	)
+	var config := terrain_manager.config
+	var surface_local_y := (
+		config.initial_surface_row * profile.mask_pixels_per_cell
+		- chunk_mask_top
+	)
+	var clipped_height := stamp_size.y
+	if destination_position.y < surface_local_y:
+		var clipped_rows := surface_local_y - destination_position.y
+		if clipped_rows >= clipped_height:
+			return Rect2i()
+		clipped_height -= clipped_rows
+		destination_position.y = surface_local_y
+	var floor_local_y := (
+		(config.get_bottom_surface_row() + 1) * profile.mask_pixels_per_cell
+		- chunk_mask_top
+	)
+	clipped_height = mini(
+		clipped_height,
+		floor_local_y - destination_position.y
+	)
+	if clipped_height <= 0:
+		return Rect2i()
+	return Rect2i(
+		destination_position,
+		Vector2i(stamp_size.x, clipped_height)
+	).intersection(
+		Rect2i(Vector2i.ZERO, _get_chunk_mask_size())
+	)
+
+
+## Shares the exact visible-layer contract between synchronous stamping and
+## deferred queue construction, so rejected strata never become queued no-ops.
+func _can_apply_impact_stamp_layer(
+	stamp: ImpactStamp,
+	layer_index: int
+) -> bool:
 	var gameplay_layer_count := profile.get_gameplay_layer_count()
 	if (
 		layer_index < 0
@@ -1652,45 +3669,14 @@ func _apply_impact_stamp_layer(
 		)
 	):
 		return false
+	# Orange remains the decorative tunnel backdrop below combo seven. At or
+	# above the combo gate, the size threshold still prevents a physically
+	# small secondary path from exposing the brown back wall.
 	var is_layer_covering_backdrop := (
 		profile.keep_back_layer_solid
 		and layer_index == gameplay_layer_count - 2
 	)
-	# Orange remains the decorative tunnel backdrop below combo seven. At or
-	# above the combo gate, the size threshold still prevents a physically
-	# small secondary path from exposing the brown back wall.
-	if is_layer_covering_backdrop and not stamp.use_big_hole:
-		return false
-	_make_layer_writable(chunk, layer_index)
-	if not stamp.narrow_path_points.is_empty():
-		return _punch_narrow_path(
-			chunk.mask_images[layer_index],
-			chunk_index,
-			stamp,
-			layer_index
-		)
-	var mask_data := _get_hole_mask_data(
-		layer_index,
-		stamp.use_big_hole
-	)
-	if mask_data == null:
-		return false
-	var opening_rect := _get_layer_opening_rect(stamp, layer_index)
-	var layer_variation := _get_layer_stamp_variation(
-		stamp,
-		layer_index
-	)
-	return _punch_hole(
-		chunk.mask_images[layer_index],
-		chunk_index,
-		opening_rect,
-		mask_data,
-		layer_variation.x == 1,
-		layer_variation.y == 1,
-		layer_variation.z,
-		raster_band_index,
-		raster_band_count
-	)
+	return not is_layer_covering_backdrop or stamp.use_big_hole
 
 
 ## Returns the organic opening drawn for one ordinary impact layer.
@@ -2176,32 +4162,22 @@ func _punch_hole(
 	flip_x: bool,
 	flip_y: bool,
 	rotation_quarters: int,
+	include_fracture_lines: bool = true,
 	raster_band_index: int = 0,
-	raster_band_count: int = 1
+	raster_band_count: int = 1,
+	destination_mask_origin: Vector2i = Vector2i.ZERO
 ) -> bool:
-	var source_bounds := _get_oriented_transparent_bounds(
+	var full_stamp_rect := _get_full_stamp_world_rect(
+		opening_world_rect,
 		mask_data,
 		flip_x,
 		flip_y,
 		rotation_quarters
 	)
-	if source_bounds.size.x <= 0.0 or source_bounds.size.y <= 0.0:
+	if not full_stamp_rect.has_area():
 		return false
-
-	var full_stamp_size := Vector2(
-		opening_world_rect.size.x
-		/ source_bounds.size.x,
-		opening_world_rect.size.y
-		/ source_bounds.size.y
-	)
-	var full_stamp_position := (
-		opening_world_rect.position
-		- source_bounds.position * full_stamp_size
-	)
-	var full_stamp_rect := Rect2(
-		full_stamp_position,
-		full_stamp_size
-	)
+	var full_stamp_size := full_stamp_rect.size
+	var full_stamp_position := full_stamp_rect.position
 	var chunk_world_size := _get_chunk_world_size()
 	var chunk_world_rect := Rect2(
 		Vector2(
@@ -2220,26 +4196,15 @@ func _punch_hole(
 		float(profile.mask_pixels_per_cell)
 		/ float(terrain_manager.config.terrain_cell_world_size)
 	)
-	var stamp_size := Vector2i(
-		maxi(
-			ceili(
-				full_stamp_size.x * mask_pixels_per_world_unit
-			),
-			1
-		),
-		maxi(
-			ceili(
-				full_stamp_size.y * mask_pixels_per_world_unit
-			),
-			1
-		)
-	)
+	var stamp_size := _get_stamp_pixel_size(full_stamp_size)
 	var stamp_images := _get_resized_stamp_images(
 		mask_data,
 		stamp_size,
 		flip_x,
 		flip_y,
-		rotation_quarters
+		rotation_quarters,
+		false,
+		include_fracture_lines
 	)
 	var chunk_mask_top := (
 		chunk_index
@@ -2256,6 +4221,7 @@ func _punch_hole(
 				* mask_pixels_per_world_unit
 			) - chunk_mask_top
 	)
+	destination_position -= destination_mask_origin
 	# The mask artwork carries its crack strokes as opaque pixels, and blending
 	# them onto a row that holds no terrain would turn a stroke into solid
 	# ground. Clip the stamp to the real strata so cracks can never draw against
@@ -2265,6 +4231,7 @@ func _punch_hole(
 	var surface_local_y := (
 		config.initial_surface_row * profile.mask_pixels_per_cell
 		- chunk_mask_top
+		- destination_mask_origin.y
 	)
 	if destination_position.y < surface_local_y:
 		var clipped_rows := surface_local_y - destination_position.y
@@ -2276,6 +4243,7 @@ func _punch_hole(
 	var floor_local_y := (
 		(config.get_bottom_surface_row() + 1) * profile.mask_pixels_per_cell
 		- chunk_mask_top
+		- destination_mask_origin.y
 	)
 	if destination_position.y + source_rect.size.y > floor_local_y:
 		source_rect.size.y = floor_local_y - destination_position.y
@@ -2323,16 +4291,56 @@ func _punch_hole(
 		source_rect.position + affected_rect.position - destination_position,
 		affected_rect.size
 	)
-	var solid_before_stamp := destination.get_region(affected_rect)
-	var fracture_region := (
-		stamp_images.fracture_source.get_region(clipped_source_rect)
-	)
-	destination.blend_rect_mask(
-		fracture_region,
-		solid_before_stamp,
-		Rect2i(Vector2i.ZERO, affected_rect.size),
-		affected_rect.position
-	)
+	if stamp_images.fracture_source != null:
+		var scratch_size := affected_rect.size
+		if (
+			_fracture_band_scratch == null
+			or _fracture_band_scratch.get_width() < scratch_size.x
+			or _fracture_band_scratch.get_height() < scratch_size.y
+		):
+			var grown_size := Vector2i(
+				maxi(
+					scratch_size.x,
+					_fracture_band_scratch.get_width()
+						if _fracture_band_scratch != null
+						else 1
+				),
+				maxi(
+					scratch_size.y,
+					_fracture_band_scratch.get_height()
+						if _fracture_band_scratch != null
+						else 1
+				)
+			)
+			_fracture_band_scratch = Image.create(
+				grown_size.x,
+				grown_size.y,
+				false,
+				Image.FORMAT_LA8
+			)
+			_solid_band_scratch = Image.create(
+				grown_size.x,
+				grown_size.y,
+				false,
+				Image.FORMAT_LA8
+			)
+		_fracture_band_scratch.blit_rect(
+			stamp_images.fracture_source,
+			clipped_source_rect,
+			Vector2i.ZERO
+		)
+		_solid_band_scratch.blit_rect(
+			destination,
+			affected_rect,
+			Vector2i.ZERO
+		)
+		var scratch_rect := Rect2i(Vector2i.ZERO, scratch_size)
+		destination.blend_rect_mask(
+			_fracture_band_scratch,
+			_solid_band_scratch,
+			scratch_rect,
+			affected_rect.position
+		)
 
 	# Only now carve this stamp's own cavity.
 	destination.blit_rect_mask(
@@ -2342,6 +4350,53 @@ func _punch_hole(
 		affected_rect.position
 	)
 	return true
+
+
+## Resolves the transformed authored stamp once for queue sizing and punching.
+## Both callers use this exact rect, so per-chunk bands cover every crack pixel
+## without repeating the full multi-chunk height in each touched chunk.
+func _get_full_stamp_world_rect(
+	opening_world_rect: Rect2,
+	mask_data: HoleMaskData,
+	flip_x: bool,
+	flip_y: bool,
+	rotation_quarters: int
+) -> Rect2:
+	var source_bounds := _get_oriented_transparent_bounds(
+		mask_data,
+		flip_x,
+		flip_y,
+		rotation_quarters
+	)
+	if source_bounds.size.x <= 0.0 or source_bounds.size.y <= 0.0:
+		return Rect2()
+	var full_stamp_size := Vector2(
+		opening_world_rect.size.x / source_bounds.size.x,
+		opening_world_rect.size.y / source_bounds.size.y
+	)
+	return Rect2(
+		opening_world_rect.position
+			- source_bounds.position * full_stamp_size,
+		full_stamp_size
+	)
+
+
+## Converts the shared predicted/authoritative world size into one cache key.
+func _get_stamp_pixel_size(stamp_world_size: Vector2) -> Vector2i:
+	var mask_pixels_per_world_unit := (
+		float(profile.mask_pixels_per_cell)
+		/ float(terrain_manager.config.terrain_cell_world_size)
+	)
+	return Vector2i(
+		maxi(
+			ceili(stamp_world_size.x * mask_pixels_per_world_unit),
+			1
+		),
+		maxi(
+			ceili(stamp_world_size.y * mask_pixels_per_world_unit),
+			1
+		)
+	)
 
 
 ## Maps the mask's real transparent cavity through its authored orientation.
@@ -2386,16 +4441,21 @@ func _get_resized_stamp_images(
 	stamp_size: Vector2i,
 	flip_x: bool,
 	flip_y: bool,
-	rotation_quarters: int
+	rotation_quarters: int,
+	is_preparation: bool = false,
+	include_fracture_lines: bool = true
 ) -> TerrainStampImageCache.StampImages:
 	return _stamp_image_cache.get_images(
 		mask_data.cache_id,
 		mask_data.erase_mask,
 		mask_data.fracture_source,
+		mask_data.has_fracture_lines and include_fracture_lines,
 		stamp_size,
 		flip_x,
 		flip_y,
-		rotation_quarters
+		rotation_quarters,
+		is_preparation,
+		AUTHORED_MASK_SOURCE_SUPERSAMPLE
 	)
 
 
@@ -2481,6 +4541,10 @@ func _prepare_chamber_transition_stamps() -> void:
 			stamp.flip_y = random.randi_range(0, 1) == 1
 			stamp.rotation_quarters = random.randi_range(0, 3)
 			stamp.size_variation = random.randf_range(0.92, 1.08)
+			# Chamber ceilings already receive the continuous shader cut outline.
+			# Their eight overlapping transition stamps omit authored fracture
+			# spurs so streamed rooms do not repeat the heaviest impact-only blend.
+			stamp.include_fracture_lines = false
 
 			for chunk_index in _get_stamp_chunk_indices(stamp):
 				var chunk_stamps: Array = _chamber_stamps_by_chunk.get(
@@ -2560,19 +4624,21 @@ func _create_hole_mask_data(
 		Image.FORMAT_LA8
 	)
 	erase_mask.fill(EMPTY_MASK_COLOR)
-	var fracture_source := Image.create(
-		mask_width,
-		mask_height,
-		false,
-		Image.FORMAT_LA8
-	)
-	# Carry the stroke value in the unwritten pixels too. Coverage lives in
-	# alpha, and the per-hit resize interpolates luminance and alpha separately,
-	# so a white backing would mix a shrinking stroke toward white before its
-	# coverage ever reached blend_rect - fading the same line twice.
-	var line_value := 1.0 - profile.fracture_line_strength
-	fracture_source.fill(Color(line_value, line_value, line_value, 0.0))
 	var writes_fracture_lines := fracture_line_scale > 0.0
+	var fracture_source: Image
+	if writes_fracture_lines:
+		fracture_source = Image.create(
+			mask_width,
+			mask_height,
+			false,
+			Image.FORMAT_LA8
+		)
+		# Carry the stroke value in unwritten pixels too. Coverage lives in
+		# alpha, so a white backing would fade a shrinking line twice.
+		var line_value := 1.0 - profile.fracture_line_strength
+		fracture_source.fill(
+			Color(line_value, line_value, line_value, 0.0)
+		)
 	# Three temporary buffers the size of one authored mask. They are local to
 	# this call and released with it; nothing accumulates per hit or per chunk.
 	var cell_count := mask_width * mask_height
@@ -2642,32 +4708,41 @@ func _create_hole_mask_data(
 			fracture_line_scale
 		)
 
-	# Remove opaque margins before any per-hit resize. Mirroring the crop around
-	# the authored image center retains the exact flip and quarter-turn pivot.
-	var crop_minimum := Vector2i(
-		mini(
-			content_minimum.x,
-			mask_width - 1 - content_maximum.x
-		),
-		mini(
-			content_minimum.y,
-			mask_height - 1 - content_maximum.y
-		)
-	)
-	var crop_maximum := Vector2i(
-		mask_width - 1 - crop_minimum.x,
-		mask_height - 1 - crop_minimum.y
-	)
+	# Fracture spurs retain their symmetric art canvas because their offset from
+	# the cavity is authored. Alpha-only layers need only the tight cavity: the
+	# opening rect already defines its final world placement, so resizing empty
+	# canvas margins spends CPU without contributing a visible mask pixel.
 	var crop_rect := Rect2i(
-		crop_minimum,
-		crop_maximum - crop_minimum + Vector2i.ONE
+		minimum,
+		maximum - minimum + Vector2i.ONE
 	)
+	if writes_fracture_lines:
+		var crop_minimum := Vector2i(
+			mini(
+				content_minimum.x,
+				mask_width - 1 - content_maximum.x
+			),
+			mini(
+				content_minimum.y,
+				mask_height - 1 - content_maximum.y
+			)
+		)
+		var crop_maximum := Vector2i(
+			mask_width - 1 - crop_minimum.x,
+			mask_height - 1 - crop_minimum.y
+		)
+		crop_rect = Rect2i(
+			crop_minimum,
+			crop_maximum - crop_minimum + Vector2i.ONE
+		)
 	erase_mask = erase_mask.get_region(crop_rect)
-	fracture_source = fracture_source.get_region(crop_rect)
+	if fracture_source != null:
+		fracture_source = fracture_source.get_region(crop_rect)
 
 	var data := HoleMaskData.new()
 	data.erase_mask = erase_mask
 	data.fracture_source = fracture_source
+	data.has_fracture_lines = writes_fracture_lines
 	data.cache_id = cache_id
 	data.transparent_bounds = Rect2i(
 		minimum - crop_rect.position,
