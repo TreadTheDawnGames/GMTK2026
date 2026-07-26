@@ -200,15 +200,21 @@ func _destroy_tunnel_row(
 	var chamber_bounds := Vector2i.ZERO
 	var is_chamber_row := false
 	if encounter_config != null:
-		chamber_bounds = encounter_config.get_chamber_horizontal_bounds(
-			depth_row,
-			config.total_run_depth,
-			config.terrain_width_cells
-		)
 		is_chamber_row = encounter_config.is_chamber_row(
 			depth_row,
 			config.total_run_depth
 		)
+		# Ordinary rows are the hot path. Resolve chamber bounds only after the
+		# cheap row test succeeds instead of scanning the encounter schedule
+		# twice for every row of a fully stacked hit.
+		if is_chamber_row:
+			chamber_bounds = (
+				encounter_config.get_chamber_horizontal_bounds(
+					depth_row,
+					config.total_run_depth,
+					config.terrain_width_cells
+				)
+			)
 
 	var chunk_index := _world_to_chunk_index(cell_y)
 	var local_y := cell_y - chunk_index * config.chunk_height_cells

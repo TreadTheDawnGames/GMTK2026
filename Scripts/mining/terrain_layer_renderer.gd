@@ -80,6 +80,9 @@ class ImpactRasterWork:
 	var prepare_only: bool = false
 	var finish_preparation: bool = false
 	var publish_layer: bool = true
+	## True after this descriptor applied its CPU patch. A final publisher may
+	## then resume the same queue slot once per dirty GPU tile.
+	var raster_complete: bool = false
 	var prepared_patch: PreparedLayerPatch
 	var image_preparation
 
@@ -92,6 +95,9 @@ class ImpactStampPreparation:
 	var raster_band_index: int = 0
 	var raster_band_count: int = 1
 	var prepares_patch: bool = false
+	## A nonnegative index detaches one candidate-independent GPU mask tile.
+	## At most three tiles per active stratum can ever remain allocated.
+	var private_texture_tile_index: int = -1
 	var image_preparation
 
 
@@ -315,6 +321,9 @@ var _preparing_layer_patches: Dictionary[String, PreparedLayerPatch] = {}
 
 ## Connects terrain events and loads the initial visible strata.
 func _ready() -> void:
+	# Editor previews can stream sculpt rows before the runtime-only setup below.
+	# Initialize the fixed decode table before either lifecycle path can publish.
+	_prepare_sculpt_byte_expansion_words()
 	if Engine.is_editor_hint():
 		# Streaming, input, and signal routes belong to a running game. An
 		# editor instance only draws, and only when its scene asked it to.
@@ -375,7 +384,6 @@ func _ready() -> void:
 	)
 	_prepare_hole_masks()
 	_prepare_chamber_transition_stamps()
-	_prepare_sculpt_byte_expansion_words()
 	_on_view_position_changed(terrain_manager.get_view_position())
 
 
@@ -480,6 +488,7 @@ func _on_dig_visuals_preparation_started(
 		work.raster_band_index = 0
 		work.raster_band_count = 1
 		work.prepares_patch = false
+		work.private_texture_tile_index = -1
 		work.image_preparation = null
 		if (
 			_stamp_preparation_pool.size()
@@ -562,12 +571,33 @@ func _prepare_next_pending_stamp_layer() -> void:
 		>= _pending_stamp_preparation.size()
 	):
 		return
+	# Queue descriptors are candidate-independent and bounded by the same hard
+	# cap as authoritative work. Grow their pool during wind-up so a stacked
+	# contact does not allocate dozens of RefCounted objects on the hit frame.
+	if _impact_work_pool.size() < MAX_PENDING_IMPACT_WORK_ITEMS:
+		_impact_work_pool.append(ImpactRasterWork.new())
 	var work := _pending_stamp_preparation[
 		_pending_stamp_preparation_head
 	]
 	_pending_stamp_preparation_head += 1
 	var stamp := work.stamp
 	var layer_index := work.layer_index
+	if work.private_texture_tile_index >= 0:
+		if _active_chunks.get(work.chunk_index) != work.chunk:
+			return
+		var tile_bit := 1 << work.private_texture_tile_index
+		if (
+			work.chunk.needs_private_texture_tiles[layer_index]
+			& tile_bit
+			== 0
+		):
+			return
+		# Allocate the private GPU destination during target wind-up while it
+		# still contains the unchanged terrain. Impact then performs an update,
+		# avoiding first-use texture allocation inside the protected queue.
+		work.chunk.dirty_mask_tiles[layer_index] |= tile_bit
+		_publish_layer_texture(work.chunk, layer_index, tile_bit)
+		return
 	if work.prepares_patch:
 		_prepare_stamp_layer_patch_band(work)
 		return
@@ -673,6 +703,7 @@ func _obtain_stamp_preparation_work() -> ImpactStampPreparation:
 	work.raster_band_index = 0
 	work.raster_band_count = 1
 	work.prepares_patch = false
+	work.private_texture_tile_index = -1
 	work.image_preparation = null
 	return work
 
@@ -723,6 +754,19 @@ func _queue_stamp_layer_patch_preparation(
 		work.raster_band_count = raster_band_count
 		work.prepares_patch = true
 		_pending_stamp_preparation.append(work)
+	# GPU texture creation is candidate-independent once the CPU stratum has
+	# detached. Queue one bounded tile allocation after its patch raster bands.
+	var dirty_tile_bits := _get_stamp_dirty_tile_bits(stamp, layer_index)
+	for tile_index in range(MASK_HORIZONTAL_TILE_COUNT):
+		if dirty_tile_bits & (1 << tile_index) == 0:
+			continue
+		var texture_work := _obtain_stamp_preparation_work()
+		texture_work.stamp = stamp
+		texture_work.layer_index = layer_index
+		texture_work.chunk = chunk
+		texture_work.chunk_index = chunk_index
+		texture_work.private_texture_tile_index = tile_index
+		_pending_stamp_preparation.append(texture_work)
 
 
 ## Builds one immutable patch from a terrain revision. If contact or streaming
@@ -856,6 +900,7 @@ func _compact_pending_stamp_preparation() -> void:
 		work.raster_band_index = 0
 		work.raster_band_count = 1
 		work.prepares_patch = false
+		work.private_texture_tile_index = -1
 		work.image_preparation = null
 		if (
 			_stamp_preparation_pool.size()
@@ -1046,9 +1091,9 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 							raster_band_index,
 							raster_band_count
 						)
-		# CPU masks still consume every stamp in order. Publish only the final
-		# item for each chunk/layer so a stacked hit cannot upload the same tile
-		# repeatedly before any rendered frame can display the intermediates.
+		# CPU masks still consume every stamp in order. The final item for each
+		# chunk/layer publishes its dirty GPU tiles one bounded slice at a time
+		# without allocating extra queue descriptors for multi-tile masks.
 		var last_work_by_chunk_layer: Dictionary[int, int] = {}
 		for work_index in range(
 			maxi(grouped_work_start, _pending_impact_work_head),
@@ -1058,10 +1103,11 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 			if grouped_work.chunk == null or grouped_work.prepare_only:
 				continue
 			grouped_work.publish_layer = false
-			last_work_by_chunk_layer[
+			var chunk_layer_key := (
 				grouped_work.chunk_index * layer_count
-					+ grouped_work.layer_index
-			] = work_index
+				+ grouped_work.layer_index
+			)
+			last_work_by_chunk_layer[chunk_layer_key] = work_index
 		for work_index in last_work_by_chunk_layer.values():
 			_pending_impact_work[work_index].publish_layer = true
 		_prepared_layer_patches.clear()
@@ -1121,6 +1167,7 @@ func _append_impact_work(
 	work.prepare_only = prepare_only
 	work.finish_preparation = finish_preparation
 	work.publish_layer = true
+	work.raster_complete = false
 	work.prepared_patch = prepared_patch
 	work.image_preparation = null
 	_pending_impact_work.append(work)
@@ -1134,7 +1181,7 @@ func _process_next_pending_impact_work() -> void:
 		return
 	var work := _pending_impact_work[_pending_impact_work_head]
 	_pending_impact_work_head += 1
-	if work.prepared_patch != null:
+	if not work.raster_complete and work.prepared_patch != null:
 		if _active_chunks.get(work.chunk_index) == work.chunk:
 			_make_layer_writable(work.chunk, work.layer_index)
 			if (
@@ -1155,8 +1202,6 @@ func _process_next_pending_impact_work() -> void:
 					work.prepared_patch.dirty_tile_bits
 				)
 				work.chunk.layer_revisions[work.layer_index] += 1
-				if work.publish_layer:
-					_publish_layer_texture(work.chunk, work.layer_index)
 			else:
 				# A non-mining terrain mutation invalidated the candidate after
 				# queue construction. This rare path stays authoritative.
@@ -1166,15 +1211,18 @@ func _process_next_pending_impact_work() -> void:
 					work.stamp,
 					work.layer_index
 				)
-				if work.publish_layer:
-					_publish_layer_texture(work.chunk, work.layer_index)
-	elif work.prepare_only:
+		work.raster_complete = true
+	elif not work.raster_complete and work.prepare_only:
 		if not _advance_committed_stamp_images(work):
 			_pending_impact_work_head -= 1
 			return
 		if work.finish_preparation:
 			_stamp_image_cache.discard_prepared()
-	elif _active_chunks.get(work.chunk_index) == work.chunk:
+		work.raster_complete = true
+	elif (
+		not work.raster_complete
+		and _active_chunks.get(work.chunk_index) == work.chunk
+	):
 		_apply_impact_stamp_layer(
 			work.chunk,
 			work.chunk_index,
@@ -1183,8 +1231,30 @@ func _process_next_pending_impact_work() -> void:
 			work.raster_band_index,
 			work.raster_band_count
 		)
-		if work.publish_layer:
-			_publish_layer_texture(work.chunk, work.layer_index)
+		work.raster_complete = true
+	else:
+		work.raster_complete = true
+	# A final descriptor resumes at the same head until every dirty tile has
+	# uploaded. Queue size stays bounded while the 7 ms guard sees each slice.
+	if (
+		work.publish_layer
+		and _active_chunks.get(work.chunk_index) == work.chunk
+		and work.chunk.dirty_mask_tiles[work.layer_index] != 0
+	):
+		var dirty_tile_bits := work.chunk.dirty_mask_tiles[work.layer_index]
+		for tile_index in range(MASK_HORIZONTAL_TILE_COUNT):
+			var tile_bit := 1 << tile_index
+			if dirty_tile_bits & tile_bit == 0:
+				continue
+			_publish_layer_texture(
+				work.chunk,
+				work.layer_index,
+				tile_bit
+			)
+			break
+		if work.chunk.dirty_mask_tiles[work.layer_index] != 0:
+			_pending_impact_work_head -= 1
+			return
 	work.chunk = null
 	work.stamp = null
 	work.raster_band_index = 0
@@ -1192,6 +1262,7 @@ func _process_next_pending_impact_work() -> void:
 	work.prepare_only = false
 	work.finish_preparation = false
 	work.publish_layer = true
+	work.raster_complete = false
 	work.prepared_patch = null
 	work.image_preparation = null
 	if _impact_work_pool.size() < MAX_PENDING_IMPACT_WORK_ITEMS:
@@ -1232,6 +1303,7 @@ func _compact_pending_impact_work(
 			work.prepare_only = false
 			work.finish_preparation = false
 			work.publish_layer = true
+			work.raster_complete = false
 			work.prepared_patch = null
 			work.image_preparation = null
 			if _impact_work_pool.size() < MAX_PENDING_IMPACT_WORK_ITEMS:
@@ -1273,6 +1345,7 @@ func rebuild_all_chunks() -> void:
 		pending_work.prepare_only = false
 		pending_work.finish_preparation = false
 		pending_work.publish_layer = true
+		pending_work.raster_complete = false
 		pending_work.prepared_patch = null
 		pending_work.image_preparation = null
 		if _impact_work_pool.size() < MAX_PENDING_IMPACT_WORK_ITEMS:
@@ -1969,7 +2042,8 @@ func _compact_pending_chunk_texture_publishes() -> void:
 ## its own; one that was already its own is updated in place.
 func _publish_layer_texture(
 	chunk: TerrainChunkVisual,
-	layer_index: int
+	layer_index: int,
+	tile_filter: int = ALL_MASK_TILES_DIRTY
 ) -> void:
 	var mask_image: Image = chunk.mask_images[layer_index]
 	if mask_image == null:
@@ -1980,7 +2054,9 @@ func _publish_layer_texture(
 		and chunk.dirty_mask_tiles[layer_index] == 0
 	):
 		return
-	var dirty_tiles: int = chunk.dirty_mask_tiles[layer_index]
+	var dirty_tiles: int = (
+		chunk.dirty_mask_tiles[layer_index] & tile_filter
+	)
 	if dirty_tiles == 0:
 		return
 	var texture_tiles: Array = chunk.mask_texture_tiles[layer_index]
@@ -2027,7 +2103,7 @@ func _publish_layer_texture(
 		chunk.needs_private_texture_tiles[layer_index] &= ~tile_bit
 	chunk.mask_texture_tiles[layer_index] = texture_tiles
 	_set_sprite_mask_textures(sprite, texture_tiles)
-	chunk.dirty_mask_tiles[layer_index] = 0
+	chunk.dirty_mask_tiles[layer_index] &= ~dirty_tiles
 
 
 ## Binds one layer's fixed tile set to its single full-width sprite.
@@ -2753,6 +2829,8 @@ func _queue_sculpt_run_preparation(
 
 ## Builds the fixed binary-byte to eight-LA8-pixel decode table once at boot.
 func _prepare_sculpt_byte_expansion_words() -> void:
+	if _sculpt_byte_expansion_words.size() == 256 * 2:
+		return
 	_sculpt_byte_expansion_words.resize(256 * 2)
 	for packed_cells in range(256):
 		var expanded_cells := PackedByteArray()
@@ -2779,6 +2857,9 @@ func _advance_sculpt_run_preparation(
 		return true
 	if preparation.phase == 0:
 		if preparation.cell_bytes.is_empty():
+			# Tool scripts and direct fixtures may enter preparation without
+			# _ready(); keep their decode contract identical to runtime.
+			_prepare_sculpt_byte_expansion_words()
 			preparation.cell_bytes.resize(
 				preparation.padded_size.x
 				* preparation.padded_size.y
