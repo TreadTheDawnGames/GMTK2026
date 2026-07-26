@@ -29,9 +29,10 @@ var stored_combo : int = 0
 
 var _audio_handler: PlayerAudioHandler
 var _target_unlocks: Array[PickaxeDefinition] = []
-var _progression_target_scenes: Array[PackedScene] = []
 var _progression_bonus_target_combos := PackedInt32Array()
 var _uses_encounter_progression: bool = false
+var _active_combo_target_group_index: int = -1
+var _highest_unlocked_combo_target_group_index: int = 0
 var _bounce_muted: bool = false
 var _displayed_distance: int = 0
 
@@ -124,6 +125,7 @@ func _on_run_reset() -> void:
 	recovery_window.stop()
 	recovery_window2.stop()
 	mining_window.reset_all_targets()
+	_apply_combo_target_group(0, false)
 	mining_window.start()
 
 ## Shows distance to the Thief, then distance travelled beyond the Thief.
@@ -147,20 +149,27 @@ func set_pickaxe_target_unlocks(
 ## New level-owned timing rules are added to this explicit contract and passed
 ## by EncounterProgression.apply_level(), as documented in pickaxe_authoring.md.
 func set_progression_target_rules(
-	target_scenes: Array[PackedScene],
 	slider_speed: float,
 	starting_target_count: int,
-	bonus_target_combos: PackedInt32Array
+	bonus_target_combos: PackedInt32Array,
+	highest_unlocked_combo_target_group_index: int
 ) -> void:
-	if target_scenes.is_empty():
-		push_warning("Encounter progression requires timing target scenes.")
+	if (
+		mining_config == null
+		or not mining_config.has_valid_combo_target_groups()
+	):
+		push_warning("Encounter progression requires combo target groups.")
 		return
 	_uses_encounter_progression = true
-	_progression_target_scenes = target_scenes.duplicate()
 	_progression_bonus_target_combos = bonus_target_combos.duplicate()
+	_highest_unlocked_combo_target_group_index = clampi(
+		highest_unlocked_combo_target_group_index,
+		0,
+		mining_config.combo_target_groups.size() - 1
+	)
 	mining_window.speed = slider_speed
 	mining_window.set_starting_target_count(starting_target_count)
-	mining_window.set_target_pool(_progression_target_scenes)
+	_apply_combo_target_group(combo, false)
 
 ## Rebuilds only the zero-combo target baseline after the bar is ready.
 func _apply_pickaxe_target_unlocks() -> void:
@@ -204,40 +213,12 @@ func _mining_window_pressed(
 				"SFX"
 			)
 
-		var unlocked_target_scenes: Array[PackedScene] = []
-		if (
-			_uses_encounter_progression
-			and combo in _progression_bonus_target_combos
-		):
-			unlocked_target_scenes = (
-				_progression_target_scenes.duplicate()
-			)
-		elif not _uses_encounter_progression:
-			for definition in _target_unlocks:
-				if (
-					definition == null
-					or definition.target_unlock_combo != combo
-					or definition.target_scenes.is_empty()
-				):
-					continue
-				for target_scene: PackedScene in definition.target_scenes:
-					if (
-						target_scene != null
-						and target_scene not in unlocked_target_scenes
-					):
-						unlocked_target_scenes.append(target_scene)
-		if not unlocked_target_scenes.is_empty():
-			mining_window.add_target_from_pool.call_deferred(
-				unlocked_target_scenes
-			)
-		if (
-			not _uses_encounter_progression
-			and unlocked_target_scenes.is_empty()
-			and _target_unlocks.is_empty()
-			and combo
-				% mining_config.combo_hits_for_additional_target == 0
-		):
-			mining_window.add_target.call_deferred()
+		# Defer until SliderTimingWindow finishes iterating the hit target set.
+		# Pool replacement must precede any bonus spawn at the same combo.
+		_apply_success_target_rules.call_deferred(
+			combo,
+			mining_window.is_all_targets_hit()
+		)
 	else:
 		stored_combo = combo
 		if combo >= mining_config.recovery_combo_threshold:
@@ -371,3 +352,102 @@ func fail_combo():
 	streak_ended.emit(lost_combo)
 	mining_window.speed_multiplier = 1.0
 	_play_sound(AudioLibrary.STREAK_LOST)
+	_apply_combo_target_group.call_deferred(0, false)
+
+
+## Applies a reached combo pool after a completed set, then adds hit bonuses.
+func _apply_success_target_rules(
+	reached_combo: int,
+	target_set_completed: bool
+) -> void:
+	if _uses_encounter_progression:
+		var group_index := _resolve_combo_target_group_index(reached_combo)
+		if target_set_completed:
+			_apply_combo_target_group(reached_combo, true)
+		if reached_combo in _progression_bonus_target_combos:
+			if (
+				target_set_completed
+				or group_index == _active_combo_target_group_index
+			):
+				mining_window.add_target()
+			elif group_index >= 0:
+				# This allocation occurs only at the level's bounded authored
+				# bonus thresholds (at most four per streak), not per hit.
+				var retained_pool := (
+					mining_window.target_packed_scenes.duplicate()
+				)
+				mining_window.target_packed_scenes = (
+					mining_config.combo_target_groups[group_index]
+						.target_scenes.duplicate()
+				)
+				mining_window.add_target()
+				mining_window.target_packed_scenes = retained_pool
+			mining_window.randomize_all_targets()
+		return
+	var unlocked_target_scenes: Array[PackedScene] = []
+	for definition in _target_unlocks:
+		if (
+			definition == null
+			or definition.target_unlock_combo != reached_combo
+			or definition.target_scenes.is_empty()
+		):
+			continue
+		for target_scene: PackedScene in definition.target_scenes:
+			if (
+				target_scene != null
+				and target_scene not in unlocked_target_scenes
+			):
+				unlocked_target_scenes.append(target_scene)
+	if not unlocked_target_scenes.is_empty():
+		mining_window.add_target_from_pool(unlocked_target_scenes)
+	elif (
+		_target_unlocks.is_empty()
+		and reached_combo
+			% mining_config.combo_hits_for_additional_target == 0
+	):
+		mining_window.add_target()
+
+
+## Rebuilds the active target pool while optionally retaining earned count.
+func _apply_combo_target_group(
+	reached_combo: int,
+	preserve_target_count: bool
+) -> void:
+	if (
+		not _uses_encounter_progression
+		or mining_config == null
+	):
+		return
+	var group_index := _resolve_combo_target_group_index(reached_combo)
+	if (
+		group_index < 0
+		or group_index == _active_combo_target_group_index
+	):
+		return
+	var retained_target_count := (
+		mining_window.targets.size()
+		if preserve_target_count
+		else 0
+	)
+	var group := mining_config.combo_target_groups[group_index]
+	mining_window.set_target_pool(group.target_scenes)
+	while mining_window.targets.size() < retained_target_count:
+		mining_window.add_target()
+	if retained_target_count > 0:
+		mining_window.randomize_all_targets()
+	_active_combo_target_group_index = group_index
+
+
+## Caps the combo-selected group at the current encounter unlock.
+func _resolve_combo_target_group_index(reached_combo: int) -> int:
+	if mining_config == null:
+		return -1
+	var combo_group_index := (
+		mining_config.get_combo_target_group_index(reached_combo)
+	)
+	if combo_group_index < 0:
+		return -1
+	return mini(
+		combo_group_index,
+		_highest_unlocked_combo_target_group_index
+	)

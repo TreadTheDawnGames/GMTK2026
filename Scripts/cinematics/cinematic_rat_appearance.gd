@@ -17,17 +17,17 @@ extends Resource
 ## two marks by how its canvas is padded:
 ##
 ## - The single mice are the source art cropped to one shared 938x648 content
-##   box, imported with process/size_limit 256. In that imported texture the
-##   content's bottom edge sits 88.5 px below the canvas centre and its
-##   horizontal centre 38.35 px right of it, and the sprite offset cancels
-##   exactly those two numbers.
+##   box, imported with process/size_limit 512. In that imported texture the
+##   content's bottom edge sits 177 px below the canvas centre and its
+##   horizontal centre 76.7 px right of it. The 0.11 presentation scale and
+##   authored sprite position preserve the same world-space registration.
 ## - A drawing of another shape keeps those offsets by padding its canvas, not
 ##   by moving anything in the scene, and then by raising its own size_limit in
 ##   the same proportion as its canvas so the drawn rats stay the size the
-##   single mice are. mouse_clump.png is 2264x1252 at size_limit 618 for that
-##   reason - 618/2264 is 256/938. Change one of that pair without the other and
-##   the crowd silently renders at the wrong scale or floating off the floor,
-##   with no error anywhere.
+##   single mice are. mouse_clump.png is 2264x1252 at size_limit 1236 for that
+##   reason - 1236/2264 is approximately 512/938. Change one of that pair
+##   without the other and the crowd silently renders at the wrong scale or
+##   floating off the floor, with no error anywhere.
 
 @export var idle_texture: Texture2D
 ## Contact art. A clump may point this at its idle drawing: the actor still

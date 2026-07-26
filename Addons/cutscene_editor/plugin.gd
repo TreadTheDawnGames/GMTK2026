@@ -42,6 +42,10 @@ var _stroke_before: CutsceneTerrainSculpt
 var _hover_local := Vector2.ZERO
 var _has_hover: bool = false
 var _stroke_origin_local := Vector2.ZERO
+var _stroke_operation: StringName = CutsceneSculptBrush.OP_CARVE
+## Captured on mouse-down so a shortcut pressed during a drag only selects the
+## next gesture; it cannot change what the current preview applies on release.
+var _stroke_shape: StringName = CutsceneSculptBrush.SHAPE_FREE
 ## The beat the timeline has selected, so the viewport can draw its walk.
 var _selected_beat: CutsceneBeat
 ## Which end of the selected walk is being dragged: "start", "target", or empty
@@ -51,6 +55,7 @@ var _dragging_handle: StringName = &""
 ## written live during the drag, so by release it no longer remembers what undo
 ## has to put back.
 var _move_offset_before_drag := Vector2.ZERO
+var _waypoints_before_drag: Array[Vector2] = []
 ## Colours for the selected walk: the line it travels and the handle that ends
 ## it. Green reads as "this is the path", matching the landing line's language.
 const MOVE_PATH_COLOR := Color(0.45, 0.9, 1.0, 0.85)
@@ -68,15 +73,16 @@ func _enter_tree() -> void:
 	_timeline_panel = CutsceneTimelinePanel.new()
 	_beat_inspector = CutsceneBeatInspector.new()
 	_timeline_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_beat_inspector.size_flags_horizontal = Control.SIZE_SHRINK_END
+	_beat_inspector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	var timeline_tab := HSplitContainer.new()
 	timeline_tab.name = "Timeline"
 	timeline_tab.add_child(_timeline_panel)
 	timeline_tab.add_child(_beat_inspector)
-	# Only the timeline expands. The beat editor keeps its compact minimum and
-	# the native dragger still lets a designer lend it more space temporarily.
-	timeline_tab.split_offset = 0
+	# Keep the inspector a compact rail even when a dialogue resource contains
+	# long lines. A negative split is measured from the right edge, so it stays
+	# stable when the editor enters fullscreen instead of crushing the timeline.
+	timeline_tab.split_offset = -420
 
 	var tabs := TabContainer.new()
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -119,17 +125,24 @@ func _enter_tree() -> void:
 
 	_sculpt_panel.armed_changed.connect(_on_armed_changed)
 	_sculpt_panel.brush_settings_changed.connect(_on_brush_settings_changed)
+	_sculpt_panel.shape_tool_changed.connect(_on_shape_tool_changed)
+	_sculpt_panel.selection_action_requested.connect(
+		_on_selection_action_requested
+	)
 	_timeline_panel.beat_selected.connect(_on_beat_selected)
 	_timeline_panel.scrub_time_changed.connect(_on_scrub_time_changed)
-	_context.authored_data_changed.connect(_on_authored_data_changed)
-	_context.cast_changed.connect(_on_cast_changed)
 	scene_changed.connect(_on_scene_changed)
 	_on_scene_changed(EditorInterface.get_edited_scene_root())
 
 
 func _exit_tree() -> void:
+	_cancel_active_sculpt_gesture()
 	if scene_changed.is_connected(_on_scene_changed):
 		scene_changed.disconnect(_on_scene_changed)
+	if _context.authored_data_changed.is_connected(_on_authored_data_changed):
+		_context.authored_data_changed.disconnect(_on_authored_data_changed)
+	if _context.cast_changed.is_connected(_on_cast_changed):
+		_context.cast_changed.disconnect(_on_cast_changed)
 	if _dock != null:
 		remove_control_from_bottom_panel(_dock)
 		_dock.queue_free()
@@ -165,7 +178,34 @@ func _auto_populate_cast() -> void:
 
 ## Rereads the open scene into the one context every panel shares.
 func _rebuild_context() -> void:
+	_cancel_active_sculpt_gesture()
+	# A handle drag writes live values for viewport feedback. Switching scenes
+	# before release must put the old resource back because no undo action was
+	# committed for that gesture.
+	if _selected_beat != null and not _dragging_handle.is_empty():
+		if str(_dragging_handle).begins_with("waypoint:"):
+			_selected_beat.movement_waypoints = (
+				_waypoints_before_drag.duplicate()
+			)
+		elif _dragging_handle == &"start":
+			_selected_beat.start_offset = _move_offset_before_drag
+		else:
+			_selected_beat.target_offset = _move_offset_before_drag
+	_dragging_handle = &""
+	_waypoints_before_drag.clear()
+	_selected_beat = null
+
 	var preview := _find_preview()
+	if _context.authored_data_changed.is_connected(_on_authored_data_changed):
+		_context.authored_data_changed.disconnect(_on_authored_data_changed)
+	if _context.cast_changed.is_connected(_on_cast_changed):
+		_context.cast_changed.disconnect(_on_cast_changed)
+	# Panels still hold the previous context until set_context below. Replacing
+	# rather than mutating it lets the timeline restore the previous stage's
+	# preview nodes before it binds to the new scene.
+	_context = CutsceneEditorContext.new()
+	_context.authored_data_changed.connect(_on_authored_data_changed)
+	_context.cast_changed.connect(_on_cast_changed)
 	_context.scene_root = EditorInterface.get_edited_scene_root()
 	_context.preview = preview
 	_context.stage = (
@@ -188,6 +228,17 @@ func _rebuild_context() -> void:
 	_cast_panel.set_context(_context)
 	_timeline_panel.set_context(_context)
 	_beat_inspector.set_context(_context)
+
+
+## Restores live-painted cells when the editor closes or changes scenes before
+## mouse-up. Drag shapes have not mutated yet, so the same restore is harmless.
+func _cancel_active_sculpt_gesture() -> void:
+	if not _is_stroking:
+		return
+	_is_stroking = false
+	if _stroke_before != null and _context.sculpt != null:
+		_context.sculpt.copy_shape_from(_stroke_before)
+	_stroke_before = null
 	_rebuild_layer_outline()
 	update_overlays()
 
@@ -219,6 +270,13 @@ func _on_brush_settings_changed() -> void:
 	update_overlays()
 
 
+func _on_shape_tool_changed(_shape_tool: StringName) -> void:
+	# A gesture already owns its captured shape until mouse-up. Cancelling here
+	# used to leave a partially painted free stroke with no undo entry when a
+	# designer pressed B/L/R/E/S while still holding the mouse.
+	update_overlays()
+
+
 func _on_beat_selected(beat: CutsceneBeat) -> void:
 	_selected_beat = beat
 	_beat_inspector.show_beat(beat)
@@ -241,6 +299,8 @@ func _get_selected_move_target() -> Variant:
 		target += _context.get_marker_position(_selected_beat.target_marker)
 	elif _selected_beat.target_offset == Vector2.ZERO:
 		return null
+	else:
+		target = _context.stage.to_global(target)
 	return target
 
 
@@ -261,13 +321,15 @@ func _get_selected_move_origin() -> Variant:
 			authored += _context.get_marker_position(
 				_selected_beat.start_marker
 			)
+		else:
+			authored = _context.stage.to_global(authored)
 		return authored
 	var player := CutsceneSequencePlayer.new()
 	player.bind(
 		_context.get_actor_preview,
 		_context.get_marker_position,
 		Callable(),
-		null
+		_context.stage
 	)
 	var states: Dictionary = player.evaluate_at(
 		_context.sequence,
@@ -290,14 +352,15 @@ func _on_scrub_time_changed(seconds: float) -> void:
 		_context.get_actor_preview,
 		_context.get_marker_position,
 		Callable(),
-		null
+		_context.stage
 	)
 	var states: Dictionary = player.evaluate_at(_context.sequence, seconds)
-	for actor_id: StringName in states:
+	var actor_states: Dictionary = states.get(&"actors", {})
+	for actor_id: StringName in actor_states:
 		var actor := _context.get_actor_preview(actor_id)
 		if actor == null:
 			continue
-		var state: Dictionary = states[actor_id]
+		var state: Dictionary = actor_states[actor_id]
 		if state.has("position"):
 			actor.global_position = state["position"]
 		if state.has("visible"):
@@ -366,6 +429,46 @@ func _forward_canvas_gui_input(event: InputEvent) -> bool:
 	# is armed, so ordinary editor shortcuts are untouched the rest of the time.
 	var key := event as InputEventKey
 	if key != null and key.pressed and not key.echo:
+		if not _is_stroking and _sculpt_panel.has_selection():
+			if key.ctrl_pressed and key.keycode == KEY_C:
+				_on_selection_action_requested(
+					CutsceneSculptPanel.SELECTION_COPY
+				)
+				return true
+			if (
+				key.ctrl_pressed
+				and key.keycode == KEY_V
+				and _sculpt_panel.has_selection_clipboard()
+			):
+				_on_selection_action_requested(
+					CutsceneSculptPanel.SELECTION_PASTE
+				)
+				return true
+			if (
+				not key.ctrl_pressed
+				and not key.alt_pressed
+				and key.keycode == KEY_ENTER
+				and (
+					_sculpt_panel.get_operation()
+					!= CutsceneSculptPanel.OP_DIG_HIT
+				)
+			):
+				_on_selection_action_requested(
+					CutsceneSculptPanel.SELECTION_FILL
+				)
+				return true
+			if (
+				not key.ctrl_pressed
+				and not key.alt_pressed
+				and key.keycode == KEY_M
+			):
+				_on_selection_action_requested(
+					CutsceneSculptPanel.SELECTION_MIRROR
+				)
+				return true
+			if key.keycode == KEY_ESCAPE:
+				_sculpt_panel.clear_selection()
+				return true
 		match key.keycode:
 			KEY_1, KEY_2, KEY_3, KEY_4, KEY_5:
 				_sculpt_panel.select_operation(key.keycode - KEY_1)
@@ -384,6 +487,41 @@ func _forward_canvas_gui_input(event: InputEvent) -> bool:
 				# the gesture wanted.
 				_sculpt_panel.toggle_carve_fill()
 				update_overlays()
+				return true
+			KEY_B:
+				if key.ctrl_pressed or key.alt_pressed:
+					return false
+				_sculpt_panel.select_shape_tool(
+					CutsceneSculptBrush.SHAPE_FREE
+				)
+				return true
+			KEY_L:
+				if key.ctrl_pressed or key.alt_pressed:
+					return false
+				_sculpt_panel.select_shape_tool(
+					CutsceneSculptBrush.SHAPE_LINE
+				)
+				return true
+			KEY_R:
+				if key.ctrl_pressed or key.alt_pressed:
+					return false
+				_sculpt_panel.select_shape_tool(
+					CutsceneSculptBrush.SHAPE_RECTANGLE
+				)
+				return true
+			KEY_E:
+				if key.ctrl_pressed or key.alt_pressed:
+					return false
+				_sculpt_panel.select_shape_tool(
+					CutsceneSculptBrush.SHAPE_ELLIPSE
+				)
+				return true
+			KEY_S:
+				if key.ctrl_pressed or key.alt_pressed:
+					return false
+				_sculpt_panel.select_shape_tool(
+					CutsceneSculptBrush.SHAPE_SELECTION
+				)
 				return true
 		return false
 
@@ -421,9 +559,15 @@ func _forward_canvas_gui_input(event: InputEvent) -> bool:
 			_dig_hit(_to_world_position(button.position), button.alt_pressed)
 		return true
 	if button.pressed:
+		if (
+			_sculpt_panel.get_shape_tool()
+			== CutsceneSculptBrush.SHAPE_STAMP
+		):
+			_apply_stamp(Vector2i(floor(local_cell)))
+			return true
 		_begin_stroke(local_cell, button.alt_pressed, button.ctrl_pressed)
 		return true
-	_end_stroke()
+	_end_stroke(button.alt_pressed, button.ctrl_pressed)
 	return true
 
 
@@ -464,7 +608,16 @@ func _begin_stroke(
 	_stroke_origin_local = local_cell
 	_is_stroking = true
 	_last_stroke_local = local_cell
-	_apply_operation(local_cell, local_cell, invert, smooth)
+	_stroke_operation = _resolve_stroke_operation(invert, smooth)
+	_stroke_shape = _sculpt_panel.get_shape_tool()
+	if _stroke_shape == CutsceneSculptBrush.SHAPE_FREE:
+		_sculpt_panel.get_brush().stamp_shape(
+			_context.sculpt,
+			local_cell,
+			local_cell,
+			_stroke_operation,
+			CutsceneSculptBrush.SHAPE_FREE
+		)
 
 
 func _stroke_to(
@@ -472,21 +625,123 @@ func _stroke_to(
 	invert: bool,
 	smooth: bool
 ) -> void:
-	_apply_operation(_last_stroke_local, local_cell, invert, smooth)
+	if _stroke_shape == CutsceneSculptBrush.SHAPE_FREE:
+		_sculpt_panel.get_brush().stamp_shape(
+			_context.sculpt,
+			_last_stroke_local,
+			local_cell,
+			_resolve_stroke_operation(invert, smooth),
+			CutsceneSculptBrush.SHAPE_LINE
+		)
+	else:
+		# Drag shapes mutate once on release, using the modifier state the
+		# designer is currently previewing rather than only mouse-down state.
+		_stroke_operation = _resolve_stroke_operation(invert, smooth)
 	_last_stroke_local = local_cell
+	update_overlays()
 
 
 ## Ends the drag as one undo entry. Recording per mouse-move would make a
 ## single stroke take dozens of presses of Ctrl+Z to take back.
-func _end_stroke() -> void:
+func _end_stroke(invert: bool, smooth: bool) -> void:
 	if not _is_stroking:
 		return
 	_is_stroking = false
+	var shape := _stroke_shape
+	if shape == CutsceneSculptBrush.SHAPE_SELECTION:
+		_sculpt_panel.set_selection(
+			_sculpt_panel.get_brush().normalize_region(
+				Vector2i(floor(_stroke_origin_local)),
+				Vector2i(floor(_last_stroke_local))
+			)
+		)
+		_stroke_before = null
+		update_overlays()
+		return
 	var sculpt := _context.sculpt
+	if shape != CutsceneSculptBrush.SHAPE_FREE:
+		_stroke_operation = _resolve_stroke_operation(invert, smooth)
+		_sculpt_panel.get_brush().stamp_shape(
+			sculpt,
+			_stroke_origin_local,
+			_last_stroke_local,
+			_stroke_operation,
+			shape
+		)
+	_commit_sculpt_snapshot("Sculpt cutscene room")
+
+
+func _resolve_stroke_operation(invert: bool, smooth: bool) -> StringName:
+	var operation := _sculpt_panel.get_operation()
+	if smooth:
+		return CutsceneSculptBrush.OP_SMOOTH
+	if invert:
+		if operation == CutsceneSculptBrush.OP_CARVE:
+			return CutsceneSculptBrush.OP_FILL
+		if operation == CutsceneSculptBrush.OP_FILL:
+			return CutsceneSculptBrush.OP_CARVE
+	return operation
+
+
+func _apply_stamp(center: Vector2i) -> void:
+	if _context.sculpt == null:
+		return
+	_stroke_before = CutsceneTerrainSculpt.new()
+	_stroke_before.copy_shape_from(_context.sculpt)
+	_sculpt_panel.get_brush().apply_builtin_stamp(
+		_context.sculpt,
+		center,
+		_sculpt_panel.get_selected_stamp()
+	)
+	_commit_sculpt_snapshot(
+		"Place %s terrain stamp" % _sculpt_panel.get_selected_stamp_label()
+	)
+
+
+func _on_selection_action_requested(action: StringName) -> void:
+	if _context.sculpt == null or not _sculpt_panel.has_selection():
+		return
+	var brush := _sculpt_panel.get_brush()
+	var region := _sculpt_panel.get_selection()
+	if action == CutsceneSculptPanel.SELECTION_COPY:
+		_sculpt_panel.set_selection_clipboard(
+			brush.copy_region(_context.sculpt, region)
+		)
+		return
+	_stroke_before = CutsceneTerrainSculpt.new()
+	_stroke_before.copy_shape_from(_context.sculpt)
+	match action:
+		CutsceneSculptPanel.SELECTION_PASTE:
+			if not _sculpt_panel.has_selection_clipboard():
+				_stroke_before = null
+				return
+			brush.paste_region(
+				_context.sculpt,
+				region.position,
+				_sculpt_panel.get_selection_clipboard()
+			)
+		CutsceneSculptPanel.SELECTION_FILL:
+			brush.fill_region(
+				_context.sculpt,
+				region,
+				_sculpt_panel.get_operation()
+			)
+		CutsceneSculptPanel.SELECTION_MIRROR:
+			brush.mirror_region_horizontal(_context.sculpt, region)
+		_:
+			_stroke_before = null
+			return
+	_commit_sculpt_snapshot("Edit selected cutscene terrain")
+
+
+func _commit_sculpt_snapshot(action_name: String) -> void:
+	var sculpt := _context.sculpt
+	if sculpt == null or _stroke_before == null:
+		return
 	var after := CutsceneTerrainSculpt.new()
 	after.copy_shape_from(sculpt)
 	var undo_redo := get_undo_redo()
-	undo_redo.create_action("Sculpt cutscene room")
+	undo_redo.create_action(action_name)
 	undo_redo.add_do_method(sculpt, &"copy_shape_from", after)
 	undo_redo.add_undo_method(sculpt, &"copy_shape_from", _stroke_before)
 	undo_redo.commit_action(false)
@@ -497,34 +752,6 @@ func _end_stroke() -> void:
 	_manager_panel.set_context(_context)
 	_rebuild_layer_outline()
 	update_overlays()
-
-
-## Applies one segment of the stroke. Alt swaps carve and fill, which is the
-## fastest way to correct an overshoot without leaving the drag.
-func _apply_operation(
-	from_local: Vector2,
-	to_local: Vector2,
-	invert: bool,
-	smooth: bool
-) -> void:
-	var operation := _sculpt_panel.get_operation()
-	# Holding ctrl smooths whatever is under the brush without changing the
-	# armed tool, so a wall can be softened mid-cut and the cut resumed by
-	# letting go. Alt still swaps carve and fill; ctrl wins when both are held,
-	# because smoothing an inverted stroke means nothing.
-	if smooth:
-		operation = CutsceneSculptBrush.OP_SMOOTH
-	elif invert:
-		if operation == CutsceneSculptBrush.OP_CARVE:
-			operation = CutsceneSculptBrush.OP_FILL
-		elif operation == CutsceneSculptBrush.OP_FILL:
-			operation = CutsceneSculptBrush.OP_CARVE
-	_sculpt_panel.get_brush().stamp_line(
-		_context.sculpt,
-		from_local,
-		to_local,
-		operation
-	)
 
 
 ## Draws the room's bounds, the brush, and where a falling miner lands.
@@ -562,6 +789,23 @@ func _handle_move_target_input(event: InputEvent) -> bool:
 						_dragging_handle = &"start"
 						_move_offset_before_drag = _selected_beat.start_offset
 						return true
+			for waypoint_index in range(
+				_selected_beat.movement_waypoints.size()
+			):
+				var waypoint_global := _context.stage.to_global(
+					_selected_beat.movement_waypoints[waypoint_index]
+				)
+				if (
+					(transform * waypoint_global).distance_to(button.position)
+					<= _MOVE_HANDLE_GRAB_PIXELS
+				):
+					_dragging_handle = StringName(
+						"waypoint:%d" % waypoint_index
+					)
+					_waypoints_before_drag = (
+						_selected_beat.movement_waypoints.duplicate()
+					)
+					return true
 			var handle_screen := transform * target
 			if (
 				handle_screen.distance_to(button.position)
@@ -582,6 +826,19 @@ func _handle_move_target_input(event: InputEvent) -> bool:
 	var motion := event as InputEventMouseMotion
 	if motion == null or _dragging_handle.is_empty():
 		return false
+	if str(_dragging_handle).begins_with("waypoint:"):
+		var waypoint_index := str(_dragging_handle).get_slice(":", 1).to_int()
+		if (
+			waypoint_index >= 0
+			and waypoint_index < _selected_beat.movement_waypoints.size()
+		):
+			_selected_beat.movement_waypoints[waypoint_index] = (
+				_context.stage.to_local(_to_world_position(motion.position))
+			)
+			_beat_inspector.show_beat(_selected_beat)
+			_timeline_panel.refresh_preview()
+			update_overlays()
+		return true
 	var is_start := _dragging_handle == &"start"
 	var marker_name: StringName = (
 		_selected_beat.start_marker
@@ -590,9 +847,12 @@ func _handle_move_target_input(event: InputEvent) -> bool:
 	)
 	var world := _to_world_position(motion.position)
 	var marker_origin := Vector2.ZERO
+	var offset := Vector2.ZERO
 	if not marker_name.is_empty():
 		marker_origin = _context.get_marker_position(marker_name)
-	var offset := world - marker_origin
+		offset = world - marker_origin
+	else:
+		offset = _context.stage.to_local(world)
 	if motion.shift_pressed:
 		offset = Vector2.ZERO
 	# Written straight onto the beat while dragging so the overlay and the
@@ -610,6 +870,27 @@ func _handle_move_target_input(event: InputEvent) -> bool:
 ## Records the finished drag as one undoable change.
 func _commit_move_handle_offset() -> void:
 	if _selected_beat == null or _context.undo_redo == null:
+		return
+	if str(_dragging_handle).begins_with("waypoint:"):
+		var final_waypoints: Array[Vector2] = (
+			_selected_beat.movement_waypoints.duplicate()
+		)
+		if final_waypoints == _waypoints_before_drag:
+			return
+		var waypoint_undo_redo := _context.undo_redo
+		waypoint_undo_redo.create_action("Move cutscene waypoint")
+		waypoint_undo_redo.add_do_property(
+			_selected_beat,
+			&"movement_waypoints",
+			final_waypoints
+		)
+		waypoint_undo_redo.add_undo_property(
+			_selected_beat,
+			&"movement_waypoints",
+			_waypoints_before_drag
+		)
+		waypoint_undo_redo.commit_action()
+		_waypoints_before_drag.clear()
 		return
 	var property: StringName = (
 		&"start_offset" if _dragging_handle == &"start" else &"target_offset"
@@ -694,7 +975,37 @@ func _draw_selected_move_path(overlay: Control, transform: Transform2D) -> void:
 	if origin_variant != null:
 		var origin: Vector2 = origin_variant
 		var origin_screen := transform * origin
-		overlay.draw_line(origin_screen, target_screen, MOVE_PATH_COLOR, 2.0)
+		var route_screen := PackedVector2Array([origin_screen])
+		for waypoint in _selected_beat.movement_waypoints:
+			route_screen.append(
+				transform * _context.stage.to_global(waypoint)
+			)
+		route_screen.append(target_screen)
+		overlay.draw_polyline(route_screen, MOVE_PATH_COLOR, 2.0)
+		var waypoint_font := overlay.get_theme_default_font()
+		for waypoint_index in range(
+			_selected_beat.movement_waypoints.size()
+		):
+			var waypoint_screen := route_screen[waypoint_index + 1]
+			overlay.draw_arc(
+				waypoint_screen,
+				7.0,
+				0.0,
+				TAU,
+				20,
+				MOVE_PATH_COLOR,
+				2.0
+			)
+			if waypoint_font != null:
+				overlay.draw_string(
+					waypoint_font,
+					waypoint_screen + Vector2(9.0, -8.0),
+					str(waypoint_index + 1),
+					HORIZONTAL_ALIGNMENT_LEFT,
+					-1.0,
+					11,
+					MOVE_PATH_COLOR
+				)
 		if _selected_beat.starts_from_authored_point:
 			# An authored start is draggable, so it is drawn as a handle. An
 			# inherited one is just where the actor happened to be, and a handle
@@ -754,8 +1065,7 @@ func _forward_canvas_draw_over_viewport(overlay: Control) -> void:
 	_draw_selected_move_path(overlay, transform)
 	if _sculpt_panel.is_armed():
 		_draw_readout(overlay)
-		if _has_hover:
-			_draw_brush(overlay, preview, transform)
+		_draw_sculpt_gesture(overlay, preview, sculpt, transform)
 
 
 func _draw_room_bounds(
@@ -840,6 +1150,93 @@ func _draw_brush(
 		2.0
 	)
 	overlay.draw_arc(center, 2.0, 0.0, TAU, 8, brush_color, 2.0)
+
+
+func _draw_sculpt_gesture(
+	overlay: Control,
+	preview: CinematicTerrainPreview,
+	sculpt: CutsceneTerrainSculpt,
+	transform: Transform2D
+) -> void:
+	var shape := (
+		_stroke_shape
+		if _is_stroking
+		else _sculpt_panel.get_shape_tool()
+	)
+	if _sculpt_panel.has_selection():
+		_draw_sculpt_region(
+			overlay,
+			preview,
+			transform,
+			_sculpt_panel.get_selection(),
+			Color(0.45, 0.85, 1.0, 0.82)
+		)
+	if not _has_hover:
+		return
+	if shape == CutsceneSculptBrush.SHAPE_FREE:
+		_draw_brush(overlay, preview, transform)
+		return
+	var cells: Array[Vector2i] = []
+	if shape == CutsceneSculptBrush.SHAPE_STAMP:
+		cells = _sculpt_panel.get_brush().preview_builtin_stamp_cells(
+			sculpt,
+			Vector2i(floor(_hover_local)),
+			_sculpt_panel.get_selected_stamp()
+		)
+	elif _is_stroking:
+		if shape == CutsceneSculptBrush.SHAPE_SELECTION:
+			_draw_sculpt_region(
+				overlay,
+				preview,
+				transform,
+				_sculpt_panel.get_brush().normalize_region(
+					Vector2i(floor(_stroke_origin_local)),
+					Vector2i(floor(_last_stroke_local))
+				),
+				Color(0.45, 0.85, 1.0, 0.95)
+			)
+			return
+		cells = _sculpt_panel.get_brush().preview_shape_cells(
+			sculpt,
+			_stroke_origin_local,
+			_last_stroke_local,
+			shape
+		)
+	for cell in cells:
+		var top_left := transform * preview.sculpt_local_to_global_position(
+			Vector2(cell)
+		)
+		var bottom_right := transform * preview.sculpt_local_to_global_position(
+			Vector2(cell + Vector2i.ONE)
+		)
+		overlay.draw_rect(
+			Rect2(top_left, bottom_right - top_left),
+			Color(1.0, 0.82, 0.28, 0.2),
+			true
+		)
+
+
+func _draw_sculpt_region(
+	overlay: Control,
+	preview: CinematicTerrainPreview,
+	transform: Transform2D,
+	region: Rect2i,
+	color: Color
+) -> void:
+	if not region.has_area():
+		return
+	var top_left := transform * preview.sculpt_local_to_global_position(
+		Vector2(region.position)
+	)
+	var bottom_right := transform * preview.sculpt_local_to_global_position(
+		Vector2(region.end)
+	)
+	overlay.draw_rect(
+		Rect2(top_left, bottom_right - top_left),
+		color,
+		false,
+		2.0
+	)
 
 
 ## Traces the selected stratum's solid/open boundary. The segments are cached
@@ -932,8 +1329,18 @@ func _draw_readout(overlay: Control) -> void:
 		return
 	var brush := _sculpt_panel.get_brush()
 	var layer_index: int = _sculpt_panel.get_outlined_layer()
-	var headline := "%s  ·  size %.0f  ·  %s" % [
+	var shape_label := _sculpt_panel.get_shape_tool_label()
+	if _is_stroking:
+		var captured_shape_index := CutsceneSculptPanel.SHAPES.find(
+			_stroke_shape
+		)
+		if captured_shape_index >= 0:
+			shape_label = CutsceneSculptPanel.SHAPE_LABELS[
+				captured_shape_index
+			]
+	var headline := "%s / %s  ·  size %.0f  ·  %s" % [
 		_sculpt_panel.get_operation_label(),
+		shape_label,
 		brush.radius_cells,
 		(
 			"shape"
@@ -951,8 +1358,8 @@ func _draw_readout(overlay: Control) -> void:
 		-1.0, 14, _sculpt_panel.get_active_layer_color()
 	)
 	var hint := (
-		"1-5 tool  ·  [ ] or wheel size  ·  ctrl+wheel layer"
-		+ "  ·  shift straight  ·  ctrl smooth  ·  alt invert  ·  x swap"
+		"1-5 tool  ·  B/L/R/E/S gesture  ·  [ ] or wheel size"
+		+ "  ·  ctrl+wheel layer  ·  ctrl smooth  ·  alt invert  ·  x swap"
 	)
 	overlay.draw_string(
 		font, origin + Vector2(0.0, 18.0), hint, HORIZONTAL_ALIGNMENT_LEFT,

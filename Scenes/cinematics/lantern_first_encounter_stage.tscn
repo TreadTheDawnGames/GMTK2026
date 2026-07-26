@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://dq1edo6hktxtb"]
+[gd_scene load_steps=13 format=3 uid="uid://dq1edo6hktxtb"]
 
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
 [ext_resource type="Script" uid="uid://7qy8qeox17tk" path="res://Scripts/cinematics/cutscene_actor_preview.gd" id="2_hbiw8"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" uid="uid://bpg6fvsw6y7ai" path="res://resources/encounters/character_appearance.gd" id="4_ml811"]
 [ext_resource type="Texture2D" uid="uid://bq8qwl3xn5qny" path="res://Assets/Characters/miner_idle-Pickaxe.png" id="5_thcas"]
 [ext_resource type="PackedScene" path="res://Scenes/props/lantern_staff.tscn" id="6_staff"]
+[ext_resource type="PackedScene" path="res://Scenes/props/bench.tscn" id="7_bench"]
 
 [sub_resource type="Resource" id="Resource_psbsn"]
 script = ExtResource("4_ml811")
@@ -13,23 +14,102 @@ texture = ExtResource("5_thcas")
 sprite_scale = Vector2(0.203, 0.203)
 sprite_offset = Vector2(0, -88)
 
+[sub_resource type="Animation" id="Animation_reset"]
+resource_name = "RESET"
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:camera_pan_offset_cells")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector2(0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("PropMarkers/Bench:modulate:a")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [1.0]
+}
+
+[sub_resource type="Animation" id="Animation_opening"]
+resource_name = "opening"
+length = 1.8
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:camera_pan_offset_cells")
+tracks/0/interp = 2
+tracks/0/loop_wrap = false
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.35, 1.8),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(0, 0), Vector2(0, 0), Vector2(-12, 0)]
+}
+
+[sub_resource type="Animation" id="Animation_closing"]
+resource_name = "closing"
+length = 0.9
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:camera_pan_offset_cells")
+tracks/0/interp = 2
+tracks/0/loop_wrap = false
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.9),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector2(-12, 0), Vector2(0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("PropMarkers/Bench:modulate:a")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.9),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [1.0, 0.0]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_lantern_first"]
+_data = {
+&"RESET": SubResource("Animation_reset"),
+&"closing": SubResource("Animation_closing"),
+&"opening": SubResource("Animation_opening")
+}
+
 [node name="LanternFirstEncounterStage" unique_id=211847311 instance=ExtResource("1_stage")]
-editor_description = "Story beat 3, depth 1,400: the player first meets the man with the lantern staff, who cryptically foreshadows the Thief, then hops once and fades away where he stands. He is ALREADY on his ledge when the miner breaks through - he does not walk in - so Entrance sits on the same mark as Conversation and the opening move is only long enough to keep the tween honest. He stands with his back to the miner over the drop, turns to deliver the warning, and turns back to it before he goes; that is what the three Actor Facing values do. Conversation Tracks Miner is off because a ledge cannot slide to meet a landing column, so his distance from the miner varies with where the fall left him. The jagged end wall is on the miner's RIGHT, the cheese girl wall mirrored."
-opening_move_seconds = 0.2
+editor_description = "Story beat 3, depth 1,400: the player first meets the Lantern Keeper on an authored ledge over the shaft that holds his abandoned staff. Canon gives him a slow approach, so Entrance begins 56px farther out on the same supported overhang and opening walks him toward the miner before he judges them. The camera holds on the fall for 0.35s, eases 12 cells left to discover the Keeper and cavern volume, and returns during his single-hop fade. Conversation Tracks Miner stays off because this ledge and shaft are fixed terrain, not a cluster that can slide to meet the landing column. Jared restored the approved bench beside the Keeper; it stays through the meeting and fades with him during closing, while RESET restores it after cancellation or replay. Jared rejected the encounter-specific lit/trodden floor treatment after seeing it in the dialogue frame, so this room uses the standard cave layers only; this stage owns only its camera displacement and scene-local staging."
+opening_move_seconds = 1.8
 closing_move_seconds = 0.9
-opening_step_height = 6.0
+opening_step_height = 4.0
 hide_actor_after_closing = true
 closing_fade_seconds = 0.9
-entrance_facing = -1
+entrance_facing = 1
 conversation_facing = 1
 closing_facing = -1
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
-editor_description = "Same mark as Conversation. He is already standing on the ledge when the miner breaks through, so there is no approach to walk."
-position = Vector2(-592, -64)
+editor_description = "Seven terrain cells left of Conversation, on the fractured unsupported tip. Runtime samples layer-one support at this x; y remains the ledge's authored -64px editor reference."
+position = Vector2(-648, -64)
 
 [node name="Conversation" parent="ActorMarkers" index="1"]
-editor_description = "Near the TIP of the overhang, out where the slab has nothing under it. y is -64 because the ledge stands eight rows above the miner's ground, and every marker here is authored on the surface it is used from."
+editor_description = "Near the tip of the overhang, eight terrain rows above the miner's floor and over open shaft. Runtime footing comes from the real layer-one ledge support at this x."
 position = Vector2(-592, -64)
 
 [node name="Work" parent="ActorMarkers" index="2"]
@@ -44,18 +124,26 @@ editor_description = "His own mark: he does not leave by walking. Closing Fade S
 position = Vector2(-592, -64)
 
 [node name="LanternStaff" parent="PropMarkers" index="0" unique_id=2096771290 instance=ExtResource("6_staff")]
-editor_description = "Standing in the floor at the dead centre of the shaft, 95 rows below the room - far under the bottom of the cutscene frame, so nothing of it is visible while he is still talking. The miner mines straight down past the shaft afterwards and meets it on the way by. Placed here rather than spawned: an encounter stage lives for the whole run, so the staff is simply already there when the player arrives."
-position = Vector2(-704, 764)
+texture_filter = 1
+editor_description = "Standing in the floor at the shaft centre, 95 rows below the room and far under the dialogue frame. The scene-local nearest filter keeps its linework sharp at this scale. Jared's requested 15px rightward adjustment moves the approved whole-sprite staff from x=-704 to x=-689; the shared source art has no separable lantern head and is not modified."
+position = Vector2(-689, 764)
 scale = Vector2(0.2462, 0.2462)
 
+[node name="Bench" parent="PropMarkers" index="1" instance=ExtResource("7_bench")]
+editor_description = "The approved Lantern Keeper bench composition, restored for the first meeting. It remains 118px right of his conversation mark, matching the measured character/bench clearance used by his later warning scene. This room's ledge is directly authored rather than loose tunnel dressing, so the bench uses the ledge's exact -64px reference; visual capture confirms its feet are flush with the top of layer one. Closing fades its alpha with the Keeper over 0.9s, and RESET restores it for cancellation or replay."
+position = Vector2(-474, -64)
+
+[node name="AnimationPlayer" parent="." index="3"]
+libraries/ = SubResource("AnimationLibrary_lantern_first")
+
 [node name="EditorTerrainPreview" parent="." index="4"]
-editor_description = "Previews cloak_lantern_first at its authored depth."
+editor_description = "Previews cloak_lantern_first at its authored depth, including the reusable four-plane terrain shader."
 encounter_id = &"cloak_lantern_first"
 preview_depth_rows = 1400
 
 [node name="cloak_lantern" type="Node2D" parent="." index="5" unique_id=1905941146]
 z_index = 1
-position = Vector2(-360, -25)
+position = Vector2(-592, -64)
 scale = Vector2(0.8, 0.8)
 script = ExtResource("2_hbiw8")
 actor_id = &"cloak_lantern"
@@ -65,6 +153,7 @@ metadata/_edit_group_ = true
 
 [node name="Miner" type="Node2D" parent="." index="6" unique_id=901033075]
 z_index = 1
+position = Vector2(-176, 0)
 script = ExtResource("2_hbiw8")
 actor_id = &"miner"
 appearance = SubResource("Resource_psbsn")

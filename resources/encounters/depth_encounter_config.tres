@@ -13,9 +13,11 @@
 [ext_resource type="Resource" path="res://resources/encounters/cafe_gathering_encounter.tres" id="11_cafe"]
 [ext_resource type="Resource" path="res://resources/encounters/cloak_lantern_post_credits_encounter.tres" id="12_lantern_post_credits"]
 [ext_resource type="Resource" path="res://resources/encounters/thief_final_encounter.tres" id="13_thief"]
+[ext_resource type="Resource" path="res://resources/encounters/moody_teen_first_encounter.tres" id="14_moody_first"]
+[ext_resource type="Resource" path="res://resources/encounters/moody_teen_second_encounter.tres" id="15_moody_second"]
 
 [resource]
 script = ExtResource("1_config")
-encounters = Array[ExtResource("2_encounter_type")]([ExtResource("3_cheese_girl"), ExtResource("4_lantern_first"), ExtResource("6_rutini_first"), ExtResource("5_treasure_first"), ExtResource("7_lantern_second"), ExtResource("8_treasure_second"), ExtResource("9_quibble"), ExtResource("10_rotini_colony"), ExtResource("11_cafe"), ExtResource("12_lantern_post_credits"), ExtResource("13_thief")])
+encounters = Array[ExtResource("2_encounter_type")]([ExtResource("3_cheese_girl"), ExtResource("4_lantern_first"), ExtResource("6_rutini_first"), ExtResource("5_treasure_first"), ExtResource("14_moody_first"), ExtResource("7_lantern_second"), ExtResource("8_treasure_second"), ExtResource("9_quibble"), ExtResource("15_moody_second"), ExtResource("10_rotini_colony"), ExtResource("11_cafe"), ExtResource("12_lantern_post_credits"), ExtResource("13_thief")])
 chamber_height_rows = 24
-gathering_actor_ids = Array[StringName]([&"cheese_girl", &"treasure_hunter", &"rutini", &"cloak_lantern", &"coffee_cat"])
+gathering_actor_ids = Array[StringName]([&"cloak_lantern", &"treasure_hunter", &"rutini", &"moody_teen", &"cheese_girl", &"coffee_cat"])

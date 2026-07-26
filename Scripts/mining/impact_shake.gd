@@ -28,11 +28,28 @@ var _jitter_offset: Vector2 = Vector2.ZERO
 var _sustained_strength_px: float = 0.0
 var _sustained_jitter_offset: Vector2 = Vector2.ZERO
 var _random := RandomNumberGenerator.new()
+var _reduce_motion_enabled: bool = false
 
 
 ## Sleeps until the first impact requests a shake.
 func _ready() -> void:
 	_random.randomize()
+	set_process(false)
+
+
+## Stops active camera motion and controls whether future shake can start.
+func set_reduce_motion_enabled(enabled: bool) -> void:
+	_reduce_motion_enabled = enabled
+	if not enabled:
+		return
+	_remaining_seconds = 0.0
+	_current_strength_px = 0.0
+	_seconds_until_sample = 0.0
+	_jitter_offset = Vector2.ZERO
+	_sustained_strength_px = 0.0
+	_sustained_jitter_offset = Vector2.ZERO
+	if camera != null:
+		camera.offset = Vector2.ZERO
 	set_process(false)
 
 
@@ -45,7 +62,7 @@ func play_at_impact(
 	_debris_multiplier: float,
 	swing_side: int = 1
 ) -> void:
-	if cells_removed <= 0:
+	if _reduce_motion_enabled or cells_removed <= 0:
 		return
 	_current_strength_px = lerpf(
 		base_strength_px,
@@ -64,6 +81,8 @@ func play_at_impact(
 
 
 func begin_sustained(strength_px: float) -> void:
+	if _reduce_motion_enabled:
+		return
 	_sustained_strength_px = maxf(strength_px, 0.0)
 	_seconds_until_sample = 0.0
 	set_process(_sustained_strength_px > 0.0 or _remaining_seconds > 0.0)

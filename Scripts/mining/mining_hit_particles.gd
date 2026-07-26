@@ -50,6 +50,7 @@ var _pieces: Array[DirtPiece] = []
 # cap, so repeated hits allocate no new presentation records in steady state.
 var _piece_pool: Array[DirtPiece] = []
 var _random := RandomNumberGenerator.new()
+var _reduce_motion_enabled: bool = false
 
 
 ## Prepares one shared hex mesh and sleeps processing until the first burst.
@@ -98,6 +99,19 @@ func _ready() -> void:
 	set_process(false)
 
 
+## Clears decorative debris and controls whether later impacts may spawn it.
+func set_reduce_motion_enabled(enabled: bool) -> void:
+	_reduce_motion_enabled = enabled
+	if not enabled:
+		return
+	for piece in _pieces:
+		if _piece_pool.size() < maximum_active_pieces:
+			_piece_pool.append(piece)
+	_pieces.clear()
+	set_process(false)
+	_update_particle_instances()
+
+
 ## Creates a dirt burst at the hammer's animated impact point.
 func play_at_impact(
 	impact_screen_position: Vector2,
@@ -106,7 +120,7 @@ func play_at_impact(
 	debris_multiplier: float = 1.0,
 	_swing_side: int = 1
 ) -> void:
-	if cells_removed <= 0:
+	if _reduce_motion_enabled or cells_removed <= 0:
 		return
 	var requested_piece_amount := clampi(
 		roundi(

@@ -5,9 +5,10 @@ extends CharacterEncounterStage
 ## - prepare() starts Quibble's presentation-only vibration and coffee clock.
 ## - The sprite snaps through a tiny fixed jitter pattern at a bounded rate.
 ## - Every few seconds he raises the mug, chugs it, lowers it, and returns to idle.
+## - The Miner's dialogue line forces a repeating chug until the line advances.
 ## - Dialogue may still request poses; the next coffee phase resumes the loop.
 ## - Closing or cancellation restores the exact authored sprite position.
-## - The invariant is that Quibble never moves the authoritative actor root.
+## - The invariant is that Quibble moves neither the actor root nor draw order.
 
 ## How long between one chug and the next.
 ##
@@ -46,19 +47,8 @@ enum CoffeePhase {
 ## Which dialogue slot is Quibble's own. Exported rather than hard-coded so this
 ## stays in step with the encounter resource if the slot is ever renamed.
 @export var speaking_slot: StringName = &"coffee_cat"
-## The absolute draw order Quibble holds for the whole encounter.
-##
-## One, which is MinerRig's buried_draw_order and the stratum the miner occupies
-## while he is digging: behind the foreground rock at z 2 and in front of the
-## next one at z 0. Zephan's direction is that the cast belong in the ground the
-## same way the player does, rather than being cut out in front of it.
-##
-## This has to be absolute. DepthEncounterController lifts the whole CharacterLayer
-## to cutscene_draw_order for the duration of a shot, so a relative order would be
-## measured from that lift and land back in front of everything. Setting
-## z_as_relative off is what makes this number mean the stratum it names.
-@export_range(0, 16, 1) var cutscene_draw_order: int = 1
-
+## The dialogue slot whose silence Quibble fills with continuous chugging.
+@export var chugging_slot: StringName = &"miner"
 var _motion_presenter: CharacterPresenter
 var _sprite_rest_position: Vector2
 var _jitter_elapsed_seconds: float = 0.0
@@ -67,9 +57,7 @@ var _phase_elapsed_seconds: float = 0.0
 var _jitter_index: int = 0
 var _coffee_phase: CoffeePhase = CoffeePhase.WAITING
 var _is_speaking: bool = false
-var _restore_z_index: int = 0
-var _restore_z_as_relative: bool = true
-var _has_borrowed_draw_order: bool = false
+var _is_forced_chugging: bool = false
 
 
 ## Takes stage ownership and starts the bounded actor-specific routine.
@@ -87,50 +75,22 @@ func prepare(
 	_jitter_index = 0
 	_coffee_phase = CoffeePhase.WAITING
 	_is_speaking = false
-	_borrow_cutscene_draw_order()
+	_is_forced_chugging = false
 	set_process(true)
 	return true
 
 
-## Puts Quibble on the miner's mining stratum for the length of the shot.
-##
-## Reversible, and it has to be: this presenter is the same node again at the
-## cafe, so an encounter that walked off leaving him on a borrowed layer would
-## take that layer to the gathering with him and nothing there would explain it.
-func _borrow_cutscene_draw_order() -> void:
-	if _has_borrowed_draw_order or not is_instance_valid(_motion_presenter):
-		return
-	_restore_z_index = _motion_presenter.z_index
-	_restore_z_as_relative = _motion_presenter.z_as_relative
-	_has_borrowed_draw_order = true
-	_motion_presenter.z_as_relative = false
-	_motion_presenter.z_index = cutscene_draw_order
-
-
-## Hands the authored draw order back exactly as it was found.
-func _return_cutscene_draw_order() -> void:
-	if not _has_borrowed_draw_order:
-		return
-	_has_borrowed_draw_order = false
-	if not is_instance_valid(_motion_presenter):
-		return
-	_motion_presenter.z_as_relative = _restore_z_as_relative
-	_motion_presenter.z_index = _restore_z_index
-
-
-## Stops the coffee while Quibble's own line is on screen, and lets it run again
-## the moment somebody else is talking.
+## Stops the coffee while Quibble talks and chugs through the Miner's silence.
 ##
 ## He cannot deliver a line with his face in a mug. The chug is a full second of
 ## every three, so left alone it lands on top of a line often enough to be a
 ## coin toss, and the line it ruins most is the one where he holds the coffee out
 ## to give it away.
 ##
-## Suppressed for the whole line rather than only while it types. The director
-## does not publish when the typewriter finishes, and the stricter rule is the
-## one that was asked for anyway: he is not drinking while he is talking, full
-## stop. The gaps are still his - the miner's "..." is a line by somebody else,
-## so the coffee starts again for it, which is the shot's best moment for a chug.
+## Suppressed for the whole Quibble line rather than only while it types. The
+## Miner's line starts on the drink pose immediately, then alternates a committed
+## chug with the brief cup-held recovery for as long as the player leaves "..."
+## displayed. Advancing the line returns to cup-out before Quibble speaks again.
 ##
 ## The clock is reset rather than paused, so he never resumes into the middle of
 ## a swig he began before the line went up.
@@ -139,17 +99,19 @@ func on_dialogue_line_presented(
 	_line_index: int
 ) -> void:
 	var is_his_line := speaker_slot == speaking_slot
-	if is_his_line == _is_speaking:
-		return
 	_is_speaking = is_his_line
-	if not _is_speaking:
-		return
+	_is_forced_chugging = speaker_slot == chugging_slot
 	_drink_elapsed_seconds = 0.0
 	_phase_elapsed_seconds = 0.0
+	if _is_forced_chugging:
+		_coffee_phase = CoffeePhase.DRINKING
+		if is_instance_valid(_motion_presenter):
+			_motion_presenter.play_pose(&"drink")
+		return
 	_coffee_phase = CoffeePhase.WAITING
-	# Straight back to the cup-out frame, in case the line arrived mid-chug. The
-	# controller applies the line's own speaker pose right after this, so this
-	# only decides what he does on a line that names no pose.
+	# Straight back to cup-out when the line advances, including when it leaves
+	# the forced chug. The controller applies Quibble's line pose immediately
+	# afterwards, so both owners agree on the authored reset.
 	if is_instance_valid(_motion_presenter):
 		_motion_presenter.play_pose(&"idle")
 
@@ -177,8 +139,25 @@ func _process(delta: float) -> void:
 	if _is_speaking:
 		return
 
-	_drink_elapsed_seconds += delta
 	_phase_elapsed_seconds += delta
+	if _is_forced_chugging:
+		if (
+			_coffee_phase == CoffeePhase.DRINKING
+			and _phase_elapsed_seconds >= DRINK_SECONDS
+		):
+			_phase_elapsed_seconds = 0.0
+			_coffee_phase = CoffeePhase.RECOVERING
+			_motion_presenter.play_pose(&"hold_cup")
+		elif (
+			_coffee_phase == CoffeePhase.RECOVERING
+			and _phase_elapsed_seconds >= HOLD_CUP_SECONDS
+		):
+			_phase_elapsed_seconds = 0.0
+			_coffee_phase = CoffeePhase.DRINKING
+			_motion_presenter.play_pose(&"drink")
+		return
+
+	_drink_elapsed_seconds += delta
 	if (
 		_coffee_phase == CoffeePhase.WAITING
 		and _drink_elapsed_seconds >= DRINK_INTERVAL_SECONDS
@@ -230,7 +209,11 @@ func _exit_tree() -> void:
 func _stop_quibble_motion() -> void:
 	set_process(false)
 	_is_speaking = false
-	_return_cutscene_draw_order()
+	_is_forced_chugging = false
+	_drink_elapsed_seconds = 0.0
+	_phase_elapsed_seconds = 0.0
+	_coffee_phase = CoffeePhase.WAITING
 	if is_instance_valid(_motion_presenter):
 		_motion_presenter.character_sprite.position = _sprite_rest_position
+		_motion_presenter.play_pose(&"idle")
 	_motion_presenter = null

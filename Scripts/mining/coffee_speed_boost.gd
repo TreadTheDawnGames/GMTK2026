@@ -2,6 +2,7 @@ class_name CoffeeSpeedBoost
 extends Node
 
 ## How it works:
+## - Retained for isolated previews; production Quibble no longer awards it.
 ## - The Quibble conversation callback awards one run-scoped speed boost.
 ## - The boost multiplies MinerRig playback, including real impact timing.
 ## - Duplicate conversation events cannot stack the reward.

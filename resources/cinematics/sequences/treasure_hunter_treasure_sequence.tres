@@ -4,6 +4,29 @@
 [ext_resource type="Resource" uid="uid://yigtckpqgod" path="res://resources/dialogue/treasure_hunter_treasure_conversation.tres" id="2_31prq"]
 [ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="3_fftny"]
 
+[sub_resource type="Resource" id="Beat_frame_contact"]
+script = ExtResource("1_g737l")
+kind = 11
+camera_zoom = Vector2(1.9, 1.9)
+blocks = false
+notes = "The first drawn frame of the shot, snapped rather than tweened. play_opening runs immediately after the room has settled and the miner has been seated on the rock, so sequence time zero IS the moment of contact: pushing in here reads as the camera having ridden him down the shaft, and pulling back out over the next beat is what turns the landing into the discovery of the room. Duration zero because a tween from the neutral frame would show the push-in starting after he had already stopped. Non-blocking so the jolt, the reveal and the pull-out all run under one another instead of queueing."
+
+[sub_resource type="Resource" id="Beat_contact_shake"]
+script = ExtResource("1_g737l")
+kind = 11
+duration_seconds = 0.3
+camera_action = 1
+camera_shake_strength = 11.0
+blocks = false
+notes = "The contact jolt, through the shared ImpactShake the pickaxe already uses rather than a second shake owner. It stacks with the dirt burst MiningSceneWiring already fires from the encounter-floor landing."
+
+[sub_resource type="Resource" id="Beat_contact_dust"]
+script = ExtResource("1_g737l")
+kind = 8
+cue = &"LandingContact"
+blocks = false
+notes = "The dust he throws up landing. It asks for the shared cutscene strike feedback that already exists - MiningSceneWiring._play_cinematic_strike_feedback drives the same hit particles, impact smoke, shake and sparks a pickaxe swing does - rather than instancing a second smoke presenter. mining_impact_smoke.gd warns against exactly that at its declaration site, and a standalone copy could not collide dust against rock anyway without the terrain manager, renderer and view controller injected into it. Aimed at ActionMarkers/LandingContact, which only lands on his feet because the stage now carries ActionMarkers under the same shift it gives the tracked cast; without that the plume would be up to 192px away. strike_breaks_rock_radius_cells stays zero, so this is presentation only and no terrain cell moves."
+
 [sub_resource type="Resource" id="Resource_show"]
 script = ExtResource("1_g737l")
 kind = 9
@@ -22,10 +45,21 @@ kind = 1
 actor = &"treasure_hunter"
 pose = &"idle"
 
+[sub_resource type="Resource" id="Beat_frame_room"]
+script = ExtResource("1_g737l")
+kind = 11
+start_seconds = 0.3
+duration_seconds = 1.3
+camera_offset = Vector2(75, 0)
+camera_zoom = Vector2(1.3, 1.3)
+blocks = false
+notes = "The pull-out. It eases from the tight contact frame to the shot the conversation is composed for, which is what makes the room arrive rather than merely be there. 75px centres the shared midpoint of the miner and the Treasure Hunter 150px to his right, the same half-the-separation rule Encounter 1 uses at 48px for 96px. 1.30 rather than Encounter 1's 1.40 because this shot carries a third subject: at 1.30 the frame reaches 443px right of centre, so the hoard's tail at roughly 400px runs off the edge exactly as section 6 asks - what is in shot is the near end of something bigger."
+
 [sub_resource type="Resource" id="Resource_celebrate"]
 script = ExtResource("1_g737l")
 kind = 3
 actor = &"treasure_hunter"
+start_seconds = 0.45
 duration_seconds = 0.9
 bounce_count = 4
 bounce_offset = Vector2(0, -9)
@@ -34,28 +68,31 @@ notes = "The whooping the reference puts before the room even opens - Zephan sli
 [sub_resource type="Resource" id="Resource_dialogue"]
 script = ExtResource("1_g737l")
 kind = 5
-start_seconds = 0.9
+start_seconds = 1.6
 duration_seconds = 6.0
 conversation = ExtResource("2_31prq")
-notes = "Blocks, so the clock holds here for as long as the player takes to read. Six seconds is the nominal length only. He remains at the hoard for the whole exchange, then leaves in the no-pickaxe pose so his later cafe appearance has a visible departure."
+notes = "Blocks, so the clock holds here for as long as the player takes to read. Six seconds is the nominal length only. It waits for the pull-out to land: a zoom still travelling under the first line competes with it, which is the same reason Encounter 1 pushed its dialogue back behind its camera move. He remains at the hoard for the whole exchange."
+
+[sub_resource type="Resource" id="Beat_reset_camera"]
+script = ExtResource("1_g737l")
+kind = 11
+start_seconds = 7.6
+duration_seconds = 0.9
+camera_action = 2
+blocks = false
+notes = "The typed CAMERA/RESET move gives neutral framing back before he leaves, so the handoff to mining opens on the same view the run had before the shot. Pan and zoom return together through CutsceneActionPresenter, and a cancelled or failed encounter restores the same neutral state through reset_presentation rather than relying on this beat having run."
 
 [sub_resource type="Resource" id="Resource_leave"]
 script = ExtResource("1_g737l")
 kind = 0
 actor = &"treasure_hunter"
-start_seconds = 6.9
+start_seconds = 8.5
 duration_seconds = 1.6
 target_marker = &"Exit"
 pose = &"no_pickaxe"
-notes = "He has handed off the pickaxe and leaves the hoard before his later cafe appearance."
-
-[sub_resource type="Resource" id="Resource_hide"]
-script = ExtResource("1_g737l")
-kind = 10
-actor = &"treasure_hunter"
-start_seconds = 8.5
+notes = "He has handed off the pickaxe and leaves the hoard before his later cafe appearance. Canon requires he reach the cafe empty-handed, and tests/smoke_verify.gd holds this exact beat to it - a MOVE to Exit in the no-pickaxe pose - so it stays authored here rather than being left to the stage. It runs after the camera has gone neutral, so the departure plays on the same view mining resumes on. The paired HIDE beat is gone: hide_actor_after_closing already hides him behind closing_fade_seconds, and hiding him from a beat cut the fade off mid-way. play_closing() then re-issues its own move to Exit, which is a no-op from a man already standing on it."
 
 [resource]
 script = ExtResource("3_fftny")
 sequence_id = &"treasure_hunter_treasure_sequence"
-beats = Array[ExtResource("1_g737l")]([SubResource("Resource_show"), SubResource("Resource_face"), SubResource("Resource_pose"), SubResource("Resource_celebrate"), SubResource("Resource_dialogue"), SubResource("Resource_leave"), SubResource("Resource_hide")])
+beats = Array[ExtResource("1_g737l")]([SubResource("Beat_frame_contact"), SubResource("Beat_contact_shake"), SubResource("Beat_contact_dust"), SubResource("Resource_show"), SubResource("Resource_face"), SubResource("Resource_pose"), SubResource("Beat_frame_room"), SubResource("Resource_celebrate"), SubResource("Resource_dialogue"), SubResource("Beat_reset_camera"), SubResource("Resource_leave")])

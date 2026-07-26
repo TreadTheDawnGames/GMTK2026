@@ -19,6 +19,7 @@ var _rest_position: Vector2
 var _reaction_tween: Tween
 var _has_rest_position: bool = false
 var _is_reacting: bool = false
+var _reduce_motion_enabled: bool = false
 
 
 func _ready() -> void:
@@ -27,6 +28,13 @@ func _ready() -> void:
 		push_error("SpeechReaction requires a presentation-only visual root.")
 		return
 	capture_rest_position()
+
+
+## Restores the actor and controls whether later speech may bounce its art.
+func set_reduce_motion_enabled(enabled: bool) -> void:
+	_reduce_motion_enabled = enabled
+	if enabled:
+		reset_speech_motion()
 
 
 ## Records a newly authored or staged neutral position.
@@ -54,6 +62,9 @@ func reset_speech_motion() -> void:
 
 ## Plays one readable bounce without moving the actor's authoritative root.
 func react_to_presented_line() -> void:
+	if _reduce_motion_enabled:
+		reset_speech_motion()
+		return
 	play_bounce(
 		Vector2.UP * bounce_height,
 		bounce_duration,
@@ -73,6 +84,8 @@ func play_bounce(
 	transition: Tween.TransitionType
 ) -> void:
 	reset_speech_motion()
+	if _reduce_motion_enabled:
+		return
 	if not is_instance_valid(visual_root):
 		return
 	_rest_position = visual_root.position

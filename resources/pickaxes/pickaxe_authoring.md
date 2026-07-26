@@ -49,14 +49,36 @@ Fill every `EncounterProgressionLevel` field:
 - `double_hit`: whether one timing success queues a second mining swing.
 - `mine_animation_speed`: authored successful-swing speed tier.
 - `combo_impact_scale`: multiplier for only the combo-added impact.
-- `target_scenes`: non-empty pool of valid `TimingTarget` scenes.
 - `slider_speed`: pixels per second for the main timing bar.
 - `starting_target_count`: baseline target count, at least one.
 - `bonus_target_combos`: strictly increasing, positive combo thresholds.
+- `highest_unlocked_combo_target_group_index`: highest combo-target group this
+  encounter level makes available.
 
 `MiningConfig.progression_levels` must continue to contain levels zero through
 nine in order. Each level is complete and replaces the previous one; values do
 not inherit from an earlier resource.
+
+Target-group definitions are shared instead of duplicated per encounter. Edit
+`MiningConfig.combo_target_groups` in `res://resources/mining/mining_config.tres`
+to tune the ordered, inclusive combo thresholds and each threshold's complete
+target pool. The first group must begin at combo zero. Encounter progression
+unlocks those groups in order; the current combo selects a group only up to the
+active level's authored maximum.
+
+## Production reward contract
+
+Reward cutscenes now change gameplay by unlocking target-group availability:
+
+- Treasure Hunter's two pickaxes remain collectible, equip their silver/gold
+  visuals, and play the authored reward celebration. Their legacy modifiers do
+  not alter production mining and they no longer raise a combo-intensity floor.
+- Quibble's dialogue, coffee handoff, and authored staging remain. The encounter
+  does not award the old persistent animation-speed multiplier.
+- Rotini's colony still arrives, follows the miner, and plays bounded visual
+  strikes. Those strikes do not remove terrain or raise combo intensity.
+- Non-reward difficulty steps remain authored at levels five and nine. Reward
+  transitions 3->4, 5->6, 6->7, and 7->8 change only the unlocked target group.
 
 ## Add a new pickaxe-era rule
 

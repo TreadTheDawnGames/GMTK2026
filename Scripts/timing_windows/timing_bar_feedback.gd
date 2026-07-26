@@ -75,6 +75,9 @@ class Mark:
 @export_range(1, 60, 1) var combo_heat_ceiling: int = 12
 @export_range(0.05, 1.0, 0.01) var hit_seconds: float = 0.26
 @export_range(0.05, 1.5, 0.01) var miss_seconds: float = 0.34
+## Lost combo segments turn off at this interval. The counter is bounded by the
+## combo bar's configured maximum and owns no per-loss allocations.
+@export_range(0.01, 0.25, 0.01) var combo_loss_step_seconds: float = 0.05
 
 @export_category("Shape")
 ## Stroke weight shared by the miss slash and any future line work.
@@ -109,6 +112,9 @@ var _tinted_styles: Dictionary[StyleBox, StyleBox] = {}
 # frame for a strip that usually holds still is waste. Comparing is cheaper.
 var _drawn_combo: int = -1
 var _drawn_is_recovering: bool = false
+var _reduce_motion_enabled: bool = false
+var _combo_loss_elapsed_seconds: float = 0.0
+var _is_combo_loss_animating: bool = false
 
 @onready var combo_bar: NotchedProgressBar = %ComboBar
 
@@ -134,12 +140,23 @@ func _ready() -> void:
 		push_error("TimingBarFeedback requires a TimingWindowTask.")
 
 
+## Keeps color confirmation while removing the frame's spatial expansion.
+func set_reduce_motion_enabled(enabled: bool) -> void:
+	_reduce_motion_enabled = enabled
+	queue_redraw()
+
+
 ## Turns one timing result into one Mark at the slider's resolved position.
 func _on_timing_pressed(
 	success: bool,
 	combo: int,
 	_hit_direction: int
 ) -> void:
+	if success:
+		_is_combo_loss_animating = false
+		_combo_loss_elapsed_seconds = 0.0
+		combo_bar.value = float(_current_combo())
+
 	var bar := _get_active_bar()
 	if bar == null or not bar.is_visible_in_tree():
 		return
@@ -168,12 +185,31 @@ func _on_timing_pressed(
 	)
 	_marks.append(mark)
 	queue_redraw()
-	
-	combo_bar.value = float(_current_combo()) if success else 0.0
+
+
+## Starts the stepped presentation reset only after recovery is exhausted.
+func _on_streak_ended(_previous_combo: int) -> void:
+	if combo_bar.value <= 0.0:
+		return
+	_is_combo_loss_animating = true
+	_combo_loss_elapsed_seconds = 0.0
 
 
 ## Ages the marks, and redraws whenever anything visible actually changed.
 func _process(delta: float) -> void:
+	if _is_combo_loss_animating:
+		_combo_loss_elapsed_seconds += delta
+		var step_seconds := maxf(combo_loss_step_seconds, 0.01)
+		while (
+			_combo_loss_elapsed_seconds >= step_seconds
+			and combo_bar.value > 0.0
+		):
+			_combo_loss_elapsed_seconds -= step_seconds
+			combo_bar.value = maxf(combo_bar.value - 1.0, 0.0)
+		if combo_bar.value <= 0.0:
+			_is_combo_loss_animating = false
+			_combo_loss_elapsed_seconds = 0.0
+
 	for mark_index in range(_marks.size() - 1, -1, -1):
 		var mark := _marks[mark_index]
 		mark.life -= delta / maxf(mark.lifetime, 0.01)
@@ -190,7 +226,7 @@ func _process(delta: float) -> void:
 		or combo >= _combo_ceiling()
 	):
 		queue_redraw()
-	
+
 	#if combo_bar.value == combo_bar.max_value:
 		#combo_bar.
 
@@ -381,7 +417,11 @@ func _draw_frame_flash(mark: Mark, bar: SliderTimingWindow) -> void:
 		return
 	var tint := mark.color
 	tint.a = mark.life * shine_strength
-	var kick := frame_kick_px * mark.life
+	var kick := (
+		0.0
+		if _reduce_motion_enabled
+		else frame_kick_px * mark.life
+	)
 	var surface := _get_shine_surface(bar)
 	# -1 keeps the art's authored margins, so the flash lands exactly on the
 	# frame it is flashing.

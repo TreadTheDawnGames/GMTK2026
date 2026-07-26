@@ -1,12 +1,11 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=26 format=3]
 
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
 [ext_resource type="Script" uid="uid://7qy8qeox17tk" path="res://Scripts/cinematics/cutscene_actor_preview.gd" id="2_preview"]
-[ext_resource type="PackedScene" path="res://Scenes/props/cafe_table.tscn" id="3_table"]
-[ext_resource type="PackedScene" path="res://Scenes/props/cafe_stool.tscn" id="4_stool"]
 [ext_resource type="PackedScene" path="res://Scenes/props/das_queso_cafe.tscn" id="5_cafe"]
 [ext_resource type="PackedScene" path="res://Scenes/props/cafe_stool_flat.tscn" id="13_stool_flat"]
-[ext_resource type="PackedScene" path="res://Scenes/props/cafe_table_flat.tscn" id="14_table_flat"]
+[ext_resource type="PackedScene" path="res://Scenes/props/cafe_table.tscn" id="14_table_depth"]
+[ext_resource type="PackedScene" path="res://Scenes/props/cafe_stool.tscn" id="20_chair_depth"]
 [ext_resource type="Script" uid="uid://bpg6fvsw6y7ai" path="res://resources/encounters/character_appearance.gd" id="6_appearance"]
 [ext_resource type="Texture2D" uid="uid://bq8qwl3xn5qny" path="res://Assets/Characters/miner_idle-Pickaxe.png" id="7_miner"]
 [ext_resource type="Resource" uid="uid://dq5euoa1catq7" path="res://resources/encounters/cloak_lantern_character_appearance.tres" id="8_lantern"]
@@ -14,6 +13,12 @@
 [ext_resource type="Resource" uid="uid://ckltv12x6klri" path="res://resources/encounters/rutini_character_appearance.tres" id="10_rutini"]
 [ext_resource type="Resource" path="res://resources/encounters/coffee_cat_character_appearance.tres" id="11_quibble"]
 [ext_resource type="Resource" uid="uid://bls5tpjbahtrq" path="res://resources/cinematics/sequences/cafe_gathering_sequence.tres" id="12_sequence"]
+[ext_resource type="Script" path="res://Scripts/cinematics/cafe_gathering_encounter_stage.gd" id="15_cafe_stage"]
+[ext_resource type="Shader" path="res://Shaders/cafe_speaker_highlight.gdshader" id="16_coco_shader"]
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/rat_miner.tscn" id="18_rat"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_clump.tres" id="19_rat_clump"]
+[ext_resource type="Resource" path="res://resources/encounters/moody_teen_character_appearance.tres" id="22_moody_teen"]
+[ext_resource type="Texture2D" path="res://Assets/Props/cafe_cup.png" id="23_cup"]
 
 [sub_resource type="Resource" id="Resource_miner_preview"]
 script = ExtResource("6_appearance")
@@ -21,26 +26,48 @@ texture = ExtResource("7_miner")
 sprite_scale = Vector2(0.203, 0.203)
 sprite_offset = Vector2(0, -88)
 
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_coco_speaker"]
+resource_local_to_scene = true
+shader = ExtResource("16_coco_shader")
+
+[sub_resource type="Animation" id="Animation_reset"]
+resource_name = "RESET"
+length = 0.001
+
+[sub_resource type="Animation" id="Animation_opening"]
+resource_name = "opening"
+length = 0.01
+
+[sub_resource type="Animation" id="Animation_closing"]
+resource_name = "closing"
+length = 0.01
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_cafe"]
+_data = {
+&"RESET": SubResource("Animation_reset"),
+&"closing": SubResource("Animation_closing"),
+&"opening": SubResource("Animation_opening")
+}
+
 [node name="CafeGatheringEncounterStage" instance=ExtResource("1_stage")]
-editor_description = "Encounter 9, depth 14,000: the Cheese Cafe. The Miner breaks through into Das Queso Cafe and finds everybody he met on the way down already there - Cheese Girl serving from the window, the Treasure Hunter with nothing left to carry, Rotini arriving with his colony, Quibble, and the Lantern Keeper standing apart at the open end of the room.
+editor_description = "Encounter 9, depth 14,000: the Cheese Cafe. The latest supplied composition drawing is the spatial authority.
 
-THE SHOT IS A PAN, AND THE LAYOUT IS THE PAN. Zephan's IMG_1647 plans this beat as a camera move across the gathering that ends on the Lantern Keeper, who delivers his line and 'goes shoom'. The encounter camera cannot pan - it centres on the miner's landing column and holds - so the move is authored into the LAYOUT instead. The cast are laid out left to right in the exact order they speak, so reading the conversation walks the eye across the room and finishes on the Keeper at the far right, who then fades where he stands.
+LEFT TO RIGHT: the Lantern Keeper is the far-left endpoint; Treasure Hunter and the rat crowd occupy the left-middle; the Miner lands in front-middle; Rotini and the separate dining table sit in the centre-right; Moody Teen stands behind that dining set; and the enlarged cafe is the right-middle anchor. Coco is painted into its serving window, exactly two stools sit under the sill, and Quibble occupies the right stool.
 
-Left to right: the storefront with Cheese Girl in its window, the Treasure Hunter, Rotini, the MINER, Quibble, the Lantern Keeper, and the cafe's outdoor table. That is also the order depth_encounter_config lists Gathering Actor Ids in, which is not a coincidence: the schedule's roster order and this room's left-to-right order are the same fact, and integration_verify holds them to it. Move somebody here and the roster moves with them.
+DEPTH IS AUTHORED ACROSS THE SHADER PLANE, NOT ALONG ITS REAR RIM. Screen Y is the depth rule: the cafe, Coco, Quibble, Moody Teen, and rear rats are highest and furthest back; Rotini stands in the rear-middle dining lane; the furniture, mid rats, and Treasure occupy the middle; the front rats, Keeper, and Miner are lowest and therefore nearest. Moody Teen stands at Y 6 behind the Y 36 dining furniture, so the table and chair cross his lower silhouette exactly like Eve's reference. The Miner's runtime landing settles 56px into the foreground lane. Every overlap agrees with the feet: a lower subject draws or stands in front of a higher subject. The shader supplies a 72px lit shelf and a longer matte transition, so every contact lane remains visibly grounded. CharacterLayer rests at z 4 and the active cutscene at z 5; this stage never goes below local z -1, keeping its furthest background piece at effective z 3 - still strictly above Layer 1 at z 2.
 
-SPACING IS MEASURED, NOT EYEBALLED, AND THE MEASUREMENT MOVED. Every gap is one miner-width of daylight, the house rule from the authoring guide: root to root is (a + b) / 2 + the miner's own body. That body is now 73.9px, not the 52.8 the guide's spacing table still prints - the miner's art was replaced on the integration branch and MinerRig draws it at 0.203, which measures 364 opaque pixels wide. Every gap here was re-derived against it: Quibble to Treasure Hunter 148, Treasure Hunter to Rotini 148, Rotini to the miner 142, the miner to the Keeper 161, against bodies of Rotini 62.7, Treasure Hunter 86.5, Quibble 61.5 and the Keeper 100.4.
+THE CAMERA FOLLOWS THAT SINGLE TABLEAU from RIGHT TO LEFT through typed CAMERA beats. FRAME establishes the cafe at 1.30, then gives Rotini, Coco, Treasure Hunter, the Miner, Quibble, Moody Teen, and the Keeper their own smoothly eased close framing. After Quibble, the camera finds Moody Teen behind the table for his silent line, then continues left for the final 2.4-second move to the far-left Keeper. RESET returns pan and zoom together to gameplay framing. Every move blocks before its speaker talks; CutsceneActionPresenter owns the sine easing, and cancellation or release restores neutral framing.
 
-Run local_tests/measure_actor_heights.gd before moving anybody - and note it still hard-codes 0.44 for the miner, which is the OLD scale, so read his width off MinerRig rather than off that script's output.
+THE CAFE IS ANOTHER 25 PERCENT LARGER than the previous pass. At 0.16 it is about 249px tall before camera zoom and owns the right-middle like Zephan's paper composition. The room deliberately owes that clearance; cropping the ceiling over the storefront is preferable to shrinking the destination back into a background prop.
 
-The storefront is deliberately closer than the rule: it is a building, not a body, and holding it a full miner-width off the Treasure Hunter pushed its own sign out of the frame.
+THE RAT MASS IS AUTHORED INTO THIS STAGE. Direct cutscene playtest can jump to encounter 9 without activating encounter 8's persistent followers, and those followers track the Miner rather than holding the drawing's place behind Treasure Hunter. Eight bounded, scene-authored actors depict five clumps plus three foreground rats, with no runtime growth.
 
-TRACKING IS ON, AND THIS ROOM NEEDS IT MORE THAN ANY OTHER. The snaking fall arrives down any column in a 49-cell band and the camera centres on it, so a gathering pinned to the room sits up to 192px off centre every run - and with five bodies at a fixed pitch the miner regularly lands standing inside one of them. Conversation Tracks Miner slides ActorMarkers to his column and Props Track Tracked Cast carries the storefront and the furniture under the same shift, so the whole cafe holds its shape around him at every landing.
+TRACKING REMAINS ON. The snaking fall arrives across a 49-cell band, so ActorMarkers and PropMarkers slide together from the Miner's actual landing. conversation_root_offset_from_miner_x is the authored Keeper-to-Miner distance (-354px), keeping both camera endpoints stable on every arrival column.
 
 CHEESE GIRL IS DRAWN INTO THE SET. She is painted into the storefront's serving window, so Actors Drawn Into Set names her: the cutscene editor skips her stand-in, and DepthEncounterController places her mark but leaves her presenter hidden. Her line still plays and the box still attributes it to her. Delete the DasQuesoCafe node and she has to come out of that list in the same change, or she disappears from the scene altogether.
 
-THE RATS ARE NOT AUTHORED HERE. Rotini's persistent colony has been following the player since 11,200 and is standing around the miner through this whole shot, which is what fills the room and dresses the table. Nothing in this scene places one.
-
-Reference: Zephan's IMG_1647 (the cafe boards, including the storefront and the table of mice) and IMG_1646 (the crowd)."
+Reference: Zephan's supplied paper photo, the later rendered composition, and Decompiled/Handoffs/encounter_9_camera_depth_art_direction.md."
+script = ExtResource("15_cafe_stage")
 opening_move_seconds = 0.4
 closing_move_seconds = 1.2
 opening_step_height = 5.0
@@ -51,129 +78,154 @@ entrance_facing = -1
 conversation_facing = -1
 closing_facing = -1
 conversation_tracks_miner = true
-conversation_root_offset_from_miner_x = 161.0
+conversation_root_offset_from_miner_x = -354.0
 props_track_tracked_cast = true
 sequence = ExtResource("12_sequence")
 actors_drawn_into_set = Array[StringName]([&"cheese_girl"])
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
-editor_description = "The same mark as Conversation. Canonical story says the Keeper HAS gathered here, so he is already standing at the end of the room when the ceiling comes in - there is no approach to walk, and Opening Move Seconds only exists to keep a tween honest if the timeline is ever cleared."
-position = Vector2(-15, 0)
+editor_description = "The same far-left mark as Conversation. The Keeper has already gathered here, so the shot finds him in place rather than walking him in."
+position = Vector2(-530, 58)
 
 [node name="Conversation" parent="ActorMarkers" index="1"]
-editor_description = "The Lantern Keeper's stand, 244px right of the miner - one measured miner-width off Quibble, who is himself one off the miner. The authored x is where he lands for a dead-centre fall: the stage sits 22 cells right of the terrain centre, so the miner is at -176 here. Conversation Tracks Miner re-derives the whole root's shift from wherever this marker currently is, so the number is for reading the scene rather than for the result."
-position = Vector2(-15, 0)
+editor_description = "The Lantern Keeper's far-left stand. The Miner is at -176 for a dead-centre fall, making this 354px left: the endpoint authored into the final CAMERA FRAME beat."
+position = Vector2(-530, 58)
 
 [node name="Work" parent="ActorMarkers" index="2"]
-editor_description = "The cafe table. Kept as the mark for any later beat that walks somebody over to sit down."
-position = Vector2(-390, 0)
+editor_description = "Unused by this timeline; kept at the Keeper's authored rest point."
+position = Vector2(-530, 58)
 
 [node name="Rest" parent="ActorMarkers" index="3"]
-position = Vector2(-15, 0)
+position = Vector2(-530, 58)
 
 [node name="Exit" parent="ActorMarkers" index="4"]
 editor_description = "His own mark. He does not leave by walking - Closing Fade Seconds hops him once and fades him out where he stands, which is Zephan's 'and then he goes shoom' and the same departure his warning at 5,600 uses."
-position = Vector2(-15, 0)
+position = Vector2(-530, 58)
 
 [node name="cheese_girl" type="Marker2D" parent="ActorMarkers" index="5"]
 editor_description = "The serving window, 20px right of the storefront's centre, where she is painted. Her presenter is placed here and left HIDDEN, because Actors Drawn Into Set names her. The mark exists so the schedule has somewhere to say she is and so the roster's left-to-right order stays true. Named for her actor id, which is how DepthEncounterController finds it and how an ordinary text search for the character finds her mark along with everything else about her."
-position = Vector2(176, 0)
+position = Vector2(191, 12)
 
 [node name="treasure_hunter" type="Marker2D" parent="ActorMarkers" index="6"]
-editor_description = "Between the shop and Rotini, 127px off the rat: (86.5 + 62.7) / 2 + 52.8. He stands nearest the cafe because he is the one who has stopped - 'No treasure here. Good. I was tired of carrying things.'"
-position = Vector2(-466, 0)
+editor_description = "In front of the colony in the left-middle, holding his no_pickaxe pose as drawn. The Miner and cafe are to his right."
+position = Vector2(-300, 54)
 
 [node name="rutini" type="Marker2D" parent="ActorMarkers" index="7"]
-editor_description = "On the miner's left, 110px off him: (52.8 + 62.7) / 2 + 52.8 measures 110.5. He arrived WITH the player - his colony has been digging alongside since 11,200 - so he is the only one here who is not waiting at the cafe but coming into it, and 'Easy, lads. We're here' is him calling them to a stop."
-position = Vector2(-318, 0)
+editor_description = "Immediately left of the cafe, seated behind the left chair at the separate dining table as Zephan dictated. His lowered 30px lane settles him into the chair while remaining behind its 36px foreground base."
+position = Vector2(-70, 30)
 
 [node name="coffee_cat" type="Marker2D" parent="ActorMarkers" index="8"]
-editor_description = "ON THE RIGHT-HAND STOOL, IN FRONT OF THE CAFE WINDOW. Zephan's layout: two stools stand at the serving window Cheese Girl is painted in, and the cat sits on the right one with the coffee he has been carrying since 9,200.
+editor_description = "ON THE RIGHT-HAND STOOL, IN FRONT OF THE CAFE WINDOW. Zephan's layout: two stools stand at the serving window Cheese Girl is painted in, and the cat sits on the right one with the coffee he has been carrying since 9,200. The cat and stool share the 12px rear lane; the stool's foreground draw order hides the standing-only art below its seat so Quibble reads as sitting without changing his shared grounding elsewhere."
+position = Vector2(235, 12)
 
-Y IS -32 AND IT IS A HEIGHT, NOT A POSITION. A gathered actor's mark is floor-sampled - the x says which column and the terrain says how high - so a negative y is added to the sampled ground rather than replacing it. Thirty two is the flat stool's seat, derived in local_tests/derive_flat_furniture.gd from a real 48cm stool, and it stays correct at every landing column because the rock under the stool is different rock each run and both read it from the same sampler."
-position = Vector2(211, -32)
+[node name="cloak_lantern" type="Marker2D" parent="ActorMarkers" index="9"]
+editor_description = "The identity-aware gathering mark for the stage's own visitor. It matches the far-left Conversation mark so the final camera cue resolves the Keeper rather than the fallback spread."
+position = Vector2(-530, 58)
+
+[node name="moody_teen" type="Marker2D" parent="ActorMarkers" index="10"]
+editor_description = "Moody Teen's identity-aware gathering mark. His reusable run-wide presenter stands in the Y 6 rear lane behind the Y 36 dining furniture, matching Eve's background silhouette."
+position = Vector2(20, 6)
 
 [node name="DasQuesoCafe" parent="PropMarkers" index="0" instance=ExtResource("5_cafe")]
-editor_description = "RIGHT OF CENTRE, which is Zephan's layout. The door is on the building's left and the serving window Cheese Girl is painted in is on its right, both already in the art, so the shop faces back down the room toward everybody else.
+editor_description = "THE LARGE RIGHT-MIDDLE ANCHOR from Zephan's paper layout and verbatim direction. The door remains on the building's left and the serving window Coco is painted in remains on its right.
 
-It stands 40px clear of the Lantern Keeper's right edge - closer than the house spacing rule, deliberately, because a building is not a body and holding it a full miner-width off would push its own sign toward the frame edge.
+SCALE AND THE ROOM ARE ONE DECISION. 0.16 is another 25 percent increase over the previous 0.12836 pass and makes the 1558px-tall drawing about 249px tall before camera zoom. Its room is re-carved to a 32-cell base clearance in the same change.
 
-SCALE AND THE ROOM ARE ONE DECISION. 0.10269 makes the 1626x1558 art 167px wide and 160px tall, twenty cells, still a third again the miner's own 120px. It was 24 cells and came down, because the frame is only 26 cells tall above the floor and this building tracks the miner across a 49-cell landing band - so whatever it needs is owed across seventy columns and the ceiling over all of them was pinned flat. local_tests/compare_room_ceilings.gd is the measure; encounter 3's cave, the one Zephan likes, swings from 1 cell to 36 because it protects no columns at all.
-
-Y IS -16, AND THAT IS WHAT STOPS THE FRONT ROCK EATING IT.
-
-Its base used to sit on the dig line - sixteen pixels UNDER the surface the cast are floor-sampled onto - so the floor band drew across its lower third and the shop could not be seen whole. It now stands on the same measured floor line the furniture uses. That was the whole fix; the z was a red herring.
+Y IS ZERO: the storefront is the rear anchor of the walkable shader plane. The broad rendered shelf now supplies foreground depth instead of asking the building to sink into the cave face.
 
 Z -1, WHICH IS A NUMBER RATHER THAN A TIE. The room now orders strictly: storefront -1, its furniture 0, the cast 1, the foreground set and the front stratum 2.
 
 It sat at 0, the same plane as its own stools, on the assumption that equal z falls back to tree order and index 0 draws first. It does not do so reliably for nodes added to an INHERITED scene, where the index is a hint rather than the child order - and the building drew over its own stools and table, which vanished. Quibble stayed visible only because the cast are a plane in front. Ordering that depends on tree position is ordering that breaks the next time somebody adds a prop. Re-run local_tests/carve_cafe_gathering_room.gd after changing this scale; it refuses to save rather than put the shop's roof in the stone."
 z_index = -1
-position = Vector2(159, -16)
-scale = Vector2(0.10269, 0.10269)
-
-[node name="CafeTableWindow" parent="PropMarkers" index="1" instance=ExtResource("14_table_flat")]
-editor_description = "The cafe's own table, directly under the serving window, with a stool either side of it. Zephan's flat art: drawn side on, with no perspective, so it belongs to the same elevation the terrain and the characters are drawn in.
-
-Y IS -16, MEASURED. A prop is not floor-sampled the way the cast are, so its y has to carry the whole correction itself - the level tunnel lays up to three cells of loose rock on the floor row. local_tests/capture_cafe_gathering_stage.gd samples the same floor the controller uses at every column this furniture can slide to and prints the number."
-z_index = 0
-position = Vector2(176, -16)
+material = SubResource("ShaderMaterial_coco_speaker")
+position = Vector2(170, 0)
+scale = Vector2(0.16, 0.16)
 
 [node name="CafeStoolWindowLeft" parent="PropMarkers" index="2" instance=ExtResource("13_stool_flat")]
+editor_description = "The empty left stool directly under the serving sill. Two stools remain the explicit ruling even though the composition sketch draws a third."
 z_index = 0
-position = Vector2(141, -16)
+position = Vector2(191, 12)
+scale = Vector2(0.121, 0.121)
 
 [node name="CafeStoolWindowRight" parent="PropMarkers" index="3" instance=ExtResource("13_stool_flat")]
-editor_description = "Quibble's stool. ActorMarkers/coffee_cat sits on this one, 32px up, which is this stool's derived seat height."
+editor_description = "Quibble's stool. It draws one plane in front of the cat so its seat hides the lower part of his standing-only art; together with the cat's lowered root, that overlap reads as sitting rather than hovering."
+z_index = 1
+position = Vector2(235, 12)
+scale = Vector2(0.121, 0.121)
+
+[node name="DiningChairLeft" parent="PropMarkers" index="4" instance=ExtResource("20_chair_depth")]
+editor_description = "Rotini's dining chair, left of the separate table and 36px into the shader's lit middle shelf. This is not one of the two flat stools under the cafe window."
 z_index = 0
-position = Vector2(211, -16)
+position = Vector2(-70, 36)
 
-[node name="ForegroundTable" parent="PropMarkers" index="4" instance=ExtResource("3_table")]
-editor_description = "THE FOREGROUND SET, AND THE ONLY THING IN THIS ROOM ON LAYER ONE.
+[node name="DiningChairRight" parent="PropMarkers" index="5" instance=ExtResource("20_chair_depth")]
+editor_description = "The second chair Zephan drew at the separate centre table. It shares the left chair's foreground contact lane and remains distinct from the cafe's exactly two window stools."
+z_index = 0
+position = Vector2(30, 36)
 
-Zephan wants one table that is NOT flat - the old three-quarter drawing, which has a little depth in it - standing on the first stratum and sitting a touch lower on screen, so the cast read as walking behind it. That is the whole job: everything else in the shot is a flat elevation, and one prop with drawn depth in front of the cast is what gives the room a near and a far.
+[node name="DiningTable" parent="PropMarkers" index="6" instance=ExtResource("14_table_depth")]
+editor_description = "The separate three-quarter dining table immediately left of the cafe, in the centre of the whole area as Zephan dictated. Unlike the flat window stools, this is the perspective table assigned to the middle ground lane. Its base stands 36px into the 72px lit shelf and draws in front of seated Rotini."
+z_index = 1
+position = Vector2(-20, 36)
 
-Z 2 is the foreground stratum's own draw order, one in front of the cast at z 1. Y IS +14, not the -16 the rest of the furniture uses: a foreground object sits LOWER in frame, and that offset is what sells it as nearer rather than as a table floating over the floor.
-
-It stands to the left of the cafe, near the middle of the whole area, so it crosses the shot rather than decorating one end of it. It will overlap whoever is standing behind it - that is the point, and the stools are short enough that it is legs rather than faces.
-
-STILL WAITING ON: Zephan asked for a shader on the first layer, like the road shader on the surface, so the flat area and the rocks there read as ground being walked on. That is terrain-wide and is NOT done here."
+[node name="DiningCup" type="Sprite2D" parent="PropMarkers" index="7"]
+editor_description = "The supplied blue cup on Rotini's separate dining table. Its feet and scaling are authored against the perspective tabletop rather than either of the two cafe-window stools."
+texture_filter = 4
 z_index = 2
-position = Vector2(-136, 14)
+position = Vector2(-20, -24)
+scale = Vector2(0.025, 0.025)
+texture = ExtResource("23_cup")
 
-[node name="ForegroundStoolLeft" parent="PropMarkers" index="5" instance=ExtResource("4_stool")]
-z_index = 2
-position = Vector2(-191, 14)
+[node name="RatCrowd" type="Node2D" parent="PropMarkers" index="8"]
+editor_description = "A bounded cafe-only rat mass behind Treasure Hunter. Five clump actors depict 120 rats while three foreground singles break up the repeated silhouette. Runtime never adds to this authored eight-node pool."
 
-[node name="ForegroundStoolRight" parent="PropMarkers" index="6" instance=ExtResource("4_stool")]
-z_index = 2
-position = Vector2(-81, 14)
+[node name="ClumpBackLeft" parent="PropMarkers/RatCrowd" index="0" instance=ExtResource("18_rat")]
+z_index = -1
+position = Vector2(-270, 6)
+scale = Vector2(1.05, 1.05)
+default_appearance = ExtResource("19_rat_clump")
 
-[node name="FarTableLeft" parent="PropMarkers" index="7" instance=ExtResource("14_table_flat")]
-editor_description = "THE FAR RANK, WHICH IS WHERE THE 2.5D COMES FROM.
+[node name="ClumpBackCentre" parent="PropMarkers/RatCrowd" index="1" instance=ExtResource("18_rat")]
+z_index = -1
+position = Vector2(-205, 2)
+scale = Vector2(1.1, 1.1)
+default_appearance = ExtResource("19_rat_clump")
 
-Zephan's note is that the room reads painfully flat and should sit closer to the surface's two-and-a-half D. The surface gets it from strata at different tints with a sky behind them; a tunnel has no sky, so this room gets it the way Rotini's colony already does. RatColonyFollowers ranks its mice by three values together - scale 1.0, 0.82, 0.66, 0.54; a tint darkening with depth; and a vertical offset that lifts further ranks UP the frame - and its own comment says the tint sells distance harder than the scale does.
+[node name="ClumpBackRight" parent="PropMarkers/RatCrowd" index="2" instance=ExtResource("18_rat")]
+z_index = -1
+position = Vector2(-140, 8)
+scale = Vector2(1.05, 1.05)
+default_appearance = ExtResource("19_rat_clump")
 
-This rank is that applied to furniture: 0.72 of the prop's OWN scale, darkened to 0.62, and lifted 34px, at z -2 behind everything including the storefront. Nobody sits at it, which is deliberate - a character on a 0.72 table would have to be scaled too, and the cast are shared presenters whose scale belongs to their own appearance.
+[node name="ClumpMidLeft" parent="PropMarkers/RatCrowd" index="3" instance=ExtResource("18_rat")]
+z_index = -1
+position = Vector2(-245, 22)
+scale = Vector2(1.18, 1.18)
+default_appearance = ExtResource("19_rat_clump")
 
-AN INSTANCE SCALE REPLACES THE PROP SCENE'S SCALE, IT DOES NOT MULTIPLY IT. Writing 0.72 here drew a table 0.72 of its raw 2224px canvas - sixteen hundred pixels of furniture across the top of the shot. The numbers below are the prop's own scale times the rank factor, worked out rather than typed.
+[node name="ClumpMidRight" parent="PropMarkers/RatCrowd" index="4" instance=ExtResource("18_rat")]
+z_index = -1
+position = Vector2(-165, 26)
+scale = Vector2(1.18, 1.18)
+default_appearance = ExtResource("19_rat_clump")
 
-Move all three of these together or the plane breaks. Scale, tint and lift are one decision; changing one alone makes a table read as the wrong SIZE rather than as further away."
-z_index = -2
-modulate = Color(0.62, 0.6, 0.58, 1)
-position = Vector2(-352, -34)
-scale = Vector2(0.08286, 0.08286)
+[node name="RatFrontLeft" parent="PropMarkers/RatCrowd" index="5" instance=ExtResource("18_rat")]
+z_index = 0
+position = Vector2(-335, 50)
+scale = Vector2(0.78, 0.78)
 
-[node name="FarStoolLeft" parent="PropMarkers" index="8" instance=ExtResource("13_stool_flat")]
-z_index = -2
-modulate = Color(0.62, 0.6, 0.58, 1)
-position = Vector2(-398, -34)
-scale = Vector2(0.07647, 0.07647)
+[node name="RatFrontCentre" parent="PropMarkers/RatCrowd" index="6" instance=ExtResource("18_rat")]
+z_index = 0
+position = Vector2(-200, 58)
+scale = Vector2(0.82, 0.82)
 
-[node name="FarStoolRight" parent="PropMarkers" index="9" instance=ExtResource("13_stool_flat")]
-z_index = -2
-modulate = Color(0.62, 0.6, 0.58, 1)
-position = Vector2(-306, -34)
-scale = Vector2(0.07647, 0.07647)
+[node name="RatFrontRight" parent="PropMarkers/RatCrowd" index="7" instance=ExtResource("18_rat")]
+z_index = 0
+position = Vector2(-125, 64)
+scale = Vector2(0.76, 0.76)
+
+[node name="AnimationPlayer" parent="." index="3"]
+libraries/ = SubResource("AnimationLibrary_cafe")
 
 [node name="EditorTerrainPreview" parent="." index="4"]
 editor_description = "Previews cafe_gathering at its authored depth."
@@ -181,18 +233,18 @@ encounter_id = &"cafe_gathering"
 preview_depth_rows = 14000
 
 [node name="Miner" type="Node2D" parent="." index="5"]
-editor_description = "Where the miner stands for a dead-centre landing: the stage sits 22 cells right of the terrain centre, so he is 176px left of this stage's own origin. Editor-only; it frees itself before a running game can pay for it."
+editor_description = "The foreground Miner landing preview. Runtime starts on the rear support line, then DepthEncounterController settles his sole 56px down the visible shader plane. Editor-only; it frees itself before a running game can pay for it."
 z_index = 1
-position = Vector2(-176, 0)
+position = Vector2(-176, 56)
 script = ExtResource("2_preview")
 actor_id = &"miner"
 appearance = SubResource("Resource_miner_preview")
 metadata/_edit_group_ = true
 
 [node name="treasure_hunter" type="Node2D" parent="." index="6"]
-editor_description = "Standing at the cafe with nothing left to carry. no_pickaxe is the pose his own art already has for exactly this - he gave the second one away at 7,400 - and it is the only visual in the shot that says his story finished."
+editor_description = "Standing in front of the left-middle rat crowd with nothing left to carry. no_pickaxe is the pose his own art already has for exactly this - he gave the second one away at 7,400 - and it is the only visual in the shot that says his story finished."
 z_index = 1
-position = Vector2(-466, 0)
+position = Vector2(-300, 54)
 script = ExtResource("2_preview")
 actor_id = &"treasure_hunter"
 appearance = ExtResource("9_treasure")
@@ -200,19 +252,18 @@ pose = &"no_pickaxe"
 metadata/_edit_group_ = true
 
 [node name="rutini" type="Node2D" parent="." index="7"]
+editor_description = "At the separate dining table immediately left of the enlarged right-middle cafe."
 z_index = 1
-position = Vector2(-318, 0)
+position = Vector2(-70, 30)
 script = ExtResource("2_preview")
 actor_id = &"rutini"
 appearance = ExtResource("10_rutini")
 metadata/_edit_group_ = true
 
 [node name="coffee_cat" type="Node2D" parent="." index="8"]
-editor_description = "Sitting on the bench. The stand-in is placed at the mark's own y, which is the seat; at runtime that same -30 is added to the sampled ground instead.
-
-Z 1, the second stratum, from Zephan's directive - it arrived on the integration branch while this bench was being staged. The furniture is at z 0 and the storefront at z -1, so both still sit behind him."
+editor_description = "Seated on the right-hand stool. The shared art has no seated pose, so this stage lowers it into the seat and lets the stool's z 2 top edge occlude the lower body. That is deliberately local: changing the appearance would sink Quibble into the floor at 9,200 and everywhere else."
 z_index = 1
-position = Vector2(211, -32)
+position = Vector2(235, 12)
 script = ExtResource("2_preview")
 actor_id = &"coffee_cat"
 appearance = ExtResource("11_quibble")
@@ -221,11 +272,19 @@ metadata/_edit_group_ = true
 
 [node name="cloak_lantern" type="Node2D" parent="." index="9"]
 z_index = 1
-position = Vector2(-15, 0)
+position = Vector2(-530, 58)
 script = ExtResource("2_preview")
 actor_id = &"cloak_lantern"
 appearance = ExtResource("8_lantern")
 pose = &"idle"
+metadata/_edit_group_ = true
+
+[node name="moody_teen" type="Node2D" parent="." index="10"]
+editor_description = "Behind the centre-right dining set at the same Y 6 rear depth used by the runtime presenter. The Y 36 table and chair sit lower and therefore correctly overlap him in the 2.5D composition."
+position = Vector2(20, 6)
+script = ExtResource("2_preview")
+actor_id = &"moody_teen"
+appearance = ExtResource("22_moody_teen")
 metadata/_edit_group_ = true
 
 [editable path="ActorMarkers"]

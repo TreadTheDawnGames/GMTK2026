@@ -5,10 +5,27 @@ extends VBoxContainer
 ## How it works:
 ## - Reads the shared context and builds cast, prop, and marker controls in code.
 ## - Structural edits are staged through the context's undo manager.
-## - Actor rows select the real preview node so the Inspector owns positioning.
+## - Rows multi-select real stage nodes; compact tools align, space, and floor
+##   snap them through one undoable transform action.
+## - Actor position actions request MOVE-beat edits through the shared context,
+##   leaving timeline ownership and timing outside this panel.
 ## - The context signal rebuilds this panel after edits and undo/redo.
 ## The invariant is that every authored node has the edited scene as owner and
 ## every structural change has a matching undo operation and one notification.
+
+enum AlignMode {
+	LEFT,
+	HORIZONTAL_CENTER,
+	RIGHT,
+	TOP,
+	VERTICAL_CENTER,
+	BOTTOM,
+}
+
+enum DistributeAxis {
+	HORIZONTAL,
+	VERTICAL,
+}
 
 const _MARKER_ROOT_NAMES: Array[StringName] = [
 	&"ActorMarkers",
@@ -54,6 +71,11 @@ var _marker_choice: OptionButton
 var _marker_root_selector: OptionButton
 var _marker_name_edit: LineEdit
 var _selected_preview: CutsceneActorPreview
+## The panel mirrors EditorSelection but keeps the same explicit selection in
+## standalone verification, where EditorInterface does not exist.
+var _selected_stage_nodes: Array[Node2D] = []
+var _selection_checks: Dictionary[int, CheckBox] = {}
+var _syncing_editor_selection: bool = false
 var _standalone_test_undo_redo: UndoRedo
 
 
@@ -64,6 +86,7 @@ func _init() -> void:
 
 ## Rebinds the panel to one open stage, or shows a safe empty state.
 func set_context(context: CutsceneEditorContext) -> void:
+	var context_changed := _context != context
 	if (
 		_context != null
 		and is_instance_valid(_context)
@@ -74,6 +97,9 @@ func set_context(context: CutsceneEditorContext) -> void:
 	):
 		_context.cast_changed.disconnect(_on_cast_changed)
 	_context = context
+	if context_changed:
+		_selected_stage_nodes.clear()
+		_selected_preview = null
 	if (
 		_context != null
 		and not _context.cast_changed.is_connected(
@@ -81,6 +107,7 @@ func set_context(context: CutsceneEditorContext) -> void:
 		)
 	):
 		_context.cast_changed.connect(_on_cast_changed)
+	_connect_editor_selection()
 	_rebuild()
 
 
@@ -93,13 +120,16 @@ func set_standalone_test_undo_redo(undo_redo: UndoRedo) -> void:
 
 func _rebuild() -> void:
 	_clear_contents()
-	_selected_preview = null
 	if not _has_valid_context():
+		_selected_stage_nodes.clear()
+		_selected_preview = null
 		var message := Label.new()
 		message.text = "Open a cutscene stage to edit its cast and props."
 		message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		add_child(message)
 		return
+	_prune_selected_stage_nodes()
+	_refresh_selection_from_editor()
 	_build_controls()
 
 
@@ -115,6 +145,7 @@ func _clear_contents() -> void:
 	_marker_choice = null
 	_marker_root_selector = null
 	_marker_name_edit = null
+	_selection_checks.clear()
 
 
 func _has_valid_context() -> bool:
@@ -146,18 +177,132 @@ func _build_controls() -> void:
 
 	add_child(_make_section_label("In this cutscene"))
 	var cast_scroll := ScrollContainer.new()
-	cast_scroll.custom_minimum_size.y = 120.0
+	cast_scroll.custom_minimum_size.y = 138.0
 	cast_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var cast_list := VBoxContainer.new()
 	cast_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cast_scroll.add_child(cast_list)
 	add_child(cast_scroll)
-	_build_cast_rows(cast_list)
+	_build_stage_rows(cast_list)
 
+	var selection_row := HFlowContainer.new()
+	var select_all_button := _make_compact_button(
+		"All",
+		"Select every actor and composed prop in this stage.",
+		_on_select_all_pressed
+	)
+	selection_row.add_child(select_all_button)
+	var clear_selection_button := _make_compact_button(
+		"None",
+		"Clear the stage selection.",
+		_on_clear_selection_pressed
+	)
+	selection_row.add_child(clear_selection_button)
 	var remove_button := Button.new()
-	remove_button.text = "Remove Selected Actor"
-	remove_button.pressed.connect(_on_remove_actor_pressed)
-	add_child(remove_button)
+	remove_button.text = "Remove actors"
+	remove_button.tooltip_text = (
+		"Remove selected actor stand-ins. Props and their authored children "
+		+ "are left untouched."
+	)
+	remove_button.pressed.connect(_on_remove_selected_actors_pressed)
+	selection_row.add_child(remove_button)
+	add_child(selection_row)
+
+	add_child(_make_section_label("Stage selected objects"))
+	var staging_tools := HFlowContainer.new()
+	staging_tools.add_theme_constant_override(&"h_separation", 4)
+	staging_tools.add_theme_constant_override(&"v_separation", 4)
+	for definition: Dictionary in [
+		{
+			"text": "Floor",
+			"tip": (
+				"Put each selected actor or prop origin on the first sculpted "
+				+ "rock surface below it. Horizontal placement is preserved."
+			),
+			"call": _on_snap_to_floor_pressed,
+		},
+		{
+			"text": "Left",
+			"tip": "Align selected origins to the leftmost selected object.",
+			"call": _on_align_pressed.bind(AlignMode.LEFT),
+		},
+		{
+			"text": "Center X",
+			"tip": "Align selected origins on one shared horizontal center.",
+			"call": _on_align_pressed.bind(AlignMode.HORIZONTAL_CENTER),
+		},
+		{
+			"text": "Right",
+			"tip": "Align selected origins to the rightmost selected object.",
+			"call": _on_align_pressed.bind(AlignMode.RIGHT),
+		},
+		{
+			"text": "Top",
+			"tip": "Align selected origins to the highest selected object.",
+			"call": _on_align_pressed.bind(AlignMode.TOP),
+		},
+		{
+			"text": "Center Y",
+			"tip": "Align selected origins on one shared vertical center.",
+			"call": _on_align_pressed.bind(AlignMode.VERTICAL_CENTER),
+		},
+		{
+			"text": "Bottom",
+			"tip": "Align selected origins to the lowest selected object.",
+			"call": _on_align_pressed.bind(AlignMode.BOTTOM),
+		},
+		{
+			"text": "Space X",
+			"tip": (
+				"Evenly distribute three or more selected objects from left "
+				+ "to right while keeping the endpoints fixed."
+			),
+			"call": _on_distribute_pressed.bind(DistributeAxis.HORIZONTAL),
+		},
+		{
+			"text": "Space Y",
+			"tip": (
+				"Evenly distribute three or more selected objects from top "
+				+ "to bottom while keeping the endpoints fixed."
+			),
+			"call": _on_distribute_pressed.bind(DistributeAxis.VERTICAL),
+		},
+	]:
+		staging_tools.add_child(_make_compact_button(
+			definition["text"],
+			definition["tip"],
+			definition["call"]
+		))
+	add_child(staging_tools)
+
+	var movement_tools := HFlowContainer.new()
+	movement_tools.add_theme_constant_override(&"h_separation", 4)
+	movement_tools.add_theme_constant_override(&"v_separation", 4)
+	movement_tools.add_child(_make_compact_button(
+		"Use as start",
+		(
+			"Record each selected actor's visible stage position as the "
+			+ "selected MOVE beat's authored start."
+		),
+		_on_record_start_pressed
+	))
+	movement_tools.add_child(_make_compact_button(
+		"Use as destination",
+		(
+			"Record each selected actor's visible stage position as the "
+			+ "selected MOVE beat's destination."
+		),
+		_on_record_destination_pressed
+	))
+	movement_tools.add_child(_make_compact_button(
+		"Create move here",
+		(
+			"Create one MOVE beat per selected actor, targeting where each "
+			+ "actor currently stands in the 2D scene."
+		),
+		_on_create_movement_pressed
+	))
+	add_child(movement_tools)
 
 	add_child(HSeparator.new())
 	add_child(_make_section_label("Add someone to this cutscene"))
@@ -334,23 +479,39 @@ func _add_labeled_control(label_text: String, control: Control) -> void:
 	add_child(row)
 
 
-func _build_cast_rows(cast_list: VBoxContainer) -> void:
+func _make_compact_button(
+	text: String,
+	tooltip: String,
+	callback: Callable
+) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.tooltip_text = tooltip
+	button.pressed.connect(callback)
+	return button
+
+
+func _build_stage_rows(cast_list: VBoxContainer) -> void:
 	var row_count := 0
 	for actor_id: StringName in _context.get_stage_actor_ids():
 		var preview := _context.get_actor_preview(actor_id)
 		if preview == null:
 			continue
 		var row := HBoxContainer.new()
+		_add_selection_check(row, preview)
 		var select_button := Button.new()
-		select_button.text = (
+		select_button.text = "Actor: %s" % (
 			String(preview.actor_id) if not preview.actor_id.is_empty()
 			else "<unnamed actor>"
 		)
 		select_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		select_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		select_button.tooltip_text = "Select this stand-in in the 2D editor."
+		select_button.tooltip_text = (
+			"Select only this actor in the 2D editor. Use the checkbox to "
+			+ "build a group selection."
+		)
 		select_button.pressed.connect(
-			_on_actor_row_pressed.bind(preview)
+			_on_stage_item_row_pressed.bind(preview)
 		)
 		row.add_child(select_button)
 
@@ -368,10 +529,40 @@ func _build_cast_rows(cast_list: VBoxContainer) -> void:
 			row.add_child(warning_label)
 		cast_list.add_child(row)
 		row_count += 1
+	for prop in _context.get_stage_props():
+		var prop_row := HBoxContainer.new()
+		_add_selection_check(prop_row, prop)
+		var prop_button := Button.new()
+		prop_button.text = "Prop: %s" % prop.name
+		prop_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		prop_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		prop_button.tooltip_text = (
+			"Select this composed prop in the 2D editor. Its child sprites stay "
+			+ "together as one stage object."
+		)
+		prop_button.pressed.connect(_on_stage_item_row_pressed.bind(prop))
+		prop_row.add_child(prop_button)
+		var prop_type := Label.new()
+		prop_type.text = prop.get_class()
+		prop_type.custom_minimum_size.x = 150.0
+		prop_row.add_child(prop_type)
+		cast_list.add_child(prop_row)
+		row_count += 1
 	if row_count == 0:
 		var empty_label := Label.new()
-		empty_label.text = "No actors placed in this stage."
+		empty_label.text = "No actors or props placed in this stage."
 		cast_list.add_child(empty_label)
+
+
+func _add_selection_check(row: HBoxContainer, node: Node2D) -> void:
+	var check := CheckBox.new()
+	check.tooltip_text = (
+		"Include this object in floor snap, alignment, and spacing actions."
+	)
+	check.button_pressed = _selected_stage_nodes.has(node)
+	check.toggled.connect(_on_stage_item_toggled.bind(node))
+	row.add_child(check)
+	_selection_checks[node.get_instance_id()] = check
 
 
 func _get_appearance_name(appearance: CharacterAppearance) -> String:
@@ -694,15 +885,141 @@ func _on_cast_changed() -> void:
 	_rebuild()
 
 
-func _on_actor_row_pressed(preview: CutsceneActorPreview) -> void:
-	if not is_instance_valid(preview):
+func _connect_editor_selection() -> void:
+	if not Engine.is_editor_hint():
 		return
-	_selected_preview = preview
+	var selection = EditorInterface.get_selection()
+	if (
+		selection != null
+		and not selection.selection_changed.is_connected(
+			_on_editor_selection_changed
+		)
+	):
+		selection.selection_changed.connect(_on_editor_selection_changed)
+
+
+func _on_editor_selection_changed() -> void:
+	if _syncing_editor_selection:
+		return
+	_refresh_selection_from_editor()
+	_refresh_selection_checks()
+
+
+func _refresh_selection_from_editor() -> void:
+	if not Engine.is_editor_hint() or not _has_valid_context():
+		return
 	var selection = EditorInterface.get_selection()
 	if selection == null:
 		return
+	_selected_stage_nodes.clear()
+	_selected_preview = null
+	for selected: Node in selection.get_selected_nodes():
+		var selected_2d := selected as Node2D
+		if (
+			selected_2d != null
+			and _context.is_stage_manipulable(selected_2d)
+		):
+			_selected_stage_nodes.append(selected_2d)
+			if selected_2d is CutsceneActorPreview:
+				_selected_preview = selected_2d
+
+
+func _prune_selected_stage_nodes() -> void:
+	var valid_nodes: Array[Node2D] = []
+	for selected in _selected_stage_nodes:
+		if (
+			is_instance_valid(selected)
+			and _context != null
+			and _context.is_stage_manipulable(selected)
+		):
+			valid_nodes.append(selected)
+	_selected_stage_nodes = valid_nodes
+	if (
+		is_instance_valid(_selected_preview)
+		and not _selected_stage_nodes.has(_selected_preview)
+	):
+		_selected_preview = null
+
+
+func _refresh_selection_checks() -> void:
+	for instance_id: int in _selection_checks:
+		var check := _selection_checks[instance_id]
+		if not is_instance_valid(check):
+			continue
+		var selected := false
+		for node in _selected_stage_nodes:
+			if node.get_instance_id() == instance_id:
+				selected = true
+				break
+		check.set_pressed_no_signal(selected)
+
+
+## Public selection seam used by editor actions and standalone verification.
+func set_selected_stage_nodes(nodes: Array[Node2D]) -> void:
+	_selected_stage_nodes.clear()
+	if _context != null:
+		for node in nodes:
+			if (
+				is_instance_valid(node)
+				and _context.is_stage_manipulable(node)
+				and not _selected_stage_nodes.has(node)
+			):
+				_selected_stage_nodes.append(node)
+	_selected_preview = null
+	for selected in _selected_stage_nodes:
+		if selected is CutsceneActorPreview:
+			_selected_preview = selected
+			break
+	_sync_editor_selection()
+	_refresh_selection_checks()
+
+
+func get_selected_stage_nodes() -> Array[Node2D]:
+	_refresh_selection_from_editor()
+	_prune_selected_stage_nodes()
+	return _selected_stage_nodes.duplicate()
+
+
+func _sync_editor_selection() -> void:
+	if not Engine.is_editor_hint():
+		return
+	var selection = EditorInterface.get_selection()
+	if selection == null:
+		return
+	_syncing_editor_selection = true
 	selection.clear()
-	selection.add_node(preview)
+	for node in _selected_stage_nodes:
+		selection.add_node(node)
+	_syncing_editor_selection = false
+
+
+func _on_stage_item_toggled(selected: bool, node: Node2D) -> void:
+	if not is_instance_valid(node):
+		return
+	var next_selection := get_selected_stage_nodes()
+	if selected and not next_selection.has(node):
+		next_selection.append(node)
+	elif not selected:
+		next_selection.erase(node)
+	set_selected_stage_nodes(next_selection)
+
+
+func _on_stage_item_row_pressed(node: Node2D) -> void:
+	if not is_instance_valid(node):
+		return
+	set_selected_stage_nodes([node])
+
+
+func _on_select_all_pressed() -> void:
+	if not _has_valid_context():
+		return
+	set_selected_stage_nodes(_context.get_stage_manipulable_nodes())
+	_set_status("Selected %d stage objects." % _selected_stage_nodes.size())
+
+
+func _on_clear_selection_pressed() -> void:
+	set_selected_stage_nodes([])
+	_set_status("Stage selection cleared.")
 
 
 func _on_add_actor_pressed() -> void:
@@ -761,42 +1078,308 @@ func _on_add_actor_pressed() -> void:
 	)
 	undo_redo.commit_action()
 	_selected_preview = actor
-	_on_actor_row_pressed(actor)
+	_on_stage_item_row_pressed(actor)
 
 
-func _on_remove_actor_pressed() -> void:
+func _on_remove_selected_actors_pressed() -> void:
 	if not _has_valid_context():
 		return
-	var preview := _get_selected_actor_preview()
-	if preview == null or preview.get_parent() == null:
-		_set_status("Select an actor stand-in to remove it.")
+	var removals: Array[CutsceneActorPreview] = []
+	for selected in get_selected_stage_nodes():
+		var preview := selected as CutsceneActorPreview
+		if preview != null and preview.get_parent() != null:
+			removals.append(preview)
+	if removals.is_empty():
+		_set_status("Select one or more actor stand-ins to remove.")
 		return
-	var parent := preview.get_parent()
 	var undo_redo: Variant = _get_undo_redo()
-	undo_redo.create_action("Remove cutscene actor")
-	undo_redo.add_do_method(parent, &"remove_child", preview)
-	undo_redo.add_do_method(
-		_context,
-		&"notify_cast_changed"
+	undo_redo.create_action(
+		"Remove cutscene actor"
+		if removals.size() == 1
+		else "Remove cutscene actors"
 	)
 	undo_redo.add_undo_method(
 		_context,
 		&"notify_cast_changed"
 	)
-	undo_redo.add_undo_method(parent, &"add_child", preview)
+	for preview in removals:
+		var parent := preview.get_parent()
+		undo_redo.add_do_method(parent, &"remove_child", preview)
+		undo_redo.add_undo_method(parent, &"add_child", preview)
+	undo_redo.add_do_method(
+		_context,
+		&"notify_cast_changed"
+	)
 	undo_redo.commit_action()
+	_selected_stage_nodes.clear()
 	_selected_preview = null
 
 
-func _get_selected_actor_preview() -> CutsceneActorPreview:
-	var selection = EditorInterface.get_selection()
-	if selection != null:
-		for selected: Node in selection.get_selected_nodes():
-			if selected is CutsceneActorPreview:
-				return selected
-	if is_instance_valid(_selected_preview):
-		return _selected_preview
-	return null
+## Aligns two or more selected actor/prop origins in stage space and returns the
+## number that moved.
+func align_selected(mode: AlignMode) -> int:
+	var selected := get_selected_stage_nodes()
+	if selected.size() < 2:
+		_set_status("Select at least two actors or props to align.")
+		return 0
+	var positions: Dictionary[Node2D, Vector2] = {}
+	var minimum := Vector2(INF, INF)
+	var maximum := Vector2(-INF, -INF)
+	for node in selected:
+		var position := _context.get_stage_local_position(node)
+		if not _is_finite_vector(position):
+			continue
+		positions[node] = position
+		minimum = minimum.min(position)
+		maximum = maximum.max(position)
+	if positions.size() < 2:
+		_set_status("The selected objects do not have usable stage positions.")
+		return 0
+	var target := Vector2.ZERO
+	match mode:
+		AlignMode.LEFT:
+			target.x = minimum.x
+		AlignMode.HORIZONTAL_CENTER:
+			target.x = (minimum.x + maximum.x) * 0.5
+		AlignMode.RIGHT:
+			target.x = maximum.x
+		AlignMode.TOP:
+			target.y = minimum.y
+		AlignMode.VERTICAL_CENTER:
+			target.y = (minimum.y + maximum.y) * 0.5
+		AlignMode.BOTTOM:
+			target.y = maximum.y
+	var targets: Dictionary[Node2D, Vector2] = {}
+	for node in positions:
+		var position: Vector2 = positions[node]
+		if mode in [
+			AlignMode.LEFT,
+			AlignMode.HORIZONTAL_CENTER,
+			AlignMode.RIGHT,
+		]:
+			position.x = target.x
+		else:
+			position.y = target.y
+		targets[node] = position
+	var changed := _commit_stage_positions(targets, "Align cutscene staging")
+	_set_status("Aligned %d selected objects." % changed)
+	return changed
+
+
+## Evenly distributes three or more selected origins while preserving the
+## outer two positions.
+func distribute_selected(axis: DistributeAxis) -> int:
+	var selected := get_selected_stage_nodes()
+	if selected.size() < 3:
+		_set_status("Select at least three actors or props to distribute.")
+		return 0
+	var ordered: Array[Node2D] = []
+	for node in selected:
+		if _is_finite_vector(_context.get_stage_local_position(node)):
+			ordered.append(node)
+	if ordered.size() < 3:
+		_set_status("The selected objects do not have usable stage positions.")
+		return 0
+	_sort_nodes_by_axis(ordered, axis)
+	var first := _context.get_stage_local_position(ordered.front())
+	var last := _context.get_stage_local_position(ordered.back())
+	var span := last.x - first.x
+	if axis == DistributeAxis.VERTICAL:
+		span = last.y - first.y
+	var step := span / float(ordered.size() - 1)
+	var targets: Dictionary[Node2D, Vector2] = {}
+	for index in range(1, ordered.size() - 1):
+		var node := ordered[index]
+		var position := _context.get_stage_local_position(node)
+		if axis == DistributeAxis.HORIZONTAL:
+			position.x = first.x + step * float(index)
+		else:
+			position.y = first.y + step * float(index)
+		targets[node] = position
+	var changed := _commit_stage_positions(
+		targets,
+		"Distribute cutscene staging"
+	)
+	_set_status("Distributed %d selected objects." % ordered.size())
+	return changed
+
+
+## Snaps every selected origin to the first logical terrain surface below it.
+func snap_selected_to_floor() -> int:
+	var selected := get_selected_stage_nodes()
+	if selected.is_empty():
+		_set_status("Select actors or props to snap to the floor.")
+		return 0
+	var targets: Dictionary[Node2D, Vector2] = {}
+	var unresolved := 0
+	for node in selected:
+		var target := _context.get_floor_snap_stage_position(node)
+		if not _is_finite_vector(target):
+			unresolved += 1
+			continue
+		targets[node] = target
+	var changed := _commit_stage_positions(
+		targets,
+		"Snap cutscene staging to floor"
+	)
+	if unresolved > 0:
+		_set_status(
+			"Snapped %d; %d had no sculpted floor below them."
+			% [changed, unresolved]
+		)
+	else:
+		_set_status("Snapped %d selected objects to the floor." % changed)
+	return changed
+
+
+## Captures each selected actor into the current MOVE beat's authored start.
+func record_selected_positions_as_start() -> int:
+	return _request_selected_actor_positions(&"start")
+
+
+## Captures each selected actor into the current MOVE beat's destination.
+func record_selected_positions_as_destination() -> int:
+	return _request_selected_actor_positions(&"destination")
+
+
+## Requests one new MOVE beat per selected actor at its staged position.
+func create_movements_from_selected_positions() -> int:
+	return _request_selected_actor_positions(&"create")
+
+
+func _request_selected_actor_positions(action: StringName) -> int:
+	if not _has_valid_context():
+		return 0
+	var requested := 0
+	for selected in get_selected_stage_nodes():
+		var actor := selected as CutsceneActorPreview
+		if actor == null:
+			continue
+		var accepted := false
+		match action:
+			&"start":
+				accepted = _context.request_movement_start_position(actor)
+			&"destination":
+				accepted = _context.request_movement_destination_position(actor)
+			&"create":
+				accepted = _context.request_movement_beat_creation(actor)
+		if accepted:
+			requested += 1
+	if requested == 0:
+		_set_status("Select one or more actors; props do not own MOVE lanes.")
+	else:
+		_set_status(
+			"Sent %d staged actor position%s to the timeline."
+			% [requested, "" if requested == 1 else "s"]
+		)
+	return requested
+
+
+func _commit_stage_positions(
+	stage_targets: Dictionary[Node2D, Vector2],
+	action_name: String
+) -> int:
+	if not _has_valid_context() or stage_targets.is_empty():
+		return 0
+	# Timeline scrubbing temporarily writes presentation positions onto the
+	# same preview nodes. Restore their authored transforms before capturing
+	# undo, while keeping the already-computed visible targets for the edit.
+	_context.notify_stage_positions_will_change()
+	var changes: Array[Dictionary] = []
+	for node in stage_targets:
+		if not is_instance_valid(node):
+			continue
+		var after := _context.stage_position_to_parent_position(
+			node,
+			stage_targets[node]
+		)
+		if not _is_finite_vector(after) or node.position.is_equal_approx(after):
+			continue
+		changes.append({
+			"node": node,
+			"before": node.position,
+			"after": after,
+		})
+	if changes.is_empty():
+		# The pre-change notification restored the playhead preview. Reapply it
+		# even when every requested target already matched its authored value.
+		_context.notify_cast_changed()
+		return 0
+	var undo_redo: Variant = _get_undo_redo()
+	undo_redo.create_action(action_name)
+	for change: Dictionary in changes:
+		var node: Node2D = change["node"]
+		undo_redo.add_do_property(node, &"position", change["after"])
+		undo_redo.add_undo_property(node, &"position", change["before"])
+	if undo_redo is UndoRedo:
+		undo_redo.add_do_method(
+			Callable(_context, &"notify_cast_changed")
+		)
+		undo_redo.add_undo_method(
+			Callable(_context, &"notify_cast_changed")
+		)
+	else:
+		undo_redo.add_do_method(_context, &"notify_cast_changed")
+		undo_redo.add_undo_method(_context, &"notify_cast_changed")
+	undo_redo.commit_action()
+	return changes.size()
+
+
+func _sort_nodes_by_axis(
+	nodes: Array[Node2D],
+	axis: DistributeAxis
+) -> void:
+	for right_index in range(1, nodes.size()):
+		var node := nodes[right_index]
+		var node_position := _context.get_stage_local_position(node)
+		var left_index := right_index - 1
+		while left_index >= 0:
+			var left_position := _context.get_stage_local_position(
+				nodes[left_index]
+			)
+			var belongs_before := (
+				node_position.x < left_position.x
+				if axis == DistributeAxis.HORIZONTAL
+				else node_position.y < left_position.y
+			)
+			if not belongs_before:
+				break
+			nodes[left_index + 1] = nodes[left_index]
+			left_index -= 1
+		nodes[left_index + 1] = node
+
+
+func _is_finite_vector(value: Vector2) -> bool:
+	return (
+		not is_nan(value.x)
+		and not is_inf(value.x)
+		and not is_nan(value.y)
+		and not is_inf(value.y)
+	)
+
+
+func _on_align_pressed(mode: AlignMode) -> void:
+	align_selected(mode)
+
+
+func _on_distribute_pressed(axis: DistributeAxis) -> void:
+	distribute_selected(axis)
+
+
+func _on_snap_to_floor_pressed() -> void:
+	snap_selected_to_floor()
+
+
+func _on_record_start_pressed() -> void:
+	record_selected_positions_as_start()
+
+
+func _on_record_destination_pressed() -> void:
+	record_selected_positions_as_destination()
+
+
+func _on_create_movement_pressed() -> void:
+	create_movements_from_selected_positions()
 
 
 func _on_add_prop_pressed() -> void:
@@ -848,6 +1431,8 @@ func _on_add_prop_pressed() -> void:
 		&"notify_cast_changed"
 	)
 	undo_redo.commit_action()
+	if prop_2d != null:
+		set_selected_stage_nodes([prop_2d])
 
 
 func _on_add_marker_pressed() -> void:

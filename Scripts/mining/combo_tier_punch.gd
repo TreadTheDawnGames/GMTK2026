@@ -33,6 +33,7 @@ var _base_zoom: Vector2 = Vector2.ONE
 var _has_captured_zoom: bool = false
 var _requested_punch: float = 0.0
 var _current_punch: float = 0.0
+var _reduce_motion_enabled: bool = false
 
 
 ## Captures the authored zoom and sleeps until the first tier climb.
@@ -41,9 +42,16 @@ func _ready() -> void:
 	_capture_base_zoom()
 
 
+## Restores the authored framing and controls whether future zoom kicks start.
+func set_reduce_motion_enabled(enabled: bool) -> void:
+	_reduce_motion_enabled = enabled
+	if enabled:
+		_on_run_reset()
+
+
 ## Requests one kick per climb, scaled across the director's tier count.
 func _on_combo_tier_changed(tier: int, previous_tier: int) -> void:
-	if tier <= previous_tier:
+	if _reduce_motion_enabled or tier <= previous_tier:
 		return
 	_requested_punch = maxf(
 		_requested_punch,

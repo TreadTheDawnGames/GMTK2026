@@ -42,19 +42,36 @@ duration_seconds = 0.3
 bounce_count = 2
 bounce_offset = Vector2(0, -6)
 
+[sub_resource type="Resource" id="Beat_frame_conversation"]
+script = ExtResource("1_j0luq")
+kind = 11
+start_seconds = 1.3
+duration_seconds = 0.8
+camera_offset = Vector2(48, 14)
+camera_zoom = Vector2(1.4, 1.4)
+notes = "The typed CAMERA/FRAME move closes onto the two speakers after Cheese Girl settles and before her first line. Cheese Girl stays on the rear floor plane while the Miner stands 28px nearer the camera, so the 48px horizontal and 14px vertical offsets centre their shared midpoint. The 1.40 zoom matches Encounter 9's conversational framing while preserving both grounded silhouettes and the cave around them."
+
 [sub_resource type="Resource" id="Resource_a5exc"]
 script = ExtResource("1_j0luq")
 kind = 5
-start_seconds = 1.3
+start_seconds = 2.1
 duration_seconds = 6.0
 conversation = ExtResource("2_1frda")
-notes = "Bright and quick. She introduces herself unprompted, so she arrives already pleased to see him and bobs on the spot."
+notes = "Bright and quick. She introduces herself unprompted, so she arrives already pleased to see him and bobs on the spot. The dialogue waits for the shared camera frame to finish, avoiding a zoom that competes with her first line."
+
+[sub_resource type="Resource" id="Beat_reset_camera"]
+script = ExtResource("1_j0luq")
+kind = 11
+start_seconds = 8.1
+duration_seconds = 0.9
+camera_action = 2
+notes = "The typed CAMERA/RESET move restores neutral encounter framing after the final line and before Cheese Girl exits. Pan and zoom return together through CutsceneActionPresenter, and cancellation or encounter release still restores the same neutral state."
 
 [sub_resource type="Resource" id="Resource_fq48r"]
 script = ExtResource("1_j0luq")
 kind = 0
 actor = &"cheese_girl"
-start_seconds = 7.3
+start_seconds = 9.0
 duration_seconds = 2.1
 target_marker = &"Exit"
 pose = &"walk"
@@ -63,9 +80,9 @@ pose = &"walk"
 script = ExtResource("1_j0luq")
 kind = 10
 actor = &"cheese_girl"
-start_seconds = 9.4
+start_seconds = 11.1
 
 [resource]
 script = ExtResource("3_5v7l3")
 sequence_id = &"cheese_girl_first_sequence"
-beats = Array[ExtResource("1_j0luq")]([SubResource("Resource_1o2qq"), SubResource("Resource_uapg4"), SubResource("Resource_3nch5"), SubResource("Resource_ikdqr"), SubResource("Resource_vixgb"), SubResource("Resource_a5exc"), SubResource("Resource_fq48r"), SubResource("Resource_x24b8")])
+beats = Array[ExtResource("1_j0luq")]([SubResource("Resource_1o2qq"), SubResource("Resource_uapg4"), SubResource("Resource_3nch5"), SubResource("Resource_ikdqr"), SubResource("Resource_vixgb"), SubResource("Beat_frame_conversation"), SubResource("Resource_a5exc"), SubResource("Beat_reset_camera"), SubResource("Resource_fq48r"), SubResource("Resource_x24b8")])

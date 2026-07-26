@@ -21,16 +21,18 @@ signal swing_finished
 ## Seats Eve's redrawn miner on the pale top stratum at the surface.
 ##
 ## The rig root is at y 202 and the visible sole is 66.83 px below VisualRoot,
-## so -11 keeps the boot a little over two pixels above the y 260 terrain rim.
+## so -8 overlaps the y 260 terrain rim by less than one filtered pixel.
 ## Dynamic mined floors use the measured LandingFootAnchor below.
-@export_range(-64.0, 64.0, 1.0) var intact_floor_grounding_offset_y: float = -11.0
+@export_range(-64.0, 64.0, 1.0) var intact_floor_grounding_offset_y: float = -8.0
 ## The same measured seating for the run's starting surface.
 ##
 ## It remains a separate value because a future surface redraw must not silently
 ## move every underground encounter.
-@export_range(-64.0, 64.0, 1.0) var surface_grounding_offset_y: float = -11.0
-## Keeps the measured sole above the sampled dirt edge rather than inside it.
-@export_range(0.0, 4.0, 0.25) var grounding_clearance_y: float = 1.0
+@export_range(-64.0, 64.0, 1.0) var surface_grounding_offset_y: float = -8.0
+## Slightly overlaps every sampled dirt edge so filtering cannot reveal a gap.
+## LandingFootAnchor is about one pixel below the opaque boot; two pixels seats
+## the visible sole just inside the contour without burying the ankle.
+@export_range(0.0, 4.0, 0.25) var grounding_overlap_y: float = 2.0
 ## Lifts the sole baseline slightly on each cinematic walking step.
 @export_range(0.0, 12.0, 0.5) var cinematic_walk_step_height: float = 4.0
 ## Controls how many visible walking steps fit along a traversal segment.
@@ -62,25 +64,18 @@ signal swing_finished
 ## verify_cutscene_cast_draw_order.gd asserts that relationship, because this
 ## number and the terrain profile live in different files.
 @export_range(0, 16, 1) var buried_draw_order: int = 1
-## Standing in an authored cutscene room: the SECOND stratum, the same one he
-## occupies while mining.
+## Standing in an authored cutscene room: one explicit plane above the persistent
+## encounter set and every terrain stratum.
 ##
-## Zephan's direction is that every character sits on the second layer, the way
-## the miner already does while he digs, so the foreground rock closes over the
-## cast in a cutscene exactly as it closes over him in the run. This used to be 3
-## - clear of every stratum - on the reasoning that a held shot should show a
-## whole man. That reads as a more legible frame and as a different world: the
-## cast were pasted on top of rock everything else in the game is inside.
+## The earlier contract deliberately put cutscene cast behind Layer 1. The final
+## Encounter 9 review reversed it: Layer 1 must never overlap a person or prop on
+## the shader surface. Ordinary mining still uses buried_draw_order between the
+## first two strata; only a cutscene temporarily takes this foreground order.
 ##
-## Whether it is worth keeping as its own number now that it equals
-## buried_draw_order: yes. They mean different things - one is where a man stands
-## while working, the other is where a shot puts its cast - and a future change to
-## either should not silently move the other.
-##
-## This one value is also the whole cast's. DepthEncounterController copies it
-## onto the character layer, so moving it moves every visitor with him; there is
-## no per-character draw order to keep in step with it.
-@export_range(0, 16, 1) var cutscene_draw_order: int = 1
+## This one value is also the active cast's. DepthEncounterController copies it
+## onto CharacterLayer for the shot, then restores CharacterLayer's persistent
+## encounter order when control returns.
+@export_range(0, 16, 1) var cutscene_draw_order: int = 5
 
 @export_category("References")
 @export var animation_player: AnimationPlayer
@@ -400,6 +395,12 @@ func reset_speech_motion() -> void:
 		speech_reaction.reset_speech_motion()
 
 
+## Removes presentation-only speech bounce without changing mining animation.
+func set_reduce_motion_enabled(enabled: bool) -> void:
+	if is_instance_valid(speech_reaction):
+		speech_reaction.set_reduce_motion_enabled(enabled)
+
+
 ## Bounces the miner artwork without changing the gameplay rig position.
 func react_to_presented_line() -> void:
 	if is_instance_valid(speech_reaction):
@@ -541,7 +542,7 @@ func seat_landing_foot_at_screen_y(support_screen_y: float) -> void:
 	# foot happened to be and keep it there.
 	var grounding_delta: float = (
 		support_screen_y
-		- grounding_clearance_y
+		+ grounding_overlap_y
 		- (landing_foot_anchor.global_position.y + _get_walk_step_lift())
 	)
 	var current_grounding_offset: float = (

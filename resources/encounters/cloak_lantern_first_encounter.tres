@@ -12,6 +12,7 @@ script = ExtResource("1_encounter")
 encounter_id = &"cloak_lantern_first"
 actor_id = &"cloak_lantern"
 depth_from_surface = 1400
+chamber_height_rows_override = 40
 appearance = ExtResource("2_appearance")
 conversation = ExtResource("3_dialogue")
 stage_scene = ExtResource("4_18km8")

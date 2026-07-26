@@ -14,6 +14,8 @@
 [ext_resource type="Resource" uid="uid://2g3sn8h0mk7t" path="res://resources/encounters/depth_encounter_config.tres" id="12_vtugv"]
 [ext_resource type="Shader" uid="uid://basjt8wi65bkp" path="res://Shaders/sunset_prop.gdshader" id="13_sunset_prop"]
 [ext_resource type="Texture2D" uid="uid://bkgia2xwepbwk" path="res://Assets/Terrain/grass_band.png" id="14_grass_band"]
+[ext_resource type="Texture2D" uid="uid://nt7e2v0jnwu4" path="res://Assets/Props/bus_click.png" id="15_bus_click"]
+[ext_resource type="Texture2D" uid="uid://d4l4bwx72wabh" path="res://Assets/Props/bus_left_click.png" id="16_bus_left_click"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_grass_far"]
 resource_local_to_scene = true
@@ -100,6 +102,8 @@ bus = NodePath("Bus")
 bus_sprite = NodePath("Bus/BusSprite")
 bus_side_right_texture = ExtResource("3_bus")
 bus_side_left_texture = ExtResource("10_bus_left")
+bus_side_right_click_texture = ExtResource("15_bus_click")
+bus_side_left_click_texture = ExtResource("16_bus_left_click")
 station = NodePath("Station")
 attendant = NodePath("Attendant")
 bus_arrival_anchor = NodePath("BusArrivalAnchor")
@@ -159,11 +163,11 @@ z_index = 5
 position = Vector2(1500, 262)
 
 [node name="BusSprite" type="Sprite2D" parent="Bus" unique_id=1886361131]
-editor_description = "rim_strength is 0 on purpose: a lit contour around the bus read as an outline pasted on the shot rather than as sunlight, so the bus takes only the twilight shade and the ground bounce. The stop still uses its rim. Full drawn bus body. During the miner exit this sits in front of him for its whole length, so the trailing edge is what uncovers him. Placement is measured from the art: wheels bottom out at texture y=1002. Each travel frame carries its own sprite offset and wheel-shine UVs, applied together in _apply_bus_art. The import is capped at 1024 px; this compensated scale preserves the original footprint."
+editor_description = "rim_strength is 0 on purpose: a lit contour around the bus read as an outline pasted on the shot rather than as sunlight, so the bus takes only the twilight shade and the ground bounce. The stop still uses its rim. Full drawn bus body. During the miner exit this sits in front of him for its whole length, so the trailing edge is what uncovers him. Placement is measured from the art: wheels bottom out at texture y=1002. Each travel frame carries its own sprite offset and wheel-shine UVs, applied together in _apply_bus_art. The texture keeps its original 2224 x 1668 logical size when the import data is capped, so the authored 0.44 scale preserves the 566 px opaque bus footprint described by the edge anchors."
 texture_filter = 4
 material = SubResource("ShaderMaterial_bus_wheels")
 position = Vector2(-14, -74)
-scale = Vector2(0.955625, 0.955625)
+scale = Vector2(0.44, 0.44)
 texture = ExtResource("3_bus")
 
 [node name="FrontEdgeAnchor" type="Marker2D" parent="Bus" unique_id=613728874]

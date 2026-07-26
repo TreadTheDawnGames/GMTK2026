@@ -1,13 +1,11 @@
 extends SceneTree
 
-## Proves a cutscene's cast is drawn in the rock they are standing in, on the
-## same stratum the miner occupies while he is digging.
+## Proves a cutscene's cast is drawn above every terrain stratum while the
+## ordinary buried Miner remains between the first two.
 ##
-## Cutscenes used to lift the whole cast clear of every stratum so a held shot
-## showed whole characters. Zephan's direction reversed that: the cast belong in
-## the ground the way the player does, with their feet covered, rather than being
-## cut out in front of it. So the cutscene order and the mining order now name the
-## same stratum, and this check tests that they still do.
+## The previous test asserted that Layer 1 covered cutscene feet. The final
+## Encounter 9 ruling explicitly reverses that: people and props stand on the
+## shader surface and Layer 1 may not overlap them. Mining remains unchanged.
 ##
 ## Both are compared against whatever the terrain profile's strata actually draw
 ## at. Those numbers live in a different file and nothing else ties them together:
@@ -16,8 +14,8 @@ extends SceneTree
 ## pasted on top of the ground; too far back and they are simply gone behind the
 ## dirt.
 ##
-## The invariant is that both orders sit strictly between the two frontmost
-## strata: behind the foreground layer, in front of the one it stands on.
+## The invariant is that cutscene order is strictly above the frontmost stratum,
+## while buried order remains strictly between the two frontmost strata.
 
 const MINER_SCENE := preload("res://Scenes/mining/miner_rig.tscn")
 const PROFILE_PATH := "res://resources/mining/default_terrain_layer_profile.tres"
@@ -55,29 +53,17 @@ func _run() -> void:
 	])
 
 	var second_stratum_z := _get_second_stratum_z(profile)
-	# Mining and cutscenes now stand the cast on the SAME stratum, the second one,
-	# which is Zephan's direction: the foreground rock closes over a cutscene cast
-	# exactly as it closes over the miner while he digs. This used to assert the
-	# opposite - that a cutscene cleared every stratum - so the rule reversing is
-	# the change, not a check going soft.
-	if cutscene_order >= frontmost_terrain_z:
+	# Cutscenes and mining deliberately use different planes. The held tableau is
+	# fully readable above Layer 1; the active mining shaft retains its occlusion.
+	if cutscene_order <= frontmost_terrain_z:
 		_failures.append(
 			(
-				"Cutscene cast order %d is not behind the foreground stratum at "
-				+ "%d, so the cast would be pasted on top of the rock the rest of "
-				+ "the game sits inside."
+				"Cutscene cast order %d is not above the foreground stratum at "
+				+ "%d, so Layer 1 would overlap the authored shader tableau."
 			) % [cutscene_order, frontmost_terrain_z]
 		)
-	if cutscene_order <= second_stratum_z:
-		_failures.append(
-			(
-				"Cutscene cast order %d is not in front of the second stratum at "
-				+ "%d, so the cast would be buried behind the layer they stand on."
-			) % [cutscene_order, second_stratum_z]
-		)
-	# Both ends of the miner's own mining order are still asserted, because a
-	# single number satisfying one and not the other is exactly how this goes
-	# wrong.
+	# Both ends of the Miner's own mining order remain asserted, because this
+	# visual correction must not flatten ordinary digging.
 	if buried_order >= frontmost_terrain_z:
 		_failures.append(
 			(

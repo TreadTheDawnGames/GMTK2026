@@ -55,7 +55,13 @@ var _view_mode: ViewMode = ViewMode.FOLLOWING_MINER
 var _last_miner_screen_offset := Vector2(NAN, NAN)
 var _is_encounter_focus_active: bool = false
 var _is_encounter_release_active: bool = false
+## A recession is bounded to the interval before mining chooses a new target.
+var _is_post_encounter_view_held: bool = false
 var _encounter_view_tween: Tween
+var _reduce_motion_enabled: bool = false
+## Endpoint retained so enabling reduced motion during release snaps to the
+## authored recession rather than silently replacing it with gameplay framing.
+var _encounter_release_view := Vector2.ZERO
 ## The frame the encounter focus settled on, which authored camera moves during
 ## that encounter are measured from.
 var _encounter_focus_view := Vector2.ZERO
@@ -66,6 +72,7 @@ func _ready() -> void:
 	current_view_x = float(config.terrain_width_cells) * 0.5
 	current_view_y = float(config.initial_surface_row)
 	target_view_position = Vector2(current_view_x, current_view_y)
+	_encounter_release_view = target_view_position
 	_current_miner_position = target_view_position
 	_fall_start_position = target_view_position
 	_review_target_y = current_view_y
@@ -83,6 +90,7 @@ func _process(delta: float) -> void:
 	if (
 		not _is_encounter_focus_active
 		and not _is_encounter_release_active
+		and not _is_post_encounter_view_held
 	):
 		match _view_mode:
 			ViewMode.FOLLOWING_MINER:
@@ -98,14 +106,23 @@ func _process(delta: float) -> void:
 
 
 ## Tweens from the live view to the visible subject's authored focus.
-func focus_miner_for_encounter(subject_rest_screen_y: float = NAN) -> void:
+func focus_miner_for_encounter(
+	subject_rest_screen_y: float = NAN,
+	focus_viewport_y_ratio: float = -1.0
+) -> void:
 	_cancel_encounter_view_tween()
 	_is_encounter_focus_active = true
 	_is_encounter_release_active = false
+	_is_post_encounter_view_held = false
 	var cell_size := float(config.terrain_cell_world_size)
+	var resolved_focus_ratio := (
+		encounter_focus_viewport_y_ratio
+		if focus_viewport_y_ratio < 0.0
+		else clampf(focus_viewport_y_ratio, 0.3, 0.82)
+	)
 	var focus_screen_y: float = (
 		get_viewport().get_visible_rect().size.y
-			* encounter_focus_viewport_y_ratio
+			* resolved_focus_ratio
 	)
 	var focus_view_y: float
 	if is_nan(subject_rest_screen_y):
@@ -138,6 +155,22 @@ func focus_miner_for_encounter(subject_rest_screen_y: float = NAN) -> void:
 		encounter_focus_duration,
 		_on_encounter_focus_tween_finished
 	)
+
+
+## Snaps active encounter framing to its endpoint when motion is reduced.
+func set_reduce_motion_enabled(enabled: bool) -> void:
+	_reduce_motion_enabled = enabled
+	if not enabled or _encounter_view_tween == null:
+		return
+	if _is_encounter_release_active:
+		_cancel_encounter_view_tween()
+		_apply_encounter_view_position(_encounter_release_view)
+		_on_encounter_release_tween_finished()
+		return
+	if _is_encounter_focus_active:
+		_cancel_encounter_view_tween()
+		_apply_encounter_view_position(_encounter_focus_view)
+		_on_encounter_focus_tween_finished()
 
 
 ## Slides the framed view off the framing an encounter settled on, in terrain
@@ -185,19 +218,36 @@ func get_current_view_position() -> Vector2:
 
 
 ## Tweens back to the selected smooth or chunked mining framing.
-func release_encounter_focus() -> void:
+func release_encounter_focus(recession_viewport_ratio: float = 0.0) -> void:
 	if not _is_encounter_focus_active:
 		return
 	_cancel_encounter_view_tween()
 	_is_encounter_focus_active = false
 	_is_encounter_release_active = true
-	var release_view_position := target_view_position
-	if config.mining_camera_style == MiningConfig.MiningCameraStyle.CHUNK_SNAP:
+	var release_view_position: Vector2
+	if recession_viewport_ratio > 0.0:
+		var recession_rows := (
+			get_viewport().get_visible_rect().size.y
+			* clampf(recession_viewport_ratio, 0.0, 0.2)
+			/ float(config.terrain_cell_world_size)
+		)
+		release_view_position = Vector2(
+			target_view_position.x,
+			_encounter_focus_view.y + recession_rows
+		)
+	else:
+		release_view_position = target_view_position
+	if (
+		recession_viewport_ratio <= 0.0
+		and config.mining_camera_style
+			== MiningConfig.MiningCameraStyle.CHUNK_SNAP
+	):
 		release_view_position.y = _get_chunk_camera_y(
 			target_view_position.y
 		)
+	_encounter_release_view = release_view_position
 	_tween_encounter_view_to(
-		release_view_position,
+		_encounter_release_view,
 		encounter_release_duration,
 		_on_encounter_release_tween_finished
 	)
@@ -211,6 +261,10 @@ func _tween_encounter_view_to(
 ) -> void:
 	var current_view_position := Vector2(current_view_x, current_view_y)
 	if current_view_position.is_equal_approx(view_position):
+		_apply_encounter_view_position(view_position)
+		finished_callback.call()
+		return
+	if _reduce_motion_enabled:
 		_apply_encounter_view_position(view_position)
 		finished_callback.call()
 		return
@@ -242,6 +296,10 @@ func _on_encounter_focus_tween_finished() -> void:
 func _on_encounter_release_tween_finished() -> void:
 	_encounter_view_tween = null
 	_is_encounter_release_active = false
+	_is_post_encounter_view_held = not Vector2(
+		current_view_x,
+		current_view_y
+	).is_equal_approx(target_view_position)
 
 
 ## Kills only presentation interpolation, preserving gameplay camera state.
@@ -270,6 +328,8 @@ func _publish_miner_screen_offset() -> void:
 
 ## Sets the terrain cell the normal view should follow.
 func follow_mining_position(mining_position: Vector2i) -> void:
+	if not Vector2(mining_position).is_equal_approx(target_view_position):
+		_is_post_encounter_view_held = false
 	_fall_start_position = _current_miner_position
 	target_view_position = Vector2(mining_position)
 
@@ -295,6 +355,8 @@ func snap_follow_to_target() -> void:
 	_cancel_encounter_view_tween()
 	_is_encounter_focus_active = false
 	_is_encounter_release_active = false
+	_is_post_encounter_view_held = false
+	_encounter_release_view = target_view_position
 	_view_mode = ViewMode.FOLLOWING_MINER
 	_current_miner_position = target_view_position
 	_fall_start_position = target_view_position

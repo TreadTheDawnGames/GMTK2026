@@ -6,6 +6,7 @@ extends Node2D
 ## - prepare() snapshots one presenter and places it at the authored entrance.
 ## - Opening/closing movement follows an injected production-floor sampler.
 ## - Dialogue stage_cue values play same-named AnimationPlayer animations.
+## - Typed sequence actions are forwarded without making the stage their owner.
 ## - Closing may leave the actor at a persistent rest marker for review mode.
 ## - cancel_and_restore() stops motion/animation and restores the exact snapshot.
 ## - The stage never owns dialogue, rewards, mining gates, or encounter order.
@@ -29,6 +30,30 @@ signal sequence_dialogue_requested(
 	conversation: DialogueConversation,
 	line_range: Vector2i
 )
+## Typed timeline requests are forwarded to the encounter owner. If nothing is
+## connected, playback still completes and the request is a safe no-op.
+signal sequence_camera_action_requested(
+	action: int,
+	offset: Vector2,
+	zoom: Vector2,
+	shake_strength: float,
+	duration_seconds: float
+)
+signal sequence_audio_action_requested(
+	action: int,
+	stream: AudioStream,
+	bus: StringName,
+	volume_db: float,
+	pitch_scale: float,
+	fade_seconds: float
+)
+signal sequence_vfx_action_requested(
+	action: int,
+	effect_id: StringName,
+	scene: PackedScene,
+	screen_position: Vector2,
+	duration_seconds: float
+)
 
 ## Terrain cells the framed view is displaced from the encounter focus.
 ##
@@ -39,9 +64,8 @@ signal sequence_dialogue_requested(
 ## it ends, so the timeline still owns when the pan happens and how long the shot
 ## waits for it, while the clip owns how it moves.
 ##
-## The Thief finale is the only encounter that animates it. Left at zero it emits
-## nothing and costs the other ten nothing, and the view controller ignores a pan
-## outside an encounter it is already framing.
+## The Thief finale is the legacy stage that animates it. New camera work belongs
+## in typed CAMERA beats, which share the same view-controller boundary.
 var camera_pan_offset_cells := Vector2.ZERO:
 	set(value):
 		if camera_pan_offset_cells.is_equal_approx(value):
@@ -106,7 +130,7 @@ var camera_pan_offset_cells := Vector2.ZERO:
 ## Dynamically keeps this actor beside the miner regardless of landing column.
 @export var conversation_tracks_miner: bool = false
 ## Presenter-root offset; actor sprite offsets remain authored by appearance.
-@export_range(-256.0, 256.0, 1.0) var conversation_root_offset_from_miner_x: float = 0.0
+@export_range(-1024.0, 1024.0, 1.0) var conversation_root_offset_from_miner_x: float = 0.0
 ## Slides this stage's props with its tracked cast instead of leaving them
 ## pinned to the room.
 ##
@@ -121,6 +145,12 @@ var camera_pan_offset_cells := Vector2.ZERO:
 ## shift that tracking already applied. Off by default, so every room whose
 ## props are authored against its own terrain is untouched.
 @export var props_track_tracked_cast: bool = false
+## Slides ActionMarkers with a tracked cast instead of leaving them room-fixed.
+##
+## Off preserves every existing stage. On is for body-owned impact marks whose
+## shared dust/smoke/spark feedback must follow the miner's variable landing
+## column; wall-owned strike marks remain fixed by leaving this disabled.
+@export var strike_markers_track_tracked_cast: bool = false
 ## How much rock a strike on this stage opens, as a radius in terrain cells.
 ##
 ## Zero, the default, leaves a strike exactly what it has always been: dirt,
@@ -233,7 +263,7 @@ func prepare(
 		return false
 	_presenter = presenter
 	_floor_sampler = floor_sampler
-	_follow_tracked_cast_with_props()
+	_follow_tracked_cast_with_authored_roots()
 	_restore_position = presenter.global_position
 	_restore_visible = presenter.visible
 	_restore_flip_h = presenter.character_sprite.flip_h
@@ -490,27 +520,33 @@ func _finish_closing_fade() -> void:
 	_presenter.modulate = _restore_modulate
 
 
-## Puts this stage's props under the same shift tracking gave its actor markers.
+## Puts opted-in authored roots under the shift tracking gave ActorMarkers.
 ##
 ## DepthEncounterController slides ActorMarkers to the miner's landing column and
-## leaves everything else where the room put it, which is right for a prop that
-## belongs to the terrain and wrong for one that belongs to the conversation. The
-## shift is read back off the marker root rather than recomputed, because the
-## controller has already done that arithmetic against the miner's real foot
-## position and a second derivation could only ever disagree with it.
+## leaves every other root where the room put it. That is right for room-owned
+## props and strikes. Cast-owned props and body-owned impact marks instead need
+## their respective opt-ins to keep the authored offset. The shift is read back
+## off the marker root rather than recomputed, because the controller has already
+## done that arithmetic against the miner's real foot position and a second
+## derivation could only ever disagree with it.
 ##
 ## ActorMarkers is authored at the stage origin, so its x is exactly the
 ## accumulated shift. Assigning rather than adding keeps this correct on a repeat
 ## visit, where the root still carries the previous encounter's offset.
-func _follow_tracked_cast_with_props() -> void:
+func _follow_tracked_cast_with_authored_roots() -> void:
 	if (
-		not props_track_tracked_cast
-		or not conversation_tracks_miner
+		not conversation_tracks_miner
 		or not is_instance_valid(actor_markers_root)
-		or not is_instance_valid(prop_markers_root)
 	):
 		return
-	prop_markers_root.position.x = actor_markers_root.position.x
+	var tracked_shift_x := actor_markers_root.position.x
+	if props_track_tracked_cast and is_instance_valid(prop_markers_root):
+		prop_markers_root.position.x = tracked_shift_x
+	if (
+		strike_markers_track_tracked_cast
+		and is_instance_valid(action_markers_root)
+	):
+		action_markers_root.position.x = tracked_shift_x
 
 
 ## Turns the actor to face a world direction, or leaves them as they are on zero.
@@ -565,6 +601,24 @@ func _ensure_sequence_player() -> void:
 		_sequence_player.dialogue_requested.connect(
 			_on_sequence_dialogue_requested
 		)
+	if not _sequence_player.camera_action_requested.is_connected(
+		_on_sequence_camera_action_requested
+	):
+		_sequence_player.camera_action_requested.connect(
+			_on_sequence_camera_action_requested
+		)
+	if not _sequence_player.audio_action_requested.is_connected(
+		_on_sequence_audio_action_requested
+	):
+		_sequence_player.audio_action_requested.connect(
+			_on_sequence_audio_action_requested
+		)
+	if not _sequence_player.vfx_action_requested.is_connected(
+		_on_sequence_vfx_action_requested
+	):
+		_sequence_player.vfx_action_requested.connect(
+			_on_sequence_vfx_action_requested
+		)
 
 
 ## Resolves a timeline's actor id to something on screen.
@@ -605,6 +659,56 @@ func _on_sequence_dialogue_requested(
 	line_range: Vector2i
 ) -> void:
 	sequence_dialogue_requested.emit(conversation, line_range)
+
+
+func _on_sequence_camera_action_requested(
+	action: int,
+	offset: Vector2,
+	zoom: Vector2,
+	shake_strength: float,
+	duration_seconds: float
+) -> void:
+	sequence_camera_action_requested.emit(
+		action,
+		offset,
+		zoom,
+		shake_strength,
+		duration_seconds
+	)
+
+
+func _on_sequence_audio_action_requested(
+	action: int,
+	stream: AudioStream,
+	bus: StringName,
+	volume_db: float,
+	pitch_scale: float,
+	fade_seconds: float
+) -> void:
+	sequence_audio_action_requested.emit(
+		action,
+		stream,
+		bus,
+		volume_db,
+		pitch_scale,
+		fade_seconds
+	)
+
+
+func _on_sequence_vfx_action_requested(
+	action: int,
+	effect_id: StringName,
+	scene: PackedScene,
+	screen_position: Vector2,
+	duration_seconds: float
+) -> void:
+	sequence_vfx_action_requested.emit(
+		action,
+		effect_id,
+		scene,
+		screen_position,
+		duration_seconds
+	)
 
 
 ## Releases a timeline that is holding for dialogue it asked somebody else to run.

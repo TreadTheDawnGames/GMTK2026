@@ -8,6 +8,7 @@ extends SceneTree
 ## - Confirms damaged terrain restores byte-exactly without replaying history.
 ## - Checks fractional review travel, encounter stops, and upward preloading.
 ## - Guards the sample-neutral shader path that smooths buried cut contours.
+## - Confirms a real dig starts one bounded allocation-free crush transition.
 ## - Exits nonzero on any failed contract so agents get a fast merge gate.
 ## - This intentionally stays small; detailed behavior remains in local_tests.
 ## - The invariant is that a parseable game can complete one mining mutation.
@@ -18,6 +19,12 @@ const MINING_SCENE: PackedScene = preload(
 const TREASURE_HUNTER_APPEARANCE: CharacterAppearance = preload(
 	"res://resources/encounters/treasure_hunter_character_appearance.tres"
 )
+const ROTINI_APPEARANCE: CharacterAppearance = preload(
+	"res://resources/encounters/rutini_character_appearance.tres"
+)
+const CLOAK_LANTERN_APPEARANCE: CharacterAppearance = preload(
+	"res://resources/encounters/cloak_lantern_character_appearance.tres"
+)
 const MOODY_TEEN_APPEARANCE: CharacterAppearance = preload(
 	"res://resources/encounters/moody_teen_character_appearance.tres"
 )
@@ -26,6 +33,12 @@ const TREASURE_HUNTER_FIRST_SEQUENCE: CutsceneSequence = preload(
 )
 const TREASURE_HUNTER_TREASURE_SEQUENCE: CutsceneSequence = preload(
 	"res://resources/cinematics/sequences/treasure_hunter_treasure_sequence.tres"
+)
+const CAFE_GATHERING_SEQUENCE: CutsceneSequence = preload(
+	"res://resources/cinematics/sequences/cafe_gathering_sequence.tres"
+)
+const CAFE_GATHERING_STAGE: PackedScene = preload(
+	"res://Scenes/cinematics/cafe_gathering_encounter_stage.tscn"
 )
 const TREASURE_HUNTER_TREASURE_CONVERSATION: DialogueConversation = preload(
 	"res://resources/dialogue/treasure_hunter_treasure_conversation.tres"
@@ -40,6 +53,12 @@ const OPENING_SURFACE_CONVERSATION: DialogueConversation = preload(
 var _failures: Array[String] = []
 var _presented_line_indices: PackedInt32Array = PackedInt32Array()
 var _finished_conversation_ids: Array[StringName] = []
+var _mouse_dig_contact_count: int = 0
+var _mouse_dig_start_row: int = 0
+var _mouse_dig_depth_rows: int = 0
+var _mouse_dig_half_width_cells: int = 0
+var _mouse_dig_miner_cell_x: int = 0
+var _mouse_dig_miner_target_cell_x: int = 0
 
 
 func _initialize() -> void:
@@ -66,6 +85,29 @@ func _run() -> void:
 			"neighbor_alpha.x - neighbor_alpha.y"
 		),
 		"Buried terrain contours must retain sample-neutral derivative smoothing."
+	)
+	_expect(
+		terrain_shader_source.contains("impact_crush_timing")
+		and terrain_shader_source.contains(
+			"previous_mask_sample = sample_streamed_terrain_mask(safe_uv)"
+		),
+		"Mining impacts must reveal from the prior mask without a white frame."
+	)
+	# Same reasoning for the mining dust: headless cannot judge whether a cloud
+	# shimmers, so protect the three choices that stopped it. The noise domain is
+	# measured in world pixels recovered from the instance transform, so a lobe
+	# growing or stretching no longer re-scales its own field; the fine octaves
+	# fade out by screen footprint instead of aliasing; and the tone bands are
+	# softened by their own derivative instead of being hard-stepped.
+	var smoke_shader_source := FileAccess.get_file_as_string(
+		"res://Shaders/mining_smoke.gdshader"
+	)
+	_expect(
+		smoke_shader_source.contains("MODEL_MATRIX")
+		and smoke_shader_source.contains("quad_half_size")
+		and smoke_shader_source.contains("cell_span")
+		and smoke_shader_source.contains("fwidth"),
+		"Mining dust must keep its world-anchored, derivative-aware noise field."
 	)
 	await _verify_mining_scene()
 	_verify_finale_text_resolves()
@@ -124,6 +166,32 @@ func _verify_entry_scene() -> void:
 		and MOODY_TEEN_APPEARANCE.art_faces_left,
 		"Moody Teen must use Ayden's supplied single-frame character art."
 	)
+	_expect(
+		ROTINI_APPEARANCE.texture != null
+		and ROTINI_APPEARANCE.texture.resource_path
+			== "res://Assets/Characters/mice/mouse_grey.png",
+		"Rotini must use Jared's approved gray rat asset."
+	)
+	var keeper_measured_sole := ActorSoleMeasure.measure_frame_sole(
+		CLOAK_LANTERN_APPEARANCE.texture,
+		CLOAK_LANTERN_APPEARANCE.horizontal_frames,
+		CLOAK_LANTERN_APPEARANCE.vertical_frames,
+		CLOAK_LANTERN_APPEARANCE.frame
+	)
+	var keeper_uncorrected_y := (
+		-keeper_measured_sole
+		* CLOAK_LANTERN_APPEARANCE.sprite_scale.y
+	)
+	_expect(
+		not is_nan(keeper_measured_sole)
+		and CLOAK_LANTERN_APPEARANCE.body_grounding_offset_y > 0.0
+		and is_equal_approx(
+			ActorSoleMeasure.get_sprite_y(CLOAK_LANTERN_APPEARANCE),
+			keeper_uncorrected_y
+				+ CLOAK_LANTERN_APPEARANCE.body_grounding_offset_y
+		),
+		"Lantern Keeper body grounding must compensate for the lower staff tip."
+	)
 	var opening_uses_mr_sitts := (
 		OPENING_SURFACE_CONVERSATION.validate().is_empty()
 		and OPENING_SURFACE_CONVERSATION.participants.size() == 1
@@ -177,6 +245,12 @@ func _verify_mining_scene() -> void:
 	var run_intro_controller := game_root.get_node_or_null(
 		"MiningScene/Systems/RunIntroController"
 	) as RunIntroController
+	var cutscene_action_presenter := game_root.get_node_or_null(
+		"MiningScene/Systems/SceneWiring/CutsceneActionPresenter"
+	) as CutsceneActionPresenter
+	var arrival_sequence := game_root.get_node_or_null(
+		"MiningScene/ArrivalIntro"
+	) as ArrivalIntroSequence
 	var mining_controller := game_root.get_node_or_null(
 		"MiningScene/Systems/MiningController"
 	) as MiningController
@@ -192,12 +266,21 @@ func _verify_mining_scene() -> void:
 	var miner_rig := game_root.get_node_or_null(
 		"MiningScene/MinerRig"
 	) as MinerRig
+	var character_layer := game_root.get_node_or_null(
+		"MiningScene/CharacterLayer"
+	) as Node2D
+	var rat_colony_followers := game_root.get_node_or_null(
+		"MiningScene/RatColonyFollowers"
+	) as RatColonyFollowers
 	var hud := game_root.get_node_or_null(
 		"MiningScene/HUD"
 	) as MiningHud
 	var timing_window := game_root.get_node_or_null(
 		"MiningScene/HUD/TimingWindow"
 	) as TimingWindowTask
+	var timing_bar_feedback := game_root.get_node_or_null(
+		"MiningScene/HUD/TimingBarFeedback"
+	) as TimingBarFeedback
 	var main_menu := game_root.get_node_or_null(
 		"MainMenuLayer/MainMenu"
 	) as GameMainMenu
@@ -209,9 +292,52 @@ func _verify_mining_scene() -> void:
 	_expect(mining_scene != null, "MiningScene root must exist.")
 	_expect(terrain_manager != null, "TerrainManager must exist.")
 	_expect(terrain_renderer != null, "TerrainLayerRenderer must exist.")
+	var terrain_renderer_source := FileAccess.get_file_as_string(
+		"res://Scripts/mining/terrain_layer_renderer.gd"
+	)
+	_expect(
+		not terrain_renderer_source.contains("KEY_F3")
+			and not terrain_renderer_source.contains("logical_overlay_key")
+			and not terrain_renderer_source.contains(
+				"func _unhandled_key_input"
+			),
+		"TerrainLayerRenderer still exposes the removed F3 debug shortcut."
+	)
 	_expect(scene_wiring != null, "MiningSceneWiring must exist.")
+	_expect(
+		cutscene_action_presenter != null,
+		"CutsceneActionPresenter must exist under the composition root."
+	)
 	_expect(mining_controller != null, "MiningController must exist.")
 	_expect(view_controller != null, "ViewController must exist.")
+	_expect(
+		timing_bar_feedback != null,
+		"TimingBarFeedback must exist under the mining HUD."
+	)
+	if timing_bar_feedback != null:
+		timing_bar_feedback.combo_bar.value = 4.0
+		timing_bar_feedback._on_streak_ended(4)
+		timing_bar_feedback._process(
+			timing_bar_feedback.combo_loss_step_seconds * 0.5
+		)
+		_expect(
+			is_equal_approx(timing_bar_feedback.combo_bar.value, 4.0),
+			"Lost combo bar must hold until its first decay step."
+		)
+		timing_bar_feedback._process(
+			timing_bar_feedback.combo_loss_step_seconds * 0.5
+		)
+		_expect(
+			is_equal_approx(timing_bar_feedback.combo_bar.value, 3.0),
+			"Lost combo bar must turn off exactly one segment per step."
+		)
+		timing_bar_feedback._process(
+			timing_bar_feedback.combo_loss_step_seconds * 3.0
+		)
+		_expect(
+			is_zero_approx(timing_bar_feedback.combo_bar.value),
+			"Lost combo bar must finish its stepped decay at zero."
+		)
 	if (
 		terrain_manager == null
 		or terrain_renderer == null
@@ -222,6 +348,27 @@ func _verify_mining_scene() -> void:
 		game_root.queue_free()
 		await process_frame
 		return
+	var override_focus_ratio := 0.76
+	var subject_rest_screen_y := terrain_manager.config.mining_face_screen_y
+	view_controller.focus_miner_for_encounter(
+		subject_rest_screen_y,
+		override_focus_ratio
+	)
+	var expected_focus_view_y := (
+		view_controller.target_view_position.y
+		- (
+			root.get_visible_rect().size.y * override_focus_ratio
+				- subject_rest_screen_y
+		) / float(terrain_manager.config.terrain_cell_world_size)
+	)
+	_expect(
+		is_equal_approx(
+			view_controller._encounter_focus_view.y,
+			expected_focus_view_y
+		),
+		"An encounter focus override must frame against its requested ratio."
+	)
+	view_controller.snap_follow_to_target()
 	# The title camera is wider than gameplay. Cover its real world-space bottom
 	# and keep the cinematic bars out until Start, or the menu exposes grey.
 	if impact_camera != null and not is_zero_approx(impact_camera.zoom.y):
@@ -250,6 +397,279 @@ func _verify_mining_scene() -> void:
 		and dialogue_director.cinematic_frame.is_closed(),
 		"Title menu must keep the cinematic bars off the live terrain."
 	)
+	if (
+		dialogue_director != null
+		and dialogue_director.cinematic_frame != null
+	):
+		var cinematic_frame := dialogue_director.cinematic_frame
+		var requested_bar_ratio := 0.08
+		dialogue_director.open_cinematic_frame(true, requested_bar_ratio)
+		var override_height := (
+			cinematic_frame.size.y * requested_bar_ratio
+		)
+		_expect(
+			cinematic_frame.is_open()
+			and is_equal_approx(
+				cinematic_frame.top_bar.size.y,
+				override_height
+			),
+			"An encounter must be able to opt into its own letterbox height."
+		)
+		# Dialogue may ask to open an already-framed shot. That second request
+		# must not silently replace the encounter's chosen composition.
+		dialogue_director.open_cinematic_frame(true)
+		_expect(
+			is_equal_approx(
+				cinematic_frame.top_bar.size.y,
+				override_height
+			),
+			"Repeated frame opens must retain the active encounter ratio."
+		)
+		dialogue_director.close_cinematic_frame(true)
+		dialogue_director.open_cinematic_frame(true)
+		_expect(
+			is_equal_approx(
+				cinematic_frame.top_bar.size.y,
+				cinematic_frame.size.y
+					* cinematic_frame.bar_height_ratio
+			)
+			and is_equal_approx(
+				cinematic_frame.bar_height_ratio,
+				CinematicFrame.DEFAULT_BAR_HEIGHT_RATIO
+			),
+			"An encounter letterbox override must not leak into the next shot."
+		)
+		dialogue_director.close_cinematic_frame(true)
+		var viewport_height := root.get_visible_rect().size.y
+		var dialogue_panel_bottom := (
+			dialogue_director.bottom_panel.position.y
+			+ dialogue_director.bottom_panel.size.y
+		)
+		_expect(
+			dialogue_director.bottom_panel.position.y
+				>= viewport_height * 0.75
+			and dialogue_panel_bottom <= viewport_height,
+			"Dialogue must stay inside the reserved bottom ground band instead "
+				+ "of covering the encounter scene."
+		)
+	if view_controller != null:
+		var held_view_target := Vector2i(
+			view_controller.target_view_position
+		)
+		view_controller.current_view_y -= 1.0
+		view_controller._on_encounter_release_tween_finished()
+		_expect(
+			view_controller._is_post_encounter_view_held,
+			"Encounter release must hold the recessed room until mining."
+		)
+		view_controller.follow_mining_position(held_view_target)
+		_expect(
+			view_controller._is_post_encounter_view_held,
+			"A zero-depth mining target must not release the recessed room."
+		)
+		view_controller.follow_mining_position(
+			held_view_target + Vector2i.DOWN
+		)
+		_expect(
+			not view_controller._is_post_encounter_view_held,
+			"The first new mining target must release the recessed room."
+		)
+		view_controller.follow_mining_position(held_view_target)
+		view_controller.snap_follow_to_target()
+		view_controller.current_view_y -= 1.0
+		view_controller._on_encounter_release_tween_finished()
+		view_controller.snap_follow_to_target()
+		_expect(
+			not view_controller._is_post_encounter_view_held,
+			"Cancellation or a hard follow reset must clear the recession hold."
+		)
+		view_controller.current_view_y -= 1.0
+		view_controller._on_encounter_release_tween_finished()
+		view_controller.focus_miner_for_encounter(
+			subject_rest_screen_y,
+			override_focus_ratio
+		)
+		_expect(
+			not view_controller._is_post_encounter_view_held,
+			"Entering the next encounter must clear the previous recession hold."
+		)
+		view_controller.snap_follow_to_target()
+		view_controller.focus_miner_for_encounter(
+			subject_rest_screen_y,
+			override_focus_ratio
+		)
+		view_controller._apply_encounter_view_position(
+			view_controller._encounter_focus_view
+		)
+		view_controller._on_encounter_focus_tween_finished()
+		view_controller.release_encounter_focus(0.06)
+		var reduced_motion_release_view := (
+			view_controller._encounter_release_view
+		)
+		view_controller.set_reduce_motion_enabled(true)
+		_expect(
+			Vector2(
+				view_controller.current_view_x,
+				view_controller.current_view_y
+			).is_equal_approx(reduced_motion_release_view)
+			and view_controller._is_post_encounter_view_held,
+			"Reduced motion must snap to, then hold, the authored recession."
+		)
+		view_controller.set_reduce_motion_enabled(false)
+		view_controller.snap_follow_to_target()
+	if terrain_renderer != null:
+		terrain_renderer.set_trodden_floor(true, 1000.0)
+		_expect(
+			terrain_renderer._trodden_floor_is_enabled
+			and terrain_renderer._trodden_floor_seals_mask,
+			"An entering room must seal its complete 2.5D floor."
+		)
+		terrain_renderer._on_dig_presentation_started(1)
+		_expect(
+			terrain_renderer._trodden_floor_is_enabled
+			and not terrain_renderer._trodden_floor_seals_mask,
+			"The first mining contact must retain the floor treatment while "
+				+ "releasing its mask seal for real terrain deformation."
+		)
+		terrain_renderer.set_trodden_floor(false)
+		# This direct lifecycle check bypasses MiningController, so restore the
+		# production combo input before later prepared-patch assertions use this
+		# same renderer. Otherwise the test prepares combo 0 while the renderer
+		# intentionally retains combo 1 from the synthetic contact above.
+		terrain_renderer._on_dig_presentation_started(0)
+	if encounter_controller != null and terrain_renderer != null:
+		terrain_renderer.set_trodden_floor(true, 1000.0)
+		terrain_renderer.set_cutscene_floor_plane(true, 1000.0)
+		encounter_controller._finish_cinematic_flow()
+		_expect(
+			not terrain_renderer._trodden_floor_is_enabled
+			and not terrain_renderer._cutscene_floor_plane_is_enabled,
+			"Cutscene release must restore normal layered terrain before mining."
+		)
+	if encounter_controller != null:
+		if miner_rig != null and miner_rig.speech_reaction != null:
+			miner_rig.speech_reaction.play_bounce(
+				Vector2.UP * 7.0,
+				1.0,
+				1,
+				Tween.TRANS_QUAD
+			)
+			_expect(
+				miner_rig.speech_reaction._is_reacting,
+				"The Miner speech reaction must start before camera settling."
+			)
+			encounter_controller._on_character_stage_camera_action_requested(
+				CutsceneBeat.CameraAction.FRAME,
+				Vector2.ZERO,
+				Vector2.ONE,
+				0.0,
+				0.0
+			)
+			_expect(
+				not miner_rig.speech_reaction._is_reacting,
+				"A speaker bounce must settle before the next camera frame "
+					+ "moves."
+			)
+		var expected_encounter_ids: Array[StringName] = [
+			&"cheese_girl_first",
+			&"cloak_lantern_first",
+			&"rutini_first",
+			&"treasure_hunter_first",
+			&"moody_teen_first",
+			&"cloak_lantern_warning",
+			&"treasure_hunter_treasure",
+			&"coffee_cat_first",
+			&"moody_teen_second",
+			&"rutini_second",
+			&"cafe_gathering",
+			&"cloak_lantern_post_credits",
+			&"thief_finale",
+		]
+		var expected_encounter_depths: Array[int] = [
+			300,
+			1_400,
+			2_500,
+			4_000,
+			5_000,
+			5_600,
+			7_400,
+			9_200,
+			10_500,
+			11_200,
+			14_000,
+			15_400,
+			100_000,
+		]
+		var schedule_matches := (
+			encounter_controller.encounter_config.encounters.size()
+				== expected_encounter_ids.size()
+		)
+		if schedule_matches:
+			for encounter_index in range(expected_encounter_ids.size()):
+				var scheduled_encounter := (
+					encounter_controller.encounter_config.encounters[
+						encounter_index
+					]
+				)
+				if (
+					scheduled_encounter.encounter_id
+						!= expected_encounter_ids[encounter_index]
+					or scheduled_encounter.resolve_depth(
+						encounter_controller.mining_config.total_run_depth
+					) != expected_encounter_depths[encounter_index]
+				):
+					schedule_matches = false
+					break
+		_expect(
+			schedule_matches,
+			"The thirteen encounter resources must remain in canonical depth order."
+		)
+		var cafe_is_prestaged := false
+		var cafe_framing_is_authored := false
+		var shader_floor_encounters := PackedStringArray()
+		for encounter: DepthCharacterEncounter in (
+			encounter_controller.encounter_config.encounters
+		):
+			if (
+				encounter.dresses_trodden_floor
+				or encounter.lights_floor_as_plane
+			):
+				shader_floor_encounters.append(str(encounter.encounter_id))
+			if encounter.encounter_id != &"cafe_gathering":
+				continue
+			cafe_is_prestaged = (
+				encounter.prestage_before_landing
+				and encounter.dresses_trodden_floor
+				and encounter.lights_floor_as_plane
+			)
+			cafe_framing_is_authored = (
+				is_equal_approx(
+					encounter.cinematic_focus_viewport_y_ratio,
+					0.72
+				)
+				and is_equal_approx(
+					encounter.cinematic_bar_height_ratio,
+					0.08
+				)
+				and is_equal_approx(
+					encounter.post_cinematic_recession_ratio,
+					0.06
+				)
+			)
+			break
+		_expect(
+			cafe_is_prestaged,
+			"The occupied cafe and its 2.5D floor must exist before entry."
+		)
+		_expect(
+			cafe_framing_is_authored,
+			"Encounter 9 must own its high focus, shallow bars, and recession."
+		)
+		_expect(
+			shader_floor_encounters == PackedStringArray(["cafe_gathering"]),
+			"Only Encounter 9 may opt into the black floor shader; observed %s."
+				% [", ".join(shader_floor_encounters)]
+		)
 	if dialogue_director != null:
 		var art_conversation := DialogueConversation.new()
 		art_conversation.conversation_id = &"smoke_textbox_art"
@@ -291,7 +711,7 @@ func _verify_mining_scene() -> void:
 				and not dialogue_director.speaker_label.visible
 				and is_equal_approx(
 					dialogue_director.bottom_panel.size.y,
-					173.0
+					130.0
 				)
 				and dialogue_director.textbox_art.stretch_mode
 					== TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -319,6 +739,12 @@ func _verify_mining_scene() -> void:
 						"normal_font_size"
 					)
 					== dialogue_director.art_body_font_size
+				)
+				and (
+					dialogue_director.dialogue_margin.get_theme_constant(
+						"margin_top"
+					)
+					== 34
 				)
 				and (
 					dialogue_director.textbox_art.texture
@@ -501,18 +927,83 @@ func _verify_mining_scene() -> void:
 		miner_rig != null and miner_rig._audio_handler == audio_handler,
 		"SceneWiring must inject AudioHandler into MinerRig."
 	)
+	if miner_rig != null:
+		var requested_support_y := (
+			miner_rig.landing_foot_anchor.global_position.y + 10.0
+		)
+		miner_rig.seat_landing_foot_at_screen_y(requested_support_y)
+		_expect(
+			is_equal_approx(
+				miner_rig.landing_foot_anchor.global_position.y,
+				requested_support_y + miner_rig.grounding_overlap_y
+			),
+			"MinerRig must overlap sampled terrain instead of floating above it."
+		)
+		_expect(
+			miner_rig.surface_grounding_offset_y == -8.0
+			and miner_rig.intact_floor_grounding_offset_y == -8.0,
+			"MinerRig static surface footing must match its visible sole."
+		)
+		miner_rig.show_intact_floor_grounding()
 	_expect(
 		timing_window != null
 		and timing_window._audio_handler == audio_handler,
 		"SceneWiring must inject AudioHandler into TimingWindowTask."
 	)
+	_verify_combo_target_groups(terrain_manager.config, timing_window)
 	_expect(
 		run_intro_controller != null
-		and run_intro_controller.arrival_sequence != null
+		and arrival_sequence != null
+		and run_intro_controller.arrival_sequence == arrival_sequence
 		and run_intro_controller.arrival_sequence._audio_handler
 			== audio_handler,
 		"SceneWiring must inject AudioHandler into ArrivalIntroSequence."
 	)
+	if arrival_sequence != null:
+		_expect(
+			run_intro_controller.hold_after_reveal_seconds >= 0.6
+				and arrival_sequence.bus_arrival_seconds >= 3.0
+				and arrival_sequence.bus_settle_seconds >= 0.3
+				and arrival_sequence.miner_exit_delay_seconds >= 0.4
+				and arrival_sequence.hold_before_dialogue_seconds >= 0.3
+				and arrival_sequence.bus_departure_seconds >= 3.0,
+			"Surface arrival must preserve its deliberate bus pacing."
+		)
+		_expect(
+			not arrival_sequence.bus.visible,
+			"Surface arrival must keep the bus out of the title shot."
+		)
+		arrival_sequence._show_click_to_mine_art = true
+		arrival_sequence._set_bus_travel_art(1)
+		var desktop_right_art_is_valid := (
+			arrival_sequence.bus_sprite.texture
+				== arrival_sequence.bus_side_right_click_texture
+			and arrival_sequence.bus_sprite.position
+				== arrival_sequence.side_right_click_sprite_offset
+			and arrival_sequence.bus_sprite.scale == Vector2(0.44, 0.44)
+			and arrival_sequence._active_wheel_uvs
+				== arrival_sequence.side_right_click_wheel_uvs
+		)
+		arrival_sequence._set_bus_travel_art(-1)
+		_expect(
+			desktop_right_art_is_valid
+				and arrival_sequence.bus_sprite.texture
+					== arrival_sequence.bus_side_left_click_texture,
+			"Desktop travel must use directional Click to Mine bus art."
+		)
+		arrival_sequence._show_click_to_mine_art = false
+		arrival_sequence._set_bus_travel_art(1)
+		var touch_right_art_is_valid := (
+			arrival_sequence.bus_sprite.texture
+				== arrival_sequence.bus_side_right_texture
+		)
+		arrival_sequence._set_bus_travel_art(-1)
+		_expect(
+			touch_right_art_is_valid
+				and arrival_sequence.bus_sprite.texture
+					== arrival_sequence.bus_side_left_texture,
+			"Touch travel must retain the clean directional bus art."
+		)
 	_expect(
 		TREASURE_HUNTER_APPEARANCE.pose_set != null
 		and TREASURE_HUNTER_APPEARANCE.pose_set.has_pose(&"idle")
@@ -549,6 +1040,259 @@ func _verify_mining_scene() -> void:
 		exits_without_pickaxe,
 		"Treasure Hunter must leave and reach the cafe without his pickaxe."
 	)
+	var cafe_camera_frame_count := 0
+	var cafe_frames_establishing := false
+	var cafe_frames_rutini := false
+	var cafe_frames_coco := false
+	var cafe_frames_keeper := false
+	var cafe_frame_treasure_visit_count := 0
+	var cafe_frames_miner := false
+	var cafe_frames_quibble := false
+	var cafe_frames_moody_teen := false
+	var cafe_resets_camera := false
+	var cafe_individual_dialogue_lines: Array[bool] = []
+	cafe_individual_dialogue_lines.resize(8)
+	cafe_individual_dialogue_lines.fill(false)
+	for beat: CutsceneBeat in CAFE_GATHERING_SEQUENCE.beats:
+		if (
+			beat.kind == CutsceneBeat.Kind.DIALOGUE
+			and beat.conversation != null
+			and beat.conversation.conversation_id == &"cafe_gathering"
+			and beat.line_range.x == beat.line_range.y
+			and beat.line_range.x >= 0
+			and beat.line_range.x < cafe_individual_dialogue_lines.size()
+		):
+			cafe_individual_dialogue_lines[beat.line_range.x] = true
+		if beat.kind != CutsceneBeat.Kind.CAMERA:
+			continue
+		if beat.camera_action == CutsceneBeat.CameraAction.FRAME:
+			cafe_camera_frame_count += 1
+			if (
+				beat.camera_offset.is_equal_approx(Vector2(220.0, 40.0))
+				and beat.camera_zoom.is_equal_approx(
+					Vector2(1.3, 1.3)
+				)
+			):
+				cafe_frames_establishing = true
+			elif (
+				beat.camera_offset.is_equal_approx(Vector2(100.0, 75.0))
+				and beat.camera_zoom.is_equal_approx(
+					Vector2(1.55, 1.55)
+				)
+			):
+				cafe_frames_rutini = true
+			elif (
+				beat.camera_offset.is_equal_approx(Vector2(255.0, 60.0))
+				and beat.camera_zoom.is_equal_approx(
+					Vector2(1.6, 1.6)
+				)
+			):
+				cafe_frames_coco = true
+			elif (
+				beat.camera_offset.is_equal_approx(Vector2(-110.0, 80.0))
+				and beat.camera_zoom.is_equal_approx(
+					Vector2(1.55, 1.55)
+				)
+			):
+				cafe_frame_treasure_visit_count += 1
+			elif (
+				beat.camera_offset.is_equal_approx(Vector2(0.0, 80.0))
+				and beat.camera_zoom.is_equal_approx(
+					Vector2(1.6, 1.6)
+				)
+			):
+				cafe_frames_miner = true
+			elif (
+				beat.camera_offset.is_equal_approx(Vector2(275.0, 60.0))
+				and beat.camera_zoom.is_equal_approx(
+					Vector2(1.6, 1.6)
+				)
+			):
+				cafe_frames_quibble = true
+			elif (
+				beat.camera_offset.is_equal_approx(Vector2(195.0, 55.0))
+				and beat.camera_zoom.is_equal_approx(
+					Vector2(1.6, 1.6)
+				)
+			):
+				cafe_frames_moody_teen = true
+			elif (
+				beat.camera_offset.is_equal_approx(Vector2(-350.0, 60.0))
+				and beat.camera_zoom.is_equal_approx(
+					Vector2(1.5, 1.5)
+				)
+			):
+				cafe_frames_keeper = true
+		elif beat.camera_action == CutsceneBeat.CameraAction.RESET:
+			cafe_resets_camera = true
+	_expect(
+		cafe_camera_frame_count == 9
+		and cafe_frames_establishing
+		and cafe_frames_rutini
+		and cafe_frames_coco
+		and cafe_frame_treasure_visit_count == 2
+		and cafe_frames_miner
+		and cafe_frames_quibble
+		and cafe_frames_moody_teen
+		and cafe_frames_keeper
+		and cafe_resets_camera
+		and not cafe_individual_dialogue_lines.has(false),
+		"Encounter 9 must ease between individual speakers, complete the long "
+			+ "right-to-left Keeper pan, and reset."
+	)
+	var cafe_stage := CAFE_GATHERING_STAGE.instantiate()
+	var cafe_actor_markers := cafe_stage.get_node("ActorMarkers") as Node2D
+	var cafe_props := cafe_stage.get_node("PropMarkers") as Node2D
+	var keeper_mark := cafe_actor_markers.get_node(
+		"cloak_lantern"
+	) as Marker2D
+	var treasure_mark := cafe_actor_markers.get_node(
+		"treasure_hunter"
+	) as Marker2D
+	var rutini_mark := cafe_actor_markers.get_node("rutini") as Marker2D
+	var cat_mark := cafe_actor_markers.get_node("coffee_cat") as Marker2D
+	var moody_teen := cafe_actor_markers.get_node(
+		"moody_teen"
+	) as Marker2D
+	var cafe_prop := cafe_props.get_node("DasQuesoCafe") as Node2D
+	var dining_table := cafe_props.get_node("DiningTable") as Node2D
+	var dining_cup := cafe_props.get_node("DiningCup") as Sprite2D
+	var left_window_stool := cafe_props.get_node(
+		"CafeStoolWindowLeft"
+	) as Node2D
+	var right_window_stool := cafe_props.get_node(
+		"CafeStoolWindowRight"
+	) as Node2D
+	var left_dining_chair := cafe_props.get_node(
+		"DiningChairLeft"
+	) as Node2D
+	var minimum_cafe_prop_z := 0
+	var cafe_prop_nodes: Array[Node] = [cafe_props]
+	while not cafe_prop_nodes.is_empty():
+		var cafe_prop_node: Node = cafe_prop_nodes.pop_back()
+		var cafe_prop_node_2d := cafe_prop_node as Node2D
+		if cafe_prop_node_2d != null:
+			minimum_cafe_prop_z = mini(
+				minimum_cafe_prop_z,
+				cafe_prop_node_2d.z_index
+			)
+		for child: Node in cafe_prop_node.get_children():
+			cafe_prop_nodes.append(child)
+	var frontmost_terrain_z := -2_147_483_648
+	if terrain_renderer != null and terrain_renderer.profile != null:
+		for layer_index: int in range(
+			terrain_renderer.profile.get_layer_count()
+		):
+			frontmost_terrain_z = maxi(
+				frontmost_terrain_z,
+				terrain_renderer.profile.get_layer_z_index(layer_index)
+			)
+	var window_stool_count := 0
+	var dining_chair_count := 0
+	for cafe_prop_child: Node in cafe_props.get_children():
+		if String(cafe_prop_child.name).begins_with("CafeStoolWindow"):
+			window_stool_count += 1
+		elif String(cafe_prop_child.name).begins_with("DiningChair"):
+			dining_chair_count += 1
+	_expect(
+		keeper_mark.position.x < treasure_mark.position.x
+		and treasure_mark.position.x < -176.0
+		and -176.0 < rutini_mark.position.x
+		and rutini_mark.position.x < moody_teen.position.x
+		and moody_teen.position.x < cafe_prop.position.x
+		and rutini_mark.position.x < cafe_prop.position.x
+		and dining_table.position.x < cafe_prop.position.x
+		and is_equal_approx(dining_cup.position.x, dining_table.position.x)
+		and dining_cup.position.y < dining_table.position.y
+		and dining_cup.texture != null
+		and cafe_prop.position.x < cat_mark.position.x
+		and left_window_stool.position.x < right_window_stool.position.x
+		and is_equal_approx(
+			cat_mark.position.x,
+			right_window_stool.position.x
+		)
+		and is_equal_approx(
+			rutini_mark.position.x,
+			left_dining_chair.position.x
+		)
+		and cafe_prop.position.y < left_window_stool.position.y
+		and moody_teen.position.y < left_window_stool.position.y
+		and left_window_stool.position.y < left_dining_chair.position.y
+		and rutini_mark.position.y < left_dining_chair.position.y
+		and left_dining_chair.position.y < treasure_mark.position.y
+		and treasure_mark.position.y < keeper_mark.position.y
+		and window_stool_count == 2
+		and dining_chair_count == 2
+		and character_layer != null
+		and miner_rig != null
+		and character_layer.z_index + minimum_cafe_prop_z
+			> frontmost_terrain_z
+		and miner_rig.cutscene_draw_order > frontmost_terrain_z,
+		"Encounter 9 must stage Keeper far left, cafe right, and Quibble on "
+			+ "the right of exactly two window stools, with Rotini seated at "
+			+ "the separate two-chair table and Moody Teen behind it. Every "
+			+ "depth lane must remain above Layer 1."
+	)
+	cafe_stage.free()
+	if encounter_controller != null:
+		var cafe_encounter_index := -1
+		for encounter_index: int in range(
+			encounter_controller.encounter_config.encounters.size()
+		):
+			if (
+				encounter_controller.encounter_config.encounters[
+					encounter_index
+				].encounter_id
+				== &"cafe_gathering"
+			):
+				cafe_encounter_index = encounter_index
+				break
+		if (
+			cafe_encounter_index >= 0
+			and cafe_encounter_index
+				< encounter_controller._stages.size()
+		):
+			var prestaged_cafe := encounter_controller._stages[
+				cafe_encounter_index
+			] as CharacterEncounterStage
+			encounter_controller._gather_cafe_characters(
+				cafe_encounter_index,
+				prestaged_cafe,
+				Callable()
+			)
+			var prestaged_treasure := (
+				encounter_controller._presenters_by_actor_id.get(
+					&"treasure_hunter"
+				) as CharacterPresenter
+			)
+			var prestaged_cat := (
+				encounter_controller._presenters_by_actor_id.get(
+					&"coffee_cat"
+				) as CharacterPresenter
+			)
+			var prestaged_keeper := (
+				encounter_controller._presenters_by_actor_id.get(
+					&"cloak_lantern"
+				) as CharacterPresenter
+			)
+			var prestaged_moody_teen := (
+				encounter_controller._presenters_by_actor_id.get(
+					&"moody_teen"
+				) as CharacterPresenter
+			)
+			_expect(
+				prestaged_treasure != null
+				and prestaged_treasure.get("_resting_pose")
+					== &"no_pickaxe"
+				and prestaged_cat != null
+				and prestaged_cat.get("_resting_pose") == &"hold_cup"
+				and prestaged_keeper != null
+				and prestaged_keeper.visible
+				and prestaged_moody_teen != null
+				and prestaged_moody_teen.visible,
+				"Encounter 9 must prestage the occupied cafe's final poses "
+					+ "before the Miner enters."
+			)
 	if encounter_controller != null:
 		_verify_authored_bounces(encounter_controller)
 	_expect(
@@ -587,11 +1331,51 @@ func _verify_mining_scene() -> void:
 		scene_wiring.mining_controller == mining_controller,
 		"SceneWiring must reference the production MiningController."
 	)
+	if encounter_controller != null and cutscene_action_presenter != null:
+		_expect(
+			encounter_controller.character_stage_camera_action_requested
+				.is_connected(
+					cutscene_action_presenter.present_camera_action
+				),
+			"Typed cutscene camera actions must cross SceneWiring."
+		)
+		_expect(
+			encounter_controller.character_stage_audio_action_requested
+				.is_connected(
+					cutscene_action_presenter.present_audio_action
+				),
+			"Typed cutscene audio actions must cross SceneWiring."
+		)
+		_expect(
+			encounter_controller.character_stage_vfx_action_requested
+				.is_connected(
+					cutscene_action_presenter.present_vfx_action
+				),
+			"Typed cutscene VFX actions must cross SceneWiring."
+		)
+		_expect(
+			scene_wiring.cinematic_flow.flow_finished.is_connected(
+				cutscene_action_presenter.reset_presentation
+			),
+			"Cutscene actions must reset when cinematic flow actually ends."
+		)
+		_expect(
+			not encounter_controller.encounter_completed.is_connected(
+				cutscene_action_presenter.reset_presentation
+			),
+			"Cutscene actions must survive closing presentation until flow ends."
+		)
 	_expect(
 		terrain_manager.view_position_changed.is_connected(
 			terrain_renderer._on_view_position_changed
 		),
 		"View changes must be wired to terrain streaming."
+	)
+	await _verify_rat_colony_support(
+		rat_colony_followers,
+		scene_wiring,
+		terrain_manager,
+		timing_window
 	)
 	var music_manager := root.get_node_or_null("MusicManager")
 	_expect(music_manager != null, "MusicManager autoload must exist.")
@@ -607,6 +1391,23 @@ func _verify_mining_scene() -> void:
 		terrain_manager.config.terrain_width_cells / 2,
 		terrain_manager.config.initial_surface_row
 	)
+	# Exercise the production successful-target path rather than the cold debug
+	# path: the timing window predicts this exact hit during wind-up, including
+	# its bounded GPU patch, before terrain changes at the contact frame.
+	terrain_renderer._on_dig_visuals_preparation_started(false)
+	terrain_renderer._on_dig_visuals_preparation_requested(
+		impact_cell,
+		1,
+		0,
+		impact_cell.x,
+		0
+	)
+	while (
+		terrain_renderer._pending_stamp_preparation_head
+		< terrain_renderer._pending_stamp_preparation.size()
+	):
+		terrain_renderer._prepare_next_pending_stamp_layer()
+	terrain_renderer._compact_pending_stamp_preparation()
 	var was_solid := terrain_manager.is_solid_cell(impact_cell)
 	var dig_result := terrain_manager.dig_tunnel(impact_cell, 1, 0)
 	_expect(was_solid, "Smoke-test impact cell must begin solid.")
@@ -618,12 +1419,147 @@ func _verify_mining_scene() -> void:
 		not terrain_manager.is_solid_cell(impact_cell),
 		"Removed terrain must become logically open."
 	)
-	# Drain only the bounded production scheduler, then retire and restore the
-	# impacted chunk. This catches stale or lossy snapshot changes; detailed
-	# timing remains in the non-blocking terrain benchmark so smoke stays fast.
+	# Everything this dig queued shares one presentation group, so the checks
+	# below can wait for exactly this hit instead of the first crush any older
+	# queued work happens to start.
+	var dig_presentation_group := (
+		terrain_renderer._next_impact_presentation_group - 1
+	)
 	var impact_chunk_index := terrain_renderer._world_row_to_chunk(
 		impact_cell.y
 	)
+	var impact_chunk: TerrainLayerRenderer.TerrainChunkVisual = (
+		terrain_renderer._active_chunks.get(impact_chunk_index)
+	)
+	# The transition must not start at input time. Web preparation may need more
+	# than one frame, so the production scheduler starts it only when the exact
+	# prepared patch becomes visible and the complete 90 ms reveal can play.
+	var impact_crush_is_active := (
+		terrain_renderer._active_impact_crush_count > 0
+	)
+	_expect(
+		not impact_crush_is_active,
+		"A terrain crush must wait until its prepared patch is visible."
+	)
+	for _presentation_frame in range(16):
+		terrain_renderer._process(1.0 / 60.0)
+		if terrain_renderer._active_impact_crush_count > 0:
+			break
+	impact_crush_is_active = false
+	if impact_chunk != null:
+		for layer_index in range(impact_chunk.layer_sprites.size()):
+			var material := (
+				impact_chunk.layer_sprites[layer_index].material
+				as ShaderMaterial
+			)
+			var crush_timing: Variant = material.get_shader_parameter(
+				&"impact_crush_timing"
+			)
+			if crush_timing is Vector2 and crush_timing.y > 0.0:
+				impact_crush_is_active = true
+				break
+	_expect(
+		impact_crush_is_active
+		and terrain_renderer._active_impact_crush_count > 0,
+		"A visible prepared patch must start one bounded crush transition."
+	)
+	# One resolved hit is one thing the player sees happen. Every stratum the hit
+	# cut must be covered by its own overlay on the frame its group presents; a
+	# stratum still waiting is one the player watches arrive on its own frame,
+	# which is the stratum-by-stratum reveal the presentation group replaced.
+	for _group_frame in range(32):
+		if not terrain_renderer._unrastered_impact_group_counts.has(
+			dig_presentation_group
+		):
+			break
+		terrain_renderer._process(1.0 / 60.0)
+	terrain_renderer._apply_ready_impact_presentations()
+	var cut_strata_count := 0
+	var presented_strata_count := 0
+	if impact_chunk != null:
+		var presented_stamp := terrain_renderer._latest_impact_stamp
+		for layer_index in range(
+			terrain_renderer.profile.get_gameplay_layer_count()
+		):
+			if not terrain_renderer._can_apply_impact_stamp_layer(
+				presented_stamp,
+				layer_index
+			):
+				continue
+			if not terrain_renderer._get_stamp_layer_chunk_mask_rect(
+				presented_stamp,
+				layer_index,
+				impact_chunk_index
+			).has_area():
+				continue
+			cut_strata_count += 1
+			var layer_material := (
+				impact_chunk.layer_sprites[layer_index].material
+				as ShaderMaterial
+			)
+			if (
+				layer_material.get_shader_parameter(&"use_impact_patch")
+				== true
+			):
+				presented_strata_count += 1
+	_expect(
+		cut_strata_count > 0
+		and presented_strata_count == cut_strata_count,
+		"Every stratum of one impact must become visible on the same frame."
+	)
+	# Fold every prepared patch into its base tile first. Active overlays must
+	# survive this upload work until their own reveal deadline, otherwise the
+	# animation would still collapse to a visible final-frame snap.
+	for _fold_frame in range(32):
+		terrain_renderer._process(1.0 / 60.0)
+		if (
+			terrain_renderer._pending_impact_work_head
+			>= terrain_renderer._pending_impact_work.size()
+		):
+			break
+	# Expire the fixed deadlines directly instead of sleeping for the authored
+	# 90 ms. This keeps the branch gate deterministic and proves cleanup cannot
+	# leave a shader transition active without making the suite wait in real time.
+	for active_chunk: TerrainLayerRenderer.TerrainChunkVisual in (
+		terrain_renderer._active_chunks.values()
+	):
+		for layer_index in range(
+			active_chunk.impact_crush_deadlines_usec.size()
+		):
+			if (
+				active_chunk.impact_crush_deadlines_usec[layer_index]
+				> 0
+			):
+				active_chunk.impact_crush_deadlines_usec[layer_index] = (
+					Time.get_ticks_usec() - 1
+				)
+	terrain_renderer._retire_completed_impact_crushes()
+	var impact_crush_retired := (
+		terrain_renderer._active_impact_crush_count == 0
+	)
+	if impact_chunk != null:
+		for layer_index in range(impact_chunk.layer_sprites.size()):
+			var material := (
+				impact_chunk.layer_sprites[layer_index].material
+				as ShaderMaterial
+			)
+			var crush_timing: Variant = material.get_shader_parameter(
+				&"impact_crush_timing"
+			)
+			impact_crush_retired = (
+				impact_crush_retired
+				and (
+					crush_timing == null
+					or crush_timing == Vector2.ZERO
+				)
+			)
+	_expect(
+		impact_crush_retired,
+		"Expired terrain crush transitions must retire without timers."
+	)
+	# Drain only the bounded production scheduler, then retire and restore the
+	# impacted chunk. This catches stale or lossy snapshot changes; detailed
+	# timing remains in the non-blocking terrain benchmark so smoke stays fast.
 	for _terrain_frame in range(64):
 		terrain_renderer._process(1.0 / 60.0)
 		if terrain_renderer._compressed_chunk_snapshots.has(
@@ -668,8 +1604,580 @@ func _verify_mining_scene() -> void:
 		terrain_manager,
 		terrain_renderer
 	)
+	_verify_impact_smoke(
+		game_root.get_node_or_null(
+			"MiningScene/MiningImpactSmoke"
+		) as MiningImpactSmoke
+	)
 	game_root.queue_free()
 	await process_frame
+
+
+## Guards the two dust contracts a still frame cannot show.
+##
+## Mining at the lobe cap used to reset the puff receiving each strike to a full
+## lifetime, which snapped a half-faded puff back to full opacity: continuous
+## digging read as the dust flickering brighter rather than thickening. A strike
+## may now only top a puff up by a bounded share of its life.
+##
+## The shader also flattens a puff against rock it is touching, and it decides
+## that from the confinement the open-space scan measures, so that value has to
+## stay inside the 0..1 range custom data can carry.
+func _verify_impact_smoke(smoke: MiningImpactSmoke) -> void:
+	_expect(smoke != null, "MiningImpactSmoke must exist in the mining scene.")
+	if smoke == null:
+		return
+	# Earlier integration checks intentionally exercise production strike
+	# feedback. Start this focused lifecycle check from its own empty cloud so
+	# it asserts the newly spawned lobe instead of a pre-existing presentation.
+	smoke._clear_cloud()
+	var impact_position := Vector2(
+		smoke.terrain_manager.config.terrain_screen_center_x,
+		smoke.terrain_manager.config.mining_face_screen_y
+	)
+	# Dust must be leaving the rock the moment it appears. Buoyancy alone takes
+	# about half a second to overcome a fresh puff's own growth, and for that
+	# half second the drawn shape spread downward off the strike; the detailed
+	# frame-by-frame check is local_tests/trace_smoke_rise.gd.
+	smoke.play_at_impact(impact_position, 40, 0.5, 1.0, 1)
+	_expect(
+		smoke._cloud != null
+		and not smoke._cloud.lobes.is_empty()
+		and smoke._cloud.lobes[0].velocity.y <= -smoke.initial_rise_speed * 0.9,
+		"A puff must be born already rising, not waiting for buoyancy."
+	)
+
+	var lobe_budget := smoke.maximum_lobes
+	if OS.has_feature("web"):
+		lobe_budget = mini(lobe_budget, smoke.web_maximum_lobes)
+	for _fill_index in range(lobe_budget + 2):
+		smoke.play_at_impact(impact_position, 40, 0.5, 1.0, 1)
+	_expect(
+		smoke._cloud != null and smoke._cloud.lobes.size() == lobe_budget,
+		"Repeated strikes must fill to the lobe cap and stop there."
+	)
+	if smoke._cloud == null or smoke._cloud.lobes.is_empty():
+		return
+
+	# Take a puff most of the way through its life, then strike it again.
+	var fading_lobe: MiningImpactSmoke.SmokeLobe = smoke._cloud.lobes[0]
+	for lobe in smoke._cloud.lobes:
+		lobe.remaining_lifetime = lobe.total_lifetime * 0.1
+	var life_before := fading_lobe.remaining_lifetime
+	smoke.play_at_impact(impact_position, 40, 0.5, 1.0, 1)
+	var largest_life_ratio := 0.0
+	var confinement_stays_normalised := true
+	for lobe in smoke._cloud.lobes:
+		largest_life_ratio = maxf(
+			largest_life_ratio,
+			lobe.remaining_lifetime / maxf(lobe.total_lifetime, 0.001)
+		)
+		if lobe.wall_confinement < 0.0 or lobe.wall_confinement > 1.0:
+			confinement_stays_normalised = false
+	_expect(
+		largest_life_ratio <= 0.1 + smoke.lobe_refresh_share + 0.001,
+		(
+			"A strike at the lobe cap must top a fading puff up by at most "
+			+ "lobe_refresh_share, not reset it (life went to %.2f from %.2f)."
+		) % [largest_life_ratio, life_before / fading_lobe.total_lifetime]
+	)
+	_expect(
+		confinement_stays_normalised,
+		"Measured wall confinement must stay inside the 0..1 custom data range."
+	)
+## Verifies the bounded mouse formation, steering bridge, and real terrain dig.
+func _verify_rat_colony_support(
+	followers: RatColonyFollowers,
+	scene_wiring: MiningSceneWiring,
+	terrain_manager: TerrainManager,
+	timing_window: TimingWindowTask
+) -> void:
+	_expect(followers != null, "Rat colony followers must exist.")
+	if (
+		followers == null
+		or scene_wiring == null
+		or terrain_manager == null
+		or timing_window == null
+		or timing_window.mining_window == null
+	):
+		return
+	_expect(
+		followers.validate_followers().is_empty(),
+		"Rat colony authored references and rank arrays must be valid."
+	)
+	_expect(
+		followers.terrain_dig_requested.is_connected(
+			scene_wiring._on_rat_colony_terrain_dig_requested
+		),
+		"Mouse terrain contacts must cross MiningSceneWiring."
+	)
+	_expect(
+		terrain_manager.parallel_tunnels_damaged.is_connected(
+			scene_wiring.terrain_renderer._on_parallel_tunnels_damaged
+		),
+		"Grouped mouse holes must cross MiningSceneWiring."
+	)
+	_expect(
+		followers.preferred_mining_side_requested.is_connected(
+			scene_wiring._on_rat_colony_preferred_side_requested
+		),
+		"Mouse route bias must cross MiningSceneWiring."
+	)
+	_expect(
+		scene_wiring.mining_controller.swing_requested.is_connected(
+			followers._on_player_swing_requested
+		),
+		"Every mouse must start from the miner's successful swing signal."
+	)
+	_expect(
+		scene_wiring.mining_controller.dig_visuals_preparation_requested
+			.is_connected(followers._on_player_dig_prepared),
+		"Mouse tunnels must use the miner's authoritative prepared dig interval."
+	)
+	var minimum_slot_distance := INF
+	var maximum_slot_distance := 0.0
+	for follower_index in range(followers.followers.size()):
+		var slot := followers.get_slot_position(follower_index)
+		minimum_slot_distance = minf(minimum_slot_distance, absf(slot.x))
+		maximum_slot_distance = maxf(maximum_slot_distance, absf(slot.x))
+	_expect(
+		minimum_slot_distance >= followers.miner_clearance_pixels,
+		"Every mouse slot must preserve the player-clear center column."
+	)
+	_expect(
+		maximum_slot_distance >= 500.0,
+		"Mouse slots must cover both floor edges, not huddle at center."
+	)
+	for follower_index in range(followers.followers.size()):
+		_expect(
+			is_equal_approx(
+				followers.get_slot_position(follower_index).y,
+				followers.get_slot_position(0).y
+			),
+			"Every mining mouse must share the miner's grounded mining face."
+		)
+	followers.activate_followers()
+	_expect(
+		followers.clump_appearances.is_empty()
+		and followers.get_depicted_rat_count()
+			== followers._live_follower_count,
+		"The mining colony must use readable individual mouse art, not clumps."
+	)
+	for rank_scale in followers.rank_scales:
+		_expect(
+			rank_scale >= 1.2,
+			"Depth rows must keep the normal large mouse size."
+		)
+	var mouse_contact_counter := Callable(
+		self,
+		&"_on_mouse_dig_smoke_requested"
+	)
+	_mouse_dig_contact_count = 0
+	_mouse_dig_start_row = 0
+	_mouse_dig_depth_rows = 0
+	_mouse_dig_half_width_cells = 0
+	_mouse_dig_miner_cell_x = 0
+	_mouse_dig_miner_target_cell_x = 0
+	if not followers.terrain_dig_requested.is_connected(
+		mouse_contact_counter
+	):
+		followers.terrain_dig_requested.connect(mouse_contact_counter)
+	followers.terrain_dig_requested.disconnect(
+		scene_wiring._on_rat_colony_terrain_dig_requested
+	)
+	var prepared_mouse_start_row := (
+		terrain_manager.config.initial_surface_row + 64
+	)
+	var prepared_mouse_depth_rows := 12
+	followers._on_player_dig_prepared(
+		Vector2i(
+			terrain_manager.config.terrain_width_cells / 2,
+			prepared_mouse_start_row
+		),
+		prepared_mouse_depth_rows,
+		3,
+		terrain_manager.config.terrain_width_cells / 2,
+		1
+	)
+	followers._on_player_swing_requested(
+		1,
+		1.0,
+		1.0,
+		1
+	)
+	var all_visible_mice_are_swinging := true
+	for follower in followers.followers:
+		if (
+			follower.visible
+			and follower._action != CinematicRatMiner.Action.BREACHING
+		):
+			all_visible_mice_are_swinging = false
+	_expect(
+		all_visible_mice_are_swinging,
+		"Every visible mouse must swing on each resolved player hit."
+	)
+	for digging_follower in followers.followers:
+		if digging_follower.visible:
+			digging_follower.animation_player.advance(0.25)
+	followers.terrain_dig_requested.connect(
+		scene_wiring._on_rat_colony_terrain_dig_requested
+	)
+	await process_frame
+	scene_wiring._flush_rat_colony_terrain_digs()
+	_expect(
+		_mouse_dig_contact_count == followers.get_visible_follower_count(),
+		"Every visible mouse must dig once at its animation contact."
+	)
+	_expect(
+		_mouse_dig_start_row == prepared_mouse_start_row
+		and _mouse_dig_depth_rows == prepared_mouse_depth_rows
+		and _mouse_dig_half_width_cells == 3,
+		(
+			"Every mouse contact must retain the miner's start row, full depth, "
+			+ "and full width."
+		)
+	)
+	_expect(
+		_mouse_dig_miner_cell_x
+			== terrain_manager.config.terrain_width_cells / 2,
+		"Mouse contacts must retain the miner column that protects the center."
+	)
+	_expect(
+		_mouse_dig_miner_target_cell_x
+			== terrain_manager.config.terrain_width_cells / 2,
+		"Mouse corridors must retain the player's moving tunnel target."
+	)
+	for digging_follower in followers.followers:
+		if digging_follower.visible:
+			digging_follower.animation_player.advance(1.0)
+	followers.global_position += Vector2.UP
+	followers._process(0.0)
+	var descending_mice_are_walking := true
+	for digging_follower in followers.followers:
+		if (
+			digging_follower.visible
+			and digging_follower.animation_player.current_animation != &"run"
+		):
+			descending_mice_are_walking = false
+	_expect(
+		descending_mice_are_walking,
+		"Vertical terrain descent must put every idle mouse into its ground walk."
+	)
+	var support_ys := PackedFloat32Array()
+	support_ys.resize(followers.get_visible_follower_count())
+	support_ys.fill(300.0)
+	followers.seat_live_followers_on_ground(support_ys)
+	var mice_are_seated_on_lane_support := true
+	for digging_follower in followers.followers:
+		if (
+			digging_follower.visible
+			and not is_equal_approx(
+				digging_follower.global_position.y,
+				300.0
+			)
+		):
+			mice_are_seated_on_lane_support = false
+	_expect(
+		mice_are_seated_on_lane_support,
+		"Each live mouse must accept its own sampled terrain support."
+	)
+	followers._on_player_impact_resolved(
+		Vector2.ZERO,
+		1,
+		1.0,
+		1.0,
+		1
+	)
+	followers.terrain_dig_requested.disconnect(mouse_contact_counter)
+	followers.preferred_mining_side_requested.emit(1)
+	_expect(
+		timing_window.mining_window.preferred_side == 1,
+		"Caspian's public preferred-side API must receive mouse steering."
+	)
+	followers.deactivate_followers()
+	_expect(
+		timing_window.mining_window.preferred_side == 0,
+		"Resetting mouse support must clear timing-side preference."
+	)
+
+	var cell_size := float(
+		terrain_manager.config.terrain_cell_world_size
+	)
+	var mouse_contact_screen := Vector2(
+		terrain_manager.config.terrain_screen_center_x + 320.0,
+		terrain_manager.config.mining_face_screen_y + cell_size * 4.0
+	)
+	var mouse_contact_world := terrain_manager.screen_to_terrain_position(
+		mouse_contact_screen
+	)
+	var mouse_contact_cell := Vector2i(
+		floori(mouse_contact_world.x / cell_size),
+		floori(mouse_contact_world.y / cell_size)
+	)
+	var mouse_cell_was_solid := terrain_manager.is_solid_cell(
+		mouse_contact_cell
+	)
+	var mouse_tunnel_end_cell := Vector2i(
+		mouse_contact_cell.x,
+		mouse_contact_cell.y + 1
+	)
+	var mouse_tunnel_end_was_solid := terrain_manager.is_solid_cell(
+		mouse_tunnel_end_cell
+	)
+	scene_wiring._on_rat_colony_terrain_dig_requested(
+		mouse_contact_screen,
+		mouse_contact_cell.y,
+		2,
+		0,
+		mouse_contact_cell.x - 8,
+		mouse_contact_cell.x - 8
+	)
+	scene_wiring._flush_rat_colony_terrain_digs()
+	_expect(
+		mouse_cell_was_solid
+		and mouse_tunnel_end_was_solid
+		and not terrain_manager.is_solid_cell(mouse_contact_cell)
+		and not terrain_manager.is_solid_cell(mouse_tunnel_end_cell),
+		"A mouse contact must remove its complete production terrain tunnel."
+	)
+	var corridor_center_x := (
+		terrain_manager.config.terrain_width_cells / 2
+	)
+	var corridor_row := mouse_contact_cell.y + 20
+	var corridor_contacts: Array[Vector2i] = [
+		Vector2i(corridor_center_x - 40, corridor_row),
+		Vector2i(corridor_center_x - 25, corridor_row),
+		Vector2i(corridor_center_x + 25, corridor_row),
+		Vector2i(corridor_center_x + 40, corridor_row),
+	]
+	var corridor_target_x := corridor_center_x + 10
+	terrain_manager.dig_parallel_tunnels(
+		corridor_contacts,
+		corridor_contacts.size(),
+		2,
+		0,
+		corridor_center_x,
+		corridor_target_x
+	)
+	_expect(
+		not terrain_manager.is_solid_cell(Vector2i(
+			corridor_center_x - 1,
+			corridor_row
+		))
+		and not terrain_manager.is_solid_cell(Vector2i(
+			corridor_center_x + 1,
+			corridor_row
+		))
+		and terrain_manager.is_solid_cell(Vector2i(
+			corridor_center_x,
+			corridor_row
+		))
+		and not terrain_manager.is_solid_cell(Vector2i(
+			corridor_target_x - 1,
+			corridor_row + 1
+		))
+		and not terrain_manager.is_solid_cell(Vector2i(
+			corridor_target_x + 1,
+			corridor_row + 1
+		))
+		and terrain_manager.is_solid_cell(Vector2i(
+			corridor_target_x,
+			corridor_row + 1
+		)),
+		(
+			"Mouse corridors must continuously meet both edges of the player's "
+			+ "moving tunnel while preserving the occupied centerline."
+		)
+	)
+	var full_mouse_visual_path: Array[Vector2i] = []
+	var prepared_mouse_half_width := 3
+	for row_offset in range(prepared_mouse_depth_rows):
+		for column_offset in range(
+			-prepared_mouse_half_width,
+			prepared_mouse_half_width + 1
+		):
+			full_mouse_visual_path.append(
+				Vector2i(
+					mouse_contact_cell.x + column_offset,
+					mouse_contact_cell.y + row_offset
+				)
+			)
+	var full_mouse_tunnel_stamp := (
+		scene_wiring.terrain_renderer._create_parallel_tunnel_stamp(
+			[full_mouse_visual_path]
+		)
+	)
+	var expected_mouse_tunnel_size := Vector2(
+		float(prepared_mouse_half_width * 2 + 1) * cell_size,
+		float(prepared_mouse_depth_rows) * cell_size
+	)
+	var combined_mouse_tunnel_rect := (
+		full_mouse_tunnel_stamp.parallel_tunnel_rects[0]
+		if not full_mouse_tunnel_stamp.parallel_tunnel_rects.is_empty()
+		else Rect2()
+	)
+	for fill_rect in full_mouse_tunnel_stamp.parallel_tunnel_fill_rects:
+		combined_mouse_tunnel_rect = combined_mouse_tunnel_rect.merge(
+			fill_rect
+		)
+	_expect(
+		full_mouse_tunnel_stamp.parallel_tunnel_rects.size() == 1
+		and combined_mouse_tunnel_rect.size == expected_mouse_tunnel_size,
+		(
+			"Mouse organic edge and bounded interior clear must together span "
+			+ "the miner's full prepared width and depth."
+		)
+	)
+
+	var gameplay_view_height := float(ProjectSettings.get_setting(
+		"display/window/size/window_height_override",
+		root.get_visible_rect().size.y
+	))
+	var required_fall_rows := ceili(gameplay_view_height / cell_size)
+	var tall_mouse_encounters := 0
+	var mouse_shader_encounters := PackedStringArray()
+	var mouse_encounter_diagnostics := PackedStringArray()
+	for encounter in terrain_manager.encounter_config.encounters:
+		if encounter == null or encounter.encounter_id not in [
+			&"rutini_first",
+			&"rutini_second",
+			]:
+			continue
+		var resolved_height := encounter.resolve_chamber_height_rows(
+			terrain_manager.encounter_config.chamber_height_rows
+		)
+		mouse_encounter_diagnostics.append(
+			"%s(height=%d,trodden=%s,plane=%s)"
+			% [
+				encounter.encounter_id,
+				resolved_height,
+				str(encounter.dresses_trodden_floor),
+				str(encounter.lights_floor_as_plane),
+			]
+		)
+		if resolved_height >= required_fall_rows:
+			tall_mouse_encounters += 1
+		if (
+			encounter.dresses_trodden_floor
+			or encounter.lights_floor_as_plane
+		):
+			mouse_shader_encounters.append(str(encounter.encounter_id))
+	_expect(
+		tall_mouse_encounters == 2,
+		(
+			"Both Rotini encounters need a full-screen fall; "
+			+ "required=%d observed=%s."
+		) % [required_fall_rows, ", ".join(mouse_encounter_diagnostics)]
+	)
+	_expect(
+		mouse_shader_encounters.is_empty(),
+		"Rotini must keep normal layered terrain outside Encounter 9; observed %s."
+			% [", ".join(mouse_shader_encounters)]
+	)
+
+
+func _on_mouse_dig_smoke_requested(
+	_screen_position: Vector2,
+	start_row: int,
+	depth_rows: int,
+	half_width_cells: int,
+	miner_cell_x: int,
+	miner_target_cell_x: int
+) -> void:
+	_mouse_dig_contact_count += 1
+	_mouse_dig_start_row = start_row
+	_mouse_dig_depth_rows = depth_rows
+	_mouse_dig_half_width_cells = half_width_cells
+	_mouse_dig_miner_cell_x = miner_cell_x
+	_mouse_dig_miner_target_cell_x = miner_target_cell_x
+
+
+## Protects the combo-owned target-type ladder and its production baseline.
+func _verify_combo_target_groups(
+	config: MiningConfig,
+	timing_window: TimingWindowTask
+) -> void:
+	var expected_minimums := PackedInt32Array([0, 4, 8, 15, 20])
+	var expected_paths: Array[Array] = [
+		["res://Scenes/targets/shrinking_target.tscn"],
+		[
+			"res://Scenes/targets/shrinking_target.tscn",
+			"res://Scenes/targets/reverse_target.tscn",
+		],
+		[
+			"res://Scenes/targets/shrinking_target.tscn",
+			"res://Scenes/targets/reverse_target.tscn",
+			"res://Scenes/targets/multi-hit_target.tscn",
+		],
+		[
+			"res://Scenes/targets/reverse_target.tscn",
+			"res://Scenes/targets/multi-hit_target.tscn",
+			"res://Scenes/targets/moving_target.tscn",
+		],
+		[
+			"res://Scenes/targets/reverse_target.tscn",
+			"res://Scenes/targets/moving_target.tscn",
+			"res://Scenes/targets/fade_target.tscn",
+		],
+	]
+	_expect(
+		config != null
+			and config.has_valid_combo_target_groups()
+			and config.combo_target_groups.size()
+				== expected_minimums.size(),
+		"MiningConfig must define five valid combo target groups."
+	)
+	if (
+		config == null
+		or not config.has_valid_combo_target_groups()
+		or config.combo_target_groups.size()
+			!= expected_minimums.size()
+	):
+		return
+	for group_index in range(config.combo_target_groups.size()):
+		var group := config.combo_target_groups[group_index]
+		var actual_paths: Array[String] = []
+		for target_scene: PackedScene in group.target_scenes:
+			actual_paths.append(target_scene.resource_path)
+		_expect(
+			group.minimum_combo == expected_minimums[group_index]
+				and actual_paths == expected_paths[group_index]
+				and config.get_combo_target_group_index(
+					group.minimum_combo
+				) == group_index,
+			"Combo target group %d must match the authored ladder."
+				% group_index
+		)
+	var expected_unlocked_group_indices := PackedInt32Array([
+		0, 0, 0, 0, 1, 1, 2, 3, 4, 4,
+	])
+	_expect(
+		config.progression_levels.size()
+			== expected_unlocked_group_indices.size(),
+		"Encounter progression must author ten combo-group unlock levels."
+	)
+	if (
+		config.progression_levels.size()
+		== expected_unlocked_group_indices.size()
+	):
+		for level_index in range(config.progression_levels.size()):
+			_expect(
+				config.progression_levels[level_index]
+					.highest_unlocked_combo_target_group_index
+					== expected_unlocked_group_indices[level_index],
+				"Encounter progression level %d has the wrong target-group cap."
+					% level_index
+			)
+	_expect(
+		timing_window != null
+			and timing_window.mining_window.target_packed_scenes.size() == 1
+			and timing_window.mining_window.target_packed_scenes[0]
+				.resource_path
+				== "res://Scenes/targets/shrinking_target.tscn"
+			and timing_window.mining_window.targets.size() == 1
+			and timing_window.mining_window.targets[0].my_width == 128.0,
+		"Production timing must start with the wide green target."
+	)
 
 
 ## Proves the finale's lines still finish themselves.

@@ -1,6 +1,8 @@
 class_name MiningSceneWiring
 extends Node
 
+const MAX_RAT_COLONY_DIG_CONTACTS: int = 32
+
 ## Connects the mining scene's cross-system signals in one searchable place.
 
 ## Which terrain stratum the miner's feet are seated against. Zero is the
@@ -59,6 +61,17 @@ const MINER_FLOOR_LAYER_INDEX: int = 0
 @export var dialogue_director: DialogueDirector
 @export var credits_overlay: CreditsOverlay
 
+## Reused same-frame mouse contact buffer. It is pre-sized once to the fixed
+## 32-actor desktop pool, overwritten by index, flushed as one terrain batch,
+## and reset to count zero; no contact array grows per hit.
+var _rat_colony_dig_cells: Array[Vector2i] = []
+var _rat_colony_dig_cell_count: int = 0
+var _rat_colony_dig_depth_rows: int = 1
+var _rat_colony_dig_half_width_cells: int = 0
+var _rat_colony_dig_center_cell_x: int = 0
+var _rat_colony_dig_target_cell_x: int = 0
+var _rat_colony_dig_flush_queued: bool = false
+
 @onready var _game_state: RunState = (
 	get_node_or_null("/root/GameState") as RunState
 )
@@ -70,10 +83,14 @@ const MINER_FLOOR_LAYER_INDEX: int = 0
 
 ## Owns the two depth thresholds where the run's music dies and the organ starts.
 var _finale_music: FinaleApproachMusic
+## Owns bounded cutscene-only camera, audio, and VFX presentation. Constructed
+## here because every signal it consumes crosses the mining composition boundary.
+var _cutscene_action_presenter: CutsceneActionPresenter
 
 
 ## Establishes every signal that crosses a mining subsystem boundary.
 func _ready() -> void:
+	_rat_colony_dig_cells.resize(MAX_RAT_COLONY_DIG_CONTACTS)
 	if _game_state == null or _audio_handler == null:
 		push_error(
 			"MiningSceneWiring requires GameState and AudioHandler autoloads."
@@ -98,6 +115,16 @@ func _ready() -> void:
 	_finale_music.name = "FinaleApproachMusic"
 	add_child(_finale_music)
 	_finale_music.configure(_conductor as AudioStreamPlayer)
+	_cutscene_action_presenter = CutsceneActionPresenter.new()
+	_cutscene_action_presenter.name = "CutsceneActionPresenter"
+	add_child(_cutscene_action_presenter)
+	_cutscene_action_presenter.configure(
+		view_controller,
+		impact_shake.camera,
+		impact_shake,
+		terrain_renderer.get_parent(),
+		float(view_controller.config.terrain_cell_world_size)
+	)
 	_connect_once(
 		_game_state.run_reset,
 		_finale_music._on_run_reset
@@ -203,8 +230,17 @@ func _ready() -> void:
 		terrain_renderer._on_dig_visuals_preparation_requested
 	)
 	_connect_once(
+		terrain_manager.parallel_tunnels_damaged,
+		terrain_renderer._on_parallel_tunnels_damaged
+	)
+	_connect_once(
 		view_controller.landing_reached,
 		_on_miner_landing_grounding,
+		Object.CONNECT_DEFERRED
+	)
+	_connect_once(
+		view_controller.landing_reached,
+		_on_rat_colony_landing_grounding,
 		Object.CONNECT_DEFERRED
 	)
 	_connect_once(
@@ -266,21 +302,12 @@ func _ready() -> void:
 		timing_window.streak_ended,
 		combo_director._on_streak_ended
 	)
-	_connect_once(
-		pickaxe_progression.upgrade_granted,
-		combo_director._on_upgrade_granted
-	)
+	# Encounter completion now unlocks target groups through
+	# EncounterProgression. Reward signals retain authored presentation only;
+	# they do not raise a permanent combo-intensity floor.
 	_connect_once(
 		pickaxe_progression.upgrade_granted,
 		pickaxe_reward_celebration.play_for_upgrade
-	)
-	_connect_once(
-		coffee_speed_boost.boost_awarded,
-		combo_director._on_coffee_boost_awarded
-	)
-	_connect_once(
-		encounter_controller.rat_colony_support_requested,
-		combo_director._on_rat_colony_support_requested
 	)
 	_connect_once(
 		_game_state.run_reset,
@@ -314,6 +341,10 @@ func _ready() -> void:
 		_game_state.save_game.settings_applied,
 		timing_window.set_bounce_muted
 	)
+	_connect_once(
+		_game_state.save_game.reduce_motion_applied,
+		_apply_reduce_motion
+	)
 	# A lost streak gives the darkened frame straight back instead of letting it
 	# decay, so the release reads as part of losing the combo.
 	_connect_once(
@@ -323,6 +354,10 @@ func _ready() -> void:
 	_connect_once(
 		timing_window.pressed,
 		timing_bar_feedback._on_timing_pressed
+	)
+	_connect_once(
+		timing_window.streak_ended,
+		timing_bar_feedback._on_streak_ended
 	)
 	_connect_once(
 		mining_controller.dig_number_requested,
@@ -345,6 +380,14 @@ func _ready() -> void:
 		miner_rig.play_success
 	)
 	_connect_once(
+		mining_controller.dig_visuals_preparation_requested,
+		rat_colony_followers._on_player_dig_prepared
+	)
+	_connect_once(
+		mining_controller.swing_requested,
+		rat_colony_followers._on_player_swing_requested
+	)
+	_connect_once(
 		mining_controller.mine_resolved,
 		encounter_controller._on_final_breakthrough_mined
 	)
@@ -360,10 +403,8 @@ func _ready() -> void:
 		dialogue_director.line_presented,
 		encounter_controller._on_dialogue_line_presented
 	)
-	_connect_once(
-		encounter_controller.coffee_speed_boost_requested,
-		coffee_speed_boost.award_boost
-	)
+	# Rotini's followers remain a persistent visual reward. Their strikes play
+	# bounded feedback but never remove terrain or raise combo intensity.
 	_connect_once(
 		encounter_controller.rat_colony_support_requested,
 		rat_colony_followers.activate_followers
@@ -407,6 +448,14 @@ func _ready() -> void:
 		_on_character_stage_strike_requested
 	)
 	_connect_once(
+		rat_colony_followers.terrain_dig_requested,
+		_on_rat_colony_terrain_dig_requested
+	)
+	_connect_once(
+		rat_colony_followers.preferred_mining_side_requested,
+		_on_rat_colony_preferred_side_requested
+	)
+	_connect_once(
 		encounter_controller.character_stage_rock_break_requested,
 		_on_character_stage_rock_break_requested
 	)
@@ -415,7 +464,27 @@ func _ready() -> void:
 	# convert a screen position into terrain.
 	_connect_once(
 		encounter_controller.character_stage_camera_pan_requested,
-		view_controller.set_encounter_view_offset_cells
+		_on_character_stage_camera_pan_requested
+	)
+	_connect_once(
+		encounter_controller.character_stage_camera_action_requested,
+		_cutscene_action_presenter.present_camera_action
+	)
+	_connect_once(
+		encounter_controller.character_stage_audio_action_requested,
+		_cutscene_action_presenter.present_audio_action
+	)
+	_connect_once(
+		encounter_controller.character_stage_vfx_action_requested,
+		_cutscene_action_presenter.present_vfx_action
+	)
+	_connect_once(
+		cinematic_flow.flow_finished,
+		_cutscene_action_presenter.reset_presentation
+	)
+	_connect_once(
+		_game_state.run_reset,
+		_cutscene_action_presenter.reset_presentation
 	)
 	_connect_once(
 		encounter_controller.stampede_rumble_started,
@@ -426,7 +495,36 @@ func _ready() -> void:
 		impact_shake.end_sustained
 	)
 	timing_window.set_bounce_muted(_game_state.save_game.mute_bounce)
+	_apply_reduce_motion(_game_state.save_game.reduce_motion)
+	_on_rat_colony_preferred_side_requested(0)
 	_on_run_depth_changed(_game_state.depth)
+
+
+## Fans the accessibility preference out to presentation-only motion owners.
+func _apply_reduce_motion(enabled: bool) -> void:
+	hit_particles.set_reduce_motion_enabled(enabled)
+	impact_smoke.set_reduce_motion_enabled(enabled)
+	impact_spark.set_reduce_motion_enabled(enabled)
+	combo_vignette.set_reduce_motion_enabled(enabled)
+	dig_number_presenter.set_reduce_motion_enabled(enabled)
+	impact_shake.set_reduce_motion_enabled(enabled)
+	pickaxe_reward_celebration.set_reduce_motion_enabled(enabled)
+	view_controller.set_reduce_motion_enabled(enabled)
+	combo_tier_punch.set_reduce_motion_enabled(enabled)
+	timing_bar_feedback.set_reduce_motion_enabled(enabled)
+	encounter_controller.set_reduce_motion_enabled(enabled)
+	run_intro_controller.attendant_presenter.set_reduce_motion_enabled(enabled)
+	_cutscene_action_presenter.set_reduce_motion_enabled(enabled)
+	rat_colony_followers.set_reduce_motion_enabled(enabled)
+
+
+## Holds the stable encounter frame while an authored pan timeline advances.
+func _on_character_stage_camera_pan_requested(
+	offset_cells: Vector2
+) -> void:
+	if _game_state.save_game.reduce_motion:
+		return
+	view_controller.set_encounter_view_offset_cells(offset_cells)
 
 
 ## Resets shared run state before handing the live title shot to its intro.
@@ -458,14 +556,17 @@ func _on_final_encounter_music(_encounter_id: StringName) -> void:
 
 
 ## Frames the authored sole instead of the abstract mining-row coordinate.
-func _on_cinematic_camera_focus_requested() -> void:
+func _on_cinematic_camera_focus_requested(
+	focus_viewport_y_ratio: float
+) -> void:
 	var screen_offset := view_controller.get_miner_screen_offset()
 	var current_offset_y := (
 		0.0 if is_nan(screen_offset.y) else screen_offset.y
 	)
 	view_controller.focus_miner_for_encounter(
 		miner_rig.get_cinematic_foot_screen_position().y
-			- current_offset_y
+			- current_offset_y,
+		focus_viewport_y_ratio
 	)
 
 
@@ -507,6 +608,86 @@ func _on_character_stage_rock_break_requested(
 			floori(terrain_position.y / cell_size)
 		),
 		radius_cells
+	)
+
+
+## Collects same-frame mouse contacts for one production terrain batch.
+##
+## The colony owns which actor struck and when its pickaxe touched. This
+## composition boundary owns screen-to-terrain conversion and the TerrainManager
+## dependency, so the reusable mouse scene never reaches into gameplay state.
+## The y-coordinate comes from the same immutable swing request as the miner;
+## reading it back from the screen at contact would be wrong after camera fall.
+func _on_rat_colony_terrain_dig_requested(
+	screen_position: Vector2,
+	start_row: int,
+	depth_rows: int,
+	half_width_cells: int,
+	miner_cell_x: int,
+	miner_target_cell_x: int
+) -> void:
+	if _rat_colony_dig_cell_count >= MAX_RAT_COLONY_DIG_CONTACTS:
+		return
+	var contact_cell := Vector2i(
+		terrain_manager.screen_x_to_terrain_cell_x(screen_position.x),
+		start_row
+	)
+	_rat_colony_dig_cells[_rat_colony_dig_cell_count] = contact_cell
+	_rat_colony_dig_cell_count += 1
+	_rat_colony_dig_depth_rows = clampi(
+		depth_rows,
+		1,
+		TerrainManager.MAX_PARALLEL_TUNNEL_DEPTH_ROWS
+	)
+	_rat_colony_dig_half_width_cells = clampi(
+		half_width_cells,
+		0,
+		3
+	)
+	_rat_colony_dig_center_cell_x = clampi(
+		miner_cell_x,
+		0,
+		terrain_manager.config.terrain_width_cells - 1
+	)
+	_rat_colony_dig_target_cell_x = clampi(
+		miner_target_cell_x,
+		0,
+		terrain_manager.config.terrain_width_cells - 1
+	)
+	if _rat_colony_dig_flush_queued:
+		return
+	_rat_colony_dig_flush_queued = true
+	Callable(
+		self,
+		&"_flush_rat_colony_terrain_digs"
+	).call_deferred()
+
+
+## Publishes all mouse contacts only after every contact callback in this frame.
+func _flush_rat_colony_terrain_digs() -> void:
+	_rat_colony_dig_flush_queued = false
+	if _rat_colony_dig_cell_count <= 0:
+		return
+	terrain_manager.dig_parallel_tunnels(
+		_rat_colony_dig_cells,
+		_rat_colony_dig_cell_count,
+		_rat_colony_dig_depth_rows,
+		_rat_colony_dig_half_width_cells,
+		_rat_colony_dig_center_cell_x,
+		_rat_colony_dig_target_cell_x
+	)
+	_rat_colony_dig_cell_count = 0
+
+
+## Applies the colony's deterministic route bias through Caspian's public API.
+##
+## Zero on reset restores normal target placement. This adapter deliberately
+## does not read or modify target internals in the adapt-only timing scene.
+func _on_rat_colony_preferred_side_requested(side: int) -> void:
+	if timing_window == null or timing_window.mining_window == null:
+		return
+	timing_window.mining_window.set_preferred_side(
+		clampi(side, -1, 1)
 	)
 
 
@@ -569,6 +750,31 @@ func _on_miner_landing_grounding(mining_y: int) -> void:
 		)
 	)
 	miner_rig.seat_landing_foot_at_screen_y(support_screen_y)
+
+
+## Samples the same foreground support as the miner at every live mouse sole.
+## This keeps the formation on the organic floor it actually removed instead
+## of leaving all actors on one authored screen-space baseline.
+func _on_rat_colony_landing_grounding(mining_y: int) -> void:
+	if not rat_colony_followers.is_active():
+		return
+	var sample_xs := (
+		rat_colony_followers.get_live_ground_sample_screen_xs()
+	)
+	var support_ys := PackedFloat32Array()
+	support_ys.resize(sample_xs.size())
+	for sample_index in range(sample_xs.size()):
+		var sample_x := sample_xs[sample_index]
+		support_ys[sample_index] = (
+			NAN
+			if is_nan(sample_x) or is_inf(sample_x)
+			else terrain_renderer.get_layer_opening_floor_support_screen_y(
+				sample_x,
+				mining_y,
+				MINER_FLOOR_LAYER_INDEX
+			)
+		)
+	rat_colony_followers.seat_live_followers_on_ground(support_ys)
 
 
 ## Bursts dirt out of the miner's soles and jolts the camera when he lands on

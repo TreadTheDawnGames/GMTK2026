@@ -74,6 +74,17 @@ const MAXIMUM_GRID_SIZE := Vector2i(512, 512)
 		edge_smoothing = clampf(value, 0.0, 1.0)
 		emit_changed()
 
+## Rounds the drawn contour across neighboring authored cells before expansion.
+##
+## Zero preserves every existing room. The value is the maximum cell-scale
+## reach used to remove the visible eight-pixel staircase without changing the
+## logical mask used by collision. The visual rim may move by at most that many
+## cells; terrain parity tooling exposes the exact logical cells.
+@export_range(0.0, 2.0, 0.05) var contour_rounding_cells: float = 0.0:
+	set(value):
+		contour_rounding_cells = clampf(value, 0.0, 2.0)
+		emit_changed()
+
 ## Top-left of the grid relative to the encounter anchor cell, which is the
 ## chamber's center column on its solid floor row. The default reaches 110
 ## rows above the floor and keeps 10 rows below it so the floor itself can be

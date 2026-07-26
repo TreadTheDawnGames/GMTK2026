@@ -200,7 +200,8 @@ editor_description = "No z_index override on purpose. MinerRig owns its draw ord
 follow_target = NodePath("../MinerRig")
 
 [node name="CharacterLayer" type="Node2D" parent="MiningScene" unique_id=1096715694]
-z_index = 1
+editor_description = "Encounter sets and persistent visitors draw above terrain Layer 1 so the authored 2.5D ground remains their visible support instead of cutting through them. DepthEncounterController temporarily raises this layer one additional step while a cutscene owns the frame, then restores this persistent encounter order. The extra gap above Layer 1 lets a stage use local z -1 for background set pieces without falling back into the terrain."
+z_index = 4
 
 [node name="MiningHitParticles" parent="MiningScene" unique_id=1668060940 node_paths=PackedStringArray("terrain_manager") instance=ExtResource("10_hit_particles")]
 z_index = 3

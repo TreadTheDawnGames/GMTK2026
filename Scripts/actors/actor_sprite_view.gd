@@ -5,8 +5,9 @@ extends Node
 ## - A caller requests a named pose without knowing sprite-sheet layout.
 ## - A valid pose atomically assigns the texture, grid, and first frame.
 ## - Multi-frame poses advance in _process; still poses do no per-frame work.
+## - Each frame re-seats its lowest opaque row on the actor's floor origin.
 ## - Missing or invalid poses leave every Sprite2D property untouched.
-## - The invariant is that animation never advances outside the pose's range.
+## - The invariant is that every playable frame stays in range and grounded.
 
 @export var actor_sprite: Sprite2D
 @export var pose_set: ActorPoseSet
@@ -28,7 +29,7 @@ func play_pose(pose_name: StringName) -> bool:
 	actor_sprite.texture = pose.texture
 	actor_sprite.hframes = pose.horizontal_frames
 	actor_sprite.vframes = pose.vertical_frames
-	actor_sprite.frame = pose.first_frame
+	_apply_pose_frame(pose.first_frame)
 	set_process(
 		pose.frame_count > 1
 		and pose.frames_per_second > 0.0
@@ -61,4 +62,18 @@ func _process(delta: float) -> void:
 		frame_offset = mini(frame_offset, _active_pose.frame_count - 1)
 		if frame_offset == _active_pose.frame_count - 1:
 			set_process(false)
-	actor_sprite.frame = _active_pose.first_frame + frame_offset
+	_apply_pose_frame(_active_pose.first_frame + frame_offset)
+
+
+## Applies one bounded frame and keeps its drawn sole on the sprite owner's origin.
+func _apply_pose_frame(frame_index: int) -> void:
+	actor_sprite.frame = frame_index
+	var measured_sole := ActorSoleMeasure.measure_frame_sole(
+		actor_sprite.texture,
+		actor_sprite.hframes,
+		actor_sprite.vframes,
+		frame_index
+	)
+	if is_nan(measured_sole):
+		return
+	actor_sprite.position.y = -measured_sole * actor_sprite.scale.y

@@ -71,5 +71,5 @@ enum VisualTier {
 ## Legacy-preview-only while production EncounterProgression is active. Zero
 ## reserves these scenes for that preview's starting baseline.
 @export_range(0, 100, 1) var target_unlock_combo: int = 0
-## Production target pools belong to progression_level_N.tres.
+## Production target pools belong to MiningConfig.combo_target_groups.
 @export var target_scenes: Array[PackedScene] = []

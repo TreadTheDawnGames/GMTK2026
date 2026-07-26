@@ -80,12 +80,30 @@ var _flashes: Array[SparkFlash] = []
 var _shard_pool: Array[SparkShard] = []
 var _flash_pool: Array[SparkFlash] = []
 var _random := RandomNumberGenerator.new()
+var _reduce_motion_enabled: bool = false
 
 
 ## Prepares random values and sleeps processing until the first hit.
 func _ready() -> void:
 	_random.randomize()
 	set_process(false)
+
+
+## Clears moving flashes and controls whether later impacts may create more.
+func set_reduce_motion_enabled(enabled: bool) -> void:
+	_reduce_motion_enabled = enabled
+	if not enabled:
+		return
+	for shard in _shards:
+		if _shard_pool.size() < maximum_active_shards:
+			_shard_pool.append(shard)
+	for flash in _flashes:
+		if _flash_pool.size() < maximum_active_flashes:
+			_flash_pool.append(flash)
+	_shards.clear()
+	_flashes.clear()
+	set_process(false)
+	queue_redraw()
 
 
 ## Strikes one spark at the hammer's animated contact point. Shares the impact
@@ -97,7 +115,11 @@ func play_at_impact(
 	_debris_multiplier: float = 1.0,
 	swing_side: int = 1
 ) -> void:
-	if cells_removed <= 0 or terrain_manager == null:
+	if (
+		_reduce_motion_enabled
+		or cells_removed <= 0
+		or terrain_manager == null
+	):
 		return
 	var strength := clampf(combo_strength, 0.0, 1.0)
 	var spawn_position := terrain_manager.screen_to_terrain_position(

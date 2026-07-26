@@ -11,6 +11,7 @@ extends VBoxContainer
 
 signal scrub_time_changed(seconds: float)
 signal beat_selected(beat: CutsceneBeat)
+signal beat_selection_changed(beats: Array[CutsceneBeat])
 
 const RULER_HEIGHT: float = 34.0
 const LANE_LABEL_WIDTH: float = 140.0
@@ -25,6 +26,15 @@ const DEFAULT_GRID_SECONDS: float = 0.1
 ## before it snaps onto it.
 const _NEIGHBOUR_SNAP_PIXELS: float = 8.0
 
+enum TemplateKind {
+	ENTRANCE,
+	CONVERSATION,
+	REACTION,
+	MINING_STRIKE,
+	EXIT,
+	FULL_EXCHANGE,
+}
+
 const KIND_COLORS: Dictionary = {
 	CutsceneBeat.Kind.MOVE: Color("#4b91d1"),
 	CutsceneBeat.Kind.POSE: Color("#9d70cf"),
@@ -37,6 +47,9 @@ const KIND_COLORS: Dictionary = {
 	CutsceneBeat.Kind.STRIKE: Color("#d45d57"),
 	CutsceneBeat.Kind.SHOW: Color("#73aa61"),
 	CutsceneBeat.Kind.HIDE: Color("#755f70"),
+	CutsceneBeat.Kind.CAMERA: Color("#d0a64f"),
+	CutsceneBeat.Kind.AUDIO: Color("#52a9ca"),
+	CutsceneBeat.Kind.VFX: Color("#c466df"),
 }
 
 class _TimelineCanvas extends Control:
@@ -134,6 +147,10 @@ var _actor_option: OptionButton
 var _zoom_spin: SpinBox
 var _grid_spin: SpinBox
 var _play_button: Button
+var _loop_button: CheckButton
+var _lane_lock_button: CheckButton
+var _lane_mute_button: CheckButton
+var _lane_solo_button: CheckButton
 var _time_label: Label
 var _duration_label: Label
 var _validation_list: ItemList
@@ -142,11 +159,18 @@ var _empty_message: Label
 var _lane_actor_ids: PackedStringArray = PackedStringArray()
 var _invalid_beat_indices: Dictionary = {}
 var _selected_beat: CutsceneBeat
+var _selected_beats: Array[CutsceneBeat] = []
 var _selected_kind: int = CutsceneBeat.Kind.MOVE
 var _pixels_per_second: float = DEFAULT_PIXELS_PER_SECOND
 var _grid_seconds: float = DEFAULT_GRID_SECONDS
 var _scrub_time: float = 0.0
 var _is_playing: bool = false
+var _loop_enabled: bool = false
+var _loop_start_seconds: float = 0.0
+var _loop_end_seconds: float = 0.0
+var _locked_lanes: Dictionary = {}
+var _muted_lanes: Dictionary = {}
+var _solo_lanes: Dictionary = {}
 
 var _drag_mode: StringName = &""
 var _drag_beat: CutsceneBeat
@@ -157,12 +181,19 @@ var _drag_pointer_offset_seconds: float = 0.0
 var _drag_preview_start: float = 0.0
 var _drag_preview_duration: float = 0.0
 var _drag_preview_actor: StringName
+var _drag_group_original_starts: Dictionary = {}
+var _drag_group_preview_starts: Dictionary = {}
 
 var _preview_player: CutsceneSequencePlayer
 var _preview_base_states: Dictionary = {}
 ## The position this panel last wrote for each actor, so a later restore can
 ## distinguish its own work from a node the designer moved by hand.
 var _preview_applied_states: Dictionary = {}
+
+## Editor-session clipboard deliberately stores duplicated beat resources rather
+## than serializing text. It survives switching scenes while Godot is open but
+## never dirties a game resource until Paste is explicitly requested.
+static var _beat_clipboard: Array[CutsceneBeat] = []
 
 
 func _init() -> void:
@@ -185,9 +216,14 @@ func _process(delta: float) -> void:
 		_set_scrub_time(0.0, true)
 		_set_playing(false)
 		return
-	var next_time := minf(_scrub_time + maxf(delta, 0.0), duration)
+	var playback_end := duration
+	if _has_loop_range():
+		playback_end = _loop_end_seconds
+	var next_time := minf(_scrub_time + maxf(delta, 0.0), playback_end)
 	_set_scrub_time(next_time, true)
-	if is_equal_approx(next_time, duration):
+	if is_equal_approx(next_time, playback_end) and _has_loop_range():
+		_set_scrub_time(_loop_start_seconds, true)
+	elif is_equal_approx(next_time, duration):
 		_set_playing(false)
 
 
@@ -205,9 +241,37 @@ func set_context(context: CutsceneEditorContext) -> void:
 		_on_context_data_changed
 	):
 		_context.cast_changed.disconnect(_on_context_data_changed)
+	if _context != null:
+		if _context.movement_start_position_requested.is_connected(
+			_on_movement_start_position_requested
+		):
+			_context.movement_start_position_requested.disconnect(
+				_on_movement_start_position_requested
+			)
+		if _context.movement_destination_position_requested.is_connected(
+			_on_movement_destination_position_requested
+		):
+			_context.movement_destination_position_requested.disconnect(
+				_on_movement_destination_position_requested
+			)
+		if _context.movement_beat_creation_requested.is_connected(
+			_on_movement_beat_creation_requested
+		):
+			_context.movement_beat_creation_requested.disconnect(
+				_on_movement_beat_creation_requested
+			)
+		if _context.stage_positions_will_change.is_connected(
+			_prepare_for_stage_position_change
+		):
+			_context.stage_positions_will_change.disconnect(
+				_prepare_for_stage_position_change
+			)
 	_context = context
 	_selected_beat = null
+	_selected_beats.clear()
 	_scrub_time = 0.0
+	_loop_start_seconds = 0.0
+	_loop_end_seconds = 0.0
 	_set_playing(false)
 	_preview_base_states.clear()
 	_preview_applied_states.clear()
@@ -218,7 +282,101 @@ func set_context(context: CutsceneEditorContext) -> void:
 		_context.authored_data_changed.connect(_on_context_data_changed)
 	if not _context.cast_changed.is_connected(_on_context_data_changed):
 		_context.cast_changed.connect(_on_context_data_changed)
+	_context.movement_start_position_requested.connect(
+		_on_movement_start_position_requested
+	)
+	_context.movement_destination_position_requested.connect(
+		_on_movement_destination_position_requested
+	)
+	_context.movement_beat_creation_requested.connect(
+		_on_movement_beat_creation_requested
+	)
+	_context.stage_positions_will_change.connect(
+		_prepare_for_stage_position_change
+	)
 	_build_valid_panel()
+
+
+func _on_movement_start_position_requested(
+	actor_id: StringName,
+	stage_position: Vector2
+) -> void:
+	var beat := _selected_move_for_actor(actor_id)
+	if beat == null:
+		return
+	_commit_resource_changes(
+		beat,
+		{
+			&"starts_from_authored_point": {
+				"before": beat.starts_from_authored_point,
+				"after": true,
+			},
+			&"start_marker": {
+				"before": beat.start_marker,
+				"after": StringName(),
+			},
+			&"start_offset": {
+				"before": beat.start_offset,
+				"after": stage_position,
+			},
+		},
+		"Record cutscene movement start"
+	)
+
+
+func _on_movement_destination_position_requested(
+	actor_id: StringName,
+	stage_position: Vector2
+) -> void:
+	var beat := _selected_move_for_actor(actor_id)
+	if beat == null:
+		return
+	_commit_resource_changes(
+		beat,
+		{
+			&"target_marker": {
+				"before": beat.target_marker,
+				"after": StringName(),
+			},
+			&"target_offset": {
+				"before": beat.target_offset,
+				"after": stage_position,
+			},
+		},
+		"Record cutscene movement destination"
+	)
+
+
+func _on_movement_beat_creation_requested(
+	actor_id: StringName,
+	stage_position: Vector2
+) -> void:
+	if not _has_valid_context():
+		return
+	var beat := CutsceneBeat.new()
+	beat.kind = CutsceneBeat.Kind.MOVE
+	beat.actor = actor_id
+	beat.start_seconds = snap_time(_scrub_time)
+	beat.duration_seconds = 1.0
+	beat.target_offset = stage_position
+	_append_new_beats([beat], "Create staged movement beat")
+
+
+func _selected_move_for_actor(actor_id: StringName) -> CutsceneBeat:
+	if (
+		_selected_beat != null
+		and _selected_beat.kind == CutsceneBeat.Kind.MOVE
+		and _selected_beat.actor == actor_id
+	):
+		return _selected_beat
+	for selected in _selected_beats:
+		if (
+			selected != null
+			and selected.kind == CutsceneBeat.Kind.MOVE
+			and selected.actor == actor_id
+		):
+			return selected
+	return null
 
 
 ## Converts authored seconds to the horizontal timeline coordinate.
@@ -305,7 +463,9 @@ func _build_valid_panel() -> void:
 		+ "  Shift+arrows  step ten divisions\n"
 		+ "  Ctrl+arrows  move the selected beat instead of the playhead\n"
 		+ "  Home and End  jump to the start or the end\n"
-		+ "  Ctrl+D  duplicate the selected beat\n"
+		+ "  Shift-click  select several beats\n"
+		+ "  Ctrl+A/C/V/D  select all, copy, paste, or duplicate\n"
+		+ "  I and O  set loop in/out; L toggles looping\n"
 		+ "  Delete  remove the selected beat"
 	)
 	var scroll := ScrollContainer.new()
@@ -317,9 +477,13 @@ func _build_valid_panel() -> void:
 	add_child(scroll)
 	_validation_list = ItemList.new()
 	_validation_list.name = "ValidationMessages"
-	_validation_list.select_mode = ItemList.SELECT_MULTI
-	_validation_list.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_validation_list.select_mode = ItemList.SELECT_SINGLE
+	_validation_list.mouse_filter = Control.MOUSE_FILTER_STOP
+	_validation_list.tooltip_text = (
+		"Select an error to focus the beat that needs attention."
+	)
 	_validation_list.custom_minimum_size = Vector2(0.0, 64.0)
+	_validation_list.item_selected.connect(_on_validation_selected)
 	add_child(_validation_list)
 	_rebuild_lane_data()
 	_capture_preview_states()
@@ -380,6 +544,50 @@ func _build_toolbar() -> void:
 	if not delete_button.pressed.is_connected(_delete_selected):
 		delete_button.pressed.connect(_delete_selected)
 
+	var copy_button := Button.new()
+	copy_button.text = "Copy"
+	copy_button.tooltip_text = "Copy selected beats for this or another cutscene.  (Ctrl+C)"
+	copy_button.pressed.connect(_copy_selected)
+	_toolbar.add_child(copy_button)
+
+	var paste_button := Button.new()
+	paste_button.text = "Paste"
+	paste_button.tooltip_text = "Paste copied beats at the playhead.  (Ctrl+V)"
+	paste_button.pressed.connect(_paste_clipboard)
+	_toolbar.add_child(paste_button)
+
+	var template_menu := MenuButton.new()
+	template_menu.text = "Template"
+	template_menu.tooltip_text = (
+		"Add a reusable choreography block at the playhead."
+	)
+	var template_popup := template_menu.get_popup()
+	template_popup.add_item("Entrance", TemplateKind.ENTRANCE)
+	template_popup.add_item("Conversation", TemplateKind.CONVERSATION)
+	template_popup.add_item("Reaction", TemplateKind.REACTION)
+	template_popup.add_item("Mining strike", TemplateKind.MINING_STRIKE)
+	template_popup.add_item("Exit", TemplateKind.EXIT)
+	template_popup.add_separator()
+	template_popup.add_item("Enter, speak, react, leave", TemplateKind.FULL_EXCHANGE)
+	template_popup.id_pressed.connect(_on_template_selected)
+	_toolbar.add_child(template_menu)
+
+	var insert_time_button := Button.new()
+	insert_time_button.text = "+ Time"
+	insert_time_button.tooltip_text = (
+		"Insert one grid division at the playhead and ripple later beats right."
+	)
+	insert_time_button.pressed.connect(_ripple_time.bind(1))
+	_toolbar.add_child(insert_time_button)
+
+	var remove_time_button := Button.new()
+	remove_time_button.text = "- Time"
+	remove_time_button.tooltip_text = (
+		"Remove one grid division at the playhead and ripple later beats left."
+	)
+	remove_time_button.pressed.connect(_ripple_time.bind(-1))
+	_toolbar.add_child(remove_time_button)
+
 	var spacer := Control.new()
 	spacer.custom_minimum_size.x = 12.0
 	_toolbar.add_child(spacer)
@@ -399,6 +607,12 @@ func _build_toolbar() -> void:
 	_toolbar.add_child(_zoom_spin)
 	if not _zoom_spin.value_changed.is_connected(_on_zoom_changed):
 		_zoom_spin.value_changed.connect(_on_zoom_changed)
+
+	var fit_button := Button.new()
+	fit_button.text = "Fit"
+	fit_button.tooltip_text = "Fit the whole sequence into the visible timeline."
+	fit_button.pressed.connect(_zoom_to_fit)
+	_toolbar.add_child(fit_button)
 
 	var grid_label := Label.new()
 	grid_label.text = "Grid"
@@ -428,6 +642,38 @@ func _build_toolbar() -> void:
 	if not _play_button.toggled.is_connected(_on_play_toggled):
 		_play_button.toggled.connect(_on_play_toggled)
 
+	var set_in_button := Button.new()
+	set_in_button.text = "In"
+	set_in_button.tooltip_text = "Set loop start at the playhead.  (I)"
+	set_in_button.pressed.connect(_set_loop_in)
+	_toolbar.add_child(set_in_button)
+	var set_out_button := Button.new()
+	set_out_button.text = "Out"
+	set_out_button.tooltip_text = "Set loop end at the playhead.  (O)"
+	set_out_button.pressed.connect(_set_loop_out)
+	_toolbar.add_child(set_out_button)
+	_loop_button = CheckButton.new()
+	_loop_button.text = "Loop"
+	_loop_button.tooltip_text = "Repeat the marked in/out range.  (L)"
+	_loop_button.toggled.connect(_on_loop_toggled)
+	_toolbar.add_child(_loop_button)
+
+	_lane_lock_button = CheckButton.new()
+	_lane_lock_button.text = "Lock lane"
+	_lane_lock_button.tooltip_text = "Prevent edits on the actor lane selected above."
+	_lane_lock_button.toggled.connect(_on_lane_lock_toggled)
+	_toolbar.add_child(_lane_lock_button)
+	_lane_mute_button = CheckButton.new()
+	_lane_mute_button.text = "Mute lane"
+	_lane_mute_button.tooltip_text = "Ignore this actor lane while previewing."
+	_lane_mute_button.toggled.connect(_on_lane_mute_toggled)
+	_toolbar.add_child(_lane_mute_button)
+	_lane_solo_button = CheckButton.new()
+	_lane_solo_button.text = "Solo lane"
+	_lane_solo_button.tooltip_text = "Preview only this actor lane."
+	_lane_solo_button.toggled.connect(_on_lane_solo_toggled)
+	_toolbar.add_child(_lane_solo_button)
+
 	_time_label = Label.new()
 	_time_label.name = "CurrentTime"
 	_time_label.custom_minimum_size = Vector2(72.0, 0.0)
@@ -437,6 +683,7 @@ func _build_toolbar() -> void:
 	_duration_label.custom_minimum_size = Vector2(82.0, 0.0)
 	_toolbar.add_child(_duration_label)
 	_update_actor_option_state()
+	_update_lane_control_state()
 
 
 func _build_status_bar() -> void:
@@ -488,6 +735,10 @@ func _clear_children() -> void:
 	_canvas = null
 	_validation_list = null
 	_empty_message = null
+	_loop_button = null
+	_lane_lock_button = null
+	_lane_mute_button = null
+	_lane_solo_button = null
 
 
 func _populate_actor_option() -> void:
@@ -521,8 +772,53 @@ func _on_kind_selected(index: int) -> void:
 
 
 func _on_actor_selected(_index: int) -> void:
-	# The actor choice is read when the next beat is added.
-	pass
+	# The same choice authors the next beat and scopes the session-only lane
+	# controls, so a designer does not need a second actor picker.
+	_update_lane_control_state()
+
+
+func _current_toolbar_actor() -> StringName:
+	if _actor_option == null or _actor_option.item_count <= 0:
+		return StringName()
+	var selected_index := maxi(_actor_option.selected, 0)
+	return StringName(_actor_option.get_item_metadata(selected_index))
+
+
+func _update_lane_control_state() -> void:
+	var actor_id := _current_toolbar_actor()
+	if _lane_lock_button != null:
+		_lane_lock_button.set_pressed_no_signal(
+			bool(_locked_lanes.get(actor_id, false))
+		)
+	if _lane_mute_button != null:
+		_lane_mute_button.set_pressed_no_signal(
+			bool(_muted_lanes.get(actor_id, false))
+		)
+	if _lane_solo_button != null:
+		_lane_solo_button.set_pressed_no_signal(
+			bool(_solo_lanes.get(actor_id, false))
+		)
+
+
+func _set_lane_state(store: Dictionary, enabled: bool) -> void:
+	var actor_id := _current_toolbar_actor()
+	if enabled:
+		store[actor_id] = true
+	else:
+		store.erase(actor_id)
+	refresh_preview()
+
+
+func _on_lane_lock_toggled(enabled: bool) -> void:
+	_set_lane_state(_locked_lanes, enabled)
+
+
+func _on_lane_mute_toggled(enabled: bool) -> void:
+	_set_lane_state(_muted_lanes, enabled)
+
+
+func _on_lane_solo_toggled(enabled: bool) -> void:
+	_set_lane_state(_solo_lanes, enabled)
 
 
 func _on_zoom_changed(value: float) -> void:
@@ -552,6 +848,200 @@ func _set_playing(playing: bool) -> void:
 	set_process(_is_playing or _has_valid_context())
 
 
+func _has_loop_range() -> bool:
+	return (
+		_loop_enabled
+		and _loop_end_seconds > _loop_start_seconds + 0.00001
+	)
+
+
+func _set_loop_in() -> void:
+	_loop_start_seconds = _scrub_time
+	if _loop_end_seconds <= _loop_start_seconds:
+		_loop_end_seconds = minf(
+			_sequence_duration(),
+			_loop_start_seconds + maxf(_grid_seconds, DEFAULT_GRID_SECONDS)
+		)
+	_update_playhead_readout()
+	if _canvas != null:
+		_canvas.queue_redraw()
+
+
+func _set_loop_out() -> void:
+	_loop_end_seconds = _scrub_time
+	if _loop_end_seconds <= _loop_start_seconds:
+		_loop_start_seconds = maxf(
+			0.0,
+			_loop_end_seconds - maxf(_grid_seconds, DEFAULT_GRID_SECONDS)
+		)
+	_update_playhead_readout()
+	if _canvas != null:
+		_canvas.queue_redraw()
+
+
+func _on_loop_toggled(enabled: bool) -> void:
+	_loop_enabled = enabled
+	if enabled and _loop_end_seconds <= _loop_start_seconds:
+		_loop_start_seconds = _scrub_time
+		_loop_end_seconds = _sequence_duration()
+	if _canvas != null:
+		_canvas.queue_redraw()
+
+
+func _zoom_to_fit() -> void:
+	var duration := maxf(_sequence_duration(), 0.1)
+	var available_width := maxf(size.x - LANE_LABEL_WIDTH - 32.0, 200.0)
+	_pixels_per_second = clampf(
+		available_width / (duration + 0.25),
+		MIN_PIXELS_PER_SECOND,
+		MAX_PIXELS_PER_SECOND
+	)
+	if _zoom_spin != null:
+		_zoom_spin.set_value_no_signal(_pixels_per_second)
+	_update_timeline_size()
+
+
+## Inserts or removes one grid unit without changing beat durations. This is a
+## concrete ripple edit rather than a general time-warp system: every beat at
+## or after the playhead moves together, and no beat can cross time zero.
+func _ripple_time(direction: int) -> void:
+	if not _has_valid_context() or direction == 0:
+		return
+	var amount := maxf(_grid_seconds, DEFAULT_GRID_SECONDS) * float(signi(direction))
+	var changes: Dictionary = {}
+	for beat in _context.sequence.beats:
+		if beat == null or beat.start_seconds < _scrub_time - 0.00001:
+			continue
+		if bool(_locked_lanes.get(beat.actor, false)):
+			continue
+		var moved := maxf(beat.start_seconds + amount, _scrub_time if amount < 0.0 else 0.0)
+		if not is_equal_approx(moved, beat.start_seconds):
+			changes[beat] = moved
+	_commit_beat_start_changes(
+		changes,
+		"Insert cutscene time" if direction > 0 else "Remove cutscene time"
+	)
+
+
+func _on_template_selected(template_id: int) -> void:
+	if not _has_valid_context():
+		return
+	var actor_id := _current_toolbar_actor()
+	if actor_id.is_empty() and not _lane_actor_ids.is_empty():
+		actor_id = StringName(_lane_actor_ids[0])
+	var cursor := snap_time(_scrub_time)
+	var additions: Array[CutsceneBeat] = []
+	match template_id:
+		TemplateKind.ENTRANCE:
+			additions.append(_make_move_template(actor_id, cursor, &"Entrance", &"Conversation"))
+		TemplateKind.CONVERSATION:
+			additions.append(_make_dialogue_template(cursor))
+		TemplateKind.REACTION:
+			additions.append(_make_reaction_template(actor_id, cursor))
+		TemplateKind.MINING_STRIKE:
+			var strike := CutsceneBeat.new()
+			strike.kind = CutsceneBeat.Kind.STRIKE
+			strike.start_seconds = cursor
+			strike.duration_seconds = 0.25
+			strike.cue = _first_marker_name(&"ActionMarkers")
+			additions.append(strike)
+		TemplateKind.EXIT:
+			additions.append(_make_move_template(actor_id, cursor, &"Rest", &"Exit"))
+		TemplateKind.FULL_EXCHANGE:
+			additions.append(_make_move_template(actor_id, cursor, &"Entrance", &"Conversation"))
+			cursor += 1.0
+			var dialogue := _make_dialogue_template(cursor)
+			additions.append(dialogue)
+			cursor += maxf(dialogue.duration_seconds, 1.0)
+			additions.append(_make_reaction_template(actor_id, cursor))
+			cursor += 0.4
+			additions.append(_make_move_template(actor_id, cursor, &"Conversation", &"Exit"))
+	if additions.is_empty():
+		return
+	_append_new_beats(additions, "Add choreography template")
+
+
+func _make_move_template(
+	actor_id: StringName,
+	start_seconds: float,
+	start_marker: StringName,
+	target_marker: StringName
+) -> CutsceneBeat:
+	var beat := CutsceneBeat.new()
+	beat.kind = CutsceneBeat.Kind.MOVE
+	beat.actor = actor_id
+	beat.start_seconds = start_seconds
+	beat.duration_seconds = 1.0
+	beat.starts_from_authored_point = true
+	beat.start_marker = start_marker if _context.get_marker_names().has(start_marker) else StringName()
+	beat.target_marker = target_marker if _context.get_marker_names().has(target_marker) else StringName()
+	if beat.start_marker.is_empty():
+		beat.start_offset = _actor_position(actor_id)
+	if beat.target_marker.is_empty():
+		beat.target_offset = _actor_position(actor_id)
+	return beat
+
+
+func _make_dialogue_template(start_seconds: float) -> CutsceneBeat:
+	var beat := CutsceneBeat.new()
+	beat.kind = CutsceneBeat.Kind.DIALOGUE
+	beat.start_seconds = start_seconds
+	beat.duration_seconds = 2.0
+	beat.blocks = true
+	if _context.encounter != null:
+		beat.conversation = _context.encounter.conversation
+	return beat
+
+
+func _make_reaction_template(
+	actor_id: StringName,
+	start_seconds: float
+) -> CutsceneBeat:
+	var beat := CutsceneBeat.new()
+	beat.kind = CutsceneBeat.Kind.BOUNCE
+	beat.actor = actor_id
+	beat.start_seconds = start_seconds
+	beat.duration_seconds = 0.35
+	beat.bounce_count = 1
+	return beat
+
+
+func _actor_position(actor_id: StringName) -> Vector2:
+	var actor := _context.get_actor_preview(actor_id)
+	if not is_instance_valid(actor):
+		return Vector2.ZERO
+	return _context.stage.to_local(actor.global_position)
+
+
+func _first_marker_name(root_name: StringName) -> StringName:
+	if _context == null or not is_instance_valid(_context.stage):
+		return StringName()
+	var marker_root := _context.stage.get_node_or_null(NodePath(root_name))
+	if marker_root == null:
+		return StringName()
+	for child in marker_root.get_children():
+		if child is Marker2D:
+			return child.name
+	return StringName()
+
+
+func _append_new_beats(
+	additions: Array[CutsceneBeat],
+	action_name: String
+) -> void:
+	var beats: Array[CutsceneBeat] = _context.sequence.beats.duplicate()
+	beats.append_array(additions)
+	_commit_resource_changes(
+		_context.sequence,
+		{&"beats": beats},
+		action_name
+	)
+	_set_selection(additions, additions.back())
+	_rebuild_lane_data()
+	_refresh_validation()
+	_update_timeline_size()
+
+
 func _add_beat() -> void:
 	if not _has_valid_context():
 		return
@@ -569,6 +1059,11 @@ func _add_beat() -> void:
 		if selected_index < 0:
 			selected_index = 0
 		beat.actor = _actor_option.get_item_metadata(selected_index)
+		if bool(_locked_lanes.get(beat.actor, false)):
+			_validation_list.tooltip_text = (
+				"Unlock '%s' before adding a beat to it." % beat.actor
+			)
+			return
 	var next_beats: Array[CutsceneBeat] = []
 	for existing in _context.sequence.beats:
 		if existing != null:
@@ -584,8 +1079,7 @@ func _add_beat() -> void:
 		},
 		"Add cutscene beat"
 	)
-	_selected_beat = beat
-	beat_selected.emit(beat)
+	_set_selection([beat], beat)
 	_rebuild_lane_data()
 	_refresh_validation()
 	_update_timeline_size()
@@ -594,12 +1088,15 @@ func _add_beat() -> void:
 
 
 func _delete_selected() -> void:
-	if not _has_valid_context() or _selected_beat == null:
+	if not _has_valid_context() or _selected_beats.is_empty():
 		return
 	var next_beats: Array[CutsceneBeat] = []
 	var found := false
 	for existing in _context.sequence.beats:
-		if existing == _selected_beat:
+		if _selected_beats.has(existing):
+			if bool(_locked_lanes.get(existing.actor, false)):
+				next_beats.append(existing)
+				continue
 			found = true
 			continue
 		if existing != null:
@@ -616,7 +1113,7 @@ func _delete_selected() -> void:
 		},
 		"Delete cutscene beat"
 	)
-	_selected_beat = null
+	_set_selection([], null)
 	_rebuild_lane_data()
 	_refresh_validation()
 	_update_timeline_size()
@@ -640,9 +1137,14 @@ func _handle_canvas_input(
 				return true
 			var hit := _hit_test_beat(position)
 			if hit.is_empty():
+				if not (event as InputEventMouseButton).shift_pressed:
+					_set_selection([], null)
 				return false
 			var beat := hit["beat"] as CutsceneBeat
-			_select_beat(beat)
+			var button := event as InputEventMouseButton
+			_select_beat(beat, button.shift_pressed or button.ctrl_pressed)
+			if bool(_locked_lanes.get(beat.actor, false)):
+				return true
 			_begin_drag(
 				beat,
 				bool(hit["resize"]),
@@ -694,14 +1196,45 @@ func _handle_canvas_key(key: InputEventKey) -> bool:
 			_set_playing(not _is_playing)
 			return true
 		KEY_DELETE:
-			if _selected_beat == null:
+			if _selected_beats.is_empty():
 				return false
 			_delete_selected()
 			return true
+		KEY_A:
+			if not key.ctrl_pressed:
+				return false
+			var all_beats: Array[CutsceneBeat] = []
+			for beat in _context.sequence.beats:
+				if beat != null:
+					all_beats.append(beat)
+			_set_selection(all_beats, all_beats.back() if not all_beats.is_empty() else null)
+			return true
+		KEY_C:
+			if not key.ctrl_pressed or _selected_beats.is_empty():
+				return false
+			_copy_selected()
+			return true
+		KEY_V:
+			if not key.ctrl_pressed or _beat_clipboard.is_empty():
+				return false
+			_paste_clipboard()
+			return true
 		KEY_D:
-			if not key.ctrl_pressed or _selected_beat == null:
+			if not key.ctrl_pressed or _selected_beats.is_empty():
 				return false
 			_duplicate_selected()
+			return true
+		KEY_I:
+			_set_loop_in()
+			return true
+		KEY_O:
+			_set_loop_out()
+			return true
+		KEY_L:
+			_loop_enabled = not _loop_enabled
+			if _loop_button != null:
+				_loop_button.set_pressed_no_signal(_loop_enabled)
+			_on_loop_toggled(_loop_enabled)
 			return true
 		KEY_LEFT:
 			if key.ctrl_pressed:
@@ -725,28 +1258,91 @@ func _handle_canvas_key(key: InputEventKey) -> bool:
 ## Copies the selected beat one grid step later and selects the copy, so a
 ## repeated action is authored by duplicating rather than by rebuilding it.
 func _duplicate_selected() -> void:
-	if not _has_valid_context() or _selected_beat == null:
+	if not _has_valid_context() or _selected_beats.is_empty():
 		return
-	var copy: CutsceneBeat = _selected_beat.duplicate()
 	var step := _grid_seconds if _grid_seconds > 0.0 else DEFAULT_GRID_SECONDS
-	copy.start_seconds = snap_time(
-		maxf(_selected_beat.start_seconds, 0.0)
-		+ maxf(_selected_beat.duration_seconds, step)
-	)
 	var beats: Array[CutsceneBeat] = _context.sequence.beats.duplicate()
-	beats.append(copy)
+	var copies: Array[CutsceneBeat] = []
+	var selection_end := 0.0
+	for selected in _selected_beats:
+		selection_end = maxf(selection_end, selected.get_end_seconds())
+	var selection_start := _selection_start_seconds()
+	var offset := maxf(selection_end - selection_start, step)
+	for selected in _selected_beats:
+		if bool(_locked_lanes.get(selected.actor, false)):
+			continue
+		var copy: CutsceneBeat = selected.duplicate(true)
+		copy.start_seconds = snap_time(selected.start_seconds + offset)
+		beats.append(copy)
+		copies.append(copy)
+	if copies.is_empty():
+		return
 	_commit_resource_changes(
 		_context.sequence,
 		{&"beats": beats},
-		"Duplicate cutscene beat"
+		"Duplicate cutscene beats"
 	)
-	_select_beat(copy)
+	_set_selection(copies, copies.back())
+
+
+func _selection_start_seconds() -> float:
+	if _selected_beats.is_empty():
+		return _scrub_time
+	var earliest := INF
+	for beat in _selected_beats:
+		earliest = minf(earliest, maxf(beat.start_seconds, 0.0))
+	return earliest
+
+
+func _copy_selected() -> void:
+	if not _has_valid_context() or _selected_beats.is_empty():
+		return
+	_beat_clipboard.clear()
+	var ordered := _selected_beats.duplicate()
+	ordered.sort_custom(
+		func(left: CutsceneBeat, right: CutsceneBeat) -> bool:
+			return left.start_seconds < right.start_seconds
+	)
+	for beat in ordered:
+		_beat_clipboard.append(beat.duplicate(true))
+
+
+func _paste_clipboard() -> void:
+	if not _has_valid_context() or _beat_clipboard.is_empty():
+		return
+	var earliest := INF
+	for copied in _beat_clipboard:
+		earliest = minf(earliest, copied.start_seconds)
+	var beats: Array[CutsceneBeat] = _context.sequence.beats.duplicate()
+	var pasted: Array[CutsceneBeat] = []
+	for copied in _beat_clipboard:
+		if bool(_locked_lanes.get(copied.actor, false)):
+			continue
+		var beat: CutsceneBeat = copied.duplicate(true)
+		beat.start_seconds = snap_time(
+			_scrub_time + maxf(copied.start_seconds - earliest, 0.0)
+		)
+		beats.append(beat)
+		pasted.append(beat)
+	if pasted.is_empty():
+		return
+	_commit_resource_changes(
+		_context.sequence,
+		{&"beats": beats},
+		"Paste cutscene beats"
+	)
+	_set_selection(pasted, pasted.back())
+	_rebuild_lane_data()
+	_refresh_validation()
+	_update_timeline_size()
 
 
 ## Slides the selected beat along its lane by one step, clamped at zero so a
 ## beat cannot be nudged to a negative start time.
 func _nudge_selected_beat(delta_seconds: float) -> bool:
 	if not _has_valid_context() or _selected_beat == null:
+		return false
+	if bool(_locked_lanes.get(_selected_beat.actor, false)):
 		return false
 	var moved := maxf(
 		snap_time(maxf(_selected_beat.start_seconds, 0.0) + delta_seconds),
@@ -776,7 +1372,21 @@ func _begin_drag(beat: CutsceneBeat, resize: bool, position: Vector2) -> void:
 	_drag_preview_duration = _drag_original_duration
 	_drag_preview_actor = _drag_original_actor
 	_drag_mode = &"resize" if resize else &"move"
+	_drag_group_original_starts.clear()
+	_drag_group_preview_starts.clear()
 	if not resize:
+		if not _selected_beats.has(beat):
+			_set_selection([beat], beat)
+		for selected in _selected_beats:
+			if not bool(_locked_lanes.get(selected.actor, false)):
+				_drag_group_original_starts[selected] = maxf(
+					selected.start_seconds,
+					0.0
+				)
+				_drag_group_preview_starts[selected] = maxf(
+					selected.start_seconds,
+					0.0
+				)
 		var pointer_time := pixels_to_time(
 			position.x - LANE_LABEL_WIDTH
 		)
@@ -861,6 +1471,25 @@ func _update_drag(position: Vector2, event: InputEvent) -> void:
 			)
 			snapped_start = snapped_end - duration
 		_drag_preview_start = maxf(snapped_start, 0.0)
+		if not _drag_group_original_starts.is_empty():
+			var delta := _drag_preview_start - _drag_original_start
+			var earliest := INF
+			for original_variant in _drag_group_original_starts.values():
+				earliest = minf(earliest, float(original_variant))
+			delta = maxf(delta, -earliest)
+			for selected_variant in _drag_group_original_starts.keys():
+				var selected := selected_variant as CutsceneBeat
+				if selected == null:
+					continue
+				_drag_group_preview_starts[selected] = (
+					float(_drag_group_original_starts[selected]) + delta
+				)
+			_drag_preview_start = float(
+				_drag_group_preview_starts.get(
+					_drag_beat,
+					_drag_preview_start
+				)
+			)
 		var lane_actor := _actor_for_lane_position(position.y)
 		if lane_actor != &"__outside__":
 			_drag_preview_actor = lane_actor
@@ -876,6 +1505,32 @@ func _finish_drag() -> void:
 		return
 	if _drag_beat == null:
 		_stop_drag_without_commit()
+		return
+	if _drag_mode == &"move" and not _drag_group_preview_starts.is_empty():
+		var start_changes: Dictionary = {}
+		for selected_variant in _drag_group_preview_starts.keys():
+			var selected := selected_variant as CutsceneBeat
+			if selected == null:
+				continue
+			var preview_start := float(_drag_group_preview_starts[selected])
+			if not is_equal_approx(preview_start, selected.start_seconds):
+				start_changes[selected] = preview_start
+		_commit_beat_start_changes(start_changes, "Move cutscene beats")
+		if _drag_preview_actor != _drag_original_actor:
+			_commit_resource_changes(
+				_drag_beat,
+				{
+					&"actor": {
+						"before": _drag_original_actor,
+						"after": _drag_preview_actor,
+					}
+				},
+				"Move cutscene beat to lane"
+			)
+		_stop_drag_without_commit()
+		_rebuild_lane_data()
+		_refresh_validation()
+		_update_timeline_size()
 		return
 	var changes: Dictionary = {}
 	if not is_equal_approx(_drag_preview_start, _drag_original_start):
@@ -901,6 +1556,8 @@ func _finish_drag() -> void:
 		)
 	_drag_beat = null
 	_drag_mode = &""
+	_drag_group_original_starts.clear()
+	_drag_group_preview_starts.clear()
 	_rebuild_lane_data()
 	_refresh_validation()
 	_update_timeline_size()
@@ -911,6 +1568,8 @@ func _finish_drag() -> void:
 func _stop_drag_without_commit() -> void:
 	_drag_mode = &""
 	_drag_beat = null
+	_drag_group_original_starts.clear()
+	_drag_group_preview_starts.clear()
 	if _canvas != null:
 		_canvas.queue_redraw()
 
@@ -921,11 +1580,37 @@ func _stop_drag_without_commit() -> void:
 ## answer is in the viewport, not in this panel. Without the scrub the cast
 ## stays frozen wherever the playhead happened to be, so the selected beat
 ## highlights a box on a chart while the stage shows an unrelated instant.
-func _select_beat(beat: CutsceneBeat) -> void:
-	_selected_beat = beat
-	if beat != null and not _is_playing:
-		_set_scrub_time(maxf(beat.start_seconds, 0.0), true)
-	beat_selected.emit(beat)
+func _select_beat(beat: CutsceneBeat, additive: bool = false) -> void:
+	if not additive:
+		_set_selection([beat] if beat != null else [], beat)
+		return
+	var next_selection: Array[CutsceneBeat] = _selected_beats.duplicate()
+	if next_selection.has(beat):
+		next_selection.erase(beat)
+	else:
+		next_selection.append(beat)
+	var active: CutsceneBeat = beat if next_selection.has(beat) else (
+		next_selection.back() if not next_selection.is_empty() else null
+	)
+	_set_selection(next_selection, active)
+
+
+func _set_selection(beats: Array, active: CutsceneBeat) -> void:
+	_selected_beats.clear()
+	for beat_variant in beats:
+		var beat := beat_variant as CutsceneBeat
+		if beat != null and not _selected_beats.has(beat):
+			_selected_beats.append(beat)
+	if active != null and _selected_beats.has(active):
+		_selected_beat = active
+	else:
+		_selected_beat = (
+			_selected_beats.back() if not _selected_beats.is_empty() else null
+		)
+	if _selected_beat != null and not _is_playing:
+		_set_scrub_time(maxf(_selected_beat.start_seconds, 0.0), true)
+	beat_selected.emit(_selected_beat)
+	beat_selection_changed.emit(_selected_beats)
 	if _canvas != null:
 		_canvas.queue_redraw()
 
@@ -937,7 +1622,7 @@ func _begin_preview_evaluation() -> void:
 		Callable(self, "_resolve_preview_actor"),
 		Callable(self, "_resolve_preview_marker"),
 		Callable(),
-		null
+		_context.stage
 	)
 
 
@@ -976,12 +1661,18 @@ func _apply_preview_at_time() -> void:
 		_scrub_time
 	)
 	var actor_states: Dictionary = result.get(&"actors", {})
+	var has_solo := not _solo_lanes.is_empty()
 	for actor_id_text in _context.get_stage_actor_ids():
 		var actor_id := StringName(actor_id_text)
-		if not actor_states.has(actor_id):
-			continue
 		var preview := _context.get_actor_preview(actor_id) as Node2D
 		if not is_instance_valid(preview):
+			continue
+		if bool(_muted_lanes.get(actor_id, false)) or (
+			has_solo and not bool(_solo_lanes.get(actor_id, false))
+		):
+			preview.visible = false
+			continue
+		if not actor_states.has(actor_id):
 			continue
 		var state: Dictionary = actor_states[actor_id]
 		if state.has(&"position"):
@@ -1043,11 +1734,28 @@ func _restore_preview_states() -> void:
 				_preview_base_states[actor_id_variant] = base_state
 				_preview_applied_states.erase(actor_id)
 				continue
+		elif not preview.global_position.is_equal_approx(
+			base_state["position"]
+		):
+			# An actor with no beats has no preview-applied entry. Cast tools
+			# still move that actor's real scene node, so adopt the changed
+			# position instead of restoring the stale position captured when
+			# the timeline opened.
+			base_state["position"] = preview.global_position
+			_preview_base_states[actor_id_variant] = base_state
+			continue
 		preview.global_position = base_state["position"]
 		preview.scale = base_state["scale"]
 		preview.pose = base_state["pose"]
 		preview.visible = bool(base_state["visible"])
 		preview.set_presentation_offset(base_state["visual_offset"])
+
+
+func _prepare_for_stage_position_change() -> void:
+	_restore_preview_states()
+	# The next Cast notification must treat its committed transforms as authored
+	# changes even when a target happens to equal the former playhead preview.
+	_preview_applied_states.clear()
 
 
 func _resolve_preview_actor(actor_id: StringName) -> Node2D:
@@ -1092,6 +1800,8 @@ func _beat_rect(beat: CutsceneBeat) -> Rect2:
 
 
 func _display_start(beat: CutsceneBeat) -> float:
+	if _drag_group_preview_starts.has(beat):
+		return float(_drag_group_preview_starts[beat])
 	return _drag_preview_start if beat == _drag_beat else maxf(beat.start_seconds, 0.0)
 
 
@@ -1186,8 +1896,25 @@ func _draw_timeline(canvas: Control) -> void:
 			1.0
 		)
 		var lane_label := "Shared"
+		var lane_actor := StringName()
 		if lane_index > 0 and lane_index - 1 < _lane_actor_ids.size():
 			lane_label = _lane_actor_ids[lane_index - 1]
+			lane_actor = StringName(lane_label)
+		if bool(_locked_lanes.get(lane_actor, false)):
+			lane_label += "  [LOCK]"
+		if bool(_muted_lanes.get(lane_actor, false)):
+			lane_label += "  [MUTE]"
+			canvas.draw_rect(
+				Rect2(
+					LANE_LABEL_WIDTH,
+					lane_y,
+					canvas.size.x - LANE_LABEL_WIDTH,
+					LANE_HEIGHT
+				),
+				Color(0.04, 0.05, 0.07, 0.52)
+			)
+		if bool(_solo_lanes.get(lane_actor, false)):
+			lane_label += "  [SOLO]"
 		canvas.draw_string(
 			font,
 			Vector2(12.0, lane_y + 34.0),
@@ -1204,6 +1931,30 @@ func _draw_timeline(canvas: Control) -> void:
 			1.0
 	)
 	_draw_time_ruler(canvas, font)
+	if _loop_end_seconds > _loop_start_seconds + 0.00001:
+		var loop_start_x := LANE_LABEL_WIDTH + time_to_pixels(_loop_start_seconds)
+		var loop_end_x := LANE_LABEL_WIDTH + time_to_pixels(_loop_end_seconds)
+		canvas.draw_rect(
+			Rect2(
+				loop_start_x,
+				0.0,
+				maxf(loop_end_x - loop_start_x, 1.0),
+				canvas.size.y
+			),
+			Color(0.95, 0.78, 0.35, 0.07 if _loop_enabled else 0.035)
+		)
+		canvas.draw_line(
+			Vector2(loop_start_x, 0.0),
+			Vector2(loop_start_x, canvas.size.y),
+			Color(0.95, 0.78, 0.35, 0.72),
+			1.0
+		)
+		canvas.draw_line(
+			Vector2(loop_end_x, 0.0),
+			Vector2(loop_end_x, canvas.size.y),
+			Color(0.95, 0.78, 0.35, 0.72),
+			1.0
+		)
 	for beat_index in range(_context.sequence.beats.size()):
 		var beat := _context.sequence.beats[beat_index]
 		if beat == null:
@@ -1272,7 +2023,7 @@ func _draw_beat(
 	if _invalid_beat_indices.has(beat_index):
 		color = color.lerp(Color("#d94343"), 0.38)
 	canvas.draw_style_box(
-		_make_beat_box(color, beat == _selected_beat),
+		_make_beat_box(color, _selected_beats.has(beat)),
 		rect
 	)
 	var label := _kind_name(beat.kind)
@@ -1322,6 +2073,16 @@ func _beat_detail_label(beat: CutsceneBeat) -> String:
 			return str(beat.cue) if not beat.cue.is_empty() else ""
 		CutsceneBeat.Kind.DIALOGUE:
 			return _dialogue_preview(beat)
+		CutsceneBeat.Kind.CAMERA:
+			return CutsceneBeat.CameraAction.keys()[beat.camera_action]
+		CutsceneBeat.Kind.AUDIO:
+			if beat.audio_stream != null:
+				return beat.audio_stream.resource_path.get_file()
+			return CutsceneBeat.AudioAction.keys()[beat.audio_action]
+		CutsceneBeat.Kind.VFX:
+			if beat.vfx_scene != null:
+				return beat.vfx_scene.resource_path.get_file()
+			return CutsceneBeat.VfxAction.keys()[beat.vfx_action]
 	return ""
 
 
@@ -1404,8 +2165,24 @@ func _refresh_validation() -> void:
 		for beat_index in range(_context.sequence.beats.size()):
 			if error_text.begins_with("Beat %d:" % (beat_index + 1)):
 				_invalid_beat_indices[beat_index] = true
+				_validation_list.set_item_metadata(
+					_validation_list.item_count - 1,
+					beat_index
+				)
 	if errors.is_empty():
 		_validation_list.add_item("No validation errors.")
+
+
+func _on_validation_selected(item_index: int) -> void:
+	if not _has_valid_context() or _validation_list == null:
+		return
+	var metadata: Variant = _validation_list.get_item_metadata(item_index)
+	if metadata == null:
+		return
+	var beat_index := int(metadata)
+	if beat_index < 0 or beat_index >= _context.sequence.beats.size():
+		return
+	_select_beat(_context.sequence.beats[beat_index])
 
 
 func _on_context_data_changed() -> void:
@@ -1429,6 +2206,46 @@ func _on_context_data_changed() -> void:
 		_canvas.queue_redraw()
 
 
+func _commit_beat_start_changes(
+	changes: Dictionary,
+	action_name: String
+) -> void:
+	if changes.is_empty():
+		return
+	var undo_redo: EditorUndoRedoManager = null
+	if _context != null:
+		undo_redo = _context.undo_redo
+	if undo_redo == null:
+		for beat_variant in changes.keys():
+			var beat := beat_variant as CutsceneBeat
+			if beat != null:
+				beat.start_seconds = float(changes[beat_variant])
+	else:
+		undo_redo.create_action(action_name)
+		for beat_variant in changes.keys():
+			var beat := beat_variant as CutsceneBeat
+			if beat == null:
+				continue
+			undo_redo.add_do_property(
+				beat,
+				&"start_seconds",
+				float(changes[beat_variant])
+			)
+			undo_redo.add_undo_property(
+				beat,
+				&"start_seconds",
+				beat.start_seconds
+			)
+		undo_redo.commit_action()
+	if _context != null:
+		_context.notify_authored_data_changed()
+	_rebuild_lane_data()
+	_refresh_validation()
+	_update_timeline_size()
+	if _canvas != null:
+		_canvas.queue_redraw()
+
+
 func _commit_resource_changes(
 	target: Object,
 	changes: Dictionary,
@@ -1441,14 +2258,22 @@ func _commit_resource_changes(
 		undo_redo = _context.undo_redo
 	if undo_redo == null:
 		for property_name in changes.keys():
-			var change: Dictionary = changes[property_name]
-			target.set(property_name, change["after"])
+			var change_variant: Variant = changes[property_name]
+			var after_value: Variant = change_variant
+			if change_variant is Dictionary and change_variant.has("after"):
+				after_value = change_variant["after"]
+			target.set(property_name, after_value)
 	else:
 		undo_redo.create_action(action_name)
 		for property_name in changes.keys():
-			var change: Dictionary = changes[property_name]
-			undo_redo.add_do_property(target, property_name, change["after"])
-			undo_redo.add_undo_property(target, property_name, change["before"])
+			var change_variant: Variant = changes[property_name]
+			var before_value: Variant = target.get(property_name)
+			var after_value: Variant = change_variant
+			if change_variant is Dictionary and change_variant.has("after"):
+				after_value = change_variant["after"]
+				before_value = change_variant.get("before", before_value)
+			undo_redo.add_do_property(target, property_name, after_value)
+			undo_redo.add_undo_property(target, property_name, before_value)
 		undo_redo.commit_action()
 	if _context != null:
 		_context.notify_authored_data_changed()
@@ -1538,6 +2363,7 @@ func _kind_uses_actor(kind: int) -> bool:
 		CutsceneBeat.Kind.PROP,
 		CutsceneBeat.Kind.SHOW,
 		CutsceneBeat.Kind.HIDE,
+		CutsceneBeat.Kind.VFX,
 	]
 
 
@@ -1548,6 +2374,7 @@ func _default_duration_for_kind(kind: int) -> float:
 		CutsceneBeat.Kind.BOUNCE,
 		CutsceneBeat.Kind.WAIT,
 		CutsceneBeat.Kind.DIALOGUE,
+		CutsceneBeat.Kind.CAMERA,
 	] else 0.0
 
 

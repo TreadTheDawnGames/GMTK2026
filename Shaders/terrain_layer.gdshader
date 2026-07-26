@@ -1,5 +1,7 @@
 shader_type canvas_item;
 
+#include "res://Shaders/ground_plane_light.gdshaderinc"
+
 // How it works:
 // - mask_tile_0..2 supply one continuous three-tile terrain mask.
 // - Optional authored fill art and the layer tint establish the base color.
@@ -37,6 +39,15 @@ uniform sampler2D mask_tile_2 : filter_linear;
 uniform sampler2D impact_patch_texture : filter_linear;
 uniform bool use_impact_patch = false;
 uniform vec4 impact_patch_uv_rect = vec4(0.0);
+// Mining reveals the finished mask through a short top-down compression front.
+// During that bounded window the already-streamed mask is the source and the
+// prepared patch is the destination. Preserving real prior pixels avoids the
+// rectangular "solid white stamp" that repainted older holes and fracture ink.
+// Settled terrain pays no extra branch and the final 16 px silhouette is exact.
+uniform vec4 impact_crush_uv_rect = vec4(0.0);
+// X is shader-uptime start, Y is duration; zero duration disables the branch.
+// Packing them halves material updates compared with separate start/use values.
+uniform vec2 impact_crush_timing = vec2(0.0);
 
 // World-space period of optional fill art, independent of the mask resolution.
 uniform vec2 fill_texture_world_size = vec2(256.0);
@@ -118,6 +129,10 @@ uniform float foreground_gem_maximum_height = 42.0;
 // chunk_world_size, so it is independent of mask resolution.
 // Snaps the filtered mask back to a crisp cut edge instead of a soft ramp.
 uniform bool sharpen_mask_edges = true;
+// Authored rooms can widen the derivative AA band without changing ordinary
+// mining masks. The renderer keeps this at one unless an overlapping sculpt
+// explicitly requests cell-scale contour rounding.
+uniform float authored_contour_aa_scale = 1.0;
 
 uniform bool use_layer_edge_shading = true;
 uniform float edge_shade_world_pixels = 6.0;
@@ -187,6 +202,10 @@ uniform float grass_tip_light_strength = 0.60;
 // ground it removed.
 uniform bool use_trodden_floor = false;
 uniform float trodden_floor_world_y = 0.0;
+// Held only until the first post-cutscene mining contact. While true the
+// foreground closes filtered floor-edge pinholes so the buried stratum cannot
+// peek above the 2.5D plane; once false, real damage-mask alpha deforms it.
+uniform bool trodden_floor_seals_mask = false;
 // How deep the packed band reaches before it starts giving way, and how far it
 // then takes to fade out. Two numbers rather than one because a band that ends
 // where it stops fading reads as a painted stripe.
@@ -210,6 +229,38 @@ uniform float trodden_grain_world_px = 26.0;
 // band is swept bare and the stones resume exactly where the transition fades,
 // which is what puts a visible edge on the walking area without drawing a line.
 uniform float trodden_rock_clearing = 0.85;
+// The cafe's rendered ground-to-matte span is about 130 output pixels. Its
+// authored 1.45 zoom and the viewport stretch turn that into about 67 world
+// pixels, so extending the packed plane by 30px makes its full 66px depth meet
+// the matte instead of exposing a bright vertical cave wall between them. The
+// first 40px remain rough ground; the existing 26px falloff is its uneven edge.
+// During the authored return to 1.0 zoom the same world depth reaches black
+// slightly before the matte. That is intentional: the handback cannot reopen a
+// lower-stratum seam while the surface is visually receding from the camera.
+uniform float trodden_ground_extension_world_px = 84.0;
+// The last part of the extended floor loses value into the exact matte colour.
+// It does not brighten the shelf or add detail work: the already-computed grain
+// only wanders the fade edge so it cannot read as another horizontal stripe.
+uniform float trodden_matte_fade_world_px = 32.0;
+uniform vec4 trodden_matte_color : source_color = vec4(0.0, 0.0, 0.0, 1.0);
+// Unlike ordinary underground rock, an authored room floor has a visible top
+// plane. It uses the surface shelf's lighting model with cave-local dimensions:
+// a narrow warm plane, a longer dark turn into the front face, and a tight seam.
+// Reusing the daylight dimensions made nearly fifty pixels of cave wall bright
+// tan, which separated by value but read as a slab rather than as depth.
+uniform float trodden_shelf_depth_world_px = 72.0;
+uniform float trodden_shelf_plateau : hint_range(0.0, 1.0) = 0.35;
+uniform vec4 trodden_shelf_light_color : source_color = vec4(
+	0.52,
+	0.40,
+	0.30,
+	1.0
+);
+uniform float trodden_shelf_light_strength = 0.16;
+uniform float trodden_face_shade_depth_world_px = 148.0;
+uniform float trodden_face_shade_strength = 0.52;
+uniform float trodden_contact_depth_world_px = 4.0;
+uniform float trodden_contact_strength = 0.55;
 
 // Packed earth on the exposed top of the surface, in place of the old overlay.
 uniform float crust_depth_world_px = 10.0;
@@ -241,27 +292,32 @@ uniform float ground_face_shade_strength = 0.24;
 uniform float ground_contact_depth_world_px = 6.0;
 uniform float ground_contact_strength = 0.42;
 
-vec4 sample_terrain_mask(vec2 chunk_uv) {
-	vec2 safe_uv = clamp(chunk_uv, vec2(0.0), vec2(1.0));
-	if (use_impact_patch) {
-		vec2 patch_position = impact_patch_uv_rect.xy;
-		vec2 patch_size = max(
-			impact_patch_uv_rect.zw,
-			vec2(0.000001)
-		);
-		vec2 patch_uv = (safe_uv - patch_position) / patch_size;
-		vec2 inside_low = step(vec2(0.0), patch_uv);
-		vec2 inside_high = step(patch_uv, vec2(1.0));
-		if (
-			inside_low.x * inside_low.y
-			* inside_high.x * inside_high.y > 0.5
-		) {
-			return texture(
-				impact_patch_texture,
-				clamp(patch_uv, vec2(0.0), vec2(1.0))
-			);
-		}
-	}
+// The same ground stack, moved down onto a cutscene room's own floor.
+//
+// The block above is pinned to surface_world_y, the one ground line the whole
+// run shares, so every room below it drew its floor as flat rock and the shot
+// lost the depth the surface gets for free. These key the identical masks to a
+// floor line the caller supplies, reusing the tunables above rather than
+// introducing a second ground look to keep in step with the first.
+//
+// Foreground stratum only, the same rule the crust and the trodden floor follow.
+uniform bool use_cutscene_floor_plane = false;
+uniform float cutscene_floor_world_y = 0.0;
+// Bounce the lit floor throws up onto rock standing on it. A wall that runs
+// continuously out of the floor otherwise meets it as a hard seam at exactly
+// the place the 2.5D read has to hold; this is the transition band above that
+// junction. Zero disables the branch, which is what keeps the surface path
+// byte-identical to what it drew before this existed.
+uniform float ground_wall_rise_world_px = 52.0;
+uniform vec4 ground_wall_rise_color : source_color = vec4(
+	0.86,
+	0.64,
+	0.42,
+	1.0
+);
+uniform float ground_wall_rise_strength : hint_range(0.0, 1.0) = 0.22;
+
+vec4 sample_streamed_terrain_mask(vec2 safe_uv) {
 	vec2 tile_size = vec2(textureSize(mask_tile_0, 0));
 	float tile_content_width = max(tile_size.x - 2.0, 1.0);
 	float full_mask_width = tile_content_width * 3.0;
@@ -277,6 +333,99 @@ vec4 sample_terrain_mask(vec2 chunk_uv) {
 		return texture(mask_tile_1, tile_uv);
 	}
 	return texture(mask_tile_2, tile_uv);
+}
+
+vec4 sample_terrain_mask(vec2 chunk_uv) {
+	vec2 safe_uv = clamp(chunk_uv, vec2(0.0), vec2(1.0));
+	vec4 mask_sample;
+	bool sampled_patch = false;
+	if (use_impact_patch) {
+		vec2 patch_position = impact_patch_uv_rect.xy;
+		vec2 patch_size = max(
+			impact_patch_uv_rect.zw,
+			vec2(0.000001)
+		);
+		vec2 patch_uv = (safe_uv - patch_position) / patch_size;
+		vec2 patch_inside_low = step(vec2(0.0), patch_uv);
+		vec2 patch_inside_high = step(patch_uv, vec2(1.0));
+		float inside_patch = patch_inside_low.x * patch_inside_low.y
+			* patch_inside_high.x * patch_inside_high.y;
+		if (inside_patch > 0.5) {
+			mask_sample = texture(
+				impact_patch_texture,
+				clamp(patch_uv, vec2(0.0), vec2(1.0))
+			);
+			sampled_patch = true;
+		}
+	}
+	if (!sampled_patch) {
+		mask_sample = sample_streamed_terrain_mask(safe_uv);
+	}
+
+	if (impact_crush_timing.y > 0.0) {
+		vec2 crush_position = impact_crush_uv_rect.xy;
+		vec2 crush_size = max(
+			impact_crush_uv_rect.zw,
+			vec2(0.000001)
+		);
+		vec2 crush_uv = (safe_uv - crush_position) / crush_size;
+		vec2 crush_inside_low = step(vec2(0.0), crush_uv);
+		vec2 crush_inside_high = step(crush_uv, vec2(1.0));
+		float inside_crush = crush_inside_low.x * crush_inside_low.y
+			* crush_inside_high.x * crush_inside_high.y;
+		if (inside_crush > 0.5) {
+			// TIME and Time.get_ticks_usec() share engine uptime. Modulo handles
+			// Godot's default one-hour shader TIME rollover during a transition.
+			float elapsed = mod(
+				TIME - impact_crush_timing.x + 3600.0,
+				3600.0
+			);
+			float crush_progress = clamp(
+				elapsed / max(impact_crush_timing.y, 0.0001),
+				0.0,
+				1.0
+			);
+			float eased_progress = 1.0
+				- pow(1.0 - crush_progress, 3.0);
+			// The opening begins at the hammer-side top center and drives down
+			// through the dirt. A derivative-soft front prevents the transition
+			// from introducing a second pixel staircase around the final mask.
+			vec2 crush_offset = vec2(
+				(crush_uv.x - 0.5) * 0.95,
+				(crush_uv.y - 0.04) * 0.58
+			);
+			float crush_distance = length(crush_offset);
+			// Two cheap continuous folds keep the moving edge from reading as
+			// a perfect digital ellipse. They run only inside the tiny active
+			// patch and need no texture, allocation, or settled-frame work.
+			crush_distance += sin(
+				crush_uv.x * 27.0 + crush_uv.y * 11.0
+			) * 0.018;
+			crush_distance += sin(
+				crush_uv.x * 9.0 - crush_uv.y * 23.0
+			) * 0.012;
+			float crush_front = mix(-0.04, 0.80, eased_progress);
+			float crush_softness = max(fwidth(crush_distance), 0.001);
+			float crush_reveal = smoothstep(
+				crush_distance - crush_softness,
+				crush_distance + crush_softness,
+				crush_front
+			);
+			// The base tiles still contain the exact pre-hit mask while the
+			// prepared patch is held. Blend only changed pixels from that mask
+			// so the patch rectangle itself can never become visible.
+			vec4 previous_mask_sample = mask_sample;
+			if (sampled_patch) {
+				previous_mask_sample = sample_streamed_terrain_mask(safe_uv);
+			}
+			mask_sample = mix(
+				previous_mask_sample,
+				mask_sample,
+				crush_reveal
+			);
+		}
+	}
+	return mask_sample;
 }
 
 // Darkens a solid pixel that sits near its own layer's cut edge and lights the
@@ -883,7 +1032,10 @@ void fragment() {
 	// not. Neighbour taps below intentionally keep reading the raw ramp,
 	// because the bevel wants the gradual falloff this removes here.
 	if (sharpen_mask_edges) {
-		float alpha_softness = max(fwidth(mask_alpha), 0.0001);
+		float alpha_softness = max(
+			fwidth(mask_alpha) * authored_contour_aa_scale,
+			0.0001
+		);
 		mask_alpha = smoothstep(
 			0.5 - alpha_softness * cut_aa_half_width,
 			0.5 + alpha_softness * cut_aa_half_width,
@@ -911,17 +1063,29 @@ void fragment() {
 	// scatter needs it too - the band is only convincing if the stones answer to
 	// it as well as the colour does.
 	float trodden_ramp = 0.0;
+	float trodden_grain = 0.5;
 	if (use_trodden_floor) {
 		float trodden_below = world_position.y - trodden_floor_world_y;
 		float trodden_wobble = (
 			dirt_noise(vec2(world_position.x / 53.0, 0.0)) - 0.5
 		) * 2.0 * trodden_edge_wander_world_px;
+		float trodden_hold_depth = max(
+			trodden_depth_world_px + trodden_ground_extension_world_px,
+			0.0
+		);
+		float trodden_end_depth = max(
+			trodden_hold_depth + trodden_falloff_world_px,
+			1.0
+		);
 		trodden_ramp = smoothstep(-2.0, 2.0, trodden_below) * (
 			1.0 - smoothstep(
-				0.0,
-				max(trodden_depth_world_px + trodden_falloff_world_px, 1.0),
+				trodden_hold_depth,
+				trodden_end_depth,
 				trodden_below - trodden_wobble
 			)
+		);
+		trodden_grain = dirt_noise(
+			world_position / max(trodden_grain_world_px, 1.0)
 		);
 	}
 
@@ -971,7 +1135,7 @@ void fragment() {
 		// that threshold over one screen pixel. A binary step here was the
 		// remaining source of stair-stepped ink even with a dense terrain mask.
 		vec4 neighbor_softness = max(
-			fwidth(neighbor_alpha),
+			fwidth(neighbor_alpha) * authored_contour_aa_scale,
 			vec4(0.0001)
 		);
 		vec4 solid_neighbor = smoothstep(
@@ -1001,7 +1165,7 @@ void fragment() {
 				UV + open_direction / open_direction_length * edge_step
 			).a;
 			float projected_softness = max(
-				fwidth(projected_alpha),
+				fwidth(projected_alpha) * authored_contour_aa_scale,
 				0.0001
 			);
 			projected_solid_neighbor = smoothstep(
@@ -1087,6 +1251,19 @@ void fragment() {
 	// Only alpha is cut by the streamed mask. Optional artwork alpha and layer
 	// tint alpha are preserved, while RGB remains the fully shaded dirt color.
 	float final_alpha = artwork.a * layer_tint.a * mask_alpha;
+	if (use_trodden_floor && trodden_floor_seals_mask) {
+		// An encounter floor is already complete before control reaches it.
+		// Seal the foreground from one world pixel above its authored support
+		// line downward while the cinematic owns it, so filtered chamber-mask
+		// alpha can never expose the lower stratum above the 2.5D plane. This is
+		// a presentation-only mismatch of at most one world pixel; collision
+		// remains on the logical floor and parity tooling renders that truth.
+		float floor_backdrop_occlusion = step(
+			-1.0,
+			world_position.y - trodden_floor_world_y
+		);
+		final_alpha = max(final_alpha, floor_backdrop_occlusion);
+	}
 
 	// The colour half of the trodden floor. The ramp itself was resolved above,
 	// before the strata pass, so the rock scatter could thin out in step with it.
@@ -1094,9 +1271,6 @@ void fragment() {
 		// Grain is a whisper. It exists so a long flat floor is not one clean
 		// gradient, not to texture the rock - the strata pass already did that,
 		// and it has just been told to leave this band alone.
-		float trodden_grain = dirt_noise(
-			world_position / max(trodden_grain_world_px, 1.0)
-		);
 		vec3 packed_color = trodden_color.rgb * (
 			1.0 + (trodden_grain - 0.5) * trodden_grain_strength
 		);
@@ -1104,6 +1278,54 @@ void fragment() {
 			surface_color,
 			packed_color,
 			clamp(trodden_ramp * trodden_strength, 0.0, 1.0)
+		);
+	}
+	if (use_trodden_floor) {
+		float depth_below_floor = (
+			world_position.y - trodden_floor_world_y
+		);
+		surface_color = apply_ground_plane(
+			surface_color,
+			world_position.y,
+			trodden_floor_world_y,
+			trodden_shelf_depth_world_px,
+			trodden_shelf_plateau,
+			trodden_shelf_light_color.rgb,
+			trodden_shelf_light_strength,
+			trodden_face_shade_depth_world_px,
+			trodden_face_shade_strength,
+			1.0,
+			trodden_color.rgb,
+			0.0,
+			trodden_contact_depth_world_px,
+			trodden_contact_strength,
+			1.0,
+			vec3(0.0),
+			0.0
+		);
+		float trodden_end_depth = max(
+			trodden_depth_world_px
+				+ trodden_ground_extension_world_px
+				+ trodden_falloff_world_px,
+			1.0
+		);
+		float matte_fade_depth = clamp(
+			trodden_matte_fade_world_px,
+			1.0,
+			trodden_end_depth
+		);
+		float matte_wander = (trodden_grain - 0.5)
+			* 2.0
+			* trodden_edge_wander_world_px;
+		float matte_taper = smoothstep(
+			trodden_end_depth - matte_fade_depth,
+			trodden_end_depth,
+			depth_below_floor - matte_wander
+		);
+		surface_color = mix(
+			surface_color,
+			trodden_matte_color.rgb,
+			matte_taper
 		);
 	}
 
@@ -1148,84 +1370,71 @@ void fragment() {
 				}
 			}
 		} else {
-			// The top of the ground, built from the widest band to the
-			// tightest so each one shades what the last laid down: the lit
-			// shelf, the shadow off its far edge, the packed lip on it, then
-			// the grass's contact shade over all of it. Read together they
-			// give the dirt a top face, a far edge, and a cut face below.
-			float depth_below_surface = world_position.y - surface_world_y;
-			float shelf_depth = max(ground_shelf_depth_world_px, 1.0);
-			float shelf_edge = shelf_depth
-				* clamp(ground_shelf_plateau, 0.0, 0.99);
-
-			// Sunlit top plane, held flat to its far edge and then turned
-			// down. Fading it from the ground line instead would read as a
-			// gradient painted on a wall rather than as a surface.
-			float shelf = step(-1.0, depth_below_surface) * (
-				1.0 - smoothstep(
-					shelf_edge,
-					shelf_depth,
-					depth_below_surface
-				)
-			);
-			surface_color = mix(
+			// The top of the ground: lit shelf, the shadow off its far edge,
+			// the packed lip on it, then the grass's contact shade over all of
+			// it. Read together they give the dirt a top face, a far edge, and
+			// a cut face below. The stack lives in ground_plane_light so the
+			// cutscene floor below can be the same ground rather than a second
+			// one drifting out of step with this.
+			//
+			// Rise strength is zero here: the world surface has open sky above
+			// it, not a wall standing on it, and passing zero keeps this path
+			// exactly the pixels it drew before the stack moved out of line.
+			surface_color = apply_ground_plane(
 				surface_color,
+				world_position.y,
+				surface_world_y,
+				ground_shelf_depth_world_px,
+				ground_shelf_plateau,
 				ground_shelf_light_color.rgb,
-				clamp(shelf * ground_shelf_light_strength, 0.0, 1.0)
-			);
-
-			// The corner itself: darkest just past the shelf's far edge, back
-			// to open dirt over its own depth.
-			float face_shade = smoothstep(
-				shelf_edge,
-				shelf_depth,
-				depth_below_surface
-			) * (
-				1.0 - smoothstep(
-					shelf_depth,
-					shelf_depth + max(
-						ground_face_shade_depth_world_px,
-						1.0
-					),
-					depth_below_surface
-				)
-			);
-			surface_color *= 1.0 - clamp(
-				face_shade * ground_face_shade_strength,
-				0.0,
-				0.9
-			);
-
-			// Packed earth on the exposed top of the original ground line.
-			float crust = step(-1.0, depth_below_surface) * (
-				1.0 - smoothstep(
-					0.0,
-					max(crust_depth_world_px, 1.0),
-					depth_below_surface
-				)
-			);
-			surface_color = mix(
-				surface_color,
+				ground_shelf_light_strength,
+				ground_face_shade_depth_world_px,
+				ground_face_shade_strength,
+				crust_depth_world_px,
 				crust_color.rgb,
-				clamp(crust * crust_strength, 0.0, 1.0)
-			);
-
-			// Contact shade last, so it darkens the finished lip rather than
-			// being covered by it. It is tighter than the crust, which leaves
-			// the order dark line, bright lip, falling face.
-			float contact = step(-1.0, depth_below_surface) * (
-				1.0 - smoothstep(
-					0.0,
-					max(ground_contact_depth_world_px, 1.0),
-					depth_below_surface
-				)
-			);
-			surface_color *= 1.0 - clamp(
-				contact * ground_contact_strength,
+				crust_strength,
+				ground_contact_depth_world_px,
+				ground_contact_strength,
 				0.0,
-				0.9
+				vec3(0.0),
+				0.0
 			);
 		}
+
+	}
+
+	// The same ground again, on the room's own floor. A cutscene stands its
+	// cast hundreds of rows below the surface, where none of the above reaches,
+	// so without this the floor they stand on is flat rock and the shot loses
+	// the depth the surface gets for free.
+	//
+	// Outside the surface-grass branch deliberately. That flag is about grass,
+	// and a room 2,500 rows down has none: nesting this under it would tie a
+	// cutscene floor to whether the stratum above it grows anything.
+	//
+	// Here the rise is on. A room has rock standing on its floor, and the band
+	// above that junction is what stops the wall and the floor meeting as a
+	// seam.
+	if (use_cutscene_floor_plane) {
+		surface_color = apply_ground_plane(
+			surface_color,
+			world_position.y,
+			cutscene_floor_world_y,
+			ground_shelf_depth_world_px,
+			ground_shelf_plateau,
+			ground_shelf_light_color.rgb,
+			ground_shelf_light_strength,
+			ground_face_shade_depth_world_px,
+			ground_face_shade_strength,
+			crust_depth_world_px,
+			crust_color.rgb,
+			crust_strength,
+			ground_contact_depth_world_px,
+			ground_contact_strength,
+			ground_wall_rise_world_px,
+			ground_wall_rise_color.rgb,
+			ground_wall_rise_strength
+		);
 	}
 
 	COLOR = vec4(surface_color, final_alpha);

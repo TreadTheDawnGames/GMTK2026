@@ -28,6 +28,7 @@ extends Node2D
 @export var remove_in_running_game: bool = true
 
 var _sprite: Sprite2D
+var _aura_sprite: Sprite2D
 var _missing_warning: Polygon2D
 var _missing_warning_cross_a: Line2D
 var _missing_warning_cross_b: Line2D
@@ -114,6 +115,19 @@ func _ensure_sprite() -> Sprite2D:
 		add_child(_sprite)
 	_sync_sprite_owner()
 	return _sprite
+
+
+func _ensure_aura_sprite() -> Sprite2D:
+	if is_instance_valid(_aura_sprite):
+		return _aura_sprite
+	_aura_sprite = get_node_or_null(NodePath("PreviewAura")) as Sprite2D
+	if _aura_sprite == null:
+		_aura_sprite = Sprite2D.new()
+		_aura_sprite.name = &"PreviewAura"
+		_aura_sprite.z_index = -1
+		add_child(_aura_sprite)
+	_sync_sprite_owner()
+	return _aura_sprite
 
 
 func _ensure_missing_warning() -> void:
@@ -271,6 +285,7 @@ func _get_active_pose() -> ActorPose:
 
 func _rebuild_sprite() -> void:
 	var target := _ensure_sprite()
+	var aura := _ensure_aura_sprite()
 	_sync_sprite_owner()
 	_ensure_missing_warning()
 	_ensure_ground_shadow()
@@ -287,6 +302,7 @@ func _rebuild_sprite() -> void:
 		target.position = Vector2.ZERO
 		target.modulate = Color.WHITE
 		target.flip_h = false
+		aura.visible = false
 		return
 
 	if not is_drawable:
@@ -298,6 +314,7 @@ func _rebuild_sprite() -> void:
 		target.position = Vector2.ZERO
 		target.modulate = Color.WHITE
 		target.flip_h = false
+		aura.visible = false
 		return
 
 	target.texture = appearance.texture
@@ -313,6 +330,16 @@ func _rebuild_sprite() -> void:
 	) + _presentation_offset
 	target.modulate = appearance.tint
 	target.flip_h = appearance.flip_h
+	aura.texture = appearance.texture
+	aura.hframes = appearance.horizontal_frames
+	aura.vframes = appearance.vertical_frames
+	aura.frame = appearance.frame
+	aura.scale = appearance.sprite_scale
+	aura.position = target.position
+	aura.modulate = Color.WHITE
+	aura.flip_h = appearance.flip_h
+	aura.material = appearance.aura_material
+	aura.visible = appearance.aura_material != null
 
 	var active_pose := _get_active_pose()
 	if active_pose == null:
@@ -321,6 +348,17 @@ func _rebuild_sprite() -> void:
 	target.hframes = active_pose.horizontal_frames
 	target.vframes = active_pose.vertical_frames
 	target.frame = active_pose.first_frame
+	var measured_pose_sole := ActorSoleMeasure.measure_frame_sole(
+		active_pose.texture,
+		active_pose.horizontal_frames,
+		active_pose.vertical_frames,
+		active_pose.first_frame
+	)
+	if not is_nan(measured_pose_sole):
+		target.position.y = (
+			-measured_pose_sole * appearance.sprite_scale.y
+			+ _presentation_offset.y
+		)
 
 
 func _is_drawable_appearance() -> bool:

@@ -21,9 +21,9 @@ these beats without Jared or Zephan approving the narrative change.
 ## Story Rules
 
 - The opening at depth 0 is not an encounter.
-- Excluding the menu and opening, there are 11 underground story scenes:
-  Encounters 1 through 9, the post-credits Lantern Keeper warning, and the
-  Thief finale.
+- Excluding the menu and opening, there are 13 underground story scenes:
+  Encounters 1 through 9, the inserted Moody Teen encounters 4.5 and 7.5, the
+  post-credits Lantern Keeper warning, and the Thief finale.
 - The pre-thief story targets a roughly 15-minute first playthrough.
 - Depth, not elapsed time, triggers encounters. The times below are pacing targets.
 - Encounters happen in mineable tunnels entered by breaking through from above.
@@ -40,9 +40,11 @@ these beats without Jared or Zephan approving the narrative change.
 | Scene 2 / Encounter 2 — Lantern Keeper | 1,400 | 1:30 | The Lantern Keeper approaches slowly and asks how many people the Miner must meet before noticing their loneliness. |
 | Scene 3 / Encounter 3 — Rotini | 2,500 | 2:40 | Rotini is introduced on the cave path while searching for the Cafe with his boys. Existing `rutini_*` resource names refer to Rotini until a coordinated rename is approved. |
 | Scene 4 / Encounter 4 — Treasure Hunter | 4,000 | 4:00 | The Treasure Hunter mines in from the side and gifts the first improved pickaxe while insisting the treasure remains his. |
+| Scene 4.5 / Encounter 4.5 — Moody Teen | 5,000 | 5:00 | The Miner and Moody Teen exchange an increasingly awkward sequence of silences until the Teen asks whether the Miner will keep staring. |
 | Scene 5 / Encounter 5 — Lantern Keeper’s Warning | 5,600 | 5:30 | The Lantern Keeper warns that people searching for the Thief fail to notice what disappears along the way. |
 | Scene 6 / Encounter 6 — The Treasure | 7,400 | 7:15 | The Treasure Hunter finds his treasure and gifts the player another pickaxe because he no longer needs it. This is a second, distinct gift. |
 | Scene 7 / Encounter 7 — Quibble | 9,200 | 9:00 | Quibble is introduced while searching for the Cafe and gives the Miner a permanent coffee speed boost. Existing `coffee_cat_*` resource names refer to Quibble. |
+| Scene 7.5 / Encounter 7.5 — Moody Teen | 10,500 | 10:30 | The Miner encounters Moody Teen again in a different cavern and repeats the same silent exchange. |
 | Scene 8 / Encounter 8 — Rotini and the Colony | 11,200 | 11:00 | The Miner tells Rotini that the cheese Cafe is straight down. Rotini’s rat colony joins the Miner and digs downward. |
 | Scene 9 / Encounter 9 — The Cheese Cafe | 14,000 | 14:00 | The Miner reaches the Cafe gathering with Cheese Girl, the Treasure Hunter, Rotini and his rats, Quibble, and the Lantern Keeper. |
 | Credits transition — not a scene | 15,000–15,400 | 15:00 | Credits begin while the player remains able to dig. Continuing through the credits is intentional. The section ends shortly after the last inscription so no empty shaft sits between it and the Lantern Keeper; Jared approved the depths on 2026-07-26. |
@@ -117,6 +119,22 @@ leaving the Miner at the excavation site.*
 
 **Don’t take my act of kindness as me yielding the treasure, I’ve been hunting this for years! I just can’t bear to watch someone try to mine with such a disgraceful piece of equipment.**
 
+### Encounter 4.5 — Moody Teen, 5,000 depth
+
+**MINER: ...**
+
+**MOODY TEEN: ...**
+
+**MINER: ...**
+
+**MOODY TEEN: ...**
+
+**MINER: ...**
+
+**MOODY TEEN: Are you just gonna stand there and stare at me?**
+
+**MINER: ...**
+
 ### Encounter 5 — Lantern Keeper’s Warning, 5,600 depth
 
 **LANTERN KEEPER: You kept digging.**
@@ -163,6 +181,11 @@ chamber.*
 
 *The Miner receives Quibble’s permanent coffee speed boost.*
 
+### Encounter 7.5 — Moody Teen, 10,500 depth
+
+*The Miner and Moody Teen repeat the same seven-line silent exchange from
+Encounter 4.5 in a different cavern.*
+
 ### Encounter 8 — Rotini and the Colony, 11,200 depth
 
 **ROTINI: You again? Did you find the cheese cafe? We seem to have gotten lost in our own tunnels.**
@@ -178,7 +201,7 @@ chamber.*
 ### Encounter 9 — The Cheese Cafe, 14,000 depth
 
 *The Miner reaches the cafe. Cheese Girl, the Treasure Hunter, Rotini and his
-rats, Quibble, and the Lantern Keeper have gathered there.*
+rats, Quibble, Moody Teen, and the Lantern Keeper have gathered there.*
 
 **ROTINI: Easy, lads. We're here.**
 
@@ -191,6 +214,8 @@ rats, Quibble, and the Lantern Keeper have gathered there.*
 **Treasure Hunter: What do you mean how did I get here? You didn’t take the elevator?**
 
 **QUIBBLE: C-C-CAFE COFFEE! WE MADE IT! DID WE MAKE IT FAST? I THINK WE MADE IT FAST!**
+
+**MOODY TEEN: ...**
 
 **LANTERN KEEPER: Stay a while. Not every minute needs somewhere to go.**
 

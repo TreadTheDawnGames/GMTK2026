@@ -7,22 +7,13 @@ class_name OptionsMenu
 ## - Owned state is limited to the currently displayed option values.
 ## - The invariant is that this screen never locates global run state itself.
 
-@onready var v_sync_options: OptionButton = (
-	$TabContainer/Panel/VBoxContainer/HBoxContainer2/Control/VSyncOptions
-)
+@onready var v_sync_options: OptionButton = %VSyncOptions
 @onready var mute_bounce: CheckBox = %MuteBounce
+@onready var reduce_motion: CheckBox = %ReduceMotion
 @onready var master_volume: VolumeControl = %MasterVolume
 @onready var music: VolumeControl = %Music
 @onready var sfx: VolumeControl = %SFX
-@onready var credits_button: Button = (
-	$TabContainer/Panel/VBoxContainer/HBoxContainer/CreditsButton
-)
-@onready var back_button: Button = (
-	$TabContainer/Panel/VBoxContainer/HBoxContainer/BackButton
-)
-@onready var return_to_settings_button: Button = (
-	$TabContainer/PanelContainer/VBoxContainer/ReturnToSettings
-)
+@onready var back_button: Button = %BackButton
 var _save_game: SaveGame
 
 
@@ -76,6 +67,7 @@ func _connect_controls() -> void:
 ## Maps the saved domain values to their matching controls and audio buses.
 func _load_controls_from_save(save_game: SaveGame) -> void:
 	mute_bounce.set_pressed_no_signal(save_game.mute_bounce)
+	reduce_motion.set_pressed_no_signal(save_game.reduce_motion)
 	v_sync_options.select(save_game.vsync_mode)
 	master_volume.load_bus_setting(
 		save_game.master_volume,
@@ -88,6 +80,7 @@ func _load_controls_from_save(save_game: SaveGame) -> void:
 ## Maps controls back to the matching saved fields without crossing buses.
 func _copy_controls_to_save(save_game: SaveGame) -> void:
 	save_game.mute_bounce = mute_bounce.button_pressed
+	save_game.reduce_motion = reduce_motion.button_pressed
 	save_game.vsync_mode = v_sync_options.selected
 	save_game.master_volume = master_volume.slider.value
 	save_game.master_mute = master_volume.check_box.button_pressed
@@ -97,9 +90,10 @@ func _copy_controls_to_save(save_game: SaveGame) -> void:
 	save_game.sfx_mute = sfx.check_box.button_pressed
 
 func _exit_tree() -> void:
-	save_settings()
+	if _save_game != null:
+		save_settings()
 
-func save_settings():
+func save_settings() -> void:
 	_copy_controls_to_save(_save_game)
 	_save_game.apply_runtime_settings()
 	_save_game.write_savegame()

@@ -22,6 +22,9 @@ enum Kind {
 	STRIKE,
 	SHOW,
 	HIDE,
+	CAMERA,
+	AUDIO,
+	VFX,
 }
 
 ## The response curve used by BOUNCE. The stored value is presentation data;
@@ -31,6 +34,26 @@ enum BounceStyle {
 	GENTLE,
 	SNAPPY,
 	LINEAR,
+}
+
+## Typed camera requests keep framing authorable without embedding scripts.
+enum CameraAction {
+	FRAME,
+	SHAKE,
+	RESET,
+}
+
+## Typed audio requests distinguish one-shots from persistent music state.
+enum AudioAction {
+	PLAY_SFX,
+	PLAY_MUSIC,
+	STOP_MUSIC,
+}
+
+## VFX instances are addressed by id so a later beat can stop a looping effect.
+enum VfxAction {
+	SPAWN,
+	STOP,
 }
 
 ## The operation this timeline entry performs at its authored start time.
@@ -58,6 +81,12 @@ enum BounceStyle {
 @export var start_marker: StringName
 ## An offset from the start marker, or a stage-local position with no marker.
 @export var start_offset: Vector2 = Vector2.ZERO
+## Stage-local intermediate points traversed in order before the target.
+##
+## Empty preserves the original direct MOVE/PROP behavior. The whole route owns
+## one duration, distributed by distance, so adding a waypoint never changes the
+## authored beat's end or creates a hidden timing dependency.
+@export var movement_waypoints: Array[Vector2] = []
 ## Pose used by POSE and held as the movement pose during MOVE.
 @export var pose: StringName
 ## Whether a POSE beat's pose survives the spoken lines that follow it.
@@ -91,6 +120,38 @@ enum BounceStyle {
 @export var bounce_offset: Vector2 = Vector2(0.0, -7.0)
 ## Motion response for BOUNCE without changing its authored timing.
 @export var bounce_style: BounceStyle = BounceStyle.GENTLE
+
+@export_category("Camera Action")
+## Operation requested by a CAMERA beat.
+@export var camera_action: CameraAction = CameraAction.FRAME
+## Stage-relative framing displacement in pixels.
+@export var camera_offset: Vector2 = Vector2.ZERO
+## Requested camera zoom. Both axes must remain positive.
+@export var camera_zoom: Vector2 = Vector2.ONE
+## Peak shake displacement in pixels for CAMERA/SHAKE.
+@export_range(0.0, 128.0, 0.1) var camera_shake_strength: float = 0.0
+
+@export_category("Audio Action")
+## Operation requested by an AUDIO beat.
+@export var audio_action: AudioAction = AudioAction.PLAY_SFX
+## Authored sound or music. STOP_MUSIC deliberately leaves this empty.
+@export var audio_stream: AudioStream
+## Godot audio bus used by the consumer.
+@export var audio_bus: StringName = &"Master"
+@export_range(-80.0, 24.0, 0.1) var audio_volume_db: float = 0.0
+@export_range(0.01, 4.0, 0.01) var audio_pitch_scale: float = 1.0
+## Optional music fade duration; zero means an immediate transition.
+@export_range(0.0, 16.0, 0.05) var audio_fade_seconds: float = 0.0
+
+@export_category("VFX Action")
+## Operation requested by a VFX beat.
+@export var vfx_action: VfxAction = VfxAction.SPAWN
+## Stable id used to replace or stop a previously spawned effect.
+@export var vfx_id: StringName
+## Authored effect scene. STOP deliberately leaves this empty.
+@export var vfx_scene: PackedScene
+
+@export_category("Documentation")
 ## An authoring note for the editor; playback never presents it to players.
 @export_multiline var notes: String
 
@@ -109,6 +170,15 @@ func validate(known_actors: PackedStringArray) -> PackedStringArray:
 		errors.append("duration_seconds must not be negative.")
 	if step_height < 0.0:
 		errors.append("step_height must not be negative.")
+	if not _vector_is_finite(target_offset):
+		errors.append("target_offset must be finite.")
+	if not _vector_is_finite(start_offset):
+		errors.append("start_offset must be finite.")
+	for waypoint_index in range(movement_waypoints.size()):
+		if not _vector_is_finite(movement_waypoints[waypoint_index]):
+			errors.append(
+				"movement_waypoints[%d] must be finite." % waypoint_index
+			)
 	if actor.is_empty() and _kind_requires_actor():
 		errors.append("%s beat requires an actor." % _kind_name())
 	if not actor.is_empty() and not _actor_is_known(known_actors):
@@ -144,6 +214,44 @@ func validate(known_actors: PackedStringArray) -> PackedStringArray:
 		Kind.STAGE_CUE, Kind.STRIKE:
 			if cue.is_empty():
 				errors.append("%s beat needs a cue name." % _kind_name())
+		Kind.CAMERA:
+			if not _vector_is_finite(camera_offset):
+				errors.append("CAMERA beat camera_offset must be finite.")
+			if not _vector_is_finite(camera_zoom):
+				errors.append("CAMERA beat camera_zoom must be finite.")
+			if camera_zoom.x <= 0.0 or camera_zoom.y <= 0.0:
+				errors.append("CAMERA beat camera_zoom must be positive.")
+			if camera_shake_strength < 0.0:
+				errors.append(
+					"CAMERA beat camera_shake_strength must not be negative."
+				)
+			if (
+				camera_action == CameraAction.SHAKE
+				and camera_shake_strength <= 0.0
+			):
+				errors.append("CAMERA/SHAKE needs a positive strength.")
+			if (
+				camera_action == CameraAction.SHAKE
+				and duration_seconds <= 0.0
+			):
+				errors.append("CAMERA/SHAKE needs a positive duration.")
+		Kind.AUDIO:
+			if (
+				audio_action != AudioAction.STOP_MUSIC
+				and audio_stream == null
+			):
+				errors.append("AUDIO play action needs an audio stream.")
+			if audio_bus.is_empty():
+				errors.append("AUDIO beat needs an audio bus.")
+			if audio_pitch_scale <= 0.0:
+				errors.append("AUDIO beat pitch scale must be positive.")
+			if audio_fade_seconds < 0.0:
+				errors.append("AUDIO beat fade must not be negative.")
+		Kind.VFX:
+			if vfx_id.is_empty():
+				errors.append("VFX beat needs a stable effect id.")
+			if vfx_action == VfxAction.SPAWN and vfx_scene == null:
+				errors.append("VFX/SPAWN needs an effect scene.")
 		Kind.WAIT, Kind.SHOW, Kind.HIDE:
 			pass
 
@@ -163,7 +271,14 @@ func _kind_requires_actor() -> bool:
 
 
 func _kind_forbids_actor() -> bool:
-	return kind in [Kind.WAIT, Kind.DIALOGUE, Kind.STAGE_CUE, Kind.STRIKE]
+	return kind in [
+		Kind.WAIT,
+		Kind.DIALOGUE,
+		Kind.STAGE_CUE,
+		Kind.STRIKE,
+		Kind.CAMERA,
+		Kind.AUDIO,
+	]
 
 
 func _actor_is_known(known_actors: PackedStringArray) -> bool:
@@ -188,3 +303,12 @@ func _validate_line_range() -> PackedStringArray:
 	if line_range.y >= conversation.lines.size():
 		errors.append("DIALOGUE line_range ends past the conversation lines.")
 	return errors
+
+
+func _vector_is_finite(value: Vector2) -> bool:
+	return (
+		not is_nan(value.x)
+		and not is_inf(value.x)
+		and not is_nan(value.y)
+		and not is_inf(value.y)
+	)

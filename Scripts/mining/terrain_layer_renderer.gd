@@ -12,7 +12,7 @@ extends Node2D
 ## Chamber antialiasing may differ by less than one logical cell at a side edge;
 ## layer one may sit up to the profile's authored reveal distance below a room's
 ## logical floor while layer two stays aligned to support. Neither mismatch
-## affects collision. Press F3 to compare the logical opening.
+## affects collision. Verification tools can overlay the logical opening.
 
 class TerrainChunkVisual:
 	var root: Node2D
@@ -33,6 +33,11 @@ class TerrainChunkVisual:
 	## GPU tile lazily when that tile is first changed; pending bits must remain
 	## until their own tile publishes or a later hit could carve a sibling.
 	var needs_private_texture_tiles: PackedInt32Array = PackedInt32Array()
+	## One fixed deadline and rectangle per stratum; mining replaces or unions
+	## these entries and retirement clears them. Growth is therefore bounded by
+	## the four authored terrain layers, never by impact count.
+	var impact_crush_deadlines_usec: PackedInt64Array = PackedInt64Array()
+	var impact_crush_rects: Array[Rect2i] = []
 
 
 class HoleMaskData:
@@ -48,6 +53,14 @@ class ImpactStamp:
 	var core_radius: float
 	var damage_bounds: Rect2
 	var narrow_path_points: PackedVector2Array
+	## Related straight mining lanes share one persistent stamp. Overlapping
+	## mouse lanes collapse into one left and one right excavation, so retained
+	## state and raster passes are bounded at two rects rather than actor count.
+	var parallel_tunnel_rects: Array[Rect2] = []
+	## The inner continuation to the player is a native rectangular clear. It
+	## overlaps the organic outer cut, keeping the visible rock boundary ragged
+	## without resizing a viewport-wide mask. Growth is bounded at two rects.
+	var parallel_tunnel_fill_rects: Array[Rect2] = []
 	var narrow_path_radius_scale: float = 1.0
 	var narrow_path_two_layer_fraction: float = 0.5
 	var use_big_hole: bool
@@ -89,6 +102,26 @@ class ImpactRasterWork:
 	var raster_complete: bool = false
 	var prepared_patch: PreparedLayerPatch
 	var image_preparation
+	## Every descriptor of one damage signal shares a group. The group becomes
+	## visible only after all of its members have rastered, so an opening can
+	## never appear one stratum, one raster band, or one GPU tile at a time.
+	var presentation_group: int = 0
+	## A fold-in owns no pixels of its own. It folds an already-visible overlay
+	## into its chunk's full-width base tiles, one bounded tile per visit.
+	var folds_in: bool = false
+
+
+## One chunk/stratum of an opening whose pixels are final and whose overlay is
+## waiting for the rest of its group. Applying it writes shader parameters only,
+## so a whole group can be published on one frame at any combo size.
+class ImpactPresentation:
+	var chunk: TerrainChunkVisual
+	var chunk_index: int = -1
+	var layer_index: int = 0
+	## Null when the changed region was too wide to hold as an overlay. Those
+	## strata publish their authoritative tiles one bounded slice at a time.
+	var patch: PreparedLayerPatch
+	var presentation_group: int = 0
 
 
 class ImpactStampPreparation:
@@ -166,6 +199,11 @@ const LAYER_SHADER: Shader = preload(
 )
 const SOLID_MASK_COLOR := Color.WHITE
 const EMPTY_MASK_COLOR := Color.TRANSPARENT
+## Only the solid-facing outer edge needs the authored organic mask. The inner
+## span joins the player's already-organic shaft and clears natively, avoiding
+## a viewport-wide image resize when the colony closes every shelf gap.
+const PARALLEL_TUNNEL_ORGANIC_WIDTH: float = 48.0
+const PARALLEL_TUNNEL_FILL_OVERLAP: float = 16.0
 # A landing samples at most 64 rows upward and 64 rows back to the support lip
 # (512 mask pixels total at the default profile). The query runs once per
 # landing and never grows with run depth or hit count.
@@ -238,6 +276,11 @@ const MAX_FRACTURE_RADIUS_CELLS: float = 32.0
 # cold Web driver. A 128-pixel slice preserves the exact 16-pixel mask while
 # avoiding the fallback queue growth caused by splitting every band in half.
 const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 128
+# An overlay is worth holding only while it is far cheaper than the base tiles
+# it hides. A fully stacked combo opening is roughly 200 mask pixels wide by one
+# chunk tall, so this keeps every mining opening eligible while a full-width
+# colony lane - which is as expensive as the tile it would cover - is not.
+const MAX_IMPACT_OVERLAY_MASK_PIXELS: int = 256 * 1024
 @export_category("References")
 @export var terrain_manager: TerrainManager
 @export var profile: TerrainLayerProfile
@@ -245,12 +288,21 @@ const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 128
 @export_category("Impact Reveal")
 ## Layer four remains covered until the active hit reaches this combo.
 @export_range(1, 100, 1) var deepest_layer_combo_threshold: int = 7
+## The mask is final and authoritative throughout this short presentation-only
+## window; only its shader reveal expands from the hammer contact into the dirt.
+@export_range(0.02, 0.20, 0.005) var impact_crush_duration_seconds: float = 0.09
 
 @export_category("Web Performance")
 ## Maximum CPU time spent starting queued mask layers in one rendered frame.
 ## GPU-ready prediction work is spread across frames; a layer already in
 ## progress completes atomically so textures never tear.
 @export_range(1.0, 16.0, 0.5) var web_impact_frame_budget_ms: float = 1.5
+## Budget used only while a resolved hit is still waiting to become visible.
+## Nothing partial is ever shown, so the whole cost of an unpredicted opening is
+## latency the player watches. The background budget alone stretched a stacked
+## unpredicted opening over a quarter of a second; this bounds it to a few
+## frames while still leaving two thirds of a 60 FPS frame to everything else.
+@export_range(1.0, 16.0, 0.5) var web_contact_frame_budget_ms: float = 5.0
 ## Limits reusable resized masks so repeated hit sizes avoid image allocations.
 @export_range(0, 48, 1) var resized_stamp_cache_limit: int = 48
 ## Oversized combo openings are one-off and must not occupy the reusable cache.
@@ -294,8 +346,7 @@ const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 128
 @export var preview_in_editor: bool = false
 
 @export_category("Debug")
-## Toggles the logical opening overlay without affecting terrain presentation.
-@export var logical_overlay_key: Key = KEY_F3
+## Logical opening overlay color used by terrain parity verification tools.
 @export var logical_overlay_color := Color(0.2, 1.0, 0.35, 0.45)
 
 ## Whether a cutscene has asked for its floor to be dressed, and where that floor
@@ -303,6 +354,13 @@ const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 128
 ## running, not to the scene.
 var _trodden_floor_is_enabled: bool = false
 var _trodden_floor_world_y: float = 0.0
+var _cutscene_floor_plane_is_enabled: bool = false
+var _cutscene_floor_plane_world_y: float = 0.0
+## Prevents filtered foreground alpha from exposing the rear stratum before the
+## player enters and completes the cutscene. The first real mining contact drops
+## this seal before damage is written, so the retained treatment bends and
+## cracks with the authoritative terrain mask rather than covering it.
+var _trodden_floor_seals_mask: bool = false
 
 var _active_chunks: Dictionary[int, TerrainChunkVisual] = {}
 # Nodes, sprites, and materials of chunks the view has left, waiting to be
@@ -380,7 +438,15 @@ var _active_impact_combo: int = 0
 var _pending_impact_work: Array[ImpactRasterWork] = []
 var _pending_impact_work_head: int = 0
 var _impact_work_pool: Array[ImpactRasterWork] = []
-var _impact_overlay_presented_this_frame: bool = false
+# One presentation group per damage signal. The counter says how much of a group
+# has still to raster, and the queue holds the finished chunk/strata waiting for
+# it. Both are bounded by visible chunks times gameplay strata per unpresented
+# signal; entries are applied on the frame their group completes, and dropped
+# when their chunk streams out or a rebuild retires the queue.
+var _pending_impact_presentations: Array[ImpactPresentation] = []
+var _impact_presentation_pool: Array[ImpactPresentation] = []
+var _unrastered_impact_group_counts: Dictionary[int, int] = {}
+var _next_impact_presentation_group: int = 1
 var _pending_chunk_texture_publishes: Array[ChunkTexturePublishWork] = []
 var _pending_chunk_texture_publish_head: int = 0
 var _chunk_texture_publish_pool: Array[ChunkTexturePublishWork] = []
@@ -403,6 +469,7 @@ var _preparation_candidate_count: int = 0
 # images, while completed patches live only until contact or target replacement.
 var _prepared_layer_patches: Dictionary[String, PreparedLayerPatch] = {}
 var _preparing_layer_patches: Dictionary[String, PreparedLayerPatch] = {}
+var _active_impact_crush_count: int = 0
 
 
 ## Connects terrain events and loads the initial visible strata.
@@ -411,9 +478,8 @@ func _ready() -> void:
 	# Initialize the fixed decode table before either lifecycle path can publish.
 	_prepare_sculpt_byte_expansion_words()
 	if Engine.is_editor_hint():
-		# Streaming, input, and signal routes belong to a running game. An
-		# editor instance only draws, and only when its scene asked it to.
-		set_process_unhandled_key_input(false)
+		# Streaming and signal routes belong to a running game. An editor
+		# instance only draws, and only when its scene asked it to.
 		if not preview_in_editor:
 			return
 		if terrain_manager == null or profile == null:
@@ -477,6 +543,7 @@ func _ready() -> void:
 ## Prediction only fills CPU caches; gameplay cells and visible textures remain
 ## unchanged until the real impact signal arrives.
 func _process(_delta: float) -> void:
+	_retire_completed_impact_crushes()
 	# Camera zoom can change while the logical mining view stays still (the
 	# title shot does exactly that). Recheck the cheap chunk bounds each frame
 	# so zooming out cannot expose the clear color below the streamed terrain.
@@ -519,25 +586,37 @@ func _process(_delta: float) -> void:
 	):
 		return
 	var frame_started_at: int = Time.get_ticks_usec()
+	# A resolved hit that has not become visible yet is latency the player is
+	# watching, so it gets the larger budget until its group is presented.
 	var frame_budget_usec: int = roundi(
-		web_impact_frame_budget_ms * 1000.0
+		(
+			web_contact_frame_budget_ms
+			if not _unrastered_impact_group_counts.is_empty()
+			else web_impact_frame_budget_ms
+		)
+		* 1000.0
 	)
 	# Committed terrain always wins the shared budget. Authoritative preparation
 	# work is inserted into this same queue immediately before its raster bands,
 	# so a partial prediction can never delay an older visible hit.
+	var impact_work_remains := false
 	while (
 		_defer_impact_rasterization
 		and _pending_impact_work_head < _pending_impact_work.size()
 	):
 		_process_next_pending_impact_work()
-		if _impact_overlay_presented_this_frame:
-			_impact_overlay_presented_this_frame = false
-			return
 		if (
 			Time.get_ticks_usec() - frame_started_at
 			>= frame_budget_usec
 		):
-			return
+			impact_work_remains = true
+			break
+	# Publishing a completed group is only shader-parameter writes, so it runs
+	# even on a frame whose raster budget ran out. Holding it back for a budget
+	# would reintroduce exactly the stratum-by-stratum reveal it replaces.
+	_apply_ready_impact_presentations()
+	if impact_work_remains:
+		return
 	_compact_pending_impact_work()
 	# Streamed structure is already in CPU memory and may be below the visible
 	# margin. Publish one bounded copy-on-write group at a time before spending
@@ -581,6 +660,9 @@ func _process(_delta: float) -> void:
 ## Captures the combo used by synchronous damage stamps for one resolved hit.
 func _on_dig_presentation_started(combo: int) -> void:
 	_active_impact_combo = maxi(combo, 0)
+	if _trodden_floor_is_enabled and _trodden_floor_seals_mask:
+		_trodden_floor_seals_mask = false
+		_publish_cutscene_floor()
 
 
 ## Replaces unfinished candidate work. Exact success keeps completed candidate
@@ -1098,6 +1180,15 @@ func _on_terrain_paths_damaged(
 	_apply_impact_stamps(stamps)
 
 
+## Draws one grouped foreground contact stamp for the colony's logical lanes.
+func _on_parallel_tunnels_damaged(destroyed_paths: Array) -> void:
+	if destroyed_paths.is_empty():
+		return
+	_apply_impact_stamps([
+		_create_parallel_tunnel_stamp(destroyed_paths)
+	])
+
+
 ## Stores related stamps and uploads each visible chunk only once.
 func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 	var affected_chunk_lookup: Dictionary[int, bool] = {}
@@ -1114,6 +1205,12 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 	if _defer_impact_rasterization:
 		var layer_count: int = profile.get_gameplay_layer_count()
 		var grouped_work_start := _pending_impact_work.size()
+		# One damage signal is one thing the player sees happen. The primary hit,
+		# each aftershock, and the lightning crack set arrive as separate signals
+		# and stay separate groups, so a prepared primary is never held back by
+		# an unpredicted follow-up that has to raster from scratch.
+		var presentation_group := _next_impact_presentation_group
+		_next_impact_presentation_group += 1
 		var queued_authoritative_preparation := false
 		var prepared_patches_by_stamp: Array[Dictionary] = []
 		prepared_patches_by_stamp.resize(stamps.size())
@@ -1124,7 +1221,10 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 		# promote their immutable terrain patch instead.
 		for stamp_index in range(stamps.size()):
 			var stamp := stamps[stamp_index]
-			if not stamp.narrow_path_points.is_empty():
+			if (
+				not stamp.narrow_path_points.is_empty()
+				or not stamp.parallel_tunnel_rects.is_empty()
+			):
 				continue
 			var preparation_layers: Array[int] = []
 			var prepared_patches: Dictionary = (
@@ -1162,6 +1262,7 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 					-1,
 					0,
 					1,
+					presentation_group,
 					true,
 					preparation_index
 						== preparation_layers.size() - 1
@@ -1199,13 +1300,17 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 							chunk_index,
 							0,
 							1,
+							presentation_group,
 							false,
 							false,
 							prepared_patch
 						)
 						continue
 					var raster_band_count := 1
-					if stamp.narrow_path_points.is_empty():
+					if (
+						stamp.narrow_path_points.is_empty()
+						and stamp.parallel_tunnel_rects.is_empty()
+					):
 						var affected_rect := (
 							_get_stamp_layer_chunk_mask_rect(
 								stamp,
@@ -1231,11 +1336,13 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 							chunk,
 							chunk_index,
 							raster_band_index,
-							raster_band_count
+							raster_band_count,
+							presentation_group
 						)
 		# CPU masks still consume every stamp in order. The final item for each
-		# chunk/layer publishes its dirty GPU tiles one bounded slice at a time
-		# without allocating extra queue descriptors for multi-tile masks.
+		# chunk/layer owns that pair's presentation, so several stamps in one
+		# signal cannot queue the same stratum twice or show a stratum whose
+		# later stamps have not rastered yet.
 		var last_work_by_chunk_layer: Dictionary[int, int] = {}
 		for work_index in range(
 			maxi(grouped_work_start, _pending_impact_work_head),
@@ -1284,6 +1391,7 @@ func _append_impact_work(
 	chunk_index: int,
 	raster_band_index: int,
 	raster_band_count: int,
+	presentation_group: int,
 	prepare_only: bool = false,
 	finish_preparation: bool = false,
 	prepared_patch: PreparedLayerPatch = null
@@ -1312,21 +1420,72 @@ func _append_impact_work(
 	work.raster_complete = false
 	work.prepared_patch = prepared_patch
 	work.image_preparation = null
+	work.presentation_group = presentation_group
+	work.folds_in = false
+	_unrastered_impact_group_counts[presentation_group] = (
+		_unrastered_impact_group_counts.get(presentation_group, 0) + 1
+	)
 	_pending_impact_work.append(work)
 
 
-## Completes one queued stratum and publishes only that texture. Work targeting
-## a chunk that streamed out is discarded because loading it again replays the
-## registered stamp history.
+## Records that one queued descriptor will never raster its share of a group,
+## whether it completed or was pruned. A group reaching zero is what allows its
+## overlays to be bound, so every exit path from the queue passes through here.
+func _release_unrastered_impact_work(work: ImpactRasterWork) -> void:
+	if work.folds_in:
+		return
+	var remaining: int = (
+		_unrastered_impact_group_counts.get(work.presentation_group, 0) - 1
+	)
+	if remaining > 0:
+		_unrastered_impact_group_counts[work.presentation_group] = remaining
+		return
+	_unrastered_impact_group_counts.erase(work.presentation_group)
+
+
+## Returns one descriptor to the bounded pool with every field cleared, so a
+## reused slot can never inherit a chunk, stamp, patch, or phase flag.
+func _recycle_impact_work(work: ImpactRasterWork) -> void:
+	work.chunk = null
+	work.stamp = null
+	work.chunk_index = -1
+	work.raster_band_index = 0
+	work.raster_band_count = 1
+	work.prepare_only = false
+	work.finish_preparation = false
+	work.publish_layer = true
+	work.raster_complete = false
+	work.prepared_patch = null
+	work.image_preparation = null
+	work.presentation_group = 0
+	work.folds_in = false
+	if _impact_work_pool.size() < MAX_PENDING_IMPACT_WORK_ITEMS:
+		_impact_work_pool.append(work)
+
+
+## Completes one queued stratum's pixels, or folds one already-visible stratum
+## into its base tiles. Nothing here changes what the player sees: a rastered
+## stratum only queues its presentation, and a fold-in is hidden behind the
+## overlay its presentation already bound. Work targeting a chunk that streamed
+## out is discarded because loading it again replays the registered stamp
+## history.
 func _process_next_pending_impact_work() -> void:
 	if _pending_impact_work_head >= _pending_impact_work.size():
 		return
 	var work := _pending_impact_work[_pending_impact_work_head]
 	_pending_impact_work_head += 1
-	var presented_prepared_overlay := false
+	if work.folds_in:
+		_fold_in_next_impact_tile(work)
+		return
+	# A stratum whose pixels are final can be shown by binding a small overlay
+	# instead of uploading its full-width base tiles. The prepared candidate
+	# already carries one; an unpredicted stamp captures its own below.
+	var presentation_patch: PreparedLayerPatch = null
+	var has_presentable_layer := false
 	if not work.raster_complete and work.prepared_patch != null:
 		if _active_chunks.get(work.chunk_index) == work.chunk:
 			_make_layer_writable(work.chunk, work.layer_index)
+			has_presentable_layer = true
 			if (
 				work.prepared_patch.source_revision
 				== work.chunk.layer_revisions[work.layer_index]
@@ -1344,14 +1503,7 @@ func _process_next_pending_impact_work() -> void:
 				work.chunk.dirty_mask_tiles[work.layer_index] |= (
 					work.prepared_patch.dirty_tile_bits
 				)
-				_show_prepared_patch_overlay(
-					work.chunk,
-					work.layer_index,
-					work.prepared_patch
-				)
-				presented_prepared_overlay = (
-					work.prepared_patch.overlay_texture != null
-				)
+				presentation_patch = work.prepared_patch
 				work.chunk.layer_revisions[work.layer_index] += 1
 			else:
 				# A non-mining terrain mutation invalidated the candidate after
@@ -1382,29 +1534,51 @@ func _process_next_pending_impact_work() -> void:
 			work.raster_band_index,
 			work.raster_band_count
 		)
+		has_presentable_layer = true
 		work.raster_complete = true
 	else:
 		work.raster_complete = true
-	# The exact small patch is already visible. Resume this same descriptor next
-	# frame for the expensive full-tile fold-in instead of doing both at contact.
-	if presented_prepared_overlay:
-		_pending_impact_work_head -= 1
-		_impact_overlay_presented_this_frame = true
-		return
-	# A final descriptor resumes at the same head until every dirty tile has
-	# uploaded. Queue size stays bounded while the 7 ms guard sees each slice.
-	# A preparation-only item owns no chunk, so it has no texture to publish.
-	#
-	# It is queued as (chunk = null, chunk_index = -1), and the grouping pass above
-	# skips exactly those items, which leaves publish_layer at its default true.
-	# The chunk comparison then reads null == _active_chunks.get(-1), which is also
-	# null, so the guard let a null chunk through to be dereferenced. On the
-	# surface this never showed, because a run only queues authoritative
-	# preparation once a speculative candidate misses - which is what a big view
-	# jump into a cutscene chamber causes.
+	# A preparation-only item owns no chunk, so it has nothing to present. It is
+	# queued as (chunk = null, chunk_index = -1), and the grouping pass in
+	# _apply_impact_stamps skips exactly those items, which leaves publish_layer
+	# at its default true. The chunk comparison then reads
+	# null == _active_chunks.get(-1), which is also null, so the guard used to
+	# let a null chunk through to be dereferenced. On the surface this never
+	# showed, because a run only queues authoritative preparation once a
+	# speculative candidate misses - which is what a big view jump into a
+	# cutscene chamber causes.
 	if (
 		work.publish_layer
+		and has_presentable_layer
 		and work.chunk != null
+	):
+		if (
+			presentation_patch == null
+			or presentation_patch.overlay_texture == null
+		):
+			presentation_patch = _capture_impact_overlay_patch(
+				work.chunk,
+				work.chunk_index,
+				work.stamp,
+				work.layer_index
+			)
+		_queue_impact_presentation(
+			work.chunk,
+			work.chunk_index,
+			work.layer_index,
+			presentation_patch,
+			work.presentation_group
+		)
+	_release_unrastered_impact_work(work)
+	_recycle_impact_work(work)
+
+
+## Uploads one bounded base tile of a stratum the player already sees through
+## its overlay. The descriptor resumes at the same queue head until every dirty
+## tile has published, so the 7 ms atomic guard still sees one slice at a time.
+func _fold_in_next_impact_tile(work: ImpactRasterWork) -> void:
+	if (
+		work.chunk != null
 		and _active_chunks.get(work.chunk_index) == work.chunk
 		and work.chunk.dirty_mask_tiles[work.layer_index] != 0
 	):
@@ -1422,18 +1596,200 @@ func _process_next_pending_impact_work() -> void:
 		if work.chunk.dirty_mask_tiles[work.layer_index] != 0:
 			_pending_impact_work_head -= 1
 			return
-	work.chunk = null
+	_recycle_impact_work(work)
+
+
+## Holds one finished chunk/stratum until the rest of its group catches up.
+## Repeated stamps in one signal resolve to one entry per chunk and stratum,
+## because only the last descriptor of each pair carries publish_layer.
+func _queue_impact_presentation(
+	chunk: TerrainChunkVisual,
+	chunk_index: int,
+	layer_index: int,
+	patch: PreparedLayerPatch,
+	presentation_group: int
+) -> void:
+	var presentation: ImpactPresentation = (
+		_impact_presentation_pool.pop_back()
+		if not _impact_presentation_pool.is_empty()
+		else ImpactPresentation.new()
+	)
+	presentation.chunk = chunk
+	presentation.chunk_index = chunk_index
+	presentation.layer_index = layer_index
+	presentation.patch = patch
+	presentation.presentation_group = presentation_group
+	_pending_impact_presentations.append(presentation)
+
+
+## Binds every finished chunk and stratum of a completed group on one frame.
+## This is the single moment an opening becomes visible, and it costs only
+## shader-parameter writes, so combo size cannot stretch it across frames.
+func _apply_ready_impact_presentations() -> void:
+	if _pending_impact_presentations.is_empty():
+		return
+	var write_index: int = 0
+	for read_index in range(_pending_impact_presentations.size()):
+		var presentation := _pending_impact_presentations[read_index]
+		if (
+			_unrastered_impact_group_counts.get(
+				presentation.presentation_group,
+				0
+			)
+			> 0
+		):
+			_pending_impact_presentations[write_index] = presentation
+			write_index += 1
+			continue
+		_present_impact_layer(presentation)
+		_recycle_impact_presentation(presentation)
+	_pending_impact_presentations.resize(write_index)
+
+
+## Shows one stratum and starts its reveal. Every stratum of a group reaches
+## this on the same frame, so their crush fronts also share one start time.
+func _present_impact_layer(presentation: ImpactPresentation) -> void:
+	var chunk := presentation.chunk
+	if chunk == null or _active_chunks.get(presentation.chunk_index) != chunk:
+		return
+	if presentation.patch != null:
+		_show_prepared_patch_overlay(
+			chunk,
+			presentation.layer_index,
+			presentation.patch
+		)
+	# No overlay could be held for this stratum, so its base tiles are the only
+	# thing that can show it and they publish one bounded slice at a time.
+	# MAX_IMPACT_OVERLAY_MASK_PIXELS confines that to the full-width colony
+	# lanes, which are authored encounter excavation rather than a mining hit,
+	# and whose overlay would have cost as much as the tiles it hid.
+	_append_impact_fold_in(
+		chunk,
+		presentation.chunk_index,
+		presentation.layer_index
+	)
+
+
+func _recycle_impact_presentation(
+	presentation: ImpactPresentation
+) -> void:
+	presentation.chunk = null
+	presentation.chunk_index = -1
+	presentation.layer_index = 0
+	presentation.patch = null
+	presentation.presentation_group = 0
+	if _impact_presentation_pool.size() < MAX_PENDING_IMPACT_WORK_ITEMS:
+		_impact_presentation_pool.append(presentation)
+
+
+## Copies the finished pixels of one chunk/stratum into a small overlay so its
+## group can be shown without waiting for full-width tile uploads. Returns null
+## when the changed region is too wide for the overlay to be the cheaper path.
+func _capture_impact_overlay_patch(
+	chunk: TerrainChunkVisual,
+	chunk_index: int,
+	stamp: ImpactStamp,
+	layer_index: int
+) -> PreparedLayerPatch:
+	if stamp == null or chunk.mask_images[layer_index] == null:
+		return null
+	var overlay_rect := _get_stamp_layer_chunk_overlay_rect(
+		stamp,
+		layer_index,
+		chunk_index
+	)
+	if not overlay_rect.has_area():
+		return null
+	if (
+		overlay_rect.size.x * overlay_rect.size.y
+		> MAX_IMPACT_OVERLAY_MASK_PIXELS
+	):
+		return null
+	var patch := PreparedLayerPatch.new()
+	patch.destination_position = overlay_rect.position
+	patch.image = chunk.mask_images[layer_index].get_region(overlay_rect)
+	patch.source_revision = chunk.layer_revisions[layer_index]
+	patch.dirty_tile_bits = chunk.dirty_mask_tiles[layer_index]
+	patch.overlay_texture = ImageTexture.create_from_image(patch.image)
+	return patch
+
+
+## Returns the chunk-local mask rectangle an overlay must cover for one stratum.
+func _get_stamp_layer_chunk_overlay_rect(
+	stamp: ImpactStamp,
+	layer_index: int,
+	chunk_index: int
+) -> Rect2i:
+	var stamp_rect := _get_stamp_layer_chunk_mask_rect(
+		stamp,
+		layer_index,
+		chunk_index
+	)
+	if stamp_rect.has_area():
+		return stamp_rect
+	# Lightning paths and colony lanes have no single stamp rectangle. Their
+	# broad world bounds are a superset of the pixels that changed, and covering
+	# extra pixels is free: the overlay copies them from the same authoritative
+	# mask the base tiles will publish.
+	var broad_rect := _get_stamp_broad_rect(stamp)
+	if not broad_rect.has_area():
+		return Rect2i()
+	var mask_pixels_per_world_unit := (
+		float(profile.mask_pixels_per_cell)
+		/ float(terrain_manager.config.terrain_cell_world_size)
+	)
+	var chunk_mask_top := (
+		chunk_index
+		* terrain_manager.config.chunk_height_cells
+		* profile.mask_pixels_per_cell
+	)
+	return Rect2i(
+		Vector2i(
+			floori(broad_rect.position.x * mask_pixels_per_world_unit) - 1,
+			floori(broad_rect.position.y * mask_pixels_per_world_unit)
+				- chunk_mask_top
+				- 1
+		),
+		Vector2i(
+			ceili(broad_rect.size.x * mask_pixels_per_world_unit) + 2,
+			ceili(broad_rect.size.y * mask_pixels_per_world_unit) + 2
+		)
+	).intersection(
+		Rect2i(Vector2i.ZERO, _get_chunk_mask_size())
+	)
+
+
+## Queues the expensive half of a presented stratum. The overlay already shows
+## the finished pixels, so these uploads are invisible and stay budgeted. A
+## repeat entry for the same chunk/stratum finds no dirty tile and retires, so
+## the queue holds at most one live fold-in per visible chunk and stratum.
+func _append_impact_fold_in(
+	chunk: TerrainChunkVisual,
+	chunk_index: int,
+	layer_index: int
+) -> void:
+	if chunk.dirty_mask_tiles[layer_index] == 0:
+		return
+	var work: ImpactRasterWork = (
+		_impact_work_pool.pop_back()
+		if not _impact_work_pool.is_empty()
+		else ImpactRasterWork.new()
+	)
+	work.chunk = chunk
+	work.chunk_index = chunk_index
 	work.stamp = null
+	work.layer_index = layer_index
 	work.raster_band_index = 0
 	work.raster_band_count = 1
 	work.prepare_only = false
 	work.finish_preparation = false
 	work.publish_layer = true
-	work.raster_complete = false
+	work.raster_complete = true
 	work.prepared_patch = null
 	work.image_preparation = null
-	if _impact_work_pool.size() < MAX_PENDING_IMPACT_WORK_ITEMS:
-		_impact_work_pool.append(work)
+	work.presentation_group = 0
+	work.folds_in = true
+	_pending_impact_work.append(work)
 
 
 ## Prunes completed queue slots and releases temporary oversized stamp images
@@ -1463,20 +1819,14 @@ func _compact_pending_impact_work(
 				_pending_impact_work[write_index] = work
 				write_index += 1
 				continue
-			work.chunk = null
-			work.stamp = null
-			work.raster_band_index = 0
-			work.raster_band_count = 1
-			work.prepare_only = false
-			work.finish_preparation = false
-			work.publish_layer = true
-			work.raster_complete = false
-			work.prepared_patch = null
-			work.image_preparation = null
-			if _impact_work_pool.size() < MAX_PENDING_IMPACT_WORK_ITEMS:
-				_impact_work_pool.append(work)
+			# A pruned descriptor still owes its group a raster it will never
+			# perform. Releasing it here is what lets the rest of the group
+			# present instead of waiting on terrain that streamed away.
+			_release_unrastered_impact_work(work)
+			_recycle_impact_work(work)
 		_pending_impact_work.resize(write_index)
 		_pending_impact_work_head = 0
+		_drop_streamed_out_impact_presentations()
 		if _pending_impact_work.is_empty():
 			_clear_temporary_stamp_cache()
 		return
@@ -1493,6 +1843,23 @@ func _compact_pending_impact_work(
 		_pending_impact_work_head
 	)
 	_pending_impact_work_head = 0
+
+
+## Releases overlays whose chunk streamed out before its group completed.
+## Reloading that chunk replays the registered stamp history, so the opening is
+## rebuilt rather than lost, and the retained ImageTexture is freed here.
+func _drop_streamed_out_impact_presentations() -> void:
+	if _pending_impact_presentations.is_empty():
+		return
+	var write_index: int = 0
+	for read_index in range(_pending_impact_presentations.size()):
+		var presentation := _pending_impact_presentations[read_index]
+		if _active_chunks.get(presentation.chunk_index) == presentation.chunk:
+			_pending_impact_presentations[write_index] = presentation
+			write_index += 1
+			continue
+		_recycle_impact_presentation(presentation)
+	_pending_impact_presentations.resize(write_index)
 
 
 ## Invalidates an old compressed mask and schedules one exact replacement.
@@ -1812,35 +2179,68 @@ func _restore_chunk_snapshot(
 ## A cutscene room's floor is hundreds of rows below the run's own surface, so
 ## the crust the surface uses cannot reach it. This pushes the same idea against
 ## whatever line the caller names, which is what makes it reusable: an encounter
-## turns it on at its own floor when the shot opens and clears it when the shot
-## releases, and no room needs its own shader or its own material.
+## turns it on before entering its own floor, and no room needs its own shader or
+## material. It stays attached after dialogue; the first mining contact releases
+## only the temporary rear-layer seal.
 ##
-## Live chunks are updated in place rather than rebuilt. The dressing is two
-## uniforms; rebuilding streamed chunks to change them would replay every mask
+## Live chunks are updated in place rather than rebuilt. Rebuilding streamed
+## chunks to change these uniforms would replay every mask
 ## upload in view, which is exactly the per-frame cost the platform budget exists
 ## to protect.
 func set_trodden_floor(enabled: bool, floor_world_y: float = 0.0) -> void:
-	if _trodden_floor_is_enabled == enabled and is_equal_approx(
-		_trodden_floor_world_y,
-		floor_world_y
+	var should_seal_mask := enabled
+	if (
+		_trodden_floor_is_enabled == enabled
+		and _trodden_floor_seals_mask == should_seal_mask
+		and is_equal_approx(
+			_trodden_floor_world_y,
+			floor_world_y
+		)
 	):
 		return
 	_trodden_floor_is_enabled = enabled
 	_trodden_floor_world_y = floor_world_y
-	_publish_trodden_floor()
+	_trodden_floor_seals_mask = should_seal_mask
+	_publish_cutscene_floor()
+
+
+## Lights a cutscene room's floor as a horizontal plane instead of flat rock.
+##
+## Deliberately separate from set_trodden_floor even though both key off the same
+## line. The trodden floor is dressing - packed earth where feet have been - and
+## this is form: the lit top face, its far edge, the cut face below it, and the
+## bounce band on rock standing on it. A room can want either without the other,
+## and folding them into one flag would mean a room that wants 2.5D form has to
+## accept walked-on ground it never earned.
+##
+## The look itself is not authored twice. The shader reuses the same ground
+## tunables the world surface uses, so a room floor and the surface are the same
+## ground seen at two depths rather than two looks drifting apart.
+func set_cutscene_floor_plane(
+	enabled: bool,
+	floor_world_y: float = 0.0
+) -> void:
+	if _cutscene_floor_plane_is_enabled == enabled and is_equal_approx(
+		_cutscene_floor_plane_world_y,
+		floor_world_y
+	):
+		return
+	_cutscene_floor_plane_is_enabled = enabled
+	_cutscene_floor_plane_world_y = floor_world_y
+	_publish_cutscene_floor()
 
 
 ## Pushes the two live values onto every chunk material already streamed, pooled
 ## ones included - a pooled chunk is refilled without its material being rebuilt,
 ## so one left behind would come back wearing the last shot's floor.
-func _publish_trodden_floor() -> void:
+func _publish_cutscene_floor() -> void:
 	for chunk in _active_chunks.values():
-		_publish_trodden_floor_to_chunk(chunk)
+		_publish_cutscene_floor_to_chunk(chunk)
 	for chunk in _chunk_visual_pool:
-		_publish_trodden_floor_to_chunk(chunk)
+		_publish_cutscene_floor_to_chunk(chunk)
 
 
-func _publish_trodden_floor_to_chunk(chunk: TerrainChunkVisual) -> void:
+func _publish_cutscene_floor_to_chunk(chunk: TerrainChunkVisual) -> void:
 	for layer_index in range(chunk.layer_sprites.size()):
 		var sprite := chunk.layer_sprites[layer_index]
 		if not is_instance_valid(sprite):
@@ -1859,6 +2259,18 @@ func _publish_trodden_floor_to_chunk(chunk: TerrainChunkVisual) -> void:
 			&"trodden_floor_world_y",
 			_trodden_floor_world_y
 		)
+		material.set_shader_parameter(
+			&"use_cutscene_floor_plane",
+			_cutscene_floor_plane_is_enabled and layer_index == 0
+		)
+		material.set_shader_parameter(
+			&"cutscene_floor_world_y",
+			_cutscene_floor_plane_world_y
+		)
+		material.set_shader_parameter(
+			&"trodden_floor_seals_mask",
+			_trodden_floor_seals_mask
+		)
 
 
 func rebuild_all_chunks() -> void:
@@ -1875,21 +2287,15 @@ func rebuild_all_chunks() -> void:
 		_pending_impact_work_head,
 		_pending_impact_work.size()
 	):
-		var pending_work := _pending_impact_work[work_index]
-		pending_work.chunk = null
-		pending_work.stamp = null
-		pending_work.raster_band_index = 0
-		pending_work.raster_band_count = 1
-		pending_work.prepare_only = false
-		pending_work.finish_preparation = false
-		pending_work.publish_layer = true
-		pending_work.raster_complete = false
-		pending_work.prepared_patch = null
-		pending_work.image_preparation = null
-		if _impact_work_pool.size() < MAX_PENDING_IMPACT_WORK_ITEMS:
-			_impact_work_pool.append(pending_work)
+		_recycle_impact_work(_pending_impact_work[work_index])
 	_pending_impact_work.clear()
 	_pending_impact_work_head = 0
+	# Nothing queued survives a rebuild, so no group can ever complete. Drop the
+	# unpresented overlays and their counters together with the work itself.
+	for presentation in _pending_impact_presentations:
+		_recycle_impact_presentation(presentation)
+	_pending_impact_presentations.clear()
+	_unrastered_impact_group_counts.clear()
 	_clear_temporary_stamp_cache()
 	_on_dig_visuals_preparation_started(false)
 	# A rebuild invalidates the chunk identity captured by every unpublished
@@ -2264,6 +2670,9 @@ func _acquire_chunk_visual(
 		0.0,
 		float(chunk_index) * _get_chunk_world_size().y
 	)
+	var authored_contour_aa_scale := (
+		_get_chunk_sculpt_contour_aa_scale(chunk_index)
+	)
 	for layer_index in range(layer_count):
 		var sprite := chunk.layer_sprites[layer_index]
 		# The rock the shader draws is placed in world space, so moving a reused
@@ -2271,6 +2680,10 @@ func _acquire_chunk_visual(
 		(sprite.material as ShaderMaterial).set_shader_parameter(
 			&"world_origin",
 			world_origin
+		)
+		(sprite.material as ShaderMaterial).set_shader_parameter(
+			&"authored_contour_aa_scale",
+			authored_contour_aa_scale
 		)
 		# Editor stratum isolation. Nothing at runtime sets an override, so this
 		# reads 1.0 during play and the sprite is untouched. Applying it on every
@@ -2291,6 +2704,10 @@ func _create_chunk_visual(layer_count: int) -> TerrainChunkVisual:
 	chunk.needs_private_texture_tiles.fill(0)
 	chunk.layer_revisions.resize(layer_count)
 	chunk.layer_revisions.fill(0)
+	chunk.impact_crush_deadlines_usec.resize(layer_count)
+	chunk.impact_crush_deadlines_usec.fill(0)
+	chunk.impact_crush_rects.resize(layer_count)
+	chunk.impact_crush_rects.fill(Rect2i())
 	for layer_index in range(layer_count):
 		var sprite := Sprite2D.new()
 		sprite.name = "TerrainLayer_%d" % layer_index
@@ -2662,6 +3079,77 @@ func _show_prepared_patch_overlay(
 		)
 	)
 	material.set_shader_parameter(&"use_impact_patch", true)
+	# Start from the frame that owns a finished visual patch, not the earlier
+	# input frame. Deferred web preparation can span several frames; starting
+	# its clock at input made the patch appear halfway through its reveal.
+	if impact_crush_duration_seconds <= 0.0:
+		return
+	var crush_rect := Rect2i(
+		patch.destination_position,
+		patch.image.get_size()
+	)
+	var started_at_usec := Time.get_ticks_usec()
+	if chunk.impact_crush_deadlines_usec[layer_index] <= 0:
+		_active_impact_crush_count += 1
+	chunk.impact_crush_deadlines_usec[layer_index] = (
+		started_at_usec
+		+ roundi(impact_crush_duration_seconds * 1_000_000.0)
+	)
+	chunk.impact_crush_rects[layer_index] = crush_rect
+	material.set_shader_parameter(
+		&"impact_crush_uv_rect",
+		Vector4(
+			float(crush_rect.position.x) / mask_size.x,
+			float(crush_rect.position.y) / mask_size.y,
+			float(crush_rect.size.x) / mask_size.x,
+			float(crush_rect.size.y) / mask_size.y
+		)
+	)
+	material.set_shader_parameter(
+		&"impact_crush_timing",
+		Vector2(
+			fmod(float(started_at_usec) / 1_000_000.0, 3600.0),
+			impact_crush_duration_seconds
+		)
+	)
+
+
+## Retires elapsed shader fronts without creating per-hit tweens or timers.
+func _retire_completed_impact_crushes() -> void:
+	if _active_impact_crush_count <= 0:
+		return
+	var now_usec := Time.get_ticks_usec()
+	for chunk: TerrainChunkVisual in _active_chunks.values():
+		for layer_index in range(
+			chunk.impact_crush_deadlines_usec.size()
+		):
+			var deadline_usec := (
+				chunk.impact_crush_deadlines_usec[layer_index]
+			)
+			if deadline_usec <= 0 or deadline_usec > now_usec:
+				continue
+			_stop_impact_crush(chunk, layer_index)
+
+
+func _stop_impact_crush(
+	chunk: TerrainChunkVisual,
+	layer_index: int
+) -> void:
+	if chunk.impact_crush_deadlines_usec[layer_index] <= 0:
+		return
+	chunk.impact_crush_deadlines_usec[layer_index] = 0
+	chunk.impact_crush_rects[layer_index] = Rect2i()
+	_active_impact_crush_count = maxi(_active_impact_crush_count - 1, 0)
+	var material := (
+		chunk.layer_sprites[layer_index].material as ShaderMaterial
+	)
+	material.set_shader_parameter(&"impact_crush_timing", Vector2.ZERO)
+	# Keeping the patch until the reveal ends preserves the old GPU mask as the
+	# transition's source. Its removal is only free once every dirty base tile
+	# has folded in and the two are byte-identical; a stacked opening can still
+	# be uploading here, so _publish_layer_texture drops it on its last tile.
+	if chunk.dirty_mask_tiles[layer_index] == 0:
+		_clear_prepared_patch_overlay(chunk, layer_index)
 
 
 ## Removes the transient exact patch only after every dirty base tile published.
@@ -2743,7 +3231,10 @@ func _publish_layer_texture(
 	chunk.mask_texture_tiles[layer_index] = texture_tiles
 	_set_sprite_mask_textures(sprite, texture_tiles)
 	chunk.dirty_mask_tiles[layer_index] &= ~dirty_tiles
-	if chunk.dirty_mask_tiles[layer_index] == 0:
+	if (
+		chunk.dirty_mask_tiles[layer_index] == 0
+		and chunk.impact_crush_deadlines_usec[layer_index] <= 0
+	):
 		_clear_prepared_patch_overlay(chunk, layer_index)
 
 
@@ -2900,6 +3391,8 @@ func _apply_layer_display_opacity() -> void:
 ## Retires a chunk's nodes for reuse while retaining their impact records.
 func _unload_chunk(chunk_index: int) -> void:
 	var chunk := _active_chunks[chunk_index]
+	for layer_index in range(chunk.impact_crush_deadlines_usec.size()):
+		_stop_impact_crush(chunk, layer_index)
 	_active_chunks.erase(chunk_index)
 	if _chunk_visual_pool.size() >= CHUNK_VISUAL_POOL_LIMIT:
 		# Streaming can cross many chunk boundaries in one frame during a fast
@@ -3103,7 +3596,7 @@ func _build_chunk_base_mask(
 			# Visual terrain may retain a solid deepest-layer backdrop behind
 			# the logical chamber. A departure room clears exactly the normal
 			# right side-wall width so the authored logical exit reads by eye;
-			# F3 still overlays logical cells for parity inspection.
+			# parity tooling can overlay logical cells for inspection.
 			var retained_backdrop_right := (
 				backdrop_right_cell
 				if chamber_right_cell == config.terrain_width_cells
@@ -3200,6 +3693,24 @@ func _chunk_contains_sculpt(chunk_index: int) -> bool:
 		):
 			return true
 	return false
+
+
+## Returns an opted-in room's wider AA band for this streamed chunk.
+func _get_chunk_sculpt_contour_aa_scale(chunk_index: int) -> float:
+	var config: MiningConfig = terrain_manager.config
+	var chunk_start_row := chunk_index * config.chunk_height_cells
+	var chunk_end_row := chunk_start_row + config.chunk_height_cells
+	var contour_rounding_cells := 0.0
+	for placement in terrain_manager.get_sculpt_placements():
+		if (
+			placement.world_rect.position.y < chunk_end_row
+			and placement.world_rect.end.y > chunk_start_row
+		):
+			contour_rounding_cells = maxf(
+				contour_rounding_cells,
+				placement.sculpt.contour_rounding_cells
+			)
+	return 1.0 + contour_rounding_cells * 1.25
 
 
 ## Reports whether a chunk holds a room whose strata were sculpted apart, which
@@ -3603,6 +4114,10 @@ func _advance_sculpt_run_preparation(
 		_sculpt_logical_mask_images[
 			preparation.sculpt
 		] = logical_layers
+		_round_sculpt_cell_contours(
+			preparation.cell_image,
+			preparation.sculpt
+		)
 		preparation.cell_bytes = PackedByteArray()
 		preparation.phase = 1
 		return false
@@ -3791,6 +4306,7 @@ func _rasterize_sculpt_mask(
 		Image.FORMAT_LA8,
 		cell_bytes
 	)
+	_round_sculpt_cell_contours(cell_image, sculpt)
 	cell_image.resize(
 		padded_size.x * mask_cell_size,
 		padded_size.y * mask_cell_size,
@@ -3809,6 +4325,41 @@ func _rasterize_sculpt_mask(
 	if sculpt.edge_smoothing > 0.0 and sculpt.edge_smoothing < 1.0:
 		_harden_sculpt_mask_rims(room_mask, sculpt, sculpt_layer_index)
 	return room_mask
+
+
+## Rounds only an opted-in authored room before its bounded mask expansion.
+##
+## Filtering the one-sample-per-cell image keeps this native resize small; the
+## existing strip preparation still performs the large expansion incrementally.
+## Collision and parity verification retain the untouched binary cell mask.
+func _round_sculpt_cell_contours(
+	cell_image: Image,
+	sculpt: CutsceneTerrainSculpt
+) -> void:
+	if (
+		cell_image == null
+		or sculpt == null
+		or sculpt.contour_rounding_cells <= 0.0
+	):
+		return
+	var original_size := cell_image.get_size()
+	var filter_scale := 1.0 + sculpt.contour_rounding_cells * 2.5
+	var filtered_size := Vector2i(
+		maxi(roundi(float(original_size.x) / filter_scale), 1),
+		maxi(roundi(float(original_size.y) / filter_scale), 1)
+	)
+	cell_image.generate_mipmaps()
+	cell_image.resize(
+		filtered_size.x,
+		filtered_size.y,
+		Image.INTERPOLATE_TRILINEAR
+	)
+	cell_image.clear_mipmaps()
+	cell_image.resize(
+		original_size.x,
+		original_size.y,
+		Image.INTERPOLATE_CUBIC
+	)
 
 
 ## Chooses the highest bounded sculpt density that divides the shipped mask.
@@ -4108,7 +4659,7 @@ func _create_impact_stamp(
 			_active_impact_combo
 		)
 
-	var cell_size := terrain_manager.config.terrain_cell_world_size
+	var cell_size: int = terrain_manager.config.terrain_cell_world_size
 	var stamp := ImpactStamp.new()
 	var damage_rect := Rect2(
 		Vector2(minimum_cell * cell_size),
@@ -4150,20 +4701,48 @@ func _create_impact_stamp(
 			0.75,
 			combo_strength
 		)
-		for cell_index in range(0, destroyed_cells.size(), 2):
+		var is_straight_vertical_path := true
+		for cell_index in range(1, destroyed_cells.size()):
+			if (
+				destroyed_cells[cell_index].x
+					!= destroyed_cells[0].x
+				or destroyed_cells[cell_index].y
+					!= destroyed_cells[cell_index - 1].y + 1
+			):
+				is_straight_vertical_path = false
+				break
+		if is_straight_vertical_path:
+			# A two-point segment has the exact capsule silhouette of all
+			# collinear intermediate points. Mouse lanes therefore raster in
+			# constant time with depth instead of retesting every dug row.
 			stamp.narrow_path_points.append(
 				(
-					Vector2(destroyed_cells[cell_index])
+					Vector2(destroyed_cells.front())
 					+ Vector2.ONE * 0.5
 				) * cell_size
 			)
-		if destroyed_cells.size() % 2 == 0:
-			stamp.narrow_path_points.append(
-				(
-					Vector2(destroyed_cells.back())
-					+ Vector2.ONE * 0.5
-				) * cell_size
-			)
+			if destroyed_cells.size() > 1:
+				stamp.narrow_path_points.append(
+					(
+						Vector2(destroyed_cells.back())
+						+ Vector2.ONE * 0.5
+					) * cell_size
+				)
+		else:
+			for cell_index in range(0, destroyed_cells.size(), 2):
+				stamp.narrow_path_points.append(
+					(
+						Vector2(destroyed_cells[cell_index])
+						+ Vector2.ONE * 0.5
+					) * cell_size
+				)
+			if destroyed_cells.size() % 2 == 0:
+				stamp.narrow_path_points.append(
+					(
+						Vector2(destroyed_cells.back())
+						+ Vector2.ONE * 0.5
+					) * cell_size
+				)
 	stamp.core_radius = (
 		maxf(damage_rect.size.x, damage_rect.size.y) * 0.5
 	)
@@ -4189,6 +4768,123 @@ func _create_impact_stamp(
 		+ float(posmod(variation_hash / 4, 9)) * 0.02
 	)
 	stamp.variation_hash = variation_hash
+	return stamp
+
+
+## Collapses the bounded mouse tunnels into one persistent foreground stamp.
+##
+## This helper currently has one caller, but it is kept as a renderer-domain
+## constructor because streaming replays the resulting stamp independently of
+## the terrain event that created it.
+func _create_parallel_tunnel_stamp(
+	destroyed_paths: Array
+) -> ImpactStamp:
+	var cell_size := terrain_manager.config.terrain_cell_world_size
+	var stamp := ImpactStamp.new()
+	var terrain_center_x := (
+		float(terrain_manager.config.terrain_width_cells * cell_size) * 0.5
+	)
+	var side_tunnel_rects: Array[Rect2] = [Rect2(), Rect2()]
+	var side_has_tunnel := PackedByteArray([0, 0])
+	for destroyed_path: Array[Vector2i] in destroyed_paths:
+		if destroyed_path.is_empty():
+			continue
+		var minimum_cell: Vector2i = destroyed_path.front()
+		var maximum_cell: Vector2i = destroyed_path.front()
+		for cell: Vector2i in destroyed_path:
+			minimum_cell.x = mini(minimum_cell.x, cell.x)
+			minimum_cell.y = mini(minimum_cell.y, cell.y)
+			maximum_cell.x = maxi(maximum_cell.x, cell.x)
+			maximum_cell.y = maxi(maximum_cell.y, cell.y)
+		var logical_width_cells: int = (
+			maximum_cell.x - minimum_cell.x + 1
+		)
+		var hole_size_cells: int = maxi(logical_width_cells, 3)
+		var tunnel_depth_cells: int = (
+			maximum_cell.y - minimum_cell.y + 1
+		)
+		var hole_center_x: float = (
+			float(minimum_cell.x + maximum_cell.x + 1) * 0.5
+		)
+		var tunnel_rect := Rect2(
+			Vector2(
+				(hole_center_x - float(hole_size_cells) * 0.5)
+					* float(cell_size),
+				float(minimum_cell.y) * float(cell_size)
+			),
+			Vector2(
+				float(hole_size_cells * cell_size),
+				float(tunnel_depth_cells * cell_size)
+			)
+		)
+		var side_index := (
+			0 if tunnel_rect.get_center().x < terrain_center_x else 1
+		)
+		side_tunnel_rects[side_index] = (
+			side_tunnel_rects[side_index].merge(tunnel_rect)
+			if side_has_tunnel[side_index] == 1
+			else tunnel_rect
+		)
+		side_has_tunnel[side_index] = 1
+	var has_damage_bounds := false
+	for side_index in range(side_tunnel_rects.size()):
+		if side_has_tunnel[side_index] == 0:
+			continue
+		var side_tunnel_rect := side_tunnel_rects[side_index]
+		var organic_tunnel_rect := side_tunnel_rect
+		if side_tunnel_rect.size.x > PARALLEL_TUNNEL_ORGANIC_WIDTH:
+			var organic_width := PARALLEL_TUNNEL_ORGANIC_WIDTH
+			var overlap := minf(
+				PARALLEL_TUNNEL_FILL_OVERLAP,
+				organic_width
+			)
+			if side_index == 0:
+				organic_tunnel_rect.size.x = organic_width
+				stamp.parallel_tunnel_fill_rects.append(Rect2(
+					Vector2(
+						organic_tunnel_rect.end.x - overlap,
+						side_tunnel_rect.position.y
+					),
+					Vector2(
+						side_tunnel_rect.end.x
+							- organic_tunnel_rect.end.x
+							+ overlap,
+						side_tunnel_rect.size.y
+					)
+				))
+			else:
+				organic_tunnel_rect.position.x = (
+					side_tunnel_rect.end.x - organic_width
+				)
+				organic_tunnel_rect.size.x = organic_width
+				stamp.parallel_tunnel_fill_rects.append(Rect2(
+					side_tunnel_rect.position,
+					Vector2(
+						organic_tunnel_rect.position.x
+							- side_tunnel_rect.position.x
+							+ overlap,
+						side_tunnel_rect.size.y
+					)
+				))
+		stamp.parallel_tunnel_rects.append(organic_tunnel_rect)
+		stamp.damage_bounds = (
+			stamp.damage_bounds.merge(side_tunnel_rect)
+			if has_damage_bounds
+			else side_tunnel_rect
+		)
+		has_damage_bounds = true
+	stamp.center = stamp.damage_bounds.get_center()
+	stamp.core_radius = maxf(
+		stamp.damage_bounds.size.x,
+		stamp.damage_bounds.size.y
+	) * 0.5
+	stamp.use_big_hole = false
+	stamp.include_fracture_lines = false
+	stamp.variation_hash = (
+		roundi(stamp.damage_bounds.position.x) * 73_856_093
+		^ roundi(stamp.damage_bounds.position.y) * 19_349_663
+		^ stamp.parallel_tunnel_rects.size() * 83_492_791
+	)
 	return stamp
 
 
@@ -4338,7 +5034,14 @@ func _apply_impact_stamp_layer(
 		return false
 	_make_layer_writable(chunk, layer_index)
 	var changed := false
-	if not stamp.narrow_path_points.is_empty():
+	if not stamp.parallel_tunnel_rects.is_empty():
+		changed = _punch_parallel_tunnels(
+			chunk.mask_images[layer_index],
+			chunk_index,
+			stamp,
+			layer_index
+		)
+	elif not stamp.narrow_path_points.is_empty():
 		changed = _punch_narrow_path(
 			chunk.mask_images[layer_index],
 			chunk_index,
@@ -4384,7 +5087,10 @@ func _get_stamp_dirty_tile_bits(
 	layer_index: int
 ) -> int:
 	var stamp_rect := _get_stamp_broad_rect(stamp)
-	if stamp.narrow_path_points.is_empty():
+	if (
+		stamp.narrow_path_points.is_empty()
+		and stamp.parallel_tunnel_rects.is_empty()
+	):
 		var mask_data := _get_hole_mask_data(
 			layer_index,
 			stamp.use_big_hole
@@ -4445,7 +5151,10 @@ func _get_stamp_layer_chunk_mask_rect(
 	layer_index: int,
 	chunk_index: int
 ) -> Rect2i:
-	if not stamp.narrow_path_points.is_empty():
+	if (
+		not stamp.narrow_path_points.is_empty()
+		or not stamp.parallel_tunnel_rects.is_empty()
+	):
 		return Rect2i()
 	var mask_data := _get_hole_mask_data(
 		layer_index,
@@ -4528,6 +5237,10 @@ func _can_apply_impact_stamp_layer(
 		)
 	):
 		return false
+	if not stamp.parallel_tunnel_rects.is_empty():
+		return layer_index == 0
+	if not stamp.narrow_path_points.is_empty():
+		return layer_index <= 2
 	# Orange remains the decorative tunnel backdrop below combo seven. At or
 	# above the combo gate, the size threshold still prevents a physically
 	# small secondary path from exposing the brown back wall.
@@ -4790,20 +5503,6 @@ func get_layer_opening_floor_support_screen_y(
 	return NAN
 
 
-## Toggles a visual audit of logical openings with one debug keypress.
-func _unhandled_key_input(event: InputEvent) -> void:
-	if (
-		not event is InputEventKey
-		or not event.pressed
-		or event.echo
-		or event.keycode != logical_overlay_key
-	):
-		return
-	_show_logical_overlay = not _show_logical_overlay
-	queue_redraw()
-	get_viewport().set_input_as_handled()
-
-
 ## Draws visible non-solid cells over whichever decorative backdrop remains.
 func _draw() -> void:
 	if not _show_logical_overlay:
@@ -4858,6 +5557,90 @@ func _draw() -> void:
 			4.0,
 			Color(1.0, 0.15, 0.85, 0.95)
 		)
+
+
+## Stretches the miner's organic mask through each mouse's complete dug interval.
+##
+## The foreground opening may soften beyond the exact logical lane by less than
+## one cell. Verification tools overlay those logical cells so the accepted
+## mismatch can be checked directly; deeper strata remain intact to preserve the
+## 2.5D rim. One side-wide rect keeps work and retained state bounded at two
+## tunnels.
+func _punch_parallel_tunnels(
+	destination: Image,
+	chunk_index: int,
+	stamp: ImpactStamp,
+	layer_index: int
+) -> bool:
+	if layer_index != 0 or stamp.parallel_tunnel_rects.is_empty():
+		return false
+	var mask_data := _get_hole_mask_data(layer_index, false)
+	if mask_data == null:
+		return false
+	var changed := false
+	for fill_rect in stamp.parallel_tunnel_fill_rects:
+		changed = (
+			_fill_parallel_tunnel_rect(
+				destination,
+				chunk_index,
+				fill_rect
+			)
+			or changed
+		)
+	for hole_index in range(stamp.parallel_tunnel_rects.size()):
+		var hole_changed := _punch_hole(
+			destination,
+			chunk_index,
+			stamp.parallel_tunnel_rects[hole_index],
+			mask_data,
+			hole_index % 2 == 1,
+			hole_index % 3 == 1,
+			hole_index % 4,
+			true
+		)
+		changed = hole_changed or changed
+	return changed
+
+
+## Clears the corridor interior with Image's native rectangle operation. Its
+## outer overlap is covered by the authored organic punch above, and its inner
+## edge meets the player's organic shaft, so no straight edge faces solid rock.
+func _fill_parallel_tunnel_rect(
+	destination: Image,
+	chunk_index: int,
+	fill_world_rect: Rect2
+) -> bool:
+	if not fill_world_rect.has_area():
+		return false
+	var mask_pixels_per_world_unit := (
+		float(profile.mask_pixels_per_cell)
+		/ float(terrain_manager.config.terrain_cell_world_size)
+	)
+	var chunk_mask_top := (
+		chunk_index
+		* terrain_manager.config.chunk_height_cells
+		* profile.mask_pixels_per_cell
+	)
+	var mask_rect := Rect2i(
+		Vector2i(
+			floori(
+				fill_world_rect.position.x
+					* mask_pixels_per_world_unit
+			),
+			floori(
+				fill_world_rect.position.y
+					* mask_pixels_per_world_unit
+			) - chunk_mask_top
+		),
+		Vector2i(
+			ceili(fill_world_rect.size.x * mask_pixels_per_world_unit),
+			ceili(fill_world_rect.size.y * mask_pixels_per_world_unit)
+		)
+	).intersection(Rect2i(Vector2i.ZERO, destination.get_size()))
+	if not mask_rect.has_area():
+		return false
+	destination.fill_rect(mask_rect, EMPTY_MASK_COLOR)
+	return true
 
 
 ## Draws one sharp dark crack instead of repeating the full hole artwork.
@@ -5935,6 +6718,7 @@ func _create_layer_material(
 		&"sharpen_mask_edges",
 		profile.sharpen_mask_edges
 	)
+	material.set_shader_parameter(&"authored_contour_aa_scale", 1.0)
 	material.set_shader_parameter(
 		&"use_layer_edge_shading",
 		profile.layer_edge_shading_enabled
@@ -5961,6 +6745,18 @@ func _create_layer_material(
 	material.set_shader_parameter(
 		&"trodden_floor_world_y",
 		_trodden_floor_world_y
+	)
+	material.set_shader_parameter(
+		&"use_cutscene_floor_plane",
+		_cutscene_floor_plane_is_enabled and layer_index == 0
+	)
+	material.set_shader_parameter(
+		&"cutscene_floor_world_y",
+		_cutscene_floor_plane_world_y
+	)
+	material.set_shader_parameter(
+		&"trodden_floor_seals_mask",
+		_trodden_floor_seals_mask
 	)
 	material.set_shader_parameter(
 		&"trodden_depth_world_px",
@@ -6061,7 +6857,10 @@ func _upload_chunk_masks(
 ## Returns a conservative area containing every layer opening.
 func _get_stamp_broad_rect(stamp: ImpactStamp) -> Rect2:
 	var gameplay_layer_count := profile.get_gameplay_layer_count()
-	if not stamp.narrow_path_points.is_empty():
+	if (
+		not stamp.narrow_path_points.is_empty()
+		or not stamp.parallel_tunnel_rects.is_empty()
+	):
 		var narrow_growth := (
 			float(terrain_manager.config.terrain_cell_world_size) * 0.75
 			+ float(profile.core_hole_padding)

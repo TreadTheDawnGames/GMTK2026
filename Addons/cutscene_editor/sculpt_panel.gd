@@ -16,6 +16,8 @@ extends VBoxContainer
 
 signal armed_changed(is_armed: bool)
 signal brush_settings_changed
+signal shape_tool_changed(shape_tool: StringName)
+signal selection_action_requested(action: StringName)
 
 ## A mined hit is not a brush stroke: it adds an authored impact marker and
 ## digs it through the production TerrainManager, exactly as a pickaxe would.
@@ -23,6 +25,66 @@ signal brush_settings_changed
 ## change it — and it is how a designer checks a room reads correctly once
 ## the miner has broken into it.
 const OP_DIG_HIT: StringName = &"dig_hit"
+
+const SELECTION_COPY: StringName = &"copy"
+const SELECTION_PASTE: StringName = &"paste"
+const SELECTION_FILL: StringName = &"fill"
+const SELECTION_MIRROR: StringName = &"mirror_horizontal"
+
+const SHAPE_LABELS: Array[String] = [
+	"Free brush",
+	"Line",
+	"Rectangle",
+	"Ellipse",
+	"Selection",
+	"Stamp",
+]
+const SHAPES: Array[StringName] = [
+	CutsceneSculptBrush.SHAPE_FREE,
+	CutsceneSculptBrush.SHAPE_LINE,
+	CutsceneSculptBrush.SHAPE_RECTANGLE,
+	CutsceneSculptBrush.SHAPE_ELLIPSE,
+	CutsceneSculptBrush.SHAPE_SELECTION,
+	CutsceneSculptBrush.SHAPE_STAMP,
+]
+const SHAPE_TOOLTIPS: Array[String] = [
+	"Paint a continuous round stroke. Shortcut: B.",
+	"Drag a straight brush-width stroke. Shortcut: L.",
+	"Drag opposite corners to apply the armed operation to a filled rectangle. "
+		+ "Shortcut: R.",
+	"Drag its bounds to apply the armed operation to a filled ellipse. "
+		+ "Shortcut: E.",
+	"Drag a cell region for copy, paste, fill, or mirror. Shortcut: S.",
+	"Place the room stamp named by the Stamp menu with one click.",
+]
+
+const STAMP_LABELS: Array[String] = [
+	"Doorway",
+	"Alcove",
+	"Platform",
+	"Pillar",
+	"Tunnel",
+]
+const STAMPS: Array[StringName] = [
+	CutsceneSculptBrush.STAMP_DOORWAY,
+	CutsceneSculptBrush.STAMP_ALCOVE,
+	CutsceneSculptBrush.STAMP_PLATFORM,
+	CutsceneSculptBrush.STAMP_PILLAR,
+	CutsceneSculptBrush.STAMP_TUNNEL,
+]
+const STAMP_TOOLTIPS: Array[String] = [
+	"Carves a 9 x 19-cell upright doorway.",
+	"Carves a 25 x 15-cell oval alcove.",
+	"Fills a 25 x 3-cell standing platform.",
+	"Fills a 5 x 21-cell upright pillar.",
+	"Carves a 29 x 9-cell level tunnel segment.",
+]
+
+const _SELECTION_MENU_COPY: int = 0
+const _SELECTION_MENU_PASTE: int = 1
+const _SELECTION_MENU_FILL: int = 2
+const _SELECTION_MENU_MIRROR: int = 3
+const _SELECTION_MENU_CLEAR: int = 4
 
 const OPERATION_LABELS: Array[String] = [
 	"Carve",
@@ -68,12 +130,21 @@ const SHAPE_COLOR := Color(1.0, 1.0, 1.0, 0.95)
 var _context: CutsceneEditorContext
 var _brush := CutsceneSculptBrush.new()
 var _operation_index: int = 0
+var _shape_index: int = 0
+var _stamp_index: int = 0
 var _is_armed: bool = false
+var _selection := Rect2i()
+## One byte per selected cell, bounded by the sculpt's 512 x 512 maximum.
+## This editor-only clipboard is discarded with the panel and never saved.
+var _selection_clipboard: Dictionary = {}
 
 var _status_label: Label
 var _landing_label: Label
 var _arm_button: Button
 var _operation_buttons: Array[Button] = []
+var _shape_selector: OptionButton
+var _stamp_menu: MenuButton
+var _selection_menu: MenuButton
 var _radius_slider: HSlider
 var _strength_slider: HSlider
 var _falloff_slider: HSlider
@@ -111,6 +182,7 @@ func set_context(context: CutsceneEditorContext) -> void:
 			previous.clear_layer_display_overrides()
 	_context = context
 	_focused_layer = -1
+	_selection = Rect2i()
 	set_armed(false)
 	refresh()
 
@@ -123,6 +195,86 @@ func get_brush() -> CutsceneSculptBrush:
 ## Returns which operation is armed.
 func get_operation() -> StringName:
 	return OPERATIONS[_operation_index]
+
+
+## Returns how a viewport drag is interpreted: brush, line, filled shape,
+## selection, or one-click built-in stamp.
+func get_shape_tool() -> StringName:
+	return SHAPES[_shape_index]
+
+
+func get_shape_tool_label() -> String:
+	return SHAPE_LABELS[_shape_index]
+
+
+func select_shape_tool(shape: StringName) -> void:
+	var shape_index := SHAPES.find(shape)
+	if shape_index < 0:
+		return
+	_shape_selector.select(shape_index)
+	_on_shape_selected(shape_index)
+
+
+func get_selected_stamp() -> StringName:
+	return STAMPS[_stamp_index]
+
+
+func get_selected_stamp_label() -> String:
+	return STAMP_LABELS[_stamp_index]
+
+
+## Selection state lives in the panel so switching away from the 2D viewport
+## does not lose it. The plugin owns the drag and redraws this rectangle.
+func set_selection(region: Rect2i) -> void:
+	var resolved := region
+	if _context != null and _context.sculpt != null:
+		resolved = region.intersection(
+			Rect2i(Vector2i.ZERO, _context.sculpt.grid_size)
+		)
+	_selection = resolved if resolved.has_area() else Rect2i()
+	_sync_selection_menu()
+	brush_settings_changed.emit()
+
+
+func get_selection() -> Rect2i:
+	return _selection
+
+
+func has_selection() -> bool:
+	return _selection.has_area()
+
+
+func clear_selection() -> void:
+	if not _selection.has_area():
+		return
+	_selection = Rect2i()
+	_sync_selection_menu()
+	brush_settings_changed.emit()
+
+
+func set_selection_clipboard(copied_region: Dictionary) -> void:
+	_selection_clipboard = copied_region.duplicate(true)
+	_sync_selection_menu()
+
+
+func get_selection_clipboard() -> Dictionary:
+	return _selection_clipboard.duplicate(true)
+
+
+func has_selection_clipboard() -> bool:
+	var copied_size: Vector2i = _selection_clipboard.get(
+		"size",
+		Vector2i.ZERO
+	)
+	var copied_cells: PackedByteArray = _selection_clipboard.get(
+		"cells",
+		PackedByteArray()
+	)
+	return (
+		copied_size.x > 0
+		and copied_size.y > 0
+		and copied_cells.size() >= copied_size.x * copied_size.y
+	)
 
 
 ## Returns the colour standing for whatever the brush is currently editing, so
@@ -290,6 +442,7 @@ func refresh() -> void:
 	_create_button.disabled = false
 	_sync_layer_selector()
 	_sync_sculpt_controls(sculpt)
+	_sync_selection_menu()
 	_update_status(sculpt)
 
 
@@ -329,12 +482,14 @@ func _build_controls() -> void:
 	_arm_button.text = "Sculpt Terrain"
 	_arm_button.toggle_mode = true
 	_arm_button.tooltip_text = (
-		"Arms the brush. While it is on, dragging in the 2D viewport sculpts "
+		"Arms terrain authoring. While it is on, dragging in the 2D viewport "
+		+ "uses the chosen gesture "
 		+ "instead of selecting; switch it off and the viewport selects and "
 		+ "moves nodes exactly as it always does.\n"
 		+ "\n"
 		+ "While armed, in the viewport:\n"
 		+ "  1-5  pick carve, fill, smooth, roughen, dig hit\n"
+		+ "  B/L/R/E/S  free, line, rectangle, ellipse, selection\n"
 		+ "  X  swap carve and fill\n"
 		+ "  [ and ]  or the wheel, resize the brush\n"
 		+ "  Ctrl+wheel  step between layers\n"
@@ -344,6 +499,21 @@ func _build_controls() -> void:
 	)
 	_arm_button.toggled.connect(_on_arm_toggled)
 	brush_column.add_child(_arm_button)
+
+	_shape_selector = _add_dropdown(
+		brush_column,
+		"Gesture",
+		"How a viewport drag applies the armed terrain operation. "
+		+ "Free and Line use brush size, strength and falloff; Rectangle and "
+		+ "Ellipse use the exact dragged cells."
+	)
+	for shape_index in range(SHAPE_LABELS.size()):
+		_shape_selector.add_item(SHAPE_LABELS[shape_index])
+		_shape_selector.set_item_tooltip(
+			shape_index,
+			SHAPE_TOOLTIPS[shape_index]
+		)
+	_shape_selector.item_selected.connect(_on_shape_selected)
 
 	var operation_grid := GridContainer.new()
 	operation_grid.columns = 3
@@ -440,7 +610,7 @@ func _build_controls() -> void:
 	floor_row.add_child(_floor_rows_spin)
 	room_column.add_child(floor_row)
 
-	var action_row := HBoxContainer.new()
+	var action_row := HFlowContainer.new()
 	room_column.add_child(action_row)
 	_add_action(
 		action_row, "Tunnel", _on_level_tunnel_pressed,
@@ -481,6 +651,61 @@ func _build_controls() -> void:
 	_copy_room_menu.about_to_popup.connect(_on_copy_room_menu_about_to_popup)
 	_copy_room_menu.get_popup().id_pressed.connect(_on_copy_room_selected)
 	action_row.add_child(_copy_room_menu)
+
+	_stamp_menu = MenuButton.new()
+	_stamp_menu.text = "Stamp: %s" % STAMP_LABELS[_stamp_index]
+	_stamp_menu.tooltip_text = (
+		"Pick a fixed room-building shape, then click once in the viewport. "
+		+ "Doorway, alcove and tunnel carve; platform and pillar fill."
+	)
+	_stamp_menu.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for stamp_index in range(STAMP_LABELS.size()):
+		var stamp_popup := _stamp_menu.get_popup()
+		stamp_popup.add_item(STAMP_LABELS[stamp_index], stamp_index)
+		stamp_popup.set_item_tooltip(
+			stamp_popup.get_item_index(stamp_index),
+			STAMP_TOOLTIPS[stamp_index]
+		)
+	_stamp_menu.get_popup().id_pressed.connect(_on_stamp_selected)
+	action_row.add_child(_stamp_menu)
+
+	_selection_menu = MenuButton.new()
+	_selection_menu.text = "Selection"
+	_selection_menu.tooltip_text = (
+		"Use the Selection gesture to drag a region, then copy, paste over it, "
+		+ "apply the armed operation, or mirror it horizontally."
+	)
+	_selection_menu.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var selection_popup := _selection_menu.get_popup()
+	selection_popup.add_item("Copy  Ctrl+C", _SELECTION_MENU_COPY)
+	selection_popup.add_item("Paste over selection  Ctrl+V", _SELECTION_MENU_PASTE)
+	selection_popup.add_separator()
+	selection_popup.add_item("Apply armed operation  Enter", _SELECTION_MENU_FILL)
+	selection_popup.add_item("Mirror horizontally  M", _SELECTION_MENU_MIRROR)
+	selection_popup.add_item("Deselect  Esc", _SELECTION_MENU_CLEAR)
+	selection_popup.set_item_tooltip(
+		selection_popup.get_item_index(_SELECTION_MENU_COPY),
+		"Copies the active shape or stratum inside the selected cells."
+	)
+	selection_popup.set_item_tooltip(
+		selection_popup.get_item_index(_SELECTION_MENU_PASTE),
+		"Pastes the copied cells over the current selection's top-left corner."
+	)
+	selection_popup.set_item_tooltip(
+		selection_popup.get_item_index(_SELECTION_MENU_FILL),
+		"Applies Carve, Fill, Smooth, or Roughen once to the selected cells."
+	)
+	selection_popup.set_item_tooltip(
+		selection_popup.get_item_index(_SELECTION_MENU_MIRROR),
+		"Reflects the active shape or stratum within the selected cells."
+	)
+	selection_popup.set_item_tooltip(
+		selection_popup.get_item_index(_SELECTION_MENU_CLEAR),
+		"Clears the selection without changing terrain."
+	)
+	selection_popup.id_pressed.connect(_on_selection_menu_pressed)
+	action_row.add_child(_selection_menu)
+	_sync_selection_menu()
 
 	_status_label = Label.new()
 	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -564,7 +789,7 @@ func _add_slider(
 
 
 func _add_action(
-	row: HBoxContainer,
+	row: Container,
 	label_text: String,
 	handler: Callable,
 	tooltip: String
@@ -588,7 +813,66 @@ func _on_operation_pressed(operation_index: int) -> void:
 		_operation_buttons[button_index].button_pressed = (
 			button_index == operation_index
 		)
+	_sync_selection_menu()
 	brush_settings_changed.emit()
+
+
+func _on_shape_selected(shape_index: int) -> void:
+	if shape_index < 0 or shape_index >= SHAPES.size():
+		return
+	_shape_index = shape_index
+	shape_tool_changed.emit(get_shape_tool())
+	brush_settings_changed.emit()
+
+
+func _on_stamp_selected(stamp_index: int) -> void:
+	if stamp_index < 0 or stamp_index >= STAMPS.size():
+		return
+	_stamp_index = stamp_index
+	_stamp_menu.text = "Stamp: %s" % STAMP_LABELS[_stamp_index]
+	select_shape_tool(CutsceneSculptBrush.SHAPE_STAMP)
+
+
+func _on_selection_menu_pressed(menu_id: int) -> void:
+	if menu_id == _SELECTION_MENU_CLEAR:
+		clear_selection()
+		return
+	match menu_id:
+		_SELECTION_MENU_COPY:
+			selection_action_requested.emit(SELECTION_COPY)
+		_SELECTION_MENU_PASTE:
+			selection_action_requested.emit(SELECTION_PASTE)
+		_SELECTION_MENU_FILL:
+			selection_action_requested.emit(SELECTION_FILL)
+		_SELECTION_MENU_MIRROR:
+			selection_action_requested.emit(SELECTION_MIRROR)
+
+
+func _sync_selection_menu() -> void:
+	if _selection_menu == null:
+		return
+	var popup := _selection_menu.get_popup()
+	var selected := has_selection()
+	popup.set_item_disabled(
+		popup.get_item_index(_SELECTION_MENU_COPY),
+		not selected
+	)
+	popup.set_item_disabled(
+		popup.get_item_index(_SELECTION_MENU_PASTE),
+		not selected or not has_selection_clipboard()
+	)
+	popup.set_item_disabled(
+		popup.get_item_index(_SELECTION_MENU_FILL),
+		not selected or get_operation() == OP_DIG_HIT
+	)
+	popup.set_item_disabled(
+		popup.get_item_index(_SELECTION_MENU_MIRROR),
+		not selected
+	)
+	popup.set_item_disabled(
+		popup.get_item_index(_SELECTION_MENU_CLEAR),
+		not selected
+	)
 
 
 func _on_brush_slider_changed() -> void:

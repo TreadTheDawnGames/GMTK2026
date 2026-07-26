@@ -12,10 +12,41 @@
 [ext_resource type="Resource" uid="uid://cyix7qxtpjhes" path="res://resources/mining/progression_level_7.tres" id="9_level_7"]
 [ext_resource type="Resource" uid="uid://bsvqjl3da48mn" path="res://resources/mining/progression_level_8.tres" id="10_level_8"]
 [ext_resource type="Resource" uid="uid://po156e267vbx" path="res://resources/mining/progression_level_9.tres" id="11_level_9"]
+[ext_resource type="Script" path="res://resources/mining/combo_target_group.gd" id="12_combo_group"]
+[ext_resource type="PackedScene" uid="uid://bcoaf8y2mxx7" path="res://Scenes/targets/shrinking_target.tscn" id="13_green"]
+[ext_resource type="PackedScene" uid="uid://cv457nmc4e8qy" path="res://Scenes/targets/reverse_target.tscn" id="14_yellow"]
+[ext_resource type="PackedScene" uid="uid://ct5832k6hpwck" path="res://Scenes/targets/multi-hit_target.tscn" id="15_stationary_blue"]
+[ext_resource type="PackedScene" uid="uid://gx2i6oqtq8fi" path="res://Scenes/targets/moving_target.tscn" id="16_moving_blue"]
+[ext_resource type="PackedScene" uid="uid://cilpog06kwu7u" path="res://Scenes/targets/fade_target.tscn" id="17_purple"]
+
+[sub_resource type="Resource" id="ComboTargetGroup_green"]
+script = ExtResource("12_combo_group")
+target_scenes = Array[PackedScene]([ExtResource("13_green")])
+
+[sub_resource type="Resource" id="ComboTargetGroup_green_yellow"]
+script = ExtResource("12_combo_group")
+minimum_combo = 4
+target_scenes = Array[PackedScene]([ExtResource("13_green"), ExtResource("14_yellow")])
+
+[sub_resource type="Resource" id="ComboTargetGroup_green_yellow_stationary_blue"]
+script = ExtResource("12_combo_group")
+minimum_combo = 8
+target_scenes = Array[PackedScene]([ExtResource("13_green"), ExtResource("14_yellow"), ExtResource("15_stationary_blue")])
+
+[sub_resource type="Resource" id="ComboTargetGroup_yellow_blue"]
+script = ExtResource("12_combo_group")
+minimum_combo = 15
+target_scenes = Array[PackedScene]([ExtResource("14_yellow"), ExtResource("15_stationary_blue"), ExtResource("16_moving_blue")])
+
+[sub_resource type="Resource" id="ComboTargetGroup_yellow_moving_blue_purple"]
+script = ExtResource("12_combo_group")
+minimum_combo = 20
+target_scenes = Array[PackedScene]([ExtResource("14_yellow"), ExtResource("16_moving_blue"), ExtResource("17_purple")])
 
 [resource]
 script = ExtResource("1_config")
 base_mine_depth_rows = 12
 combo_mine_depth_rows_per_step = 2
 progression_levels = Array[ExtResource("1_csmot")]([ExtResource("2_level_0"), ExtResource("3_level_1"), ExtResource("4_level_2"), ExtResource("5_level_3"), ExtResource("6_level_4"), ExtResource("7_level_5"), ExtResource("8_level_6"), ExtResource("9_level_7"), ExtResource("10_level_8"), ExtResource("11_level_9")])
+combo_target_groups = Array[ExtResource("12_combo_group")]([SubResource("ComboTargetGroup_green"), SubResource("ComboTargetGroup_green_yellow"), SubResource("ComboTargetGroup_green_yellow_stationary_blue"), SubResource("ComboTargetGroup_yellow_blue"), SubResource("ComboTargetGroup_yellow_moving_blue_purple")])
 combo_tier_thresholds = Array[int]([1, 5, 10, 16, 20])

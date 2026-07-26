@@ -106,6 +106,11 @@ const MAX_PLAYABLE_DEPTH: int = 2_000_000_000
 ## res://resources/pickaxes/pickaxe_authoring.md before adding a pickaxe reward.
 @export var progression_levels: Array[EncounterProgressionLevel] = []
 
+@export_category("Combo Targets")
+## Ordered target pools selected by combo. The first group must start at zero;
+## later groups replace it at their inclusive minimum_combo.
+@export var combo_target_groups: Array[ComboTargetGroup] = []
+
 @export_category("Effects")
 ## Treats this combo as full strength for animation and hit feedback.
 @export_range(1, 100, 1) var maximum_effect_combo: int = 20
@@ -125,3 +130,35 @@ const MAX_PLAYABLE_DEPTH: int = 2_000_000_000
 ## Returns the practical coordinate ceiling for the otherwise endless mine.
 func get_bottom_surface_row() -> int:
 	return initial_surface_row + MAX_PLAYABLE_DEPTH
+
+
+## Returns whether the authored combo-target ladder is complete and ordered.
+func has_valid_combo_target_groups() -> bool:
+	if (
+		combo_target_groups.is_empty()
+		or combo_target_groups[0] == null
+		or combo_target_groups[0].minimum_combo != 0
+	):
+		return false
+	var previous_minimum := -1
+	for group: ComboTargetGroup in combo_target_groups:
+		if (
+			group == null
+			or not group.is_valid()
+			or group.minimum_combo <= previous_minimum
+		):
+			return false
+		previous_minimum = group.minimum_combo
+	return true
+
+
+## Selects the last target group whose inclusive threshold has been reached.
+func get_combo_target_group_index(combo: int) -> int:
+	if not has_valid_combo_target_groups():
+		return -1
+	var selected_index := 0
+	for group_index in range(1, combo_target_groups.size()):
+		if combo < combo_target_groups[group_index].minimum_combo:
+			break
+		selected_index = group_index
+	return selected_index

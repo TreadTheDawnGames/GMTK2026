@@ -105,7 +105,7 @@ Normal hits clear the pale and tan strata but retain orange as the decorative
 tunnel backdrop. Hits large enough to select the big-hole mask family also
 clear orange and reveal the solid brown back wall. This intentionally leaves
 one colored backdrop over logically open cells; it never changes collision or
-depth. Press F3 to overlay the logical openings when checking visual parity.
+depth. Terrain parity verification tools can overlay the logical openings.
 
 ## Tuning
 
@@ -150,8 +150,8 @@ encounter closes or cancels.
 
 All encounter chambers use exactly the four gameplay strata. The fourth is the
 normal back wall; there is no promoted destination layer, deep palette, or
-temporary room mask. F3 continues to render logical cells over the visual masks
-for parity checks.
+temporary room mask. Terrain parity verification renders logical cells over the
+visual masks when explicitly enabled by verification tooling.
 
 ## Mining camera styles
 

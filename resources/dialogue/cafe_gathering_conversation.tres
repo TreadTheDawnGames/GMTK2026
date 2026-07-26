@@ -35,6 +35,11 @@ speaker_slot = &"coffee_cat"
 speaker_pose = &"hold_cup"
 text = "C-C-CAFE COFFEE! WE MADE IT! DID WE MAKE IT FAST? I THINK WE MADE IT FAST!"
 
+[sub_resource type="Resource" id="Line_moody_teen"]
+script = ExtResource("3_line")
+speaker_slot = &"moody_teen"
+text = "..."
+
 [sub_resource type="Resource" id="Line_cloak"]
 script = ExtResource("3_line")
 speaker_slot = &"cloak_lantern"
@@ -70,6 +75,11 @@ script = ExtResource("2_participant")
 slot = &"coffee_cat"
 display_name = "Quibble"
 
+[sub_resource type="Resource" id="Participant_moody_teen"]
+script = ExtResource("2_participant")
+slot = &"moody_teen"
+display_name = "Moody Teen"
+
 [sub_resource type="Resource" id="Participant_cloak_lantern"]
 script = ExtResource("2_participant")
 slot = &"cloak_lantern"
@@ -78,5 +88,5 @@ display_name = "Lantern Keeper"
 [resource]
 script = ExtResource("1_conversation")
 conversation_id = &"cafe_gathering"
-participants = Array[ExtResource("2_participant")]([SubResource("Participant_miner"), SubResource("Participant_cheese_girl"), SubResource("Participant_treasure_hunter"), SubResource("Participant_rutini"), SubResource("Participant_coffee_cat"), SubResource("Participant_cloak_lantern")])
-lines = Array[ExtResource("3_line")]([SubResource("Line_rutini"), SubResource("Line_cheese"), SubResource("Line_treasure"), SubResource("Line_miner"), SubResource("Line_treasure_elevator"), SubResource("Line_coffee"), SubResource("Line_cloak"), SubResource("Line_miner_final")])
+participants = Array[ExtResource("2_participant")]([SubResource("Participant_miner"), SubResource("Participant_cheese_girl"), SubResource("Participant_treasure_hunter"), SubResource("Participant_rutini"), SubResource("Participant_coffee_cat"), SubResource("Participant_moody_teen"), SubResource("Participant_cloak_lantern")])
+lines = Array[ExtResource("3_line")]([SubResource("Line_rutini"), SubResource("Line_cheese"), SubResource("Line_treasure"), SubResource("Line_miner"), SubResource("Line_treasure_elevator"), SubResource("Line_coffee"), SubResource("Line_moody_teen"), SubResource("Line_cloak"), SubResource("Line_miner_final")])

@@ -13,12 +13,14 @@ const GroundWalkType = preload(
 
 @export_category("References")
 @export var character_sprite: Sprite2D
+@export var character_aura: Sprite2D
 @export var actor_sprite_view: ActorSpriteView
 @export var speech_reaction: SpeechReactionType
 
 var _base_sprite_position: Vector2
 var _departure_tween: Tween
 var _art_faces_left: bool = false
+var _reduce_motion_enabled: bool = false
 ## Which way the appearance was authored, so "mirrored" means mirrored from the
 ## state the offset was tuned against rather than from flip_h being true.
 var _base_flip_h: bool = false
@@ -42,7 +44,7 @@ var _body_offset_from_node_x: float = 0.0
 var _resting_pose: StringName = &"idle"
 
 ## Opaque-body measurements, keyed by texture path. get_used_rect() scans every
-## pixel of a 2224x1668 sheet, and apply_appearance runs for all eleven encounters
+## pixel of a 2224x1668 sheet, and apply_appearance runs for all thirteen encounters
 ## at startup and again on every visit; there are only eight distinct textures, so
 ## measuring each once is the difference between a boot cost and a boot stall.
 static var _body_centre_cache: Dictionary = {}
@@ -54,6 +56,12 @@ func _ready() -> void:
 	_base_sprite_position = character_sprite.position
 	speech_reaction.capture_rest_position()
 	_ensure_ground_shadow()
+
+
+## Removes actor bobbing while preserving poses, travel, and arrival callbacks.
+func set_reduce_motion_enabled(enabled: bool) -> void:
+	_reduce_motion_enabled = enabled
+	speech_reaction.set_reduce_motion_enabled(enabled)
 
 
 ## Puts a contact shadow under this character.
@@ -91,6 +99,16 @@ func apply_appearance(appearance: CharacterAppearance) -> void:
 	)
 	character_sprite.modulate = appearance.tint
 	character_sprite.flip_h = appearance.flip_h
+	character_aura.texture = appearance.texture
+	character_aura.hframes = appearance.horizontal_frames
+	character_aura.vframes = appearance.vertical_frames
+	character_aura.frame = appearance.frame
+	character_aura.scale = appearance.sprite_scale
+	character_aura.position = character_sprite.position
+	character_aura.modulate = Color.WHITE
+	character_aura.flip_h = appearance.flip_h
+	character_aura.material = appearance.aura_material
+	character_aura.visible = appearance.aura_material != null
 	_art_faces_left = appearance.art_faces_left
 	_base_flip_h = appearance.flip_h
 	_base_sprite_position = character_sprite.position
@@ -200,6 +218,8 @@ func _apply_facing_offset(flipped: bool) -> void:
 	character_sprite.position.x = _base_sprite_position.x + (
 		2.0 * _body_offset_from_node_x if mirrored else 0.0
 	)
+	character_aura.position = character_sprite.position
+	character_aura.flip_h = character_sprite.flip_h
 
 
 ## Returns how far the drawn body sits from the sprite node along x, in world
@@ -288,7 +308,7 @@ func move_grounded_to(
 		self,
 		ground_path,
 		duration,
-		step_height
+		0.0 if _reduce_motion_enabled else step_height
 	)
 	if _departure_tween != null and hide_on_finish:
 		_departure_tween.tween_callback(hide)

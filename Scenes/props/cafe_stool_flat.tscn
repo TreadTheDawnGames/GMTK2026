@@ -9,5 +9,5 @@ It replaces cafe_stool.tscn in the cafe gathering because the old one is drawn i
 
 SCALE AND OFFSET ARE DERIVED, NOT EYED. local_tests/derive_flat_furniture.gd sizes it against a real 48cm stool at the 0.666 world pixels per centimetre the game's other seating already agrees on, which lands its seat 32px up - the same seat height the old stool had, so anything authored against that number still holds. The offset is in TEXTURE pixels, applied before scale, and puts the opaque bottom on the node's origin so dropping this on a floor marker plants it."
 texture = ExtResource("1_stool")
-offset = Vector2(0, -253)
+offset = Vector2(13, -253)
 scale = Vector2(0.10621, 0.10621)

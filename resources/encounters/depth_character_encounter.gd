@@ -47,6 +47,20 @@ extends Resource
 ## Reveals an already-present actor and set before the miner lands. Reserve this
 ## for discoveries during the fall, not visitors who enter after landing.
 @export var prestage_before_landing: bool = false
+## Seats this visitor's measured sole on the same visible line as the miner.
+##
+## Off preserves the shared three-pixel cast lift. On is reserved for an actor
+## whose authored pose must share the miner's deliberate terrain overlap in both
+## prestaging and stage movement; the controller still derives both from the
+## same renderer support sample.
+@export var cast_matches_miner_grounding: bool = false
+## Optional per-shot framing. Negative values preserve the shared presentation
+## defaults, so one room can use more height without moving every encounter.
+@export_range(-1.0, 0.82, 0.01) var cinematic_focus_viewport_y_ratio: float = -1.0
+@export_range(-1.0, 0.4, 0.01) var cinematic_bar_height_ratio: float = -1.0
+## Recedes the completed room by this share of the viewport, then holds that
+## frame until a new mining target changes the followed terrain cell.
+@export_range(0.0, 0.2, 0.01) var post_cinematic_recession_ratio: float = 0.0
 ## Used only when story text should remain encrypted in source control.
 @export var encrypted_conversation: EncryptedDialogueConversation
 @export var speaker_slot: StringName
@@ -62,17 +76,45 @@ extends Resource
 @export var requires_credits_complete: bool = false
 ## Opens the chamber through its right wall for authored choreography.
 @export var opens_right_exit: bool = false
-## Dresses this room's floor as walked-on ground while the shot is running.
+## Dresses this room's floor as walked-on ground from entry through first mining.
 ##
 ## Off by default, so every existing encounter draws exactly as before. On, and
 ## DepthEncounterController asks TerrainLayerRenderer for the shared trodden
-## floor at this encounter's own floor line for the length of the cutscene, and
-## clears it when the shot releases.
+## floor at this encounter's own floor line before the miner falls into view.
+## The renderer seals the presentation while the shot owns it, then the first
+## ordinary mining impact releases that seal so the real mask cracks the same
+## floor instead of replacing it with a separate effect.
 ##
 ## It is a shared service rather than one room's dressing - the settings live on
 ## the renderer and any encounter can opt in - so turning this on is the whole
 ## cost of using it.
 @export var dresses_trodden_floor: bool = false
+## Lights this room's floor as a horizontal plane while the shot is running.
+##
+## Off by default, so every existing encounter draws exactly as before. On, and
+## DepthEncounterController asks TerrainLayerRenderer for the shared ground stack
+## at this encounter's own floor line - the lit top face, its far edge, the cut
+## face below it, and the bounce band on rock standing on it - and clears it when
+## the shot releases.
+##
+## This is the 2.5D read the world surface gets for free and every room below it
+## went without: a side-on shot has no horizontal surfaces, so undressed floor
+## reads as a wall the cast stand in front of. It is separate from
+## `dresses_trodden_floor` because form and dressing are separate choices.
+@export var lights_floor_as_plane: bool = false
+## Optional screen-space depth between the Miner and this encounter's cast.
+##
+## Negative preserves the established shared staging: gathering encounters use
+## the cafe depth and ordinary encounters share the cast's floor line. A
+## non-negative value lets one room move only the Miner toward the camera while
+## its visitor remains on the authored rear plane.
+@export_range(-1.0, 128.0, 1.0) var miner_cutscene_depth_offset_pixels: float = -1.0
+## Keeps the room-seated Miner baseline when the cinematic frame releases.
+##
+## Off preserves every existing encounter's return to generic mining grounding.
+## On lets the next impact originate from the same depth plane shown in the
+## conversation, so the actor and crater do not jump between adjacent frames.
+@export var keeps_miner_grounding_after_release: bool = false
 ## Replaces this encounter's procedural chamber with an authored sculpted room.
 ## Leave it null and terrain generation is unchanged.
 @export var terrain_sculpt: CutsceneTerrainSculpt
@@ -90,3 +132,12 @@ func resolve_chamber_height_rows(default_height_rows: int) -> int:
 	if chamber_height_rows_override > 0:
 		return chamber_height_rows_override
 	return maxi(default_height_rows, 1)
+
+
+## Resolves this room's Miner depth without changing legacy encounter staging.
+func resolve_miner_cutscene_depth_offset(
+	default_offset_pixels: float
+) -> float:
+	if miner_cutscene_depth_offset_pixels >= 0.0:
+		return miner_cutscene_depth_offset_pixels
+	return maxf(default_offset_pixels, 0.0)
