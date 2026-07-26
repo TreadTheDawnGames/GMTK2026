@@ -27,7 +27,7 @@ var stored_combo : int = 0
 
 @export var DEBUG_starting_targets : int = -1
 
-var _audio_handler: PlayerAudioHandler = AudioHandler
+var _audio_handler: PlayerAudioHandler
 var _target_unlocks: Array[PickaxeDefinition] = []
 var _progression_target_scenes: Array[PackedScene] = []
 var _progression_bonus_target_combos := PackedInt32Array()
@@ -105,6 +105,26 @@ func set_bounce_muted(is_muted: bool) -> void:
 		return
 	mining_window.set_bounce_muted(is_muted)
 	recovery_window.set_bounce_muted(is_muted)
+	recovery_window2.set_bounce_muted(is_muted)
+
+## Restores timing state before a fresh descent begins.
+func _on_run_reset() -> void:
+	combo = 0
+	stored_combo = 0
+	failed_recovery = false
+	for window: SliderTimingWindow in [
+		mining_window,
+		recovery_window,
+		recovery_window2,
+	]:
+		window.speed_multiplier = 1.0
+		window.direction = 1.0
+		window.consecutive_hits = 0
+	mining_window.slider_position = 0.0
+	recovery_window.stop()
+	recovery_window2.stop()
+	mining_window.reset_all_targets()
+	mining_window.start()
 
 ## Shows distance to the Thief, then distance travelled beyond the Thief.
 func show_displayed_distance(displayed_distance: int) -> void:
@@ -177,7 +197,7 @@ func _mining_window_pressed(
 			# going somewhere instead of flattening out.
 			
 			# Those tones are all the notes in a scale, so it sounds good if they're together
-			_audio_handler.play_sound(
+			_play_sound(
 				AudioLibrary.MINE_SOUNDS[
 					clampi(combo - 1, 0, AudioLibrary.MINE_SOUNDS.size() - 1)
 				],
@@ -227,7 +247,7 @@ func _mining_window_pressed(
 			_play_sound(AudioLibrary.SAVE_BUILDUP)
 		else:
 			fail_combo()
-			mining_window.remove_all_extra_targets()
+			mining_window.reset_all_targets()
 			mining_window.play_animation(Color.RED)
 
 var failed_recovery : bool = false
@@ -245,7 +265,7 @@ func _recovery_window_pressed(
 			(mining_config.recovery_speed_multiplier)
 		)
 		#play audio
-		_audio_handler.play_sound(AudioLibrary.SAVE)
+		_play_sound(AudioLibrary.SAVE)
 		#set animation color
 		recovery_window.animation_color = combo_saved_color
 	else:
@@ -254,8 +274,7 @@ func _recovery_window_pressed(
 		if not failed_recovery and mining_config.use_secondary_recovery:
 			#This is our first failure
 			failed_recovery = true
-			_audio_handler.play_sound(AudioLibrary.MISS_WITH_SAVE)
-			print("first failure")
+			_play_sound(AudioLibrary.MISS_WITH_SAVE)
 			recovery_window.animation_repeats = 2
 			#all we want to do is open the secondary save, so do nothing
 		else:
@@ -278,19 +297,16 @@ func _recovery_window_pressed(
 	
 	#after the animation, if it was a success
 	if success:
-		print("Option 1")
 		#targets call themselves and we clamp them to make sure they're within the allowed area
 		mining_window.recovery_action()
 		mining_window.clamp_all_targets()
 		recovery_window.stop()
 		mining_window.start()
 	elif failed_recovery:
-		print("Option 2")
 		#Check if this is the first failure and if so,Start the secondary recovery process
 		recovery_window2.start()
-		_audio_handler.play_sound(AudioLibrary.SAVE_BUILDUP)
+		_play_sound(AudioLibrary.SAVE_BUILDUP)
 	else:
-		print("Option 3")
 		#this is the second time failing. Reset the main window, our visibility, and the recovery state
 		recovery_window.stop()
 		mining_window.start()
@@ -313,7 +329,7 @@ func _additional_recovery_window_pressed(
 			(mining_config.recovery_speed_multiplier)
 		)
 		#play audio
-		_audio_handler.play_sound(AudioLibrary.SAVE)
+		_play_sound(AudioLibrary.SAVE)
 		#set animation color
 		recovery_window2.animation_color = combo_saved_color
 	else:
@@ -325,7 +341,7 @@ func _additional_recovery_window_pressed(
 		recovery_window.speed_multiplier = 1.0
 		recovery_window2.speed_multiplier = 1.0
 		#reset targets
-		mining_window.remove_all_extra_targets()
+		mining_window.reset_all_targets()
 		#Set animation color
 		recovery_window2.animation_color = combo_lost_color
 		#reset recovery state
@@ -354,4 +370,4 @@ func fail_combo():
 	stored_combo = 0
 	streak_ended.emit(lost_combo)
 	mining_window.speed_multiplier = 1.0
-	_audio_handler.play_sound(AudioLibrary.STREAK_LOST)
+	_play_sound(AudioLibrary.STREAK_LOST)

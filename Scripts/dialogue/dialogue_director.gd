@@ -41,6 +41,7 @@ var _tree_was_paused: bool = false
 var _keep_frame_open_after_conversation: bool = false
 var _references_valid: bool = false
 var _advance_input_enabled: bool = true
+var _current_line_word_count: int = 0
 
 
 ## Starts hidden and owns the internal presentation signal connections.
@@ -241,6 +242,26 @@ func _show_next_character(token: int) -> void:
 	_set_visible_character_count(visible_count)
 	var current_text := body_label.text
 	var delay := character_delay(current_text[visible_count - 1])
+	var revealed_character := current_text[visible_count - 1]
+	var next_character := (
+		current_text[visible_count]
+		if visible_count < current_text.length()
+		else ""
+	)
+	var revealed_word_end := (
+		not [" ", "\n", "\t"].has(revealed_character)
+		and (
+			next_character.is_empty()
+			or [" ", "\n", "\t"].has(next_character)
+		)
+	)
+	if revealed_word_end:
+		_current_line_word_count += 1
+		var line := _active_conversation.lines[_current_line_index]
+		if line.typing_pause_after_word_counts.has(
+			_current_line_word_count
+		):
+			delay += line.typing_pause_seconds
 	await get_tree().create_timer(delay, true).timeout
 	_show_next_character(token)
 
@@ -290,6 +311,7 @@ func _present_current_line() -> void:
 	speaker_label.text = display_name
 	body_label.text = line.text
 	continue_label.text = continue_text
+	_current_line_word_count = 0
 	_set_visible_character_count(0)
 	_show_next_character(_presentation_token)
 

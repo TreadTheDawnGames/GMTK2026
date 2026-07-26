@@ -8,6 +8,8 @@ extends Resource
 @export_range(1, 64, 1) var vertical_frames: int = 1
 @export_range(0, 4_095, 1) var frame: int = 0
 @export var sprite_scale: Vector2 = Vector2.ONE
+## Horizontal staging only. Runtime and editor previews measure the lowest
+## opaque row so transparent canvas padding cannot move a character's feet.
 @export var sprite_offset: Vector2 = Vector2.ZERO
 @export var tint: Color = Color.WHITE
 @export var flip_h: bool = false

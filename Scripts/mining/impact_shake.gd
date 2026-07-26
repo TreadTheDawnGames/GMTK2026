@@ -1,7 +1,7 @@
 class_name ImpactShake
 extends Node
 
-## Shakes the game camera briefly when a successful mining hit lands.
+## Shakes the game camera for mining impacts and sustained cinematic rumble.
 
 @export_category("Reference")
 @export var camera: Camera2D
@@ -25,6 +25,8 @@ var _current_strength_px: float = 0.0
 var _seconds_until_sample: float = 0.0
 var _kick_direction: Vector2 = Vector2.DOWN
 var _jitter_offset: Vector2 = Vector2.ZERO
+var _sustained_strength_px: float = 0.0
+var _sustained_jitter_offset: Vector2 = Vector2.ZERO
 var _random := RandomNumberGenerator.new()
 
 
@@ -61,14 +63,23 @@ func play_at_impact(
 	set_process(true)
 
 
-## Updates camera jitter and returns it to rest after the shake.
-func _process(delta: float) -> void:
-	_remaining_seconds = maxf(_remaining_seconds - delta, 0.0)
+func begin_sustained(strength_px: float) -> void:
+	_sustained_strength_px = maxf(strength_px, 0.0)
+	_seconds_until_sample = 0.0
+	set_process(_sustained_strength_px > 0.0 or _remaining_seconds > 0.0)
+
+
+func end_sustained() -> void:
+	_sustained_strength_px = 0.0
+	_sustained_jitter_offset = Vector2.ZERO
 	if _remaining_seconds <= 0.0:
 		camera.offset = Vector2.ZERO
 		set_process(false)
-		return
 
+
+## Updates camera jitter and returns it to rest after the shake.
+func _process(delta: float) -> void:
+	_remaining_seconds = maxf(_remaining_seconds - delta, 0.0)
 	var fade_weight := _remaining_seconds / duration_seconds
 	# The jitter is resampled on its own cadence, but the kick has to move every
 	# frame or the recoil reads as a second, softer shake instead of one hit.
@@ -79,7 +90,15 @@ func _process(delta: float) -> void:
 			_random.randf_range(-1.0, 1.0),
 			_random.randf_range(-1.0, 1.0)
 		) * (1.0 - directional_portion)
-	camera.offset = (
+		_sustained_jitter_offset = Vector2(
+			_random.randf_range(-1.0, 1.0),
+			_random.randf_range(-1.0, 1.0)
+		) * _sustained_strength_px
+	var impact_offset := (
 		_kick_direction * directional_portion * fade_weight
 		+ _jitter_offset
 	) * _current_strength_px * fade_weight
+	camera.offset = impact_offset + _sustained_jitter_offset
+	if _remaining_seconds <= 0.0 and _sustained_strength_px <= 0.0:
+		camera.offset = Vector2.ZERO
+		set_process(false)

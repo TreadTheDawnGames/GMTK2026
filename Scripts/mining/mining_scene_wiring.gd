@@ -21,6 +21,7 @@ const MINER_FLOOR_LAYER_INDEX: int = 0
 @export var combo_vignette: ComboImpactVignette
 @export var dig_number_presenter: DigNumberPresenter
 @export var impact_shake: ImpactShake
+@export var pickaxe_reward_celebration: PickaxeRewardCelebration
 @export var pickaxe_progression: PickaxeProgression
 @export var encounter_progression: EncounterProgression
 @export var cinematic_flow: MiningCinematicFlow
@@ -97,6 +98,10 @@ func _ready() -> void:
 	_connect_once(
 		_game_state.run_reset,
 		encounter_progression._on_run_reset
+	)
+	_connect_once(
+		_game_state.run_reset,
+		timing_window._on_run_reset
 	)
 	_connect_once(
 		_game_state.run_reset,
@@ -239,6 +244,10 @@ func _ready() -> void:
 		combo_director._on_upgrade_granted
 	)
 	_connect_once(
+		pickaxe_progression.upgrade_granted,
+		pickaxe_reward_celebration.play_for_upgrade
+	)
+	_connect_once(
 		coffee_speed_boost.boost_awarded,
 		combo_director._on_coffee_boost_awarded
 	)
@@ -345,6 +354,8 @@ func _ready() -> void:
 		encounter_controller._on_credits_completed
 	)
 	_connect_once(
+		# Fractional high-precision wheel steps stay intact across the UI/view
+		# composition boundary; ViewController owns their pixel conversion.
 		depth_review_control.review_scroll_requested,
 		view_controller.scroll_review
 	)
@@ -375,6 +386,14 @@ func _ready() -> void:
 	_connect_once(
 		encounter_controller.character_stage_rock_break_requested,
 		_on_character_stage_rock_break_requested
+	)
+	_connect_once(
+		encounter_controller.stampede_rumble_started,
+		impact_shake.begin_sustained
+	)
+	_connect_once(
+		encounter_controller.stampede_rumble_finished,
+		impact_shake.end_sustained
 	)
 	timing_window.set_bounce_muted(_game_state.save_game.mute_bounce)
 	_on_run_depth_changed(_game_state.depth)

@@ -18,4 +18,4 @@
 script = ExtResource("1_config")
 encounters = Array[ExtResource("2_encounter_type")]([ExtResource("3_cheese_girl"), ExtResource("4_lantern_first"), ExtResource("6_rutini_first"), ExtResource("5_treasure_first"), ExtResource("7_lantern_second"), ExtResource("8_treasure_second"), ExtResource("9_quibble"), ExtResource("10_rotini_colony"), ExtResource("11_cafe"), ExtResource("12_lantern_post_credits"), ExtResource("13_thief")])
 chamber_height_rows = 24
-gathering_actor_ids = Array[StringName]([&"cheese_girl", &"treasure_hunter", &"rutini", &"coffee_cat", &"cloak_lantern"])
+gathering_actor_ids = Array[StringName]([&"cheese_girl", &"treasure_hunter", &"rutini", &"cloak_lantern", &"coffee_cat"])
