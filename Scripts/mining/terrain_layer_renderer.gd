@@ -246,6 +246,13 @@ const SCULPT_RESIZE_PHASE_PIXELS: int = 65_536
 # them, the oldest single layer completes before another is accepted, so memory
 # cannot grow with hit count and the renderer never drops an opening.
 const MAX_PENDING_IMPACT_WORK_ITEMS: int = 192
+# Resolved hits whose openings are still queued. One is the ordinary case the
+# contact budget is sized for. More than one means the player is mining faster
+# than the queue drains, and each extra group buys another share of the frame -
+# the queue has to catch up within the burst, not after it.
+# A backlog this deep already owns the frame; more shares buy nothing and only
+# push the remaining background work further out.
+const IMPACT_BACKLOG_BUDGET_SHARE_LIMIT: int = 6
 # A run has far fewer authored structural groups than this. Stale work is
 # skipped if its chunk streams out, and descriptors are recycled after use.
 const MAX_PENDING_CHUNK_TEXTURE_PUBLISH_ITEMS: int = 192
@@ -303,6 +310,15 @@ const MAX_IMPACT_OVERLAY_MASK_PIXELS: int = 256 * 1024
 ## unpredicted opening over a quarter of a second; this bounds it to a few
 ## frames while still leaving two thirds of a 60 FPS frame to everything else.
 @export_range(1.0, 16.0, 0.5) var web_contact_frame_budget_ms: float = 5.0
+## Ceiling for finishing a resolved hit on the frame it lands.
+##
+## Spreading one opening over the contact budget above cost up to nine frames on
+## a stacked combo, which is the Miner dropping through rock that still looks
+## solid. Committed openings now run until they are drawn, and this is the one
+## limit on that: a monster stack takes a second frame rather than owning an
+## unbounded one. Everything else - prediction, streaming, snapshots - keeps the
+## ordinary budget, so an idle frame is unchanged.
+@export_range(4.0, 48.0, 0.5) var web_contact_drain_ceiling_ms: float = 16.0
 ## Limits reusable resized masks so repeated hit sizes avoid image allocations.
 @export_range(0, 48, 1) var resized_stamp_cache_limit: int = 48
 ## Oversized combo openings are one-off and must not occupy the reusable cache.
@@ -588,14 +604,35 @@ func _process(_delta: float) -> void:
 	var frame_started_at: int = Time.get_ticks_usec()
 	# A resolved hit that has not become visible yet is latency the player is
 	# watching, so it gets the larger budget until its group is presented.
+	var waiting_impact_groups: int = _unrastered_impact_group_counts.size()
 	var frame_budget_usec: int = roundi(
 		(
 			web_contact_frame_budget_ms
-			if not _unrastered_impact_group_counts.is_empty()
+			if waiting_impact_groups > 0
 			else web_impact_frame_budget_ms
 		)
 		* 1000.0
 	)
+	# An opening the player has already been moved past is not latency worth
+	# budgeting for. Spreading one resolved hit over the contact budget took up
+	# to nine frames on a stacked combo, and repeated mining and its aftershocks
+	# stack hits behind one another, so what the player sees is the Miner
+	# dropping through rock whose opening has not been drawn yet. Finish every
+	# waiting hit on the frame it lands: the work is the same either way, and one
+	# frame that costs more is cheaper to look at than a world that disagrees
+	# with where the Miner is standing.
+	#
+	# Only committed openings drain. Prediction, streaming, and snapshots below
+	# still run on the ordinary budget, so an idle frame is unchanged.
+	var drain_impact_queue := waiting_impact_groups > 0
+	var drain_ceiling_usec: int = roundi(
+		web_contact_drain_ceiling_ms * 1000.0
+	)
+	if waiting_impact_groups > 1:
+		frame_budget_usec *= mini(
+			waiting_impact_groups,
+			IMPACT_BACKLOG_BUDGET_SHARE_LIMIT
+		)
 	# Committed terrain always wins the shared budget. Authoritative preparation
 	# work is inserted into this same queue immediately before its raster bands,
 	# so a partial prediction can never delay an older visible hit.
@@ -605,6 +642,17 @@ func _process(_delta: float) -> void:
 		and _pending_impact_work_head < _pending_impact_work.size()
 	):
 		_process_next_pending_impact_work()
+		if drain_impact_queue:
+			# Presenting a group queues its own fold-in work. Stop draining the
+			# moment every waiting opening has its pixels, so the invisible half
+			# goes back to the ordinary budget instead of extending the frame.
+			if _unrastered_impact_group_counts.is_empty():
+				drain_impact_queue = false
+			elif (
+				Time.get_ticks_usec() - frame_started_at
+				< drain_ceiling_usec
+			):
+				continue
 		if (
 			Time.get_ticks_usec() - frame_started_at
 			>= frame_budget_usec
