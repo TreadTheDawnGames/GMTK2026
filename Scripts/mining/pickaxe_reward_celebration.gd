@@ -5,7 +5,7 @@ extends Node2D
 ## - A granted pickaxe throws one bounded burst around the miner.
 ## - Flat confetti pieces move in screen space and fall under simple gravity.
 ## - The shared upgrade signal makes both Treasure Hunter gifts use this effect.
-## - A new burst replaces the old one; no particle survives its lifetime.
+## - No particle survives its authored lifetime or a replacement burst.
 ## - The invariant is that active confetti never exceeds the platform cap.
 
 class ConfettiParticle:
@@ -46,8 +46,6 @@ func _ready() -> void:
 	set_process(false)
 
 
-## Celebrates the one authoritative upgrade event, regardless of which of the
-## two Treasure Hunter encounters granted it.
 func play_for_upgrade(_definition: PickaxeDefinition) -> void:
 	if miner_rig == null or palette.is_empty():
 		return

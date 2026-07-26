@@ -27,13 +27,12 @@ notes = "The whole conversation: 'You kept digging.' / '...' / 'Everyone thinks 
 
 Six seconds is the authored estimate the editor scrubs against, not the real length. This beat blocks, so the clock holds here for exactly as long as the player takes to read and every beat after it slides by the same amount.
 
-Do not split this into two beats to land a cue between the lines. line_range is authored and validated but depth_encounter_controller currently ignores it, so any DIALOGUE beat plays the whole conversation.
+This remains one blocking beat because the warning is uninterrupted. The editor can split it into inclusive line ranges if later staging needs a cue between lines.
 
 The 0.6s of held silence before he speaks is deliberate: the miner has just come through the ceiling, and the Keeper is already standing there waiting for him to look up."
 
 [sub_resource type="Resource" id="Beat_wait"]
 script = ExtResource("1_beat")
-kind = 4
 start_seconds = 6.6
 duration_seconds = 0.9
 notes = "A held beat on the two of them after the last line, before the timeline ends and play_closing takes him. Without it the shot cuts straight from the dialogue box closing to him fading, and the line does not get to land.

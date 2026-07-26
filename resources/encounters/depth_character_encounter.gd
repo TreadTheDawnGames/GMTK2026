@@ -4,7 +4,8 @@ extends Resource
 
 ## How it works:
 ## - depth_from_surface places this encounter's mineable tunnel floor.
-## - Terrain generation opens the chamber above that floor.
+## - An optional chamber-height override enlarges this encounter's arrival fall.
+## - Terrain generation opens the resolved chamber above that floor.
 ## - Crossing the tunnel ceiling starts the authored conversation and stage.
 ## - stage_scene optionally adds actor movement, props, and line-driven cues.
 ## - occurs_at_run_bottom pins the final encounter to any configured run length.
@@ -16,6 +17,9 @@ extends Resource
 ## Stable story identity; repeated visits reuse the same presenter.
 @export var actor_id: StringName
 @export_range(1, 1_000_000, 1) var depth_from_surface: int = 1_000
+## Zero uses the schedule's shared chamber height. A positive value enlarges
+## only this arrival, so one tall discovery does not move every cutscene ceiling.
+@export_range(0, 2_000, 1) var chamber_height_rows_override: int = 0
 ## Gathers the stable cast roster when this depth-authored chamber is entered.
 @export var gathers_cast: bool = false
 ## Resolves this encounter to zero remaining depth for any run length.
@@ -58,6 +62,17 @@ extends Resource
 @export var requires_credits_complete: bool = false
 ## Opens the chamber through its right wall for authored choreography.
 @export var opens_right_exit: bool = false
+## Dresses this room's floor as walked-on ground while the shot is running.
+##
+## Off by default, so every existing encounter draws exactly as before. On, and
+## DepthEncounterController asks TerrainLayerRenderer for the shared trodden
+## floor at this encounter's own floor line for the length of the cutscene, and
+## clears it when the shot releases.
+##
+## It is a shared service rather than one room's dressing - the settings live on
+## the renderer and any encounter can opt in - so turning this on is the whole
+## cost of using it.
+@export var dresses_trodden_floor: bool = false
 ## Replaces this encounter's procedural chamber with an authored sculpted room.
 ## Leave it null and terrain generation is unchanged.
 @export var terrain_sculpt: CutsceneTerrainSculpt
@@ -68,3 +83,10 @@ func resolve_depth(total_run_depth: int) -> int:
 	if occurs_at_run_bottom:
 		return total_run_depth
 	return depth_from_surface
+
+
+## Returns this arrival's authored height or the schedule default.
+func resolve_chamber_height_rows(default_height_rows: int) -> int:
+	if chamber_height_rows_override > 0:
+		return chamber_height_rows_override
+	return maxi(default_height_rows, 1)

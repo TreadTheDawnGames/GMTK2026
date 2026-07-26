@@ -19,10 +19,13 @@ var combo: int = 0:
 	set(value):
 		combo = value
 		combo_label.text = "Combo: " + str(-combo)
+			
 var stored_combo : int = 0
 
 @export var combo_saved_color: Color = Color.CYAN
 @export var combo_lost_color: Color = Color.RED
+
+@export var DEBUG_starting_targets : int = -1
 
 var _audio_handler: PlayerAudioHandler
 var _target_unlocks: Array[PickaxeDefinition] = []
@@ -34,6 +37,8 @@ var _displayed_distance: int = 0
 
 ## Connects both timing bars to the combo flow.
 func _ready() -> void:
+	if DEBUG_starting_targets > 0:
+		mining_window._starting_target_count = DEBUG_starting_targets
 	if mining_config == null:
 		push_error("TimingWindowTask requires a MiningConfig.")
 		return
@@ -68,7 +73,6 @@ func _ready() -> void:
 	set_bounce_muted(_bounce_muted)
 	show_displayed_distance(_displayed_distance)
 
-
 ## Supplies the cross-scene audio service at the composition boundary.
 func set_audio_handler(audio_handler: PlayerAudioHandler) -> void:
 	_audio_handler = audio_handler
@@ -77,7 +81,6 @@ func set_audio_handler(audio_handler: PlayerAudioHandler) -> void:
 	mining_window.set_audio_handler(audio_handler)
 	recovery_window.set_audio_handler(audio_handler)
 	recovery_window2.set_audio_handler(audio_handler)
-
 
 ## Plays optional feedback when this reusable timing scene has an audio owner.
 func _play_sound(
@@ -95,7 +98,6 @@ func _play_sound(
 		pitch_scale
 	)
 
-
 ## Applies the saved bounce preference to both authored timing bars.
 func set_bounce_muted(is_muted: bool) -> void:
 	_bounce_muted = is_muted
@@ -103,7 +105,26 @@ func set_bounce_muted(is_muted: bool) -> void:
 		return
 	mining_window.set_bounce_muted(is_muted)
 	recovery_window.set_bounce_muted(is_muted)
+	recovery_window2.set_bounce_muted(is_muted)
 
+## Restores timing state before a fresh descent begins.
+func _on_run_reset() -> void:
+	combo = 0
+	stored_combo = 0
+	failed_recovery = false
+	for window: SliderTimingWindow in [
+		mining_window,
+		recovery_window,
+		recovery_window2,
+	]:
+		window.speed_multiplier = 1.0
+		window.direction = 1.0
+		window.consecutive_hits = 0
+	mining_window.slider_position = 0.0
+	recovery_window.stop()
+	recovery_window2.stop()
+	mining_window.reset_all_targets()
+	mining_window.start()
 
 ## Shows distance to the Thief, then distance travelled beyond the Thief.
 func show_displayed_distance(displayed_distance: int) -> void:
@@ -111,7 +132,8 @@ func show_displayed_distance(displayed_distance: int) -> void:
 	if not is_node_ready():
 		return
 	depth_label.text = Utils.format_number_with_commas(_displayed_distance)
-
+	if DEBUG_starting_targets > 0:
+		combo_label.text = "MINING UI IS IN DEBUG"
 
 ## Stores cumulative pickaxes and restores their zero-combo baseline scenes.
 func set_pickaxe_target_unlocks(
@@ -120,7 +142,6 @@ func set_pickaxe_target_unlocks(
 	_target_unlocks = definitions.duplicate()
 	if is_node_ready():
 		_apply_pickaxe_target_unlocks()
-
 
 ## Applies the timing portion of one complete encounter-progression level.
 ## New level-owned timing rules are added to this explicit contract and passed
@@ -140,7 +161,6 @@ func set_progression_target_rules(
 	mining_window.speed = slider_speed
 	mining_window.set_starting_target_count(starting_target_count)
 	mining_window.set_target_pool(_progression_target_scenes)
-
 
 ## Rebuilds only the zero-combo target baseline after the bar is ready.
 func _apply_pickaxe_target_unlocks() -> void:
@@ -177,7 +197,7 @@ func _mining_window_pressed(
 			# going somewhere instead of flattening out.
 			
 			# Those tones are all the notes in a scale, so it sounds good if they're together
-			_audio_handler.play_sound(
+			_play_sound(
 				AudioLibrary.MINE_SOUNDS[
 					clampi(combo - 1, 0, AudioLibrary.MINE_SOUNDS.size() - 1)
 				],
@@ -227,7 +247,7 @@ func _mining_window_pressed(
 			_play_sound(AudioLibrary.SAVE_BUILDUP)
 		else:
 			fail_combo()
-			mining_window.remove_all_extra_targets()
+			mining_window.reset_all_targets()
 			mining_window.play_animation(Color.RED)
 
 var failed_recovery : bool = false
@@ -245,7 +265,7 @@ func _recovery_window_pressed(
 			(mining_config.recovery_speed_multiplier)
 		)
 		#play audio
-		_audio_handler.play_sound(AudioLibrary.SAVE)
+		_play_sound(AudioLibrary.SAVE)
 		#set animation color
 		recovery_window.animation_color = combo_saved_color
 	else:
@@ -254,8 +274,7 @@ func _recovery_window_pressed(
 		if not failed_recovery and mining_config.use_secondary_recovery:
 			#This is our first failure
 			failed_recovery = true
-			_audio_handler.play_sound(AudioLibrary.MISS_WITH_SAVE)
-			print("first failure")
+			_play_sound(AudioLibrary.MISS_WITH_SAVE)
 			recovery_window.animation_repeats = 2
 			#all we want to do is open the secondary save, so do nothing
 		else:
@@ -269,7 +288,6 @@ func _recovery_window_pressed(
 			#reset targets
 			recovery_window.animation_repeats = 3
 			
-			mining_window.remove_all_extra_targets()
 			#Set animation color
 			recovery_window.animation_color = combo_lost_color
 			failed_recovery = false
@@ -279,23 +297,21 @@ func _recovery_window_pressed(
 	
 	#after the animation, if it was a success
 	if success:
-		print("Option 1")
 		#targets call themselves and we clamp them to make sure they're within the allowed area
 		mining_window.recovery_action()
 		mining_window.clamp_all_targets()
 		recovery_window.stop()
 		mining_window.start()
 	elif failed_recovery:
-		print("Option 2")
 		#Check if this is the first failure and if so,Start the secondary recovery process
 		recovery_window2.start()
-		_audio_handler.play_sound(AudioLibrary.SAVE_BUILDUP)
+		_play_sound(AudioLibrary.SAVE_BUILDUP)
 	else:
-		print("Option 3")
 		#this is the second time failing. Reset the main window, our visibility, and the recovery state
 		recovery_window.stop()
 		mining_window.start()
 		failed_recovery = false
+		mining_window.reset_all_targets()
 		
 	
 	#Regardless of whether we succeeded or failed, start the mining window
@@ -313,7 +329,7 @@ func _additional_recovery_window_pressed(
 			(mining_config.recovery_speed_multiplier)
 		)
 		#play audio
-		_audio_handler.play_sound(AudioLibrary.SAVE)
+		_play_sound(AudioLibrary.SAVE)
 		#set animation color
 		recovery_window2.animation_color = combo_saved_color
 	else:
@@ -325,7 +341,7 @@ func _additional_recovery_window_pressed(
 		recovery_window.speed_multiplier = 1.0
 		recovery_window2.speed_multiplier = 1.0
 		#reset targets
-		mining_window.remove_all_extra_targets()
+		mining_window.reset_all_targets()
 		#Set animation color
 		recovery_window2.animation_color = combo_lost_color
 		#reset recovery state
@@ -347,7 +363,6 @@ func _additional_recovery_window_pressed(
 		mining_window.clamp_all_targets()
 		mining_window.start()
 
-
 func fail_combo():
 	var lost_combo := combo
 	pressed.emit(false, combo, 0)
@@ -355,4 +370,4 @@ func fail_combo():
 	stored_combo = 0
 	streak_ended.emit(lost_combo)
 	mining_window.speed_multiplier = 1.0
-	_audio_handler.play_sound(AudioLibrary.STREAK_LOST)
+	_play_sound(AudioLibrary.STREAK_LOST)

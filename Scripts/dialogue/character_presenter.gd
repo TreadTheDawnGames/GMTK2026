@@ -83,7 +83,12 @@ func apply_appearance(appearance: CharacterAppearance) -> void:
 	character_sprite.vframes = appearance.vertical_frames
 	character_sprite.frame = appearance.frame
 	character_sprite.scale = appearance.sprite_scale
-	character_sprite.position = appearance.sprite_offset
+	# The actor origin is its feet. Measuring the lowest opaque row keeps art
+	# padding from making runtime placement disagree with the editor preview.
+	character_sprite.position = Vector2(
+		appearance.sprite_offset.x,
+		ActorSoleMeasure.get_sprite_y(appearance)
+	)
 	character_sprite.modulate = appearance.tint
 	character_sprite.flip_h = appearance.flip_h
 	_art_faces_left = appearance.art_faces_left
@@ -115,6 +120,24 @@ func reset_speech_motion() -> void:
 ## Bounces until another speaker or the conversation takes over.
 func react_to_presented_line() -> void:
 	speech_reaction.react_to_presented_line()
+
+
+## Plays a timeline-authored visual reaction without moving the actor root.
+##
+## This boundary keeps CutsceneSequencePlayer out of the presenter's private
+## sprite hierarchy while still letting the editor author exact motion.
+func play_cutscene_bounce(
+	offset: Vector2,
+	duration: float,
+	bounce_count: int,
+	transition: Tween.TransitionType
+) -> void:
+	speech_reaction.play_bounce(
+		offset,
+		duration,
+		bounce_count,
+		transition
+	)
 
 
 ## Reports whether this presenter can display an optional dialogue pose.

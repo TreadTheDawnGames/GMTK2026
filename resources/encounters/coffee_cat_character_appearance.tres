@@ -1,13 +1,13 @@
-[gd_resource type="Resource" script_class="CharacterAppearance" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="CharacterAppearance" format=3 uid="uid://bc1ilyydfavn"]
 
-[ext_resource type="Script" path="res://resources/encounters/character_appearance.gd" id="1_appearance"]
-[ext_resource type="Texture2D" path="res://Assets/Characters/quibble/quibble_cup_out.png" id="2_texture"]
-[ext_resource type="Resource" path="res://resources/actors/quibble_pose_set.tres" id="3_pose_set"]
+[ext_resource type="Script" uid="uid://bpg6fvsw6y7ai" path="res://resources/encounters/character_appearance.gd" id="1_appearance"]
+[ext_resource type="Texture2D" uid="uid://bfy31n8plwgdt" path="res://Assets/Characters/quibble/quibble_cup_out.png" id="2_texture"]
+[ext_resource type="Resource" uid="uid://5qijuqa7nxwy" path="res://resources/actors/quibble_pose_set.tres" id="3_pose_set"]
 
 [resource]
 script = ExtResource("1_appearance")
 texture = ExtResource("2_texture")
 sprite_scale = Vector2(0.1215, 0.1215)
-sprite_offset = Vector2(0, -35.31)
+sprite_offset = Vector2(0, -26.31)
 art_faces_left = true
 pose_set = ExtResource("3_pose_set")

@@ -54,27 +54,50 @@ func reset_speech_motion() -> void:
 
 ## Plays one readable bounce without moving the actor's authoritative root.
 func react_to_presented_line() -> void:
+	play_bounce(
+		Vector2.UP * bounce_height,
+		bounce_duration,
+		1,
+		Tween.TRANS_QUAD
+	)
+
+
+## Plays an authored visual-only motion while the actor's feet remain planted.
+##
+## The total duration belongs to the timeline rather than to each cycle, so
+## changing the bounce count changes the rhythm without moving later beats.
+func play_bounce(
+	offset: Vector2,
+	total_duration: float,
+	bounce_count: int,
+	transition: Tween.TransitionType
+) -> void:
 	reset_speech_motion()
 	if not is_instance_valid(visual_root):
 		return
 	_rest_position = visual_root.position
 	_has_rest_position = true
 	_is_reacting = true
-	var half_duration := bounce_duration * 0.5
+	var cycles := maxi(bounce_count, 1)
+	var half_duration := maxf(total_duration, 0.0) / float(cycles * 2)
+	if half_duration <= 0.0 or offset.is_zero_approx():
+		_finish_reaction()
+		return
 	_reaction_tween = create_tween()
 	_reaction_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	_reaction_tween.tween_property(
-		visual_root,
-		"position",
-		_rest_position + Vector2.UP * bounce_height,
-		half_duration
-	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	_reaction_tween.tween_property(
-		visual_root,
-		"position",
-		_rest_position,
-		half_duration
-	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	for _cycle_index in range(cycles):
+		_reaction_tween.tween_property(
+			visual_root,
+			"position",
+			_rest_position + offset,
+			half_duration
+		).set_trans(transition).set_ease(Tween.EASE_OUT)
+		_reaction_tween.tween_property(
+			visual_root,
+			"position",
+			_rest_position,
+			half_duration
+		).set_trans(transition).set_ease(Tween.EASE_IN)
 	_reaction_tween.tween_callback(_finish_reaction)
 
 

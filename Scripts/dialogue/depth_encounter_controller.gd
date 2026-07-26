@@ -27,14 +27,17 @@ signal character_stage_rock_break_requested(
 	screen_position: Vector2,
 	radius_cells: int
 )
+## Relays a stage's requested two-axis displacement from encounter focus.
+signal character_stage_camera_pan_requested(offset_cells: Vector2)
 
 const FLOW_OWNER: StringName = &"depth_encounter"
 const MINER_SPEAKER_SLOT: StringName = &"miner"
 const FINAL_BREAKTHROUGH_CUE: StringName = &"resume_mining"
-## Which terrain stratum the cast's feet are placed against. Zero is the
-## foreground layer, which is the ground the player sees them standing on now
-## that TerrainLayerProfile no longer lowers it over a chamber floor.
-const CAST_FLOOR_LAYER_INDEX: int = 0
+## The cast draws between terrain strata zero and one, so its feet stand above
+## the second stratum's visible support. Rooms that cut fully through that
+## stratum fall back to the front layer instead of inventing a floor.
+const CAST_FLOOR_LAYER_INDEX: int = 1
+const CAST_FLOOR_FALLBACK_LAYER_INDEX: int = 0
 ## How far above its floor row a landing still counts as having arrived.
 ##
 ## A cutscene room's ground is not its floor row. The level tunnel lays up to
@@ -62,20 +65,10 @@ const LANDING_FLOOR_TOLERANCE_ROWS: int = 4
 ## stage's walking sampler go through this, so the cast cannot drift apart from
 ## the man they are talking to.
 ##
-## Fourteen rather than the original seven. Seven cleared the stroked outline on
-## a flat floor and no more, so the cast read as standing level with the ground
-## rather than on top of it - and once the rooms carried the shared floor bumps,
-## a character standing on the near side of a three-cell lump had that lump drawn
-## over their soles. The intent is that everyone stands visibly on the floor,
-## which costs a few pixels of gap on perfectly flat rock and is the cheaper of
-## the two mistakes: a character floating slightly reads as a character, and a
-## character sunk slightly reads as a bug.
-const CUTSCENE_FLOOR_LIFT_PIXELS: float = 14.0
-## The miner's authored sole marker sits above the lowest opaque boot pixels,
-## unlike CharacterPresenter roots whose origin is the visible foot line. Drop
-## only the MinerRig by this amount after using the shared support sample so he
-## plants on the same contour without sinking every visitor into the ground.
-const CUTSCENE_MINER_FOOT_DROP_PIXELS: float = 14.0
+## Three pixels clears the inked edge and the idle pose's two-pixel dip now that
+## CharacterPresenter measures the actual drawn sole rather than an authored
+## canvas offset.
+const CUTSCENE_FLOOR_LIFT_PIXELS: float = 3.0
 ## How still the sampled floor has to be, and for how many readings, before the
 ## room counts as having arrived. Half a pixel is under the sub-cell resolution
 ## the mask is written at, so it cannot be met by a room still travelling.
@@ -261,7 +254,18 @@ func _schedule_next_encounter() -> bool:
 				stage.prop_markers_root.position.x = (
 					stage.actor_markers_root.position.x
 				)
-			presenter.global_position = stage.entrance_marker.global_position
+			var entrance_position := stage.entrance_marker.global_position
+			var encounter_floor_row := (
+				mining_config.initial_surface_row
+				+ encounter.resolve_depth(mining_config.total_run_depth)
+			)
+			var entrance_floor_y := _sample_cutscene_floor(
+				entrance_position.x,
+				encounter_floor_row
+			)
+			if not is_nan(entrance_floor_y) and not is_inf(entrance_floor_y):
+				entrance_position.y = entrance_floor_y
+			presenter.global_position = entrance_position
 			if presenter.has_pose(stage.conversation_pose):
 				presenter.play_pose(stage.conversation_pose)
 			if stage.conversation_facing != 0:
@@ -303,6 +307,7 @@ func _activate_pending_encounter() -> void:
 	# He has hit the room's floor. Sprawl, then get up, while the frame opens
 	# around him.
 	miner_rig.show_cutscene_landing()
+	_apply_trodden_floor(encounter)
 	cinematic_flow.focus(FLOW_OWNER)
 	_begin_active_encounter.call_deferred()
 
@@ -358,6 +363,12 @@ func _sample_cutscene_floor(screen_x: float, landing_world_row: int) -> float:
 			CAST_FLOOR_LAYER_INDEX
 		)
 	)
+	if is_nan(support):
+		support = terrain_renderer.get_layer_opening_floor_support_screen_y(
+			screen_x,
+			landing_world_row,
+			CAST_FLOOR_FALLBACK_LAYER_INDEX
+		)
 	if is_nan(support):
 		return support
 	return support - CUTSCENE_FLOOR_LIFT_PIXELS
@@ -471,7 +482,7 @@ func _on_dialogue_line_presented(
 		presenter.react_to_presented_line()
 
 
-## Opens dialogue or stops at the unwritten thief endpoint.
+## Opens the authored dialogue or releases a malformed encounter safely.
 func _begin_active_encounter() -> void:
 	var encounter := encounter_config.encounters[_active_encounter_index]
 	var presenter := _presenters[_active_encounter_index]
@@ -524,17 +535,13 @@ func _begin_active_encounter() -> void:
 			return
 		# Stand the miner on the rock rather than on the row underneath it.
 		#
-		# Mining seats him against the intact floor line, which is right for a
-		# shaft he is standing inside: the ground closes over his boots and that
-		# is the read. A cutscene holds on him in the open, where the same offset
-		# buries him to the ankles in the loose rock the room's floor carries.
-		# The cast are already dropped onto that surface through this sampler; he
-		# is the one who was not. Only for the shot - _finish_cinematic_flow puts
-		# his mining grounding back, so the intro and ordinary digging are
-		# untouched.
+		# The cast sampler lifts CharacterPresenter soles clear of the inked
+		# contour. MinerRig owns its own measured overlap contract, so undo only
+		# that cast lift and hand it the raw terrain support. This keeps every
+		# cutscene on the same footing as surface play and ordinary mining.
 		miner_rig.seat_landing_foot_at_screen_y(
 			floor_sampler.call(miner_rig.get_landing_foot_screen_x())
-			+ CUTSCENE_MINER_FOOT_DROP_PIXELS
+			+ CUTSCENE_FLOOR_LIFT_PIXELS
 		)
 		# prepare() owns restoration and therefore must snapshot the actor's
 		# original hidden state. This hide/show pair has no frame between it;
@@ -578,8 +585,11 @@ func _begin_active_encounter() -> void:
 			encounter.encrypted_conversation.decrypt_conversation()
 		)
 	if encounter.occurs_at_run_bottom and _active_conversation == null:
-		dialogue_director.open_cinematic_frame()
-		final_encounter_reached.emit(encounter.encounter_id)
+		push_error(
+			"Final encounter '%s' has no authored dialogue."
+			% encounter.encounter_id
+		)
+		_fail_active_encounter()
 		return
 	if (
 		_active_conversation != null
@@ -595,10 +605,27 @@ func _begin_active_encounter() -> void:
 		"Encounter '%s' could not start dialogue." % encounter.encounter_id
 	)
 	if encounter.occurs_at_run_bottom:
-		dialogue_director.open_cinematic_frame()
-		final_encounter_reached.emit(encounter.encounter_id)
+		_fail_active_encounter()
 		return
 	_fail_active_encounter()
+
+
+## Dresses this room's floor as walked-on ground, if the encounter asked for it.
+##
+## The floor line is derived from the encounter's own depth rather than passed in,
+## so a room can never dress a line it does not stand on. It is cleared in
+## _finish_cinematic_flow, which is the one place every ending goes through - a
+## completed shot, a cancelled one and a failed one all release there, and a
+## dressing left behind would follow the player down the rest of the run.
+func _apply_trodden_floor(encounter: DepthCharacterEncounter) -> void:
+	if not encounter.dresses_trodden_floor:
+		terrain_renderer.set_trodden_floor(false)
+		return
+	var floor_world_y := float(
+		mining_config.initial_surface_row
+		+ encounter.resolve_depth(mining_config.total_run_depth)
+	) * float(mining_config.terrain_cell_world_size)
+	terrain_renderer.set_trodden_floor(true, floor_world_y)
 
 
 ## Reports whether this conversation is the cast's shared cafe stop.
@@ -675,10 +702,7 @@ func _gather_cafe_characters(floor_sampler: Callable) -> void:
 		else:
 			presenter.global_position = Vector2(
 				authored_mark.global_position.x,
-				_resolve_gathering_floor_y(
-					floor_sampler,
-					authored_mark.global_position
-				)
+				_resolve_gathering_floor_y(floor_sampler, authored_mark)
 			)
 		if _stage_draws_actor_into_its_set(actor_id):
 			presenter.hide()
@@ -703,8 +727,19 @@ func _get_gathering_marker(actor_id: StringName) -> Marker2D:
 	) as Marker2D
 
 
-## Returns the height a gathered actor's soles rest at, preferring the sampled
-## surface and falling back to the mark's own authored y.
+## Returns the height a gathered actor's soles rest at: the sampled floor under
+## their mark, raised by however far off the ground that mark was authored.
+##
+## A mark's y is a HEIGHT ABOVE THE GROUND, not a position. Every actor marker in
+## every stage is authored at y = 0 and that still means "standing on whatever the
+## terrain turns out to be there", because the sampler decides the rest. A negative
+## y is how a character is put on top of something: Quibble sits on the cafe's
+## bench, thirty pixels up, and the bench itself moves with the loose rock under it
+## because the whole cluster tracks the same landing column.
+##
+## Reading it as an offset rather than as an absolute is what keeps that true. An
+## authored absolute would be correct at one landing column and wrong at every
+## other, since the rock the bench stands on is different rock each run.
 ##
 ## The fallback is not decoration. The sampler answers NAN for a column whose rock
 ## has not resolved, and a NAN position puts an actor nowhere at all - so a room
@@ -712,12 +747,19 @@ func _get_gathering_marker(actor_id: StringName) -> Marker2D:
 ## character out of the shot.
 func _resolve_gathering_floor_y(
 	floor_sampler: Callable,
-	mark_global_position: Vector2
+	authored_mark: Marker2D
 ) -> float:
+	var height_above_ground := (
+		authored_mark.global_position.y - _active_stage.global_position.y
+		if _active_stage != null
+		else 0.0
+	)
 	if not floor_sampler.is_valid():
-		return mark_global_position.y
-	var sampled_y := float(floor_sampler.call(mark_global_position.x))
-	return mark_global_position.y if is_nan(sampled_y) else sampled_y
+		return authored_mark.global_position.y
+	var sampled_y := float(floor_sampler.call(authored_mark.global_position.x))
+	if is_nan(sampled_y):
+		return authored_mark.global_position.y
+	return sampled_y + height_above_ground
 
 
 ## Reports whether the active stage's own artwork already draws this character.
@@ -783,10 +825,12 @@ func _complete_encounter_after_dialogue(
 		return
 	if encounter.occurs_at_run_bottom:
 		final_encounter_reached.emit(encounter.encounter_id)
-		return
-	if _active_stage != null:
+		_is_final_breakthrough_armed = false
+	var had_active_stage := _active_stage != null
+	if had_active_stage:
 		await _active_stage.play_closing()
 		_active_stage = null
+	if encounter.occurs_at_run_bottom or had_active_stage:
 		dialogue_director.close_cinematic_frame()
 		await dialogue_director.wait_until_frame_closed()
 
@@ -960,6 +1004,10 @@ func _prepare_authored_characters() -> bool:
 				stage.presentation_rock_break_requested,
 				_on_character_stage_rock_break_requested
 			)
+			_connect_once(
+				stage.presentation_camera_pan_requested,
+				_on_character_stage_camera_pan_requested
+			)
 			# A stampede floors the miner for as long as it runs. The stage owns
 			# the horde and knows when the last of them is gone; it does not own
 			# the miner, so it says what happened and this decides what that
@@ -1020,6 +1068,7 @@ func has_pending_or_active_interaction() -> bool:
 ## Releases only this encounter's named ownership of mining and camera state.
 func _finish_cinematic_flow() -> void:
 	_reset_speech_reactions()
+	terrain_renderer.set_trodden_floor(false)
 	# Nobody is left face down when the shot releases him, whatever ended it. A
 	# stampede that was cancelled mid-run never reaches its own finished signal,
 	# and the miner would go back to mining lying on his face.
@@ -1086,6 +1135,8 @@ func _on_final_breakthrough_mined(
 func _complete_final_breakthrough() -> void:
 	_reset_speech_reactions()
 	dialogue_director.close_cinematic_frame()
+	var encounter := encounter_config.encounters[_active_encounter_index]
+	final_encounter_reached.emit(encounter.encounter_id)
 	_next_encounter_index = _active_encounter_index + 1
 	_active_encounter_index = -1
 	_active_stage = null
@@ -1112,14 +1163,15 @@ func _resolve_cast_member(actor_id: StringName) -> Node2D:
 ## read.
 func _on_sequence_dialogue_requested(
 	conversation: DialogueConversation,
-	_line_range: Vector2i
+	line_range: Vector2i
 ) -> void:
 	if conversation == null:
 		return
 	_active_conversation = conversation
 	_sequence_is_awaiting_dialogue = dialogue_director.start_conversation(
 		conversation,
-		true
+		true,
+		line_range
 	)
 	if not _sequence_is_awaiting_dialogue:
 		push_error(
@@ -1167,6 +1219,12 @@ func _on_character_stage_rock_break_requested(
 	character_stage_rock_break_requested.emit(screen_position, radius_cells)
 
 
+## Relays a stage's camera pan the same way, because the framed view belongs to
+## the mining wiring and a cutscene stage owns actors, props and local effects.
+func _on_character_stage_camera_pan_requested(offset_cells: Vector2) -> void:
+	character_stage_camera_pan_requested.emit(offset_cells)
+
+
 ## Relays the clean stage transition through the cross-system wiring boundary.
 func _on_persistent_colony_requested() -> void:
 	rat_colony_support_requested.emit()
@@ -1174,6 +1232,12 @@ func _on_persistent_colony_requested() -> void:
 
 ## Restores reversible stage state and skips malformed authored dialogue.
 func _fail_active_encounter() -> void:
+	if (
+		_prestaged_encounter_index >= 0
+		and _prestaged_encounter_index < _presenters.size()
+	):
+		_presenters[_prestaged_encounter_index].hide()
+	_prestaged_encounter_index = -1
 	if _active_stage != null:
 		_active_stage.cancel_and_restore()
 		_active_stage = null
@@ -1181,6 +1245,8 @@ func _fail_active_encounter() -> void:
 	await dialogue_director.wait_until_frame_closed()
 	_reset_speech_reactions()
 	_active_conversation = null
+	_is_final_breakthrough_armed = false
+	_is_final_breakthrough_resolving = false
 	if _active_encounter_index >= 0:
 		_next_encounter_index = _active_encounter_index + 1
 	_active_encounter_index = -1

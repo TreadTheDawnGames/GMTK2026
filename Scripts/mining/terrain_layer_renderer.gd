@@ -69,6 +69,9 @@ class PreparedLayerPatch:
 	var destination_position: Vector2i
 	var source_revision: int
 	var dirty_tile_bits: int
+	## One exact patch texture per candidate/chunk/layer is uploaded during
+	## wind-up and discarded at target replacement or after its mask folds in.
+	var overlay_texture: ImageTexture
 
 
 class ImpactRasterWork:
@@ -96,6 +99,7 @@ class ImpactStampPreparation:
 	var raster_band_index: int = 0
 	var raster_band_count: int = 1
 	var prepares_patch: bool = false
+	var prepares_overlay_texture: bool = false
 	## A nonnegative index detaches one candidate-independent GPU mask tile.
 	## At most three tiles per active stratum can ever remain allocated.
 	var private_texture_tile_index: int = -1
@@ -173,10 +177,10 @@ const FRACTURE_SUPPORT_HALF_WIDTH_MASK_PIXELS: int = 2
 const FRACTURE_SUPPORT_VALUE_THRESHOLD: float = 0.9
 # Retired chunk nodes are kept so streaming reuses their sprites and fully
 # configured materials instead of rebuilding both per crossed chunk boundary.
-# Gameplay holds at most five chunks. Matching that bound prevents a deep jump
-# from rebuilding one five-layer material hierarchy every time; menu-only extra
-# coverage does not traverse, and every retired mask/texture is still released.
-const CHUNK_VISUAL_POOL_LIMIT: int = 5
+# Gameplay holds at most six chunks after the one-chunk upward review margin.
+# Matching that bound prevents a deep jump from rebuilding one five-layer
+# material hierarchy every time; every retired mask/texture is still released.
+const CHUNK_VISUAL_POOL_LIMIT: int = 6
 # A structural chunk needs at most two distinct base masks and six tiled
 # textures. One spare chunk's storage is retained so adjacent streaming updates
 # existing buffers instead of allocating multi-megabyte images at the boundary.
@@ -230,7 +234,10 @@ const MAX_FRACTURE_RADIUS_CELLS: float = 32.0
 # Sixteen-pixel profiling leaves enough atomic headroom for 192 rows. The larger
 # band removes repeated clipping/blit setup while the 7 ms benchmark still
 # guards the final band plus its one dirty-tile upload.
-const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 192
+# A 192-pixel band occasionally exceeded the 7 ms preparation ceiling on a
+# cold Web driver. A 128-pixel slice preserves the exact 16-pixel mask while
+# avoiding the fallback queue growth caused by splitting every band in half.
+const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 128
 @export_category("References")
 @export var terrain_manager: TerrainManager
 @export var profile: TerrainLayerProfile
@@ -241,8 +248,9 @@ const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 192
 
 @export_category("Web Performance")
 ## Maximum CPU time spent starting queued mask layers in one rendered frame.
-## A layer already in progress completes atomically so textures never tear.
-@export_range(1.0, 16.0, 0.5) var web_impact_frame_budget_ms: float = 3.0
+## GPU-ready prediction work is spread across frames; a layer already in
+## progress completes atomically so textures never tear.
+@export_range(1.0, 16.0, 0.5) var web_impact_frame_budget_ms: float = 1.5
 ## Limits reusable resized masks so repeated hit sizes avoid image allocations.
 @export_range(0, 48, 1) var resized_stamp_cache_limit: int = 48
 ## Oversized combo openings are one-off and must not occupy the reusable cache.
@@ -257,6 +265,29 @@ const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 192
 @export_range(1, 16, 1) var chamber_circle_max_radius_cells: int = 8
 @export_range(0.0, 8.0, 0.5) var chamber_circle_jitter_cells: float = 3.0
 
+@export_category("Trodden Floor")
+## The packed, walked-on ground a cutscene room can dress its own floor with.
+##
+## This is the surface crust generalised. The crust is pinned to the one ground
+## line the whole run shares; a cutscene room's floor is hundreds of rows below
+## it, so these are pushed against a world y the caller supplies through
+## set_trodden_floor() instead of against the surface.
+##
+## Nothing here does anything until something asks for it - the flag is off, so
+## every existing room, and ordinary mining, draw exactly as before. It is a
+## shared service rather than one encounter's dressing: any cutscene can turn it
+## on at its own floor, and the settings below are tuning that stays put.
+@export_range(1.0, 64.0, 1.0) var trodden_depth_world_px: float = 10.0
+@export_range(1.0, 96.0, 1.0) var trodden_falloff_world_px: float = 26.0
+@export var trodden_color := Color(0.30, 0.24, 0.19, 1.0)
+@export_range(0.0, 1.0, 0.01) var trodden_strength: float = 0.55
+## How far the ramp's START wanders. The falloff is a smooth transition into the
+## dirt with no edge to tear, so this is a small number - it exists so the
+## strongest part of the treatment does not begin on a ruled line.
+@export_range(0.0, 32.0, 0.5) var trodden_edge_wander_world_px: float = 2.0
+@export_range(0.0, 1.0, 0.01) var trodden_grain_strength: float = 0.10
+@export_range(4.0, 128.0, 1.0) var trodden_grain_world_px: float = 26.0
+
 @export_category("Editor Preview")
 ## Streams terrain inside the editor for this instance only. The mining scene
 ## leaves it off so opening it stays instant; cutscene previews turn it on.
@@ -266,6 +297,12 @@ const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 192
 ## Toggles the logical opening overlay without affecting terrain presentation.
 @export var logical_overlay_key: Key = KEY_F3
 @export var logical_overlay_color := Color(0.2, 1.0, 0.35, 0.45)
+
+## Whether a cutscene has asked for its floor to be dressed, and where that floor
+## is. Held here rather than exported because they belong to whichever shot is
+## running, not to the scene.
+var _trodden_floor_is_enabled: bool = false
+var _trodden_floor_world_y: float = 0.0
 
 var _active_chunks: Dictionary[int, TerrainChunkVisual] = {}
 # Nodes, sprites, and materials of chunks the view has left, waiting to be
@@ -343,6 +380,7 @@ var _active_impact_combo: int = 0
 var _pending_impact_work: Array[ImpactRasterWork] = []
 var _pending_impact_work_head: int = 0
 var _impact_work_pool: Array[ImpactRasterWork] = []
+var _impact_overlay_presented_this_frame: bool = false
 var _pending_chunk_texture_publishes: Array[ChunkTexturePublishWork] = []
 var _pending_chunk_texture_publish_head: int = 0
 var _chunk_texture_publish_pool: Array[ChunkTexturePublishWork] = []
@@ -492,6 +530,9 @@ func _process(_delta: float) -> void:
 		and _pending_impact_work_head < _pending_impact_work.size()
 	):
 		_process_next_pending_impact_work()
+		if _impact_overlay_presented_this_frame:
+			_impact_overlay_presented_this_frame = false
+			return
 		if (
 			Time.get_ticks_usec() - frame_started_at
 			>= frame_budget_usec
@@ -558,6 +599,7 @@ func _on_dig_visuals_preparation_started(
 		work.raster_band_index = 0
 		work.raster_band_count = 1
 		work.prepares_patch = false
+		work.prepares_overlay_texture = false
 		work.private_texture_tile_index = -1
 		work.image_preparation = null
 		if (
@@ -663,10 +705,27 @@ func _prepare_next_pending_stamp_layer() -> void:
 		):
 			return
 		# Allocate the private GPU destination during target wind-up while it
-		# still contains the unchanged terrain. Impact then performs an update,
-		# avoiding first-use texture allocation inside the protected queue.
+		# still contains unchanged terrain. The exact patch overlay hides the
+		# later authoritative fold-in, so contact performs no full-tile upload.
 		work.chunk.dirty_mask_tiles[layer_index] |= tile_bit
 		_publish_layer_texture(work.chunk, layer_index, tile_bit)
+		return
+	if work.prepares_overlay_texture:
+		var patch: PreparedLayerPatch = _prepared_layer_patches.get(
+			_get_prepared_layer_patch_key(
+				work.stamp,
+				work.chunk_index,
+				work.layer_index
+			)
+		)
+		if (
+			patch != null
+			and patch.source_revision
+				== work.chunk.layer_revisions[layer_index]
+		):
+			patch.overlay_texture = ImageTexture.create_from_image(
+				patch.image
+			)
 		return
 	if work.prepares_patch:
 		_prepare_stamp_layer_patch_band(work)
@@ -773,6 +832,7 @@ func _obtain_stamp_preparation_work() -> ImpactStampPreparation:
 	work.raster_band_index = 0
 	work.raster_band_count = 1
 	work.prepares_patch = false
+	work.prepares_overlay_texture = false
 	work.private_texture_tile_index = -1
 	work.image_preparation = null
 	return work
@@ -824,6 +884,15 @@ func _queue_stamp_layer_patch_preparation(
 		work.raster_band_count = raster_band_count
 		work.prepares_patch = true
 		_pending_stamp_preparation.append(work)
+	# Keep the patch upload as its own measured slice. Combining it with the
+	# final raster band can exceed the 7 ms atomic Web budget on a cold driver.
+	var overlay_work := _obtain_stamp_preparation_work()
+	overlay_work.stamp = stamp
+	overlay_work.layer_index = layer_index
+	overlay_work.chunk = chunk
+	overlay_work.chunk_index = chunk_index
+	overlay_work.prepares_overlay_texture = true
+	_pending_stamp_preparation.append(overlay_work)
 	# GPU texture creation is candidate-independent once the CPU stratum has
 	# detached. Queue one bounded tile allocation after its patch raster bands.
 	var dirty_tile_bits := _get_stamp_dirty_tile_bits(stamp, layer_index)
@@ -970,6 +1039,7 @@ func _compact_pending_stamp_preparation() -> void:
 		work.raster_band_index = 0
 		work.raster_band_count = 1
 		work.prepares_patch = false
+		work.prepares_overlay_texture = false
 		work.private_texture_tile_index = -1
 		work.image_preparation = null
 		if (
@@ -1253,6 +1323,7 @@ func _process_next_pending_impact_work() -> void:
 		return
 	var work := _pending_impact_work[_pending_impact_work_head]
 	_pending_impact_work_head += 1
+	var presented_prepared_overlay := false
 	if not work.raster_complete and work.prepared_patch != null:
 		if _active_chunks.get(work.chunk_index) == work.chunk:
 			_make_layer_writable(work.chunk, work.layer_index)
@@ -1272,6 +1343,14 @@ func _process_next_pending_impact_work() -> void:
 				)
 				work.chunk.dirty_mask_tiles[work.layer_index] |= (
 					work.prepared_patch.dirty_tile_bits
+				)
+				_show_prepared_patch_overlay(
+					work.chunk,
+					work.layer_index,
+					work.prepared_patch
+				)
+				presented_prepared_overlay = (
+					work.prepared_patch.overlay_texture != null
 				)
 				work.chunk.layer_revisions[work.layer_index] += 1
 			else:
@@ -1306,6 +1385,12 @@ func _process_next_pending_impact_work() -> void:
 		work.raster_complete = true
 	else:
 		work.raster_complete = true
+	# The exact small patch is already visible. Resume this same descriptor next
+	# frame for the expensive full-tile fold-in instead of doing both at contact.
+	if presented_prepared_overlay:
+		_pending_impact_work_head -= 1
+		_impact_overlay_presented_this_frame = true
+		return
 	# A final descriptor resumes at the same head until every dirty tile has
 	# uploaded. Queue size stays bounded while the 7 ms guard sees each slice.
 	# A preparation-only item owns no chunk, so it has no texture to publish.
@@ -1721,6 +1806,61 @@ func _restore_chunk_snapshot(
 ## Drops every streamed chunk and its stamp history so the next refresh draws
 ## intact terrain again. The editor preview needs this because moving a test
 ## impact has to un-break the rock the previous position broke.
+## Dresses the foreground stratum's top edge as walked-on ground at a world y,
+## or clears it. This is the cutscene system's shared floor treatment.
+##
+## A cutscene room's floor is hundreds of rows below the run's own surface, so
+## the crust the surface uses cannot reach it. This pushes the same idea against
+## whatever line the caller names, which is what makes it reusable: an encounter
+## turns it on at its own floor when the shot opens and clears it when the shot
+## releases, and no room needs its own shader or its own material.
+##
+## Live chunks are updated in place rather than rebuilt. The dressing is two
+## uniforms; rebuilding streamed chunks to change them would replay every mask
+## upload in view, which is exactly the per-frame cost the platform budget exists
+## to protect.
+func set_trodden_floor(enabled: bool, floor_world_y: float = 0.0) -> void:
+	if _trodden_floor_is_enabled == enabled and is_equal_approx(
+		_trodden_floor_world_y,
+		floor_world_y
+	):
+		return
+	_trodden_floor_is_enabled = enabled
+	_trodden_floor_world_y = floor_world_y
+	_publish_trodden_floor()
+
+
+## Pushes the two live values onto every chunk material already streamed, pooled
+## ones included - a pooled chunk is refilled without its material being rebuilt,
+## so one left behind would come back wearing the last shot's floor.
+func _publish_trodden_floor() -> void:
+	for chunk in _active_chunks.values():
+		_publish_trodden_floor_to_chunk(chunk)
+	for chunk in _chunk_visual_pool:
+		_publish_trodden_floor_to_chunk(chunk)
+
+
+func _publish_trodden_floor_to_chunk(chunk: TerrainChunkVisual) -> void:
+	for layer_index in range(chunk.layer_sprites.size()):
+		var sprite := chunk.layer_sprites[layer_index]
+		if not is_instance_valid(sprite):
+			continue
+		var material := sprite.material as ShaderMaterial
+		if material == null:
+			continue
+		# Foreground stratum only, the same rule the crust follows: it is the
+		# layer the cast stand on, so a mined opening takes the dressing with the
+		# ground it removed.
+		material.set_shader_parameter(
+			&"use_trodden_floor",
+			_trodden_floor_is_enabled and layer_index == 0
+		)
+		material.set_shader_parameter(
+			&"trodden_floor_world_y",
+			_trodden_floor_world_y
+		)
+
+
 func rebuild_all_chunks() -> void:
 	_impact_stamps_by_chunk.clear()
 	_compressed_chunk_snapshots.clear()
@@ -1955,7 +2095,7 @@ func _on_viewport_size_changed() -> void:
 	_position_active_chunks()
 
 
-## Loads visible chunks plus the configured below-view margin.
+## Loads visible chunks plus the configured margins above and below the view.
 func _refresh_active_chunks() -> void:
 	# Coverage is measured against the viewport, which only exists once this is
 	# in the tree. The editor instantiates a scene before parenting it, so an
@@ -1992,8 +2132,12 @@ func _refresh_active_chunks() -> void:
 		_current_view_y
 		+ (visible_world_bottom - config.mining_face_screen_y) / cell_size
 	)
-	var first_chunk := maxi(
+	var first_visible_chunk := maxi(
 		floori(top_world_y / float(config.chunk_height_cells)),
+		0
+	)
+	var first_chunk := maxi(
+		first_visible_chunk - config.preload_chunks_above,
 		0
 	)
 	var last_visible_chunk := maxi(
@@ -2001,7 +2145,7 @@ func _refresh_active_chunks() -> void:
 			(bottom_world_y - 0.001)
 			/ float(config.chunk_height_cells)
 		),
-		first_chunk
+		first_visible_chunk
 	)
 	var last_chunk := mini(
 		last_visible_chunk + config.preload_chunks_below,
@@ -2225,6 +2369,7 @@ func _share_intact_masks(
 			chunk.layer_sprites[layer_index],
 			texture_tiles
 		)
+		_clear_prepared_patch_overlay(chunk, layer_index)
 		chunk.dirty_mask_tiles[layer_index] = 0
 		chunk.layer_revisions[layer_index] = 0
 	chunk.shared_layers = (1 << layer_count) - 1
@@ -2250,13 +2395,7 @@ func _build_chunk_masks(
 	# Per-layer rooms replace every foreground source. A chamber backdrop has
 	# its own source below, so building the logical full-resolution mask here
 	# would allocate and fill an image no stratum ever consumes.
-	if (
-		not chunk_has_per_layer_sculpt
-		or (
-			profile.keep_back_layer_solid
-			and not chunk_contains_chamber
-		)
-	):
+	if not chunk_has_per_layer_sculpt:
 		base_mask = _build_chunk_base_mask(
 			chunk_index,
 			false,
@@ -2291,25 +2430,28 @@ func _build_chunk_masks(
 			else base_mask
 		)
 		var layer_mask := source_mask
-		# A room whose strata were sculpted apart needs its own rock per
-		# stratum, including its authored fourth-layer back wall. The old
-		# retained chamber backdrop knew only the procedural chamber's narrow
-		# horizontal band, so a tall sculpt showed the fourth stratum as a line
-		# across its middle. The room mask is solid across the full authored
-		# footprint and therefore remains visible wherever layers 1-3 open.
+		# Authored foreground strata need their own room masks. Every shipped
+		# fourth-layer room wall is fully solid, so reuse the immutable pristine
+		# mask instead of rasterizing a fourth full room during traversal.
 		if chunk_has_per_layer_sculpt:
-			layer_mask = _build_chunk_base_mask(
-				chunk_index,
-				false,
-				chunk_contains_chamber,
-				chunk_contains_sculpt,
-				layer_index
+			layer_mask = (
+				_get_pristine_mask_image()
+				if uses_backdrop_source
+				else _build_chunk_base_mask(
+					chunk_index,
+					false,
+					chunk_contains_chamber,
+					chunk_contains_sculpt,
+					layer_index
+				)
 			)
 		chunk.mask_images[layer_index] = layer_mask
 		chunk.dirty_mask_tiles[layer_index] = ALL_MASK_TILES_DIRTY
 	# Mark every image used by more than one stratum as copy-on-write. A later
 	# impact detaches only the layer it changes.
 	for layer_index in range(layer_count):
+		if chunk.mask_images[layer_index] == _pristine_mask_image:
+			chunk.shared_layers |= 1 << layer_index
 		for previous_layer_index in range(layer_index):
 			if (
 				chunk.mask_images[layer_index]
@@ -2347,6 +2489,8 @@ func _make_layer_writable(
 func _publish_chunk_textures(chunk: TerrainChunkVisual) -> void:
 	var shared_tiles_by_image_id: Dictionary[int, Array] = {}
 	for layer_index in range(chunk.mask_images.size()):
+		if _bind_pristine_layer_texture(chunk, layer_index):
+			continue
 		var mask_image: Image = chunk.mask_images[layer_index]
 		var image_id := mask_image.get_instance_id()
 		if (
@@ -2380,6 +2524,8 @@ func _queue_chunk_textures(
 	var layers_by_image_id: Dictionary[int, PackedInt32Array] = {}
 	for layer_index in range(chunk.mask_images.size()):
 		if chunk.dirty_mask_tiles[layer_index] == 0:
+			continue
+		if _bind_pristine_layer_texture(chunk, layer_index):
 			continue
 		var image_id := chunk.mask_images[layer_index].get_instance_id()
 		if chunk.shared_layers & (1 << layer_index) == 0:
@@ -2449,6 +2595,26 @@ func _process_next_chunk_texture_publish() -> void:
 		_chunk_texture_publish_pool.append(work)
 
 
+## Binds the one immutable solid GPU mask without rebuilding or uploading it.
+## The layer remains copy-on-write, so the first impact detaches its CPU image.
+func _bind_pristine_layer_texture(
+	chunk: TerrainChunkVisual,
+	layer_index: int
+) -> bool:
+	if chunk.mask_images[layer_index] != _pristine_mask_image:
+		return false
+	var texture_tiles: Array[ImageTexture] = []
+	texture_tiles.resize(MASK_HORIZONTAL_TILE_COUNT)
+	texture_tiles.fill(_pristine_mask_texture)
+	chunk.mask_texture_tiles[layer_index] = texture_tiles
+	_set_sprite_mask_textures(
+		chunk.layer_sprites[layer_index],
+		texture_tiles
+	)
+	chunk.dirty_mask_tiles[layer_index] = 0
+	return true
+
+
 func _compact_pending_chunk_texture_publishes() -> void:
 	if _pending_chunk_texture_publish_head <= 0:
 		return
@@ -2467,6 +2633,47 @@ func _compact_pending_chunk_texture_publishes() -> void:
 		)
 	)
 	_pending_chunk_texture_publish_head = 0
+
+
+## Displays the exact prepared pixels while the authoritative full tile folds
+## in behind them. Every mask sample, including outline probes, uses this patch.
+func _show_prepared_patch_overlay(
+	chunk: TerrainChunkVisual,
+	layer_index: int,
+	patch: PreparedLayerPatch
+) -> void:
+	if patch.overlay_texture == null:
+		return
+	var mask_size := Vector2(_get_chunk_mask_size())
+	var material := (
+		chunk.layer_sprites[layer_index].material as ShaderMaterial
+	)
+	material.set_shader_parameter(
+		&"impact_patch_texture",
+		patch.overlay_texture
+	)
+	material.set_shader_parameter(
+		&"impact_patch_uv_rect",
+		Vector4(
+			float(patch.destination_position.x) / mask_size.x,
+			float(patch.destination_position.y) / mask_size.y,
+			float(patch.image.get_width()) / mask_size.x,
+			float(patch.image.get_height()) / mask_size.y
+		)
+	)
+	material.set_shader_parameter(&"use_impact_patch", true)
+
+
+## Removes the transient exact patch only after every dirty base tile published.
+func _clear_prepared_patch_overlay(
+	chunk: TerrainChunkVisual,
+	layer_index: int
+) -> void:
+	var material := (
+		chunk.layer_sprites[layer_index].material as ShaderMaterial
+	)
+	material.set_shader_parameter(&"use_impact_patch", false)
+	material.set_shader_parameter(&"impact_patch_texture", null)
 
 
 ## Uploads one stratum, reusing its texture unless the mask it draws changed
@@ -2536,6 +2743,8 @@ func _publish_layer_texture(
 	chunk.mask_texture_tiles[layer_index] = texture_tiles
 	_set_sprite_mask_textures(sprite, texture_tiles)
 	chunk.dirty_mask_tiles[layer_index] &= ~dirty_tiles
+	if chunk.dirty_mask_tiles[layer_index] == 0:
+		_clear_prepared_patch_overlay(chunk, layer_index)
 
 
 ## Binds one layer's fixed tile set to its single full-width sprite.
@@ -2753,6 +2962,7 @@ func _release_chunk_masks(chunk: TerrainChunkVisual) -> void:
 			chunk.layer_sprites[layer_index],
 			texture_tiles
 		)
+		_clear_prepared_patch_overlay(chunk, layer_index)
 		chunk.dirty_mask_tiles[layer_index] = 0
 		chunk.layer_revisions[layer_index] = 0
 	chunk.shared_layers = (1 << chunk.mask_images.size()) - 1
@@ -5136,6 +5346,11 @@ func _prepare_chamber_transition_stamps() -> void:
 		var encounter_depth := encounter.resolve_depth(
 			config.total_run_depth
 		)
+		var encounter_chamber_height := (
+			encounter.resolve_chamber_height_rows(
+				encounter_config.chamber_height_rows
+			)
+		)
 		var chamber_bounds := (
 			encounter_config.get_chamber_horizontal_bounds(
 				encounter_depth - 1,
@@ -5148,7 +5363,7 @@ func _prepare_chamber_transition_stamps() -> void:
 		var chamber_ceiling_row := (
 			config.initial_surface_row
 			+ encounter_depth
-			- encounter_config.chamber_height_rows
+			- encounter_chamber_height
 		)
 		var random := RandomNumberGenerator.new()
 		random.seed = encounter_depth * 104_729 + 17
@@ -5735,6 +5950,39 @@ func _create_layer_material(
 	material.set_shader_parameter(
 		&"edge_light_strength",
 		profile.edge_light_strength
+	)
+	# Trodden floor, foreground stratum only, for whichever cutscene room has
+	# asked for it. Same rule as the crust below: it is the layer the cast stand
+	# on, so a mined opening takes the dressing away with the ground.
+	material.set_shader_parameter(
+		&"use_trodden_floor",
+		_trodden_floor_is_enabled and layer_index == 0
+	)
+	material.set_shader_parameter(
+		&"trodden_floor_world_y",
+		_trodden_floor_world_y
+	)
+	material.set_shader_parameter(
+		&"trodden_depth_world_px",
+		trodden_depth_world_px
+	)
+	material.set_shader_parameter(
+		&"trodden_falloff_world_px",
+		trodden_falloff_world_px
+	)
+	material.set_shader_parameter(&"trodden_color", trodden_color)
+	material.set_shader_parameter(&"trodden_strength", trodden_strength)
+	material.set_shader_parameter(
+		&"trodden_edge_wander_world_px",
+		trodden_edge_wander_world_px
+	)
+	material.set_shader_parameter(
+		&"trodden_grain_strength",
+		trodden_grain_strength
+	)
+	material.set_shader_parameter(
+		&"trodden_grain_world_px",
+		trodden_grain_world_px
 	)
 	# Only the foreground stratum grows the surface. Deeper layers keep their
 	# bare rock, and a mined opening removes grass and crust along with it.

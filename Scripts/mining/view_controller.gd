@@ -6,7 +6,7 @@ extends Node
 ## - _current_miner_position falls diagonally through each newly opened path.
 ## - Smooth mode eases after the miner and closes its lag after contact.
 ## - Chunk mode holds one page until the miner crosses its halfway point.
-## - Review mode moves the view only; returning uses its own fast free fall.
+## - Review mode follows fractional pixel input and only idles onto encounters.
 ## - Detached travel stays below one terrain chunk per rendered frame.
 ## - Encounter framing and release tween from the currently presented view.
 ## The invariant is that screen offset always equals miner position minus view.
@@ -46,6 +46,9 @@ var _fall_start_position: Vector2
 ## Downward row velocity retained across frames and consecutive openings.
 var _mining_fall_velocity: float = 0.0
 var _review_target_y: float
+var _review_idle_seconds: float = 0.0
+var _review_snap_target_y: float = NAN
+var _last_review_scroll_direction: float = 0.0
 var _return_velocity: float = 0.0
 var _last_landing_y: int
 var _view_mode: ViewMode = ViewMode.FOLLOWING_MINER
@@ -53,6 +56,9 @@ var _last_miner_screen_offset := Vector2(NAN, NAN)
 var _is_encounter_focus_active: bool = false
 var _is_encounter_release_active: bool = false
 var _encounter_view_tween: Tween
+## The frame the encounter focus settled on, which authored camera moves during
+## that encounter are measured from.
+var _encounter_focus_view := Vector2.ZERO
 
 
 ## Starts the view at the ground surface.
@@ -63,6 +69,9 @@ func _ready() -> void:
 	_current_miner_position = target_view_position
 	_fall_start_position = target_view_position
 	_review_target_y = current_view_y
+	_review_idle_seconds = 0.0
+	_review_snap_target_y = NAN
+	_last_review_scroll_direction = 0.0
 	_last_landing_y = config.initial_surface_row
 	terrain_manager.set_view_position(
 		Vector2(current_view_x, current_view_y)
@@ -114,14 +123,50 @@ func focus_miner_for_encounter(subject_rest_screen_y: float = NAN) -> void:
 	_current_miner_position = target_view_position
 	_fall_start_position = target_view_position
 	_review_target_y = target_view_position.y
+	_review_idle_seconds = 0.0
+	_review_snap_target_y = NAN
+	_last_review_scroll_direction = 0.0
 	_mining_fall_velocity = 0.0
 	_return_velocity = 0.0
 	_view_mode = ViewMode.FOLLOWING_MINER
+	# Recorded before the tween rather than after it, so an authored move that
+	# starts on the same frame the focus arrives still has a frame to measure
+	# from instead of a zero.
+	_encounter_focus_view = Vector2(target_view_position.x, focus_view_y)
 	_tween_encounter_view_to(
 		Vector2(target_view_position.x, focus_view_y),
 		encounter_focus_duration,
 		_on_encounter_focus_tween_finished
 	)
+
+
+## Slides the framed view off the framing an encounter settled on, in terrain
+## cells, on both axes.
+##
+## Every other camera move here is a tween this file owns, because every other
+## camera move is a transition between two framings. A pan is not: it is the
+## shot, it wants an authored curve, and the caller is already animating one. So
+## this takes a position rather than a destination and is expected to be called
+## every frame while the move runs.
+##
+## It is measured from `_encounter_focus_view`, the frame the focus tween
+## actually arrived at, rather than from `target_view_position`. Horizontally the
+## two agree, because the focus tween only ever moves vertically. Vertically they
+## do not: `target_view_position.y` is the miner's own cell, while the focus
+## framing has already lifted the view to put his feet at the authored screen
+## ratio, and offsetting from the raw cell would throw that away and jump the
+## camera the moment a move began.
+##
+## It refuses outside an encounter focus on purpose, because outside one
+## `target_view_position` is chasing the miner and the same offset would read as
+## the camera drifting for no reason. Nothing has to undo a move either -
+## `release_encounter_focus` already tweens back to `target_view_position`, so
+## the view walks home when the shot ends.
+func set_encounter_view_offset_cells(offset_cells: Vector2) -> void:
+	if not _is_encounter_focus_active:
+		return
+	current_view_x = _encounter_focus_view.x + offset_cells.x
+	current_view_y = _encounter_focus_view.y + offset_cells.y
 
 
 ## Exposes the last published view displacement for presentation composition.
@@ -254,6 +299,9 @@ func snap_follow_to_target() -> void:
 	_current_miner_position = target_view_position
 	_fall_start_position = target_view_position
 	_review_target_y = target_view_position.y
+	_review_idle_seconds = 0.0
+	_review_snap_target_y = NAN
+	_last_review_scroll_direction = 0.0
 	_mining_fall_velocity = 0.0
 	_return_velocity = 0.0
 	current_view_x = target_view_position.x
@@ -271,14 +319,14 @@ func snap_follow_to_target() -> void:
 	_publish_miner_screen_offset()
 
 
-## Moves the detached view toward earlier or later visited terrain.
-func scroll_review(direction: int) -> void:
-	var safe_direction := clampi(direction, -1, 1)
-	if safe_direction == 0 or _view_mode == ViewMode.RETURNING:
+## Queues fractional viewport-pixel travel through earlier or later terrain.
+func scroll_review(scroll_steps: float) -> void:
+	var safe_scroll_steps := clampf(scroll_steps, -8.0, 8.0)
+	if is_zero_approx(safe_scroll_steps) or _view_mode == ViewMode.RETURNING:
 		return
 	if (
 		_view_mode == ViewMode.FOLLOWING_MINER
-		and safe_direction > 0
+		and safe_scroll_steps > 0.0
 	):
 		return
 	if _view_mode == ViewMode.FOLLOWING_MINER:
@@ -301,12 +349,20 @@ func scroll_review(direction: int) -> void:
 		_review_target_y = current_view_y
 		review_started.emit()
 
+	if not is_nan(_review_snap_target_y):
+		# Input releases a magnetic encounter stop from the presented frame, so
+		# repeated wheel movement passes through rather than fighting the lock.
+		_review_target_y = current_view_y
+		_review_snap_target_y = NAN
+	_review_idle_seconds = 0.0
+	_last_review_scroll_direction = signf(safe_scroll_steps)
+	var scroll_rows := (
+		safe_scroll_steps
+		* config.review_scroll_pixels_per_step
+		/ float(config.terrain_cell_world_size)
+	)
 	_review_target_y = clampf(
-		_review_target_y
-			+ float(
-				safe_direction
-				* config.review_scroll_rows_per_step
-		),
+		_review_target_y + scroll_rows,
 		float(config.initial_surface_row),
 		target_view_position.y
 	)
@@ -453,20 +509,24 @@ func _report_mining_landing() -> void:
 
 ## Moves the review camera toward the most recent wheel target.
 func _move_review_view(delta: float) -> void:
-	var remaining_distance := absf(
-		_review_target_y - current_view_y
+	_review_idle_seconds += maxf(delta, 0.0)
+	if (
+		is_nan(_review_snap_target_y)
+		and _last_review_scroll_direction < 0.0
+		and _review_idle_seconds
+			>= config.review_cutscene_snap_delay_seconds
+	):
+		var encounter_view_y := _find_nearby_review_encounter_view_y(
+			_review_target_y
+		)
+		if not is_nan(encounter_view_y):
+			_review_target_y = encounter_view_y
+			_review_snap_target_y = encounter_view_y
+	var scroll_speed_rows := (
+		config.review_scroll_speed_pixels_per_second
+		/ float(config.terrain_cell_world_size)
 	)
-	var speed_weight := smoothstep(
-		0.0,
-		config.review_scroll_acceleration_distance,
-		remaining_distance
-	)
-	var scroll_speed := lerpf(
-		config.review_scroll_close_speed,
-		config.review_scroll_speed,
-		speed_weight
-	)
-	var travel := _get_stream_safe_travel(scroll_speed, delta)
+	var travel := _get_stream_safe_travel(scroll_speed_rows, delta)
 	current_view_y = move_toward(
 		current_view_y,
 		_review_target_y,
@@ -485,6 +545,52 @@ func _move_review_view(delta: float) -> void:
 		)
 	):
 		_finish_return_to_miner()
+
+
+## Finds the one authored encounter framing close enough to claim an idle review.
+func _find_nearby_review_encounter_view_y(review_target_y: float) -> float:
+	if (
+		terrain_manager == null
+		or terrain_manager.encounter_config == null
+	):
+		return NAN
+	var cell_size := float(config.terrain_cell_world_size)
+	var focus_screen_y := (
+		get_viewport().get_visible_rect().size.y
+		* encounter_focus_viewport_y_ratio
+	)
+	var focus_offset_rows := (
+		(focus_screen_y - config.mining_face_screen_y) / cell_size
+	)
+	var snap_distance_rows := (
+		config.review_cutscene_snap_distance_pixels / cell_size
+	)
+	var nearest_view_y := NAN
+	var nearest_distance := INF
+	for encounter: DepthCharacterEncounter in (
+		terrain_manager.encounter_config.encounters
+	):
+		if encounter == null:
+			continue
+		var encounter_floor_y := float(
+			config.initial_surface_row
+			+ encounter.resolve_depth(config.total_run_depth)
+		)
+		if encounter_floor_y > target_view_position.y:
+			continue
+		var encounter_view_y := clampf(
+			encounter_floor_y - focus_offset_rows,
+			float(config.initial_surface_row),
+			target_view_position.y
+		)
+		var distance := absf(encounter_view_y - review_target_y)
+		if (
+			distance <= snap_distance_rows
+			and distance < nearest_distance
+		):
+			nearest_view_y = encounter_view_y
+			nearest_distance = distance
+	return nearest_view_y
 
 
 ## Accelerates the detached camera until it reaches the miner.
@@ -551,6 +657,9 @@ func _finish_return_to_miner() -> void:
 	_current_miner_position = target_view_position
 	_fall_start_position = target_view_position
 	_review_target_y = target_view_position.y
+	_review_idle_seconds = 0.0
+	_review_snap_target_y = NAN
+	_last_review_scroll_direction = 0.0
 	_mining_fall_velocity = 0.0
 	_return_velocity = 0.0
 	_view_mode = ViewMode.FOLLOWING_MINER

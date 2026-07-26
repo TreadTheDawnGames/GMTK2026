@@ -4,18 +4,18 @@
 [ext_resource type="Script" uid="uid://sqs37vj87ep8" path="res://resources/encounters/depth_character_encounter.gd" id="2_encounter_type"]
 [ext_resource type="Resource" uid="uid://bybay0swkjdfa" path="res://resources/encounters/cheese_girl_first_encounter.tres" id="3_cheese_girl"]
 [ext_resource type="Resource" uid="uid://yjqxjobgqi5l" path="res://resources/encounters/cloak_lantern_first_encounter.tres" id="4_lantern_first"]
-[ext_resource type="Resource" uid="uid://dtmlgtaktiupi" path="res://resources/encounters/treasure_hunter_first_encounter.tres" id="5_treasure_first"]
+[ext_resource type="Resource" path="res://resources/encounters/treasure_hunter_first_encounter.tres" id="5_treasure_first"]
 [ext_resource type="Resource" uid="uid://clwsbrl16xf7j" path="res://resources/encounters/rutini_first_encounter.tres" id="6_rutini_first"]
-[ext_resource type="Resource" uid="uid://cywjl1i6q1mrx" path="res://resources/encounters/cloak_lantern_warning_encounter.tres" id="7_lantern_second"]
-[ext_resource type="Resource" uid="uid://d2j5tkiuns0rr" path="res://resources/encounters/treasure_hunter_treasure_encounter.tres" id="8_treasure_second"]
-[ext_resource type="Resource" uid="uid://dytb1yoynikil" path="res://resources/encounters/coffee_cat_first_encounter.tres" id="9_quibble"]
-[ext_resource type="Resource" uid="uid://b6ykfruy132kl" path="res://resources/encounters/rutini_second_encounter.tres" id="10_rotini_colony"]
-[ext_resource type="Resource" uid="uid://dgy46qtbey1sg" path="res://resources/encounters/cafe_gathering_encounter.tres" id="11_cafe"]
-[ext_resource type="Resource" uid="uid://v2ye4dw3xdms" path="res://resources/encounters/cloak_lantern_post_credits_encounter.tres" id="12_lantern_post_credits"]
-[ext_resource type="Resource" uid="uid://tqmj6qvdvw2r" path="res://resources/encounters/thief_final_encounter.tres" id="13_thief"]
+[ext_resource type="Resource" path="res://resources/encounters/cloak_lantern_warning_encounter.tres" id="7_lantern_second"]
+[ext_resource type="Resource" uid="uid://pxolfwsy5ug2" path="res://resources/encounters/treasure_hunter_treasure_encounter.tres" id="8_treasure_second"]
+[ext_resource type="Resource" path="res://resources/encounters/coffee_cat_first_encounter.tres" id="9_quibble"]
+[ext_resource type="Resource" path="res://resources/encounters/rutini_second_encounter.tres" id="10_rotini_colony"]
+[ext_resource type="Resource" path="res://resources/encounters/cafe_gathering_encounter.tres" id="11_cafe"]
+[ext_resource type="Resource" path="res://resources/encounters/cloak_lantern_post_credits_encounter.tres" id="12_lantern_post_credits"]
+[ext_resource type="Resource" path="res://resources/encounters/thief_final_encounter.tres" id="13_thief"]
 
 [resource]
 script = ExtResource("1_config")
 encounters = Array[ExtResource("2_encounter_type")]([ExtResource("3_cheese_girl"), ExtResource("4_lantern_first"), ExtResource("6_rutini_first"), ExtResource("5_treasure_first"), ExtResource("7_lantern_second"), ExtResource("8_treasure_second"), ExtResource("9_quibble"), ExtResource("10_rotini_colony"), ExtResource("11_cafe"), ExtResource("12_lantern_post_credits"), ExtResource("13_thief")])
 chamber_height_rows = 24
-gathering_actor_ids = Array[StringName]([&"cheese_girl", &"treasure_hunter", &"rutini", &"coffee_cat", &"cloak_lantern"])
+gathering_actor_ids = Array[StringName]([&"cheese_girl", &"treasure_hunter", &"rutini", &"cloak_lantern", &"coffee_cat"])

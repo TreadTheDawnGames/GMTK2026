@@ -1,4 +1,5 @@
 extends TimingTarget
+class_name ReverseTarget
 
 func hit(_timing_window: SliderTimingWindow = null) -> void:
 	super.hit(_timing_window)

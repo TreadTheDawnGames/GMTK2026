@@ -7,7 +7,7 @@ class_name PlayerAudioHandler
 func _ready() -> void:
 	pass # Replace with function body.
 
-func PlaySoundAtGlobalPosition(sound : AudioStream, globPos : Vector2, doPitchScale = true, busName : String = "SFX"):
+func PlaySoundAtGlobalPosition(sound : AudioStream, globPos : Vector2, set_as_parent : Node = null, doPitchScale = true, busName : String = "SFX") -> AudioStreamPlayer2D:
 	if(not sound):
 		DisplayServer.beep()
 	
@@ -18,12 +18,16 @@ func PlaySoundAtGlobalPosition(sound : AudioStream, globPos : Vector2, doPitchSc
 	audioPlayer.pitch_scale = (randf_range(1.0, 1.5) if doPitchScale else 1.0)
 	audioPlayer.bus = busName
 	audioPlayer.finished.connect(func(): audioPlayer.queue_free())
-	get_tree().root.add_child(audioPlayer)
+	if set_as_parent:
+		set_as_parent.add_child(audioPlayer)
+	else:
+		get_tree().root.add_child(audioPlayer)
+	return audioPlayer
 	
 ## pitchScale is applied when doPitchScale is false, so callers that already
 ## know the pitch they want (the combo ladder) can set it exactly instead of
 ## taking the random spread.
-func play_sound(sound : AudioStream, busName : String = "SFX", doPitchScale = false, pitchScale : float = 1.0):
+func play_sound(sound : AudioStream, busName : String = "SFX", doPitchScale = false, pitchScale : float = 1.0) -> AudioStreamPlayer:
 	if(not sound):
 		DisplayServer.beep()
 
@@ -35,6 +39,7 @@ func play_sound(sound : AudioStream, busName : String = "SFX", doPitchScale = fa
 	audioPlayer.bus = busName
 	audioPlayer.finished.connect(func(): audioPlayer.queue_free())
 	get_tree().root.add_child(audioPlayer)
+	return audioPlayer
 
 # four intensities level 1 loop forever until you hit one, then it goes into
 # level two, which loops until you reach a threshold (7 hits), at which point

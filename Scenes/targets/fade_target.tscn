@@ -6,7 +6,12 @@
 [node name="FadeTarget" unique_id=980051362 instance=ExtResource("1_1lgta")]
 self_modulate = Color(0.30588236, 0, 1, 1)
 script = ExtResource("2_ewmrw")
-fade_time = 2.0
+fade_time = 3.0
+my_width = 48.0
 
 [node name="TextureRect" parent="." index="0" unique_id=1601954937]
 visible = true
+offset_left = -21.0
+offset_top = -24.0
+offset_right = 27.0
+offset_bottom = 24.0

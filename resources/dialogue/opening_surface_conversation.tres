@@ -6,31 +6,31 @@
 
 [sub_resource type="Resource" id="Line_return"]
 script = ExtResource("3_line")
-speaker_slot = &"opening_voice"
+speaker_slot = &"newspaper_reader"
 text = "You’re back?"
 
 [sub_resource type="Resource" id="Line_thief"]
 script = ExtResource("3_line")
-speaker_slot = &"opening_voice"
+speaker_slot = &"newspaper_reader"
 text = "You already know the Thief lies below."
 
 [sub_resource type="Resource" id="Line_fools_one"]
 script = ExtResource("3_line")
-speaker_slot = &"opening_voice"
+speaker_slot = &"newspaper_reader"
 text = "Only fools find him."
 
 [sub_resource type="Resource" id="Line_fools_two"]
 script = ExtResource("3_line")
-speaker_slot = &"opening_voice"
+speaker_slot = &"newspaper_reader"
 text = "Only fools."
 
-[sub_resource type="Resource" id="Participant_opening_voice"]
+[sub_resource type="Resource" id="Participant_newspaper_reader"]
 script = ExtResource("2_participant")
-slot = &"opening_voice"
-display_name = "..."
+slot = &"newspaper_reader"
+display_name = "Mr. Sitts"
 
 [resource]
 script = ExtResource("1_conversation")
 conversation_id = &"opening_surface"
-participants = Array[ExtResource("2_participant")]([SubResource("Participant_opening_voice")])
+participants = Array[ExtResource("2_participant")]([SubResource("Participant_newspaper_reader")])
 lines = Array[ExtResource("3_line")]([SubResource("Line_return"), SubResource("Line_thief"), SubResource("Line_fools_one"), SubResource("Line_fools_two")])

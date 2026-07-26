@@ -15,6 +15,7 @@ occurs_at_run_bottom = true
 appearance = ExtResource("2_appearance")
 stage_scene = ExtResource("4_rdkm7")
 sequence = ExtResource("4_nhos6")
+plays_authored_timeline = true
 encrypted_conversation = ExtResource("3_dialogue")
 speaker_slot = &"thief"
 terrain_sculpt = ExtResource("6_nhos6")

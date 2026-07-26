@@ -23,7 +23,6 @@ Nothing moves him in this shot, so this is the only thing that can aim him. A MO
 
 [sub_resource type="Resource" id="Beat_hold"]
 script = ExtResource("1_beat")
-kind = 4
 duration_seconds = 1.2
 notes = "A second and a fifth of the two of them and nothing else, before he speaks.
 
@@ -39,13 +38,12 @@ notes = "The whole conversation: 'Yo chud, you been digging a long time.' / 'Onl
 
 Six seconds is the authored estimate the editor scrubs against, not the real length. This beat blocks, so the clock holds here for exactly as long as the player takes to read and every beat after it slides by the same amount.
 
-Do not split this into two beats to land a cue between the lines. line_range is authored and validated but depth_encounter_controller currently ignores it, so any DIALOGUE beat plays the whole conversation.
+This remains one blocking beat because the warning is uninterrupted. The editor can split it into inclusive line ranges if later staging needs a cue between lines.
 
 NOTHING IS STAGED AGAINST THE JOKE. 'Yo chud' is a register he has never used - the same figure delivered the Thief foreshadowing at 1,400 and the warning at 5,600 without once being casual - and the shot deliberately does not acknowledge it. No bounce, no quickened pacing, no loosened posture. He says it in the voice he used for everything else, and the break lands because the staging refuses to play along with it. A version that leaned into it was considered and rejected on 2026-07-25."
 
 [sub_resource type="Resource" id="Beat_settle"]
 script = ExtResource("1_beat")
-kind = 4
 start_seconds = 7.2
 duration_seconds = 1.4
 notes = "A held beat on the two of them after the last line, before the timeline ends and play_closing takes him. Without it the shot cuts straight from the dialogue box closing to him fading, and the line does not get to land. Half a second longer than the same beat at 5,600, for the same reason the opening pause is twice as long.

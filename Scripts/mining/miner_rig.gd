@@ -21,16 +21,18 @@ signal swing_finished
 ## Seats Eve's redrawn miner on the pale top stratum at the surface.
 ##
 ## The rig root is at y 202 and the visible sole is 66.83 px below VisualRoot,
-## so -11 keeps the boot a little over two pixels above the y 260 terrain rim.
+## so -8 overlaps the y 260 terrain rim by less than one filtered pixel.
 ## Dynamic mined floors use the measured LandingFootAnchor below.
-@export_range(-64.0, 64.0, 1.0) var intact_floor_grounding_offset_y: float = -11.0
+@export_range(-64.0, 64.0, 1.0) var intact_floor_grounding_offset_y: float = -8.0
 ## The same measured seating for the run's starting surface.
 ##
 ## It remains a separate value because a future surface redraw must not silently
 ## move every underground encounter.
-@export_range(-64.0, 64.0, 1.0) var surface_grounding_offset_y: float = -11.0
-## Keeps the measured sole above the sampled dirt edge rather than inside it.
-@export_range(0.0, 4.0, 0.25) var grounding_clearance_y: float = 1.0
+@export_range(-64.0, 64.0, 1.0) var surface_grounding_offset_y: float = -8.0
+## Slightly overlaps every sampled dirt edge so filtering cannot reveal a gap.
+## LandingFootAnchor is about one pixel below the opaque boot; two pixels seats
+## the visible sole just inside the contour without burying the ankle.
+@export_range(0.0, 4.0, 0.25) var grounding_overlap_y: float = 2.0
 ## Lifts the sole baseline slightly on each cinematic walking step.
 @export_range(0.0, 12.0, 0.5) var cinematic_walk_step_height: float = 4.0
 ## Controls how many visible walking steps fit along a traversal segment.
@@ -541,7 +543,7 @@ func seat_landing_foot_at_screen_y(support_screen_y: float) -> void:
 	# foot happened to be and keep it there.
 	var grounding_delta: float = (
 		support_screen_y
-		- grounding_clearance_y
+		+ grounding_overlap_y
 		- (landing_foot_anchor.global_position.y + _get_walk_step_lift())
 	)
 	var current_grounding_offset: float = (
