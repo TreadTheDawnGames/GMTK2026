@@ -27,6 +27,9 @@ const SHAFT_LEFT_X: int = 108
 const SHAFT_RIGHT_X: int = 144
 const SHAFT_BOTTOM_ROW: int = 205
 const SHAFT_AUDIT_ROW: int = 154
+const STAFF_LOCAL_X: int = 128
+const STAFF_PIT_HALF_WIDTH: int = 18
+const STAFF_PIT_RISE_ROWS: int = 10
 const LEDGE_TIP_X: int = 132
 const LEDGE_ROOT_X: int = 145
 const LEDGE_TOP_ROW: int = 102
@@ -91,6 +94,7 @@ func _cut_room(sculpt: CutsceneTerrainSculpt) -> void:
 	)
 	_clear_hanging_rock(sculpt)
 	_carve_deep_shaft(sculpt)
+	_shape_staff_pit(sculpt)
 	_build_keeper_ledge(sculpt)
 	CutsceneSculptBaker.apply_visual_depth_masks(sculpt)
 
@@ -209,6 +213,61 @@ func _carve_deep_shaft(sculpt: CutsceneTerrainSculpt) -> void:
 		)
 
 
+func _shape_staff_pit(sculpt: CutsceneTerrainSculpt) -> void:
+	# The shaft's lower support is a bowl, not a horizontal wall. Its deepest
+	# point remains the canonical 95 rows down; rock rises toward both sides.
+	sculpt.begin_edit()
+	for local_x in range(
+		STAFF_LOCAL_X - STAFF_PIT_HALF_WIDTH,
+		STAFF_LOCAL_X + STAFF_PIT_HALF_WIDTH + 1
+	):
+		var distance := absf(float(local_x - STAFF_LOCAL_X))
+		var edge_progress := clampf(
+			distance / float(STAFF_PIT_HALF_WIDTH),
+			0.0,
+			1.0
+		)
+		var rise := roundi(
+			float(STAFF_PIT_RISE_ROWS)
+				* sin(edge_progress * PI * 0.5)
+		)
+		var jag := (
+			0
+			if distance <= 2.0
+			else roundi(
+				sin(float(local_x) * 1.43) * 0.8
+				+ sin(float(local_x) * 0.57 + 1.1) * 0.55
+			)
+		)
+		var support_row := clampi(
+			SHAFT_BOTTOM_ROW - rise + jag,
+			SHAFT_BOTTOM_ROW - STAFF_PIT_RISE_ROWS - 1,
+			SHAFT_BOTTOM_ROW
+		)
+		for local_y in range(support_row, sculpt.grid_size.y):
+			sculpt.set_solid_local(Vector2i(local_x, local_y), true)
+	sculpt.end_edit()
+
+	# Two small impact bites stop the bowl rim reading as a perfect cutout.
+	var brush := CutsceneSculptBrush.new()
+	brush.radius_cells = 2.8
+	brush.falloff = 0.25
+	brush.carve(
+		sculpt,
+		Vector2(
+			float(STAFF_LOCAL_X - STAFF_PIT_HALF_WIDTH + 2),
+			float(SHAFT_BOTTOM_ROW - STAFF_PIT_RISE_ROWS)
+		)
+	)
+	brush.carve(
+		sculpt,
+		Vector2(
+			float(STAFF_LOCAL_X + STAFF_PIT_HALF_WIDTH - 2),
+			float(SHAFT_BOTTOM_ROW - STAFF_PIT_RISE_ROWS + 1)
+		)
+	)
+
+
 func _build_keeper_ledge(sculpt: CutsceneTerrainSculpt) -> void:
 	var floor_row := sculpt.get_floor_local_row()
 	sculpt.begin_edit()
@@ -300,12 +359,27 @@ func _verify_room(
 			"The deep shaft narrows to %d cells; 37 are required."
 			% shaft_width
 		)
-	var staff_x := (SHAFT_LEFT_X + SHAFT_RIGHT_X) / 2
+	var staff_x := STAFF_LOCAL_X
 	if (
 		sculpt.is_solid_local(Vector2i(staff_x, SHAFT_BOTTOM_ROW - 1))
 		or not sculpt.is_solid_local(Vector2i(staff_x, SHAFT_BOTTOM_ROW))
 	):
 		_failures.append("The staff shaft does not end on row 205.")
+	var left_pit_support := _get_first_support_below_opening(
+		sculpt,
+		STAFF_LOCAL_X - 12
+	)
+	var right_pit_support := _get_first_support_below_opening(
+		sculpt,
+		STAFF_LOCAL_X + 12
+	)
+	if (
+		SHAFT_BOTTOM_ROW - left_pit_support < 6
+		or SHAFT_BOTTOM_ROW - right_pit_support < 6
+	):
+		_failures.append(
+			"The staff floor does not rise into a visible impact bowl."
+		)
 	if not sculpt.is_solid_local(Vector2i(LEDGE_ROOT_X, LEDGE_TOP_ROW + 6)):
 		_failures.append("The Keeper ledge is detached from its cavern wall.")
 	if sculpt.is_solid_local(Vector2i(KEEPER_CONVERSATION_X, 110)):

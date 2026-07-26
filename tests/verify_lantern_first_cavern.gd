@@ -14,7 +14,7 @@ const STAGE_PATH := (
 	"res://Scenes/cinematics/lantern_first_encounter_stage.tscn"
 )
 const FLOOR_ROW: int = 110
-const SHAFT_CENTER_X: int = 126
+const STAFF_LOCAL_X: int = 128
 const SHAFT_BOTTOM_ROW: int = 205
 const LEDGE_TOP_ROW: int = 102
 
@@ -95,12 +95,19 @@ func _verify_sculpt(sculpt: CutsceneTerrainSculpt) -> void:
 		)
 	_expect(
 		not sculpt.is_solid_local(
-			Vector2i(SHAFT_CENTER_X, SHAFT_BOTTOM_ROW - 1)
+			Vector2i(STAFF_LOCAL_X, SHAFT_BOTTOM_ROW - 1)
 		)
 		and sculpt.is_solid_local(
-			Vector2i(SHAFT_CENTER_X, SHAFT_BOTTOM_ROW)
+			Vector2i(STAFF_LOCAL_X, SHAFT_BOTTOM_ROW)
 		),
 		"The staff shaft must remain open for 95 rows and close at its floor."
+	)
+	_expect(
+		_get_first_support(sculpt, STAFF_LOCAL_X - 12)
+			<= SHAFT_BOTTOM_ROW - 6
+			and _get_first_support(sculpt, STAFF_LOCAL_X + 12)
+				<= SHAFT_BOTTOM_ROW - 6,
+		"The shaft floor must rise around the staff as an impact bowl."
 	)
 	_expect(
 		not sculpt.is_solid_local(Vector2i(140, FLOOR_ROW)),
