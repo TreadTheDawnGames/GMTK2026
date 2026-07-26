@@ -111,6 +111,8 @@ class SculptRunPreparation:
 	var cell_bytes: PackedByteArray
 	var next_cell_row: int = 0
 	var cell_image: Image
+	var expanded_cell_image: Image
+	var next_resize_source_row: int = 0
 	var room_mask: Image
 	var mask_data: PackedByteArray
 	var mask_runs: Array[PackedInt32Array] = []
@@ -153,6 +155,7 @@ const SCULPT_CACHE_PIXELS_PER_CELL: int = 4
 # slice per crossing, so even a no-frame benchmark reaches the room prepared.
 const SCULPT_RUN_PREFETCH_ROWS: int = 2_200
 const SCULPT_RUN_TRAVERSAL_BUDGET_USEC: int = 400
+const SCULPT_RESIZE_PHASE_PIXELS: int = 65_536
 # Deferred web raster work is capped and pooled. The 192 slots cover the
 # configured fully-stacked hit (currently under 150 jobs). If mining ever fills
 # them, the oldest single layer completes before another is accepted, so memory
@@ -2794,16 +2797,60 @@ func _advance_sculpt_run_preparation(
 		return false
 	if preparation.phase == 1:
 		var grid := preparation.sculpt.grid_size
-		preparation.cell_image.resize(
-			preparation.padded_size.x * preparation.mask_cell_size,
-			preparation.padded_size.y * preparation.mask_cell_size,
+		var scale := preparation.mask_cell_size
+		if preparation.expanded_cell_image == null:
+			preparation.expanded_cell_image = Image.create(
+				preparation.padded_size.x * scale,
+				preparation.padded_size.y * scale,
+				false,
+				Image.FORMAT_LA8
+			)
+		var source_rows_per_step := maxi(
+			SCULPT_RESIZE_PHASE_PIXELS
+				/ maxi(preparation.padded_size.x * scale * scale, 1),
+			1
+		)
+		var first_source_row := preparation.next_resize_source_row
+		var last_source_row := mini(
+			first_source_row + source_rows_per_step,
+			preparation.padded_size.y
+		)
+		var sampled_first_row := maxi(first_source_row - 1, 0)
+		var sampled_last_row := mini(
+			last_source_row + 1,
+			preparation.padded_size.y
+		)
+		var strip := preparation.cell_image.get_region(
+			Rect2i(
+				0,
+				sampled_first_row,
+				preparation.padded_size.x,
+				sampled_last_row - sampled_first_row
+			)
+		)
+		strip.resize(
+			strip.get_width() * scale,
+			strip.get_height() * scale,
 			(
 				Image.INTERPOLATE_BILINEAR
 				if preparation.sculpt.edge_smoothing > 0.0
 				else Image.INTERPOLATE_NEAREST
 			)
 		)
-		preparation.room_mask = preparation.cell_image.get_region(
+		preparation.expanded_cell_image.blit_rect(
+			strip,
+			Rect2i(
+				0,
+				(first_source_row - sampled_first_row) * scale,
+				strip.get_width(),
+				(last_source_row - first_source_row) * scale
+			),
+			Vector2i(0, first_source_row * scale)
+		)
+		preparation.next_resize_source_row = last_source_row
+		if last_source_row < preparation.padded_size.y:
+			return false
+		preparation.room_mask = preparation.expanded_cell_image.get_region(
 			Rect2i(
 				Vector2i.ONE * preparation.mask_cell_size,
 				grid * preparation.mask_cell_size
@@ -2831,6 +2878,7 @@ func _advance_sculpt_run_preparation(
 			preparation.room_mask.get_height()
 		)
 		preparation.cell_image = null
+		preparation.expanded_cell_image = null
 		preparation.phase = 2
 		return false
 	if preparation.phase == 2:
