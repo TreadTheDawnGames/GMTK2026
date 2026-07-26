@@ -543,6 +543,7 @@ func _verify_room(
 			)
 
 	_verify_cast_headroom(sculpt)
+	_verify_front_stratum_matches_collision(sculpt)
 	_verify_arrival_trigger_matches_the_roof(sculpt, floor_row)
 	_verify_sealed_bore(sculpt, floor_row)
 	_verify_strikes_open_the_plug(sculpt, floor_row)
@@ -586,6 +587,46 @@ func _verify_cast_headroom(sculpt: CutsceneTerrainSculpt) -> void:
 				) % [local_x, headroom, required]
 			)
 			return
+
+
+## Proves the silhouette the player reads is the silhouette collision agrees with.
+##
+## This is the room's parity invariant, and it is the one thing the stratum pass
+## could plausibly break. Stratum zero is the frontmost drawn rock, so its edge IS
+## the wall as far as a player is concerned; strata one and two stand behind it
+## and may differ freely, which is the whole point of them. If stratum zero ever
+## drifts from solid_bits, the drawn wall and the wall you can stand against stop
+## being the same wall, and no amount of looking at the room will tell you - the
+## rock still looks like rock.
+##
+## Checked here rather than through the F3 overlay because the overlay cannot be
+## rendered through the editor preview at all; capture_treasure_hunter_first_stage.gd
+## carries the full explanation. Cell for cell over the whole grid is stronger
+## evidence than a screenshot would have been anyway.
+func _verify_front_stratum_matches_collision(
+	sculpt: CutsceneTerrainSculpt
+) -> void:
+	var mismatches := 0
+	var first_mismatch := Vector2i(-1, -1)
+	for local_y in range(sculpt.grid_size.y):
+		for local_x in range(sculpt.grid_size.x):
+			var local_cell := Vector2i(local_x, local_y)
+			if (
+				sculpt.is_layer_solid_local(0, local_cell)
+				== sculpt.is_solid_local(local_cell)
+			):
+				continue
+			if mismatches == 0:
+				first_mismatch = local_cell
+			mismatches += 1
+	if mismatches > 0:
+		_failures.append(
+			(
+				"The front stratum disagrees with collision in %d cells, first "
+				+ "at %s. The drawn wall and the wall the cast stand against "
+				+ "have to be the same wall."
+			) % [mismatches, first_mismatch]
+		)
 
 
 ## Proves the encounter is captured where this room's roof actually is.
