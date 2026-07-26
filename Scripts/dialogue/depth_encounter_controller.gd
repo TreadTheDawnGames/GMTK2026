@@ -7,6 +7,8 @@ extends Node
 ## - Dialogue begins only after the presentation miner lands on that floor.
 ## - A blocked reservation retries when the previous cinematic releases.
 ## - Stable actor IDs reuse presenters across visits and the cafe gathering.
+## - The gathering stands on stage marks named for each actor when they exist,
+##   and on the even terrain spread when they do not.
 ## - Optional encounter stages own reversible movement and named line cues.
 ## - MiningCinematicFlow gates input while this controller owns an interaction.
 ## - Adding a cutscene means adding its resource to the ordered config array.
@@ -428,10 +430,12 @@ func _begin_active_encounter() -> void:
 	var encounter := encounter_config.encounters[_active_encounter_index]
 	var presenter := _presenters[_active_encounter_index]
 	_reset_speech_reactions()
-	if _is_gathering_encounter(_active_encounter_index):
-		_gather_cafe_characters()
 	_active_stage = _stages[_active_encounter_index]
 	if _active_stage == null:
+		# No stage means no authored marks and no floor sampler, so the roster
+		# falls back to the even spread on the bare dig line. Same as before.
+		if _is_gathering_encounter(_active_encounter_index):
+			_gather_cafe_characters(Callable())
 		# Revealing a presenter is the stage's job, through prepare(). An
 		# encounter authored without one still has to be seen to speak.
 		presenter.show()
@@ -492,6 +496,13 @@ func _begin_active_encounter() -> void:
 			)
 			_fail_active_encounter()
 			return
+		# After prepare, not before it. prepare() stands the stage's own visitor
+		# on the entrance mark at that marker's authored y, which is the dig line
+		# - and a visitor who is already in place and never walks is never
+		# grounded by anything else. Running the gathering last puts the whole
+		# roster, that visitor included, on the surface the sampler reports.
+		if _is_gathering_encounter(_active_encounter_index):
+			_gather_cafe_characters(floor_sampler)
 		await _active_stage.play_opening()
 		if _active_encounter_index < 0:
 			return
@@ -545,7 +556,25 @@ func _is_gathering_encounter(encounter_index: int) -> bool:
 
 
 ## Places the authored stable identities together for the cafe celebration.
-func _gather_cafe_characters() -> void:
+##
+## Two ways, and the stage decides which. If it authors a marker under
+## `ActorMarkers` named for a gathered actor, that mark is where they stand and
+## the injected sampler decides how high; otherwise the whole roster falls back to
+## the even spread across the terrain this has always used.
+##
+## The marks exist because the spread cannot compose a shot. It puts five
+## characters at a fixed 128px pitch centred on the room while the camera centres
+## on whatever column the miner's snaking fall arrived down - up to 192px away -
+## so he regularly lands standing inside one of them, and the storefront, the
+## furniture and the cast can never hold a relationship to each other. A marker
+## set slides with him, so the gathering keeps its shape at every landing column.
+##
+## An actor the stage already draws into its own artwork is placed but left
+## hidden. Cheese Girl is painted into the cafe's serving window, so showing her
+## presenter as well would put two of her in the same frame; `actors_drawn_into_set`
+## is the stage saying so, and this is the runtime honouring it. She is still
+## placed, because the schedule still needs somewhere to say she is.
+func _gather_cafe_characters(floor_sampler: Callable) -> void:
 	var gathering_y := _presenters[_active_encounter_index].position.y
 	var actor_count := encounter_config.gathering_actor_ids.size()
 	var edge_margin_cells := clampi(
@@ -581,12 +610,67 @@ func _gather_cafe_characters() -> void:
 		if not _presenters_by_actor_id.has(actor_id):
 			continue
 		var presenter := _presenters_by_actor_id[actor_id]
-		presenter.position = Vector2(
-			(group_start_cell_x + float(actor_index) * spacing_cells)
-				* float(mining_config.terrain_cell_world_size),
-			gathering_y
-		)
+		var authored_mark := _get_gathering_marker(actor_id)
+		if authored_mark == null:
+			presenter.position = Vector2(
+				(group_start_cell_x + float(actor_index) * spacing_cells)
+					* float(mining_config.terrain_cell_world_size),
+				gathering_y
+			)
+		else:
+			presenter.global_position = Vector2(
+				authored_mark.global_position.x,
+				_resolve_gathering_floor_y(
+					floor_sampler,
+					authored_mark.global_position
+				)
+			)
+		if _stage_draws_actor_into_its_set(actor_id):
+			presenter.hide()
+			continue
 		presenter.show()
+
+
+## Returns the active stage's authored mark for one gathered actor, or null when
+## it has not authored one.
+##
+## Looked up by the actor's own id, so the scene says who stands where in the same
+## words the schedule and the timeline use, and an ordinary text search for an
+## actor id finds their mark along with everything else about them.
+func _get_gathering_marker(actor_id: StringName) -> Marker2D:
+	if (
+		_active_stage == null
+		or not is_instance_valid(_active_stage.actor_markers_root)
+	):
+		return null
+	return _active_stage.actor_markers_root.get_node_or_null(
+		NodePath(String(actor_id))
+	) as Marker2D
+
+
+## Returns the height a gathered actor's soles rest at, preferring the sampled
+## surface and falling back to the mark's own authored y.
+##
+## The fallback is not decoration. The sampler answers NAN for a column whose rock
+## has not resolved, and a NAN position puts an actor nowhere at all - so a room
+## that has not fully settled costs a few pixels of sink rather than losing a
+## character out of the shot.
+func _resolve_gathering_floor_y(
+	floor_sampler: Callable,
+	mark_global_position: Vector2
+) -> float:
+	if not floor_sampler.is_valid():
+		return mark_global_position.y
+	var sampled_y := float(floor_sampler.call(mark_global_position.x))
+	return mark_global_position.y if is_nan(sampled_y) else sampled_y
+
+
+## Reports whether the active stage's own artwork already draws this character.
+func _stage_draws_actor_into_its_set(actor_id: StringName) -> bool:
+	return (
+		_active_stage != null
+		and _active_stage.actors_drawn_into_set.has(actor_id)
+	)
 
 
 ## Grants the authored reward and advances to the next listed encounter.

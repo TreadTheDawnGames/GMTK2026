@@ -51,6 +51,18 @@ enum Kind {
 @export var start_offset: Vector2 = Vector2.ZERO
 ## Pose used by POSE and held as the movement pose during MOVE.
 @export var pose: StringName
+## Whether a POSE beat's pose survives the spoken lines that follow it.
+##
+## Off by default, which is what a pose worn for one moment wants. Every presented
+## dialogue line resets every presenter's speech motion and drops them back to
+## idle, so an ordinary POSE beat placed before a DIALOGUE beat is undone by the
+## first line the player reads.
+##
+## Turn it on for a pose the shot is BUILT on rather than one a beat puts on. The
+## Treasure Hunter reaches the cafe holding nothing, because he gave both pickaxes
+## away, and his no_pickaxe pose has to outlast eight lines of conversation - one
+## of which is him saying he was tired of carrying things.
+@export var holds_pose: bool = false
 ## AnimationPlayer clip for STAGE_CUE, or ActionMarkers child for STRIKE.
 @export var cue: StringName
 ## Conversation requested from the owner for DIALOGUE; the player never opens it.
