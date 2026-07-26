@@ -62,6 +62,28 @@ signal stampede_finished
 ## and frees them where they stand. Only reached if a follower is stuck, which
 ## would otherwise hold the encounter open indefinitely.
 @export_range(0.5, 12.0, 0.5) var stampede_drain_timeout_seconds: float = 6.0
+## Draw order within the rat container for a drawn crowd, and for a single mouse.
+##
+## Relative to the container, so these order the colony against itself and leave
+## its place in the scene alone. The defaults put clumps one layer behind, which
+## is the only arrangement that reads: a clump is a still drawing of two dozen
+## mice, and anything running in front of it is what makes the whole mass look
+## like it is moving.
+@export_range(-8, 8, 1) var clump_draw_order: int = -1
+@export_range(-8, 8, 1) var single_draw_order: int = 0
+## Size multipliers on the rat scene's own appearance scale, for a drawn crowd
+## and for a single mouse.
+##
+## One at both, the default, leaves every follower exactly the size the rat scene
+## authored. A stampede wants the clumps much larger than that: the drawing is
+## padded to the same registration as a single mouse, so at parity it renders as
+## one mouse-high strip of very small mice and the floor shows through between
+## the gaps. Scaling it up is what turns the same drawing into a wall.
+##
+## Kept as multipliers rather than absolute scales so the rat scene stays the one
+## place a mouse's size is decided, and a stage only says how much bigger.
+@export_range(0.25, 4.0, 0.05) var clump_scale_multiplier: float = 1.0
+@export_range(0.25, 4.0, 0.05) var single_scale_multiplier: float = 1.0
 
 ## Growth is bounded by max_live_followers (or the web cap) and pruned on exit.
 var _followers: Array[CinematicRatMiner] = []
@@ -119,15 +141,6 @@ func play_closing() -> void:
 	await super.play_closing()
 
 
-func _begin_procession() -> void:
-	if _is_spawning:
-		return
-	_is_spawning = true
-	_spawn_generation += 1
-	stampede_started.emit()
-	_spawn_next_follower(_spawn_generation)
-
-
 ## Stops new arrivals and waits for the ones already running to leave the frame.
 func _await_stampede_drained() -> void:
 	if not _is_spawning and _followers.is_empty():
@@ -177,6 +190,7 @@ func _begin_procession() -> void:
 		return
 	_is_spawning = true
 	_spawn_generation += 1
+	stampede_started.emit()
 	_spawn_next_follower(_spawn_generation)
 
 
@@ -209,9 +223,28 @@ func _spawn_follower() -> void:
 		_is_spawning = false
 		return
 	rat_container.add_child(rat)
-	rat.set_appearance(
-		rat_appearances[_appearance_index % rat_appearances.size()]
+	var appearance := rat_appearances[
+		_appearance_index % rat_appearances.size()
+	]
+	var is_clump := (
+		appearance != null and appearance.depicted_rat_count > 1
 	)
+	# Size before appearance, because set_appearance is what applies the scale to
+	# the sprite. Setting it afterwards leaves the actor drawn at the old size
+	# until something else reassigns the art.
+	rat.appearance_scale *= (
+		clump_scale_multiplier if is_clump else single_scale_multiplier
+	)
+	rat.set_appearance(appearance)
+	# A drawn crowd goes behind the individuals running over it. The clump is a
+	# backdrop - it holds two dozen mice but only ever moves as one thing - and
+	# the single mice are what sells the motion, so they have to be the layer in
+	# front or the stampede reads as one sliding picture.
+	#
+	# Taken from depicted_rat_count rather than authored per slot, because "is
+	# this a crowd" is already recorded there and saying it twice is one more
+	# place to disagree.
+	rat.z_index = clump_draw_order if is_clump else single_draw_order
 	_appearance_index += 1
 	rat.prepare_for_sequence(
 		_resolve_grounded_marker(entrance_marker),
