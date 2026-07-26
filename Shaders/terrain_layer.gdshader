@@ -164,6 +164,35 @@ uniform float grass_shade_strength = 0.42;
 uniform vec4 grass_tip_light_color : source_color = vec4(1.0, 0.80, 0.44, 1.0);
 uniform float grass_tip_light_strength = 0.60;
 
+// Trodden floor. The packed, walked-on ground at the top of a cutscene room's
+// floor, falling off into the ordinary rock underneath it.
+//
+// This is the crust block above generalised: the crust is pinned to
+// surface_world_y, the one ground line the whole run shares, and a cutscene room
+// has its own floor hundreds of rows down. Everything here is keyed to a world y
+// the caller supplies instead, so any room in the cutscene system can dress its
+// own floor by pushing these five values and turning the flag on.
+//
+// Foreground stratum only, the same rule the crust follows: it is the layer the
+// cast stand on, and a mined opening has to take the dressing away with the
+// ground it removed.
+uniform bool use_trodden_floor = false;
+uniform float trodden_floor_world_y = 0.0;
+// How deep the packed band reaches before it starts giving way, and how far it
+// then takes to fade out. Two numbers rather than one because a band that ends
+// where it stops fading reads as a painted stripe.
+uniform float trodden_depth_world_px = 14.0;
+uniform float trodden_falloff_world_px = 18.0;
+uniform vec4 trodden_color : source_color = vec4(0.30, 0.24, 0.19, 1.0);
+uniform float trodden_strength = 0.55;
+// How far the lower edge of the band wanders, in world pixels. Zero rules a
+// straight line across the room, which is the one thing that would give it away
+// as a shader rather than as ground.
+uniform float trodden_edge_wander_world_px = 7.0;
+// Grain within the band, so the walked surface is not a flat wash of colour.
+uniform float trodden_grain_strength = 0.35;
+uniform float trodden_grain_world_px = 26.0;
+
 // Packed earth on the exposed top of the surface, in place of the old overlay.
 uniform float crust_depth_world_px = 10.0;
 uniform vec4 crust_color : source_color = vec4(0.46, 0.42, 0.36, 1.0);
@@ -983,6 +1012,43 @@ void fragment() {
 	// Only alpha is cut by the streamed mask. Optional artwork alpha and layer
 	// tint alpha are preserved, while RGB remains the fully shaded dirt color.
 	float final_alpha = artwork.a * layer_tint.a * mask_alpha;
+
+	// Trodden floor, foreground stratum only. Keyed to a world y the caller
+	// supplies, so any cutscene room can dress the ground its cast stand on.
+	if (use_trodden_floor) {
+		float trodden_below = world_position.y - trodden_floor_world_y;
+		// The edge wanders per column, so the band ends on a broken line rather
+		// than on a ruled one. Sampled in world space, so it holds still while
+		// the room scrolls past.
+		float trodden_wobble = (
+			dirt_noise(vec2(world_position.x / 37.0, 0.0)) - 0.5
+		) * 2.0 * trodden_edge_wander_world_px;
+		float trodden_edge = max(trodden_depth_world_px + trodden_wobble, 1.0);
+		float trodden_band = step(-1.0, trodden_below) * (
+			1.0 - smoothstep(
+				trodden_edge,
+				trodden_edge + max(trodden_falloff_world_px, 1.0),
+				trodden_below
+			)
+		);
+		if (trodden_band > 0.0) {
+			// Grain across the walked surface. Two samples at different scales so
+			// it reads as scuffed ground rather than as one tiling pattern.
+			float trodden_grain = mix(
+				dirt_noise(world_position / max(trodden_grain_world_px, 1.0)),
+				dirt_noise(world_position / max(trodden_grain_world_px * 0.4, 1.0)),
+				0.45
+			);
+			vec3 packed_color = trodden_color.rgb * (
+				1.0 + (trodden_grain - 0.5) * trodden_grain_strength
+			);
+			surface_color = mix(
+				surface_color,
+				packed_color,
+				clamp(trodden_band * trodden_strength, 0.0, 1.0)
+			);
+		}
+	}
 
 	// Surface dressing, foreground stratum only. Grass grows out of this
 	// layer's own top edge and the crust sits in its own top pixels, so a mined

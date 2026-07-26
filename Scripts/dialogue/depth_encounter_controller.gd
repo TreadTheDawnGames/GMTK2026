@@ -49,18 +49,11 @@ const CAST_FLOOR_LAYER_INDEX: int = 0
 const LANDING_FLOOR_TOLERANCE_ROWS: int = 4
 ## Pixels every cutscene actor is raised off the sampled floor support.
 ##
-## The sampler answers with the first solid cell of the rock. What the player
-## sees is that rock's drawn outline, which is stroked outward from the boundary
-## and so sits above it, and a character seated on the raw support stands with
-## their soles inside that band looking half sunk into the ground.
+## Zero: the cast stand ON the surface the sampler reports, with no gap at all.
 ##
 ## One value here rather than a nudge per character, because it is not a property
-## of anyone's art: Cheese Girl's sprite offset already stands her exactly on her
-## own origin, and she reads as low anyway. Both the miner's seating and the
-## stage's walking sampler go through this, so the cast cannot drift apart from
-## the man they are talking to.
-##
-## Zero. The cast stand ON the surface the sampler reports, with no gap at all.
+## of anyone's art. Both the miner's seating and the stage's walking sampler go
+## through it, so the cast cannot drift apart from the man they are talking to.
 ##
 ## This has been seven and then fourteen, each time to clear the drawn outline
 ## stroked outward from the rock boundary. Fourteen is visibly too much now that
@@ -261,6 +254,7 @@ func _activate_pending_encounter() -> void:
 	# He has hit the room's floor. Sprawl, then get up, while the frame opens
 	# around him.
 	miner_rig.show_cutscene_landing()
+	_apply_trodden_floor(encounter)
 	cinematic_flow.focus(FLOW_OWNER)
 	_begin_active_encounter.call_deferred()
 
@@ -548,6 +542,24 @@ func _begin_active_encounter() -> void:
 		final_encounter_reached.emit(encounter.encounter_id)
 		return
 	_fail_active_encounter()
+
+
+## Dresses this room's floor as walked-on ground, if the encounter asked for it.
+##
+## The floor line is derived from the encounter's own depth rather than passed in,
+## so a room can never dress a line it does not stand on. It is cleared in
+## _finish_cinematic_flow, which is the one place every ending goes through - a
+## completed shot, a cancelled one and a failed one all release there, and a
+## dressing left behind would follow the player down the rest of the run.
+func _apply_trodden_floor(encounter: DepthCharacterEncounter) -> void:
+	if not encounter.dresses_trodden_floor:
+		terrain_renderer.set_trodden_floor(false)
+		return
+	var floor_world_y := float(
+		mining_config.initial_surface_row
+		+ encounter.resolve_depth(mining_config.total_run_depth)
+	) * float(mining_config.terrain_cell_world_size)
+	terrain_renderer.set_trodden_floor(true, floor_world_y)
 
 
 ## Reports whether this conversation is the cast's shared cafe stop.
@@ -976,6 +988,7 @@ func has_pending_or_active_interaction() -> bool:
 ## Releases only this encounter's named ownership of mining and camera state.
 func _finish_cinematic_flow() -> void:
 	_reset_speech_reactions()
+	terrain_renderer.set_trodden_floor(false)
 	# Nobody is left face down when the shot releases him, whatever ended it. A
 	# stampede that was cancelled mid-run never reaches its own finished signal,
 	# and the miner would go back to mining lying on his face.

@@ -55,6 +55,17 @@ extends Resource
 @export var requires_credits_complete: bool = false
 ## Opens the chamber through its right wall for authored choreography.
 @export var opens_right_exit: bool = false
+## Dresses this room's floor as walked-on ground while the shot is running.
+##
+## Off by default, so every existing encounter draws exactly as before. On, and
+## DepthEncounterController asks TerrainLayerRenderer for the shared trodden
+## floor at this encounter's own floor line for the length of the cutscene, and
+## clears it when the shot releases.
+##
+## It is a shared service rather than one room's dressing - the settings live on
+## the renderer and any encounter can opt in - so turning this on is the whole
+## cost of using it.
+@export var dresses_trodden_floor: bool = false
 ## Replaces this encounter's procedural chamber with an authored sculpted room.
 ## Leave it null and terrain generation is unchanged.
 @export var terrain_sculpt: CutsceneTerrainSculpt
