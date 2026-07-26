@@ -44,6 +44,7 @@ func _initialize() -> void:
 
 func _run() -> void:
 	await process_frame
+	_verify_headless_history_isolation()
 	_verify_entry_scene()
 	await _verify_mining_scene()
 	_verify_finale_text_resolves()
@@ -54,6 +55,28 @@ func _run() -> void:
 	for failure: String in _failures:
 		push_error("SMOKE_VERIFY_FAIL: %s" % failure)
 	quit(1)
+
+
+## Prevents local/CI verification from counting as somebody playing the game.
+func _verify_headless_history_isolation() -> void:
+	if DisplayServer.get_name() != "headless":
+		return
+	var player_history := root.get_node_or_null(
+		"/root/PlayerHistory"
+	) as PlayerHistoryRecord
+	_expect(
+		player_history != null,
+		"PlayerHistory autoload must exist for the Thief finale."
+	)
+	if player_history == null:
+		return
+	# This specifically guards the benchmark isolation fix: a headless process
+	# must not dirty or flush the real user://player_history.cfg on shutdown.
+	_expect(
+		not player_history.is_processing()
+		and not player_history._is_dirty,
+		"Headless verification must leave PlayerHistory persistence idle."
+	)
 
 
 func _verify_entry_scene() -> void:

@@ -51,6 +51,12 @@ var _is_dirty: bool = false
 
 ## Loads the record and starts accumulating against it.
 func _ready() -> void:
+	if DisplayServer.get_name() == "headless":
+		# Headless benchmarks load project autoloads but are not player sessions.
+		# Keeping this idle also prevents their exit flush from rewriting the
+		# player's real lifetime-history file and contaminating timing samples.
+		set_process(false)
+		return
 	# ALWAYS because a cutscene pauses the tree, and the eight hours a player
 	# spends reading the Thief's lines are still eight hours of their life.
 	process_mode = Node.PROCESS_MODE_ALWAYS
