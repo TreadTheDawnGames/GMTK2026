@@ -11,7 +11,11 @@ func _update(delta,_beat_pos,_measure_pos):
 	if(is_playing()):
 		seek((Conductor.current_beat-start_beat)*speed_scale,true)
 
-func play(name: StringName = &"", custom_speed: float = speed_scale, custom_blend: float = -1, from_end: bool = false):
+func play_conducted(
+	name: StringName = &"",
+	custom_speed: float = speed_scale,
+	custom_blend: float = -1.0,
+	from_end: bool = false
+) -> void:
 	start_beat = Conductor.current_beat
-	current_animation = name
-	speed_scale = custom_speed
+	super.play(name, custom_blend, custom_speed, from_end)
