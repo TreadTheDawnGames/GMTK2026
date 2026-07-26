@@ -23,7 +23,6 @@ Nothing moves him in this shot, so this is the only thing that can aim him. A MO
 
 [sub_resource type="Resource" id="Beat_hold"]
 script = ExtResource("1_beat")
-kind = 4
 duration_seconds = 1.2
 notes = "A second and a fifth of the two of them and nothing else, before he speaks.
 
@@ -45,7 +44,6 @@ NOTHING IS STAGED AGAINST THE JOKE. 'Yo chud' is a register he has never used - 
 
 [sub_resource type="Resource" id="Beat_settle"]
 script = ExtResource("1_beat")
-kind = 4
 start_seconds = 7.2
 duration_seconds = 1.4
 notes = "A held beat on the two of them after the last line, before the timeline ends and play_closing takes him. Without it the shot cuts straight from the dialogue box closing to him fading, and the line does not get to land. Half a second longer than the same beat at 5,600, for the same reason the opening pause is twice as long.
