@@ -10,7 +10,7 @@ kind = 9
 actor = &"treasure_hunter"
 notes = "Nobody walks into this shot. The gathering is already standing when the ceiling comes in - canonical story says they HAVE gathered - so the timeline opens by stating the room rather than by assembling it.
 
-DepthEncounterController has already placed and shown all four of them on their own marks under ActorMarkers by the time this runs. These SHOW beats state it anyway, so the timeline is the whole account of the shot and does not depend on the schedule having done half of it first. That is the same reason encounter 5 opens on a SHOW for a man who is already visible.
+DepthEncounterController has already placed and shown the run-wide gathered cast, including Moody Teen, on their own marks under ActorMarkers by the time this runs. These SHOW beats state it anyway, so the timeline is the whole account of the shot and does not depend on prestaging having done half of it first. That is the same reason encounter 5 opens on a SHOW for a man who is already visible.
 
 Cheese Girl gets no beat at all. She is painted into the storefront, the stage names her in Actors Drawn Into Set, and the controller leaves her presenter hidden - a SHOW here would put a second one of her on the floor in front of her own shop."
 
@@ -76,6 +76,19 @@ kind = 2
 actor = &"cloak_lantern"
 facing = 1
 notes = "Looking right across the whole gathering from the far-left edge. He remains apart from the cafe, but his last line is addressed toward everyone rather than out into empty rock."
+
+[sub_resource type="Resource" id="Beat_show_moody_teen"]
+script = ExtResource("1_beat")
+kind = 9
+actor = &"moody_teen"
+notes = "Moody Teen is already standing in the rear dining-table lane when the Miner falls into the occupied cafe. DepthEncounterController reuses the presenter established by his scheduled cavern encounters, exactly like the other returning cast."
+
+[sub_resource type="Resource" id="Beat_face_moody_teen"]
+script = ExtResource("1_beat")
+kind = 2
+actor = &"moody_teen"
+facing = -1
+notes = "Looks left from behind the dining set toward the gathering. His Y 6 origin is behind the Y 36 furniture, so its lower screen position correctly occludes his lower silhouette."
 
 [sub_resource type="Resource" id="Beat_open_silence"]
 script = ExtResource("1_beat")
@@ -214,43 +227,61 @@ conversation = ExtResource("2_conversation")
 line_range = Vector2i(5, 5)
 notes = "Quibble's cafe-coffee line on the cafe frame. His authored cup pose remains held while the line is presented."
 
-[sub_resource type="Resource" id="Beat_frame_keeper"]
+[sub_resource type="Resource" id="Beat_frame_moody_teen"]
 script = ExtResource("1_beat")
 kind = 11
 start_seconds = 20.5
+duration_seconds = 0.85
+camera_offset = Vector2(195, 55)
+camera_zoom = Vector2(1.6, 1.6)
+notes = "Continues the right-to-left pass from Quibble to Moody Teen behind the dining set. The 0.85-second sine-eased move lands before his ellipsis, keeping the background chair and table visible as the depth cue that identifies Eve's composition."
+
+[sub_resource type="Resource" id="Beat_moody_teen_dialogue"]
+script = ExtResource("1_beat")
+kind = 5
+start_seconds = 21.35
+duration_seconds = 1.5
+conversation = ExtResource("2_conversation")
+line_range = Vector2i(6, 6)
+notes = "Moody Teen's entire cafe contribution is the requested silent ellipsis. His run-wide presenter receives the same speech bounce callback as every other gathered cast member."
+
+[sub_resource type="Resource" id="Beat_frame_keeper"]
+script = ExtResource("1_beat")
+kind = 11
+start_seconds = 22.85
 duration_seconds = 2.4
 camera_offset = Vector2(-350, 60)
 camera_zoom = Vector2(1.5, 1.5)
-notes = "The longest smooth CAMERA/FRAME move crosses the entire contiguous gathering from Quibble at the right-middle cafe to the far-left Lantern Keeper, exactly Zephan's right-to-left direction. It blocks before his line, so he cannot speak until the camera has found him."
+notes = "The longest smooth CAMERA/FRAME move continues from Moody Teen behind the right-middle dining set to the far-left Lantern Keeper, completing Zephan's right-to-left direction. It blocks before his line, so he cannot speak until the camera has found him."
 
 [sub_resource type="Resource" id="Beat_keeper_dialogue"]
 script = ExtResource("1_beat")
 kind = 5
-start_seconds = 22.9
+start_seconds = 25.25
 duration_seconds = 3.0
 conversation = ExtResource("2_conversation")
-line_range = Vector2i(6, 6)
+line_range = Vector2i(7, 7)
 notes = "The Lantern Keeper alone, after the right-to-left world pan has landed on him. The canonical wording ships unchanged; Zephan's shorter alternate still needs a narrative ruling."
 
 [sub_resource type="Resource" id="Beat_miner_reaction"]
 script = ExtResource("1_beat")
 kind = 5
-start_seconds = 25.9
+start_seconds = 28.25
 duration_seconds = 1.5
 conversation = ExtResource("2_conversation")
-line_range = Vector2i(7, 7)
+line_range = Vector2i(8, 8)
 notes = "The Miner's final silence is a reaction, not another spoken thought, so the Keeper remains the last character to say a line. The tableau framing already keeps both visible and therefore does not cut or snap for the ellipsis."
 
 [sub_resource type="Resource" id="Beat_closing_hold"]
 script = ExtResource("1_beat")
-start_seconds = 27.4
+start_seconds = 29.75
 duration_seconds = 0.8
 notes = "A held beat on the Keeper after the miner's reaction. Without it the shot cuts straight from the dialogue box closing into the zoom out, and 'Stay a while. Not every minute needs somewhere to go.' does not get the moment it is asking for."
 
 [sub_resource type="Resource" id="Beat_reset_camera"]
 script = ExtResource("1_beat")
 kind = 11
-start_seconds = 28.2
+start_seconds = 30.55
 duration_seconds = 1.8
 camera_action = 2
 notes = "The typed CAMERA/RESET handback. It eases offset and zoom together from the Keeper close-up to the encounter's neutral frame, revealing the whole gathering before play_closing fades the Keeper and MiningCinematicFlow returns control.
@@ -260,4 +291,4 @@ This is deliberately the last timeline beat. Shared flow release then applies En
 [resource]
 script = ExtResource("3_sequence")
 sequence_id = &"cafe_gathering_sequence"
-beats = Array[ExtResource("1_beat")]([SubResource("Beat_show_treasure_hunter"), SubResource("Beat_pose_treasure_hunter"), SubResource("Beat_face_treasure_hunter"), SubResource("Beat_show_rutini"), SubResource("Beat_face_rutini"), SubResource("Beat_show_coffee_cat"), SubResource("Beat_pose_coffee_cat"), SubResource("Beat_face_coffee_cat"), SubResource("Beat_show_cloak_lantern"), SubResource("Beat_face_cloak_lantern"), SubResource("Beat_frame_cafe"), SubResource("Beat_open_silence"), SubResource("Beat_frame_rutini"), SubResource("Beat_rutini_arrives"), SubResource("Beat_cafe_arrival_dialogue"), SubResource("Beat_frame_coco"), SubResource("Beat_coco_dialogue"), SubResource("Beat_frame_treasure"), SubResource("Beat_treasure_dialogue"), SubResource("Beat_frame_miner"), SubResource("Beat_miner_question"), SubResource("Beat_frame_treasure_return"), SubResource("Beat_treasure_elevator"), SubResource("Beat_frame_quibble"), SubResource("Beat_quibble_dialogue"), SubResource("Beat_frame_keeper"), SubResource("Beat_keeper_dialogue"), SubResource("Beat_miner_reaction"), SubResource("Beat_closing_hold"), SubResource("Beat_reset_camera")])
+beats = Array[ExtResource("1_beat")]([SubResource("Beat_show_treasure_hunter"), SubResource("Beat_pose_treasure_hunter"), SubResource("Beat_face_treasure_hunter"), SubResource("Beat_show_rutini"), SubResource("Beat_face_rutini"), SubResource("Beat_show_coffee_cat"), SubResource("Beat_pose_coffee_cat"), SubResource("Beat_face_coffee_cat"), SubResource("Beat_show_cloak_lantern"), SubResource("Beat_face_cloak_lantern"), SubResource("Beat_show_moody_teen"), SubResource("Beat_face_moody_teen"), SubResource("Beat_frame_cafe"), SubResource("Beat_open_silence"), SubResource("Beat_frame_rutini"), SubResource("Beat_rutini_arrives"), SubResource("Beat_cafe_arrival_dialogue"), SubResource("Beat_frame_coco"), SubResource("Beat_coco_dialogue"), SubResource("Beat_frame_treasure"), SubResource("Beat_treasure_dialogue"), SubResource("Beat_frame_miner"), SubResource("Beat_miner_question"), SubResource("Beat_frame_treasure_return"), SubResource("Beat_treasure_elevator"), SubResource("Beat_frame_quibble"), SubResource("Beat_quibble_dialogue"), SubResource("Beat_frame_moody_teen"), SubResource("Beat_moody_teen_dialogue"), SubResource("Beat_frame_keeper"), SubResource("Beat_keeper_dialogue"), SubResource("Beat_miner_reaction"), SubResource("Beat_closing_hold"), SubResource("Beat_reset_camera")])

@@ -527,6 +527,29 @@ func _verify_mining_scene() -> void:
 		# intentionally retains combo 1 from the synthetic contact above.
 		terrain_renderer._on_dig_presentation_started(0)
 	if encounter_controller != null:
+		if miner_rig != null and miner_rig.speech_reaction != null:
+			miner_rig.speech_reaction.play_bounce(
+				Vector2.UP * 7.0,
+				1.0,
+				1,
+				Tween.TRANS_QUAD
+			)
+			_expect(
+				miner_rig.speech_reaction._is_reacting,
+				"The Miner speech reaction must start before camera settling."
+			)
+			encounter_controller._on_character_stage_camera_action_requested(
+				CutsceneBeat.CameraAction.FRAME,
+				Vector2.ZERO,
+				Vector2.ONE,
+				0.0,
+				0.0
+			)
+			_expect(
+				not miner_rig.speech_reaction._is_reacting,
+				"A speaker bounce must settle before the next camera frame "
+					+ "moves."
+			)
 		var expected_encounter_ids: Array[StringName] = [
 			&"cheese_girl_first",
 			&"cloak_lantern_first",
@@ -992,9 +1015,10 @@ func _verify_mining_scene() -> void:
 	var cafe_frame_treasure_visit_count := 0
 	var cafe_frames_miner := false
 	var cafe_frames_quibble := false
+	var cafe_frames_moody_teen := false
 	var cafe_resets_camera := false
 	var cafe_individual_dialogue_lines: Array[bool] = []
-	cafe_individual_dialogue_lines.resize(7)
+	cafe_individual_dialogue_lines.resize(8)
 	cafe_individual_dialogue_lines.fill(false)
 	for beat: CutsceneBeat in CAFE_GATHERING_SEQUENCE.beats:
 		if (
@@ -1053,6 +1077,13 @@ func _verify_mining_scene() -> void:
 			):
 				cafe_frames_quibble = true
 			elif (
+				beat.camera_offset.is_equal_approx(Vector2(195.0, 55.0))
+				and beat.camera_zoom.is_equal_approx(
+					Vector2(1.6, 1.6)
+				)
+			):
+				cafe_frames_moody_teen = true
+			elif (
 				beat.camera_offset.is_equal_approx(Vector2(-350.0, 60.0))
 				and beat.camera_zoom.is_equal_approx(
 					Vector2(1.5, 1.5)
@@ -1062,13 +1093,14 @@ func _verify_mining_scene() -> void:
 		elif beat.camera_action == CutsceneBeat.CameraAction.RESET:
 			cafe_resets_camera = true
 	_expect(
-		cafe_camera_frame_count == 8
+		cafe_camera_frame_count == 9
 		and cafe_frames_establishing
 		and cafe_frames_rutini
 		and cafe_frames_coco
 		and cafe_frame_treasure_visit_count == 2
 		and cafe_frames_miner
 		and cafe_frames_quibble
+		and cafe_frames_moody_teen
 		and cafe_frames_keeper
 		and cafe_resets_camera
 		and not cafe_individual_dialogue_lines.has(false),
@@ -1086,8 +1118,12 @@ func _verify_mining_scene() -> void:
 	) as Marker2D
 	var rutini_mark := cafe_actor_markers.get_node("rutini") as Marker2D
 	var cat_mark := cafe_actor_markers.get_node("coffee_cat") as Marker2D
+	var moody_teen := cafe_actor_markers.get_node(
+		"moody_teen"
+	) as Marker2D
 	var cafe_prop := cafe_props.get_node("DasQuesoCafe") as Node2D
 	var dining_table := cafe_props.get_node("DiningTable") as Node2D
+	var dining_cup := cafe_props.get_node("DiningCup") as Sprite2D
 	var left_window_stool := cafe_props.get_node(
 		"CafeStoolWindowLeft"
 	) as Node2D
@@ -1129,8 +1165,13 @@ func _verify_mining_scene() -> void:
 		keeper_mark.position.x < treasure_mark.position.x
 		and treasure_mark.position.x < -176.0
 		and -176.0 < rutini_mark.position.x
+		and rutini_mark.position.x < moody_teen.position.x
+		and moody_teen.position.x < cafe_prop.position.x
 		and rutini_mark.position.x < cafe_prop.position.x
 		and dining_table.position.x < cafe_prop.position.x
+		and is_equal_approx(dining_cup.position.x, dining_table.position.x)
+		and dining_cup.position.y < dining_table.position.y
+		and dining_cup.texture != null
 		and cafe_prop.position.x < cat_mark.position.x
 		and left_window_stool.position.x < right_window_stool.position.x
 		and is_equal_approx(
@@ -1142,7 +1183,9 @@ func _verify_mining_scene() -> void:
 			left_dining_chair.position.x
 		)
 		and cafe_prop.position.y < left_window_stool.position.y
+		and moody_teen.position.y < left_window_stool.position.y
 		and left_window_stool.position.y < left_dining_chair.position.y
+		and rutini_mark.position.y < left_dining_chair.position.y
 		and left_dining_chair.position.y < treasure_mark.position.y
 		and treasure_mark.position.y < keeper_mark.position.y
 		and window_stool_count == 2
@@ -1154,8 +1197,8 @@ func _verify_mining_scene() -> void:
 		and miner_rig.cutscene_draw_order > frontmost_terrain_z,
 		"Encounter 9 must stage Keeper far left, cafe right, and Quibble on "
 			+ "the right of exactly two window stools, with Rotini seated at "
-			+ "the separate two-chair table. Every depth lane must remain above "
-			+ "Layer 1."
+			+ "the separate two-chair table and Moody Teen behind it. Every "
+			+ "depth lane must remain above Layer 1."
 	)
 	cafe_stage.free()
 	if encounter_controller != null:
@@ -1199,6 +1242,11 @@ func _verify_mining_scene() -> void:
 					&"cloak_lantern"
 				) as CharacterPresenter
 			)
+			var prestaged_moody_teen := (
+				encounter_controller._presenters_by_actor_id.get(
+					&"moody_teen"
+				) as CharacterPresenter
+			)
 			_expect(
 				prestaged_treasure != null
 				and prestaged_treasure.get("_resting_pose")
@@ -1206,7 +1254,9 @@ func _verify_mining_scene() -> void:
 				and prestaged_cat != null
 				and prestaged_cat.get("_resting_pose") == &"hold_cup"
 				and prestaged_keeper != null
-				and prestaged_keeper.visible,
+				and prestaged_keeper.visible
+				and prestaged_moody_teen != null
+				and prestaged_moody_teen.visible,
 				"Encounter 9 must prestage the occupied cafe's final poses "
 					+ "before the Miner enters."
 			)

@@ -1,4 +1,4 @@
-[gd_scene load_steps=24 format=3]
+[gd_scene load_steps=26 format=3]
 
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
 [ext_resource type="Script" uid="uid://7qy8qeox17tk" path="res://Scripts/cinematics/cutscene_actor_preview.gd" id="2_preview"]
@@ -17,6 +17,8 @@
 [ext_resource type="Shader" path="res://Shaders/cafe_speaker_highlight.gdshader" id="16_coco_shader"]
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/rat_miner.tscn" id="18_rat"]
 [ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_clump.tres" id="19_rat_clump"]
+[ext_resource type="Resource" path="res://resources/encounters/moody_teen_character_appearance.tres" id="22_moody_teen"]
+[ext_resource type="Texture2D" path="res://Assets/Props/cafe_cup.png" id="23_cup"]
 
 [sub_resource type="Resource" id="Resource_miner_preview"]
 script = ExtResource("6_appearance")
@@ -50,11 +52,11 @@ _data = {
 [node name="CafeGatheringEncounterStage" instance=ExtResource("1_stage")]
 editor_description = "Encounter 9, depth 14,000: the Cheese Cafe. The latest supplied composition drawing is the spatial authority.
 
-LEFT TO RIGHT: the Lantern Keeper is the far-left endpoint; Treasure Hunter and the rat crowd occupy the left-middle; the Miner lands in front-middle; Rotini and the separate dining table sit in the centre-right; and the enlarged cafe is the right-middle anchor. Coco is painted into its serving window, exactly two stools sit under the sill, and Quibble occupies the right stool.
+LEFT TO RIGHT: the Lantern Keeper is the far-left endpoint; Treasure Hunter and the rat crowd occupy the left-middle; the Miner lands in front-middle; Rotini and the separate dining table sit in the centre-right; Moody Teen stands behind that dining set; and the enlarged cafe is the right-middle anchor. Coco is painted into its serving window, exactly two stools sit under the sill, and Quibble occupies the right stool.
 
-DEPTH IS AUTHORED ACROSS THE SHADER PLANE, NOT ALONG ITS REAR RIM. Screen Y is the depth rule: the cafe, Coco, Quibble, Rotini, and rear rats are highest and furthest back; the dining set, mid rats, and Treasure occupy the middle; the front rats, Keeper, and Miner are lowest and therefore nearest. The Miner's runtime landing settles 56px into that foreground lane. Every overlap agrees with the feet: a lower subject draws or stands in front of a higher subject. The shader supplies a 72px lit shelf and a longer matte transition, so every contact lane remains visibly grounded. CharacterLayer rests at z 4 and the active cutscene at z 5; this stage never goes below local z -1, keeping its furthest background piece at effective z 3 - still strictly above Layer 1 at z 2.
+DEPTH IS AUTHORED ACROSS THE SHADER PLANE, NOT ALONG ITS REAR RIM. Screen Y is the depth rule: the cafe, Coco, Quibble, Moody Teen, and rear rats are highest and furthest back; Rotini stands in the rear-middle dining lane; the furniture, mid rats, and Treasure occupy the middle; the front rats, Keeper, and Miner are lowest and therefore nearest. Moody Teen stands at Y 6 behind the Y 36 dining furniture, so the table and chair cross his lower silhouette exactly like Eve's reference. The Miner's runtime landing settles 56px into the foreground lane. Every overlap agrees with the feet: a lower subject draws or stands in front of a higher subject. The shader supplies a 72px lit shelf and a longer matte transition, so every contact lane remains visibly grounded. CharacterLayer rests at z 4 and the active cutscene at z 5; this stage never goes below local z -1, keeping its furthest background piece at effective z 3 - still strictly above Layer 1 at z 2.
 
-THE CAMERA FOLLOWS THAT SINGLE TABLEAU from RIGHT TO LEFT through typed CAMERA beats. FRAME establishes the cafe at 1.30, then gives Rotini, Coco, Treasure Hunter, the Miner, Quibble, and the Keeper their own smoothly eased close framing. The final 2.4-second move crosses the contiguous cast from the right stool to the far-left Keeper. RESET returns pan and zoom together to gameplay framing. Every move blocks before its speaker talks; CutsceneActionPresenter owns the sine easing, and cancellation or release restores neutral framing.
+THE CAMERA FOLLOWS THAT SINGLE TABLEAU from RIGHT TO LEFT through typed CAMERA beats. FRAME establishes the cafe at 1.30, then gives Rotini, Coco, Treasure Hunter, the Miner, Quibble, Moody Teen, and the Keeper their own smoothly eased close framing. After Quibble, the camera finds Moody Teen behind the table for his silent line, then continues left for the final 2.4-second move to the far-left Keeper. RESET returns pan and zoom together to gameplay framing. Every move blocks before its speaker talks; CutsceneActionPresenter owns the sine easing, and cancellation or release restores neutral framing.
 
 THE CAFE IS ANOTHER 25 PERCENT LARGER than the previous pass. At 0.16 it is about 249px tall before camera zoom and owns the right-middle like Zephan's paper composition. The room deliberately owes that clearance; cropping the ceiling over the storefront is preferable to shrinking the destination back into a background prop.
 
@@ -106,11 +108,11 @@ position = Vector2(191, 12)
 
 [node name="treasure_hunter" type="Marker2D" parent="ActorMarkers" index="6"]
 editor_description = "In front of the colony in the left-middle, holding his no_pickaxe pose as drawn. The Miner and cafe are to his right."
-position = Vector2(-300, 40)
+position = Vector2(-300, 54)
 
 [node name="rutini" type="Marker2D" parent="ActorMarkers" index="7"]
-editor_description = "Immediately left of the cafe, seated behind the left chair at the separate dining table as Zephan dictated. His 20px lane is higher than the 36px table base, so the perspective furniture correctly occludes his lower body without changing his correctly grounded shared appearance."
-position = Vector2(-70, 20)
+editor_description = "Immediately left of the cafe, seated behind the left chair at the separate dining table as Zephan dictated. His lowered 30px lane settles him into the chair while remaining behind its 36px foreground base."
+position = Vector2(-70, 30)
 
 [node name="coffee_cat" type="Marker2D" parent="ActorMarkers" index="8"]
 editor_description = "ON THE RIGHT-HAND STOOL, IN FRONT OF THE CAFE WINDOW. Zephan's layout: two stools stand at the serving window Cheese Girl is painted in, and the cat sits on the right one with the coffee he has been carrying since 9,200. The cat and stool share the 12px rear lane; the stool's foreground draw order hides the standing-only art below its seat so Quibble reads as sitting without changing his shared grounding elsewhere."
@@ -119,6 +121,10 @@ position = Vector2(235, 12)
 [node name="cloak_lantern" type="Marker2D" parent="ActorMarkers" index="9"]
 editor_description = "The identity-aware gathering mark for the stage's own visitor. It matches the far-left Conversation mark so the final camera cue resolves the Keeper rather than the fallback spread."
 position = Vector2(-530, 58)
+
+[node name="moody_teen" type="Marker2D" parent="ActorMarkers" index="10"]
+editor_description = "Moody Teen's identity-aware gathering mark. His reusable run-wide presenter stands in the Y 6 rear lane behind the Y 36 dining furniture, matching Eve's background silhouette."
+position = Vector2(20, 6)
 
 [node name="DasQuesoCafe" parent="PropMarkers" index="0" instance=ExtResource("5_cafe")]
 editor_description = "THE LARGE RIGHT-MIDDLE ANCHOR from Zephan's paper layout and verbatim direction. The door remains on the building's left and the serving window Coco is painted in remains on its right.
@@ -162,7 +168,15 @@ editor_description = "The separate three-quarter dining table immediately left o
 z_index = 1
 position = Vector2(-20, 36)
 
-[node name="RatCrowd" type="Node2D" parent="PropMarkers" index="7"]
+[node name="DiningCup" type="Sprite2D" parent="PropMarkers" index="7"]
+editor_description = "The supplied blue cup on Rotini's separate dining table. Its feet and scaling are authored against the perspective tabletop rather than either of the two cafe-window stools."
+texture_filter = 4
+z_index = 2
+position = Vector2(-20, -24)
+scale = Vector2(0.025, 0.025)
+texture = ExtResource("23_cup")
+
+[node name="RatCrowd" type="Node2D" parent="PropMarkers" index="8"]
 editor_description = "A bounded cafe-only rat mass behind Treasure Hunter. Five clump actors depict 120 rats while three foreground singles break up the repeated silhouette. Runtime never adds to this authored eight-node pool."
 
 [node name="ClumpBackLeft" parent="PropMarkers/RatCrowd" index="0" instance=ExtResource("18_rat")]
@@ -197,7 +211,7 @@ default_appearance = ExtResource("19_rat_clump")
 
 [node name="RatFrontLeft" parent="PropMarkers/RatCrowd" index="5" instance=ExtResource("18_rat")]
 z_index = 0
-position = Vector2(-275, 50)
+position = Vector2(-335, 50)
 scale = Vector2(0.78, 0.78)
 
 [node name="RatFrontCentre" parent="PropMarkers/RatCrowd" index="6" instance=ExtResource("18_rat")]
@@ -230,7 +244,7 @@ metadata/_edit_group_ = true
 [node name="treasure_hunter" type="Node2D" parent="." index="6"]
 editor_description = "Standing in front of the left-middle rat crowd with nothing left to carry. no_pickaxe is the pose his own art already has for exactly this - he gave the second one away at 7,400 - and it is the only visual in the shot that says his story finished."
 z_index = 1
-position = Vector2(-300, 40)
+position = Vector2(-300, 54)
 script = ExtResource("2_preview")
 actor_id = &"treasure_hunter"
 appearance = ExtResource("9_treasure")
@@ -240,7 +254,7 @@ metadata/_edit_group_ = true
 [node name="rutini" type="Node2D" parent="." index="7"]
 editor_description = "At the separate dining table immediately left of the enlarged right-middle cafe."
 z_index = 1
-position = Vector2(-70, 20)
+position = Vector2(-70, 30)
 script = ExtResource("2_preview")
 actor_id = &"rutini"
 appearance = ExtResource("10_rutini")
@@ -263,6 +277,14 @@ script = ExtResource("2_preview")
 actor_id = &"cloak_lantern"
 appearance = ExtResource("8_lantern")
 pose = &"idle"
+metadata/_edit_group_ = true
+
+[node name="moody_teen" type="Node2D" parent="." index="10"]
+editor_description = "Behind the centre-right dining set at the same Y 6 rear depth used by the runtime presenter. The Y 36 table and chair sit lower and therefore correctly overlap him in the 2.5D composition."
+position = Vector2(20, 6)
+script = ExtResource("2_preview")
+actor_id = &"moody_teen"
+appearance = ExtResource("22_moody_teen")
 metadata/_edit_group_ = true
 
 [editable path="ActorMarkers"]

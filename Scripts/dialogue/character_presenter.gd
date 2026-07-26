@@ -13,6 +13,7 @@ const GroundWalkType = preload(
 
 @export_category("References")
 @export var character_sprite: Sprite2D
+@export var character_aura: Sprite2D
 @export var actor_sprite_view: ActorSpriteView
 @export var speech_reaction: SpeechReactionType
 
@@ -98,6 +99,16 @@ func apply_appearance(appearance: CharacterAppearance) -> void:
 	)
 	character_sprite.modulate = appearance.tint
 	character_sprite.flip_h = appearance.flip_h
+	character_aura.texture = appearance.texture
+	character_aura.hframes = appearance.horizontal_frames
+	character_aura.vframes = appearance.vertical_frames
+	character_aura.frame = appearance.frame
+	character_aura.scale = appearance.sprite_scale
+	character_aura.position = character_sprite.position
+	character_aura.modulate = Color.WHITE
+	character_aura.flip_h = appearance.flip_h
+	character_aura.material = appearance.aura_material
+	character_aura.visible = appearance.aura_material != null
 	_art_faces_left = appearance.art_faces_left
 	_base_flip_h = appearance.flip_h
 	_base_sprite_position = character_sprite.position
@@ -207,6 +218,8 @@ func _apply_facing_offset(flipped: bool) -> void:
 	character_sprite.position.x = _base_sprite_position.x + (
 		2.0 * _body_offset_from_node_x if mirrored else 0.0
 	)
+	character_aura.position = character_sprite.position
+	character_aura.flip_h = character_sprite.flip_h
 
 
 ## Returns how far the drawn body sits from the sprite node along x, in world
