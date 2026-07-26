@@ -17,7 +17,7 @@ actors_drawn_into_set = Array[StringName]([&"cheese_girl"])
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
 editor_description = "The lantern-staff man's approach. The rest of the cast is already standing when the miner breaks through."
-position = Vector2(288, 0)
+position = Vector2(720, 0)
 
 [node name="Conversation" parent="ActorMarkers" index="1"]
 editor_description = "Authored rather than tracked, so the gathering keeps its shape wherever the miner lands."
@@ -28,7 +28,7 @@ position = Vector2(120, 0)
 
 [node name="Exit" parent="ActorMarkers" index="4"]
 editor_description = "Past the right edge of the frame. The gathering stays; only a departing speaker uses this."
-position = Vector2(560, 0)
+position = Vector2(820, 0)
 
 [node name="EditorTerrainPreview" parent="." index="4"]
 editor_description = "Previews cafe_gathering at its authored depth."

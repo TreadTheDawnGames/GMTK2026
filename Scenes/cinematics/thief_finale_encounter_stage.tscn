@@ -9,11 +9,11 @@ closing_move_seconds = 2.4
 opening_step_height = 4.0
 hide_actor_after_closing = false
 conversation_tracks_miner = true
-conversation_root_offset_from_miner_x = 96.0
+conversation_root_offset_from_miner_x = 110.9
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
 editor_description = "Far out to the right. The approach is long on purpose: this is the arrival the whole run points at."
-position = Vector2(360, 0)
+position = Vector2(504, 0)
 
 [node name="Conversation" parent="ActorMarkers" index="1"]
 position = Vector2(-96, 0)
@@ -22,7 +22,7 @@ position = Vector2(-96, 0)
 position = Vector2(-96, 0)
 
 [node name="Exit" parent="ActorMarkers" index="4"]
-position = Vector2(600, 0)
+position = Vector2(604, 0)
 
 [node name="EditorTerrainPreview" parent="." index="4"]
 editor_description = "Previews thief_finale at its scheduled depth."
