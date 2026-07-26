@@ -10,7 +10,7 @@ kind = 9
 actor = &"treasure_hunter"
 notes = "Nobody walks into this shot. The gathering is already standing when the ceiling comes in - canonical story says they HAVE gathered - so the timeline opens by stating the room rather than by assembling it.
 
-DepthEncounterController has already placed and shown the run-wide gathered cast on their own marks under ActorMarkers by the time this runs, and the cafe stage has prepared Moody Teen in its rear lane. These SHOW beats state it anyway, so the timeline is the whole account of the shot and does not depend on prestaging having done half of it first. That is the same reason encounter 5 opens on a SHOW for a man who is already visible.
+DepthEncounterController has already placed and shown the run-wide gathered cast, including Moody Teen, on their own marks under ActorMarkers by the time this runs. These SHOW beats state it anyway, so the timeline is the whole account of the shot and does not depend on prestaging having done half of it first. That is the same reason encounter 5 opens on a SHOW for a man who is already visible.
 
 Cheese Girl gets no beat at all. She is painted into the storefront, the stage names her in Actors Drawn Into Set, and the controller leaves her presenter hidden - a SHOW here would put a second one of her on the floor in front of her own shop."
 
@@ -81,7 +81,7 @@ notes = "Looking right across the whole gathering from the far-left edge. He rem
 script = ExtResource("1_beat")
 kind = 9
 actor = &"moody_teen"
-notes = "Moody Teen is already standing in the rear dining-table lane when the Miner falls into the occupied cafe. The cafe stage owns this one presenter because his separate encounters are not part of the approved run schedule."
+notes = "Moody Teen is already standing in the rear dining-table lane when the Miner falls into the occupied cafe. DepthEncounterController reuses the presenter established by his scheduled cavern encounters, exactly like the other returning cast."
 
 [sub_resource type="Resource" id="Beat_face_moody_teen"]
 script = ExtResource("1_beat")
@@ -243,7 +243,7 @@ start_seconds = 21.35
 duration_seconds = 1.5
 conversation = ExtResource("2_conversation")
 line_range = Vector2i(6, 6)
-notes = "Moody Teen's entire cafe contribution is the requested silent ellipsis. The stage-owned presenter receives the same speech bounce callback as the run-wide gathered cast."
+notes = "Moody Teen's entire cafe contribution is the requested silent ellipsis. His run-wide presenter receives the same speech bounce callback as every other gathered cast member."
 
 [sub_resource type="Resource" id="Beat_frame_keeper"]
 script = ExtResource("1_beat")

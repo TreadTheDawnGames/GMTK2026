@@ -1,4 +1,4 @@
-[gd_scene load_steps=26 format=3]
+[gd_scene load_steps=25 format=3]
 
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
 [ext_resource type="Script" uid="uid://7qy8qeox17tk" path="res://Scripts/cinematics/cutscene_actor_preview.gd" id="2_preview"]
@@ -17,7 +17,6 @@
 [ext_resource type="Shader" path="res://Shaders/cafe_speaker_highlight.gdshader" id="16_coco_shader"]
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/rat_miner.tscn" id="18_rat"]
 [ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_clump.tres" id="19_rat_clump"]
-[ext_resource type="PackedScene" path="res://Scenes/dialogue/character_presenter.tscn" id="21_presenter"]
 [ext_resource type="Resource" path="res://resources/encounters/moody_teen_character_appearance.tres" id="22_moody_teen"]
 
 [sub_resource type="Resource" id="Resource_miner_preview"]
@@ -82,7 +81,6 @@ conversation_root_offset_from_miner_x = -354.0
 props_track_tracked_cast = true
 sequence = ExtResource("12_sequence")
 actors_drawn_into_set = Array[StringName]([&"cheese_girl"])
-moody_teen_appearance = ExtResource("22_moody_teen")
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
 editor_description = "The same far-left mark as Conversation. The Keeper has already gathered here, so the shot finds him in place rather than walking him in."
@@ -123,8 +121,8 @@ position = Vector2(235, 12)
 editor_description = "The identity-aware gathering mark for the stage's own visitor. It matches the far-left Conversation mark so the final camera cue resolves the Keeper rather than the fallback spread."
 position = Vector2(-530, 58)
 
-[node name="MoodyTeenPresenter" parent="ActorMarkers" index="10" instance=ExtResource("21_presenter")]
-editor_description = "Encounter-9-only Moody Teen presenter. His origin sits in the Y 6 rear lane behind the Y 36 dining furniture, matching Eve's background silhouette without inserting his unscheduled encounters into the run."
+[node name="moody_teen" type="Marker2D" parent="ActorMarkers" index="10"]
+editor_description = "Moody Teen's identity-aware gathering mark. His reusable run-wide presenter stands in the Y 6 rear lane behind the Y 36 dining furniture, matching Eve's background silhouette."
 position = Vector2(20, 6)
 
 [node name="DasQuesoCafe" parent="PropMarkers" index="0" instance=ExtResource("5_cafe")]

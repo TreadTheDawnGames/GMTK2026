@@ -1087,8 +1087,8 @@ func _verify_mining_scene() -> void:
 	var rutini_mark := cafe_actor_markers.get_node("rutini") as Marker2D
 	var cat_mark := cafe_actor_markers.get_node("coffee_cat") as Marker2D
 	var moody_teen := cafe_actor_markers.get_node(
-		"MoodyTeenPresenter"
-	) as CharacterPresenter
+		"moody_teen"
+	) as Marker2D
 	var cafe_prop := cafe_props.get_node("DasQuesoCafe") as Node2D
 	var dining_table := cafe_props.get_node("DiningTable") as Node2D
 	var left_window_stool := cafe_props.get_node(
@@ -1205,6 +1205,11 @@ func _verify_mining_scene() -> void:
 					&"cloak_lantern"
 				) as CharacterPresenter
 			)
+			var prestaged_moody_teen := (
+				encounter_controller._presenters_by_actor_id.get(
+					&"moody_teen"
+				) as CharacterPresenter
+			)
 			_expect(
 				prestaged_treasure != null
 				and prestaged_treasure.get("_resting_pose")
@@ -1212,7 +1217,9 @@ func _verify_mining_scene() -> void:
 				and prestaged_cat != null
 				and prestaged_cat.get("_resting_pose") == &"hold_cup"
 				and prestaged_keeper != null
-				and prestaged_keeper.visible,
+				and prestaged_keeper.visible
+				and prestaged_moody_teen != null
+				and prestaged_moody_teen.visible,
 				"Encounter 9 must prestage the occupied cafe's final poses "
 					+ "before the Miner enters."
 			)
