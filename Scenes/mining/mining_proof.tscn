@@ -30,6 +30,7 @@
 [ext_resource type="Theme" uid="uid://cy302o2vx18ng" path="res://resources/themes/Menus.tres" id="42_mb17i"]
 [ext_resource type="Resource" path="res://resources/encounters/newspaper_reader_character_appearance.tres" id="44_intro_appearance"]
 [ext_resource type="Script" uid="uid://chh4kyqjtsvyq" path="res://Scripts/mining/mining_cinematic_flow.gd" id="45_cinematic_flow"]
+[ext_resource type="Texture2D" uid="uid://bqv8xq2gbikjf" path="res://Assets/UI/dialogue_textboxes/lantern_keeper_textbox.png" id="46_mb17i"]
 [ext_resource type="Script" uid="uid://3d6grhip1htq" path="res://Scripts/mining/surface_presentation.gd" id="52_surface_presentation"]
 [ext_resource type="Shader" uid="uid://dwpswe2x8kjye" path="res://Shaders/surface_sky.gdshader" id="53_surface_sky"]
 [ext_resource type="Shader" uid="uid://6u22qy01ne0" path="res://Shaders/sunlight_wash.gdshader" id="55_sunlight_wash"]
@@ -421,6 +422,7 @@ horizontal_alignment = 2
 script = ExtResource("22_playtime_reveal")
 
 [node name="DialogueDirector" parent="." unique_id=1751798570 instance=ExtResource("11_dialogue_overlay")]
+lantern_keeper_textbox_texture = ExtResource("46_mb17i")
 
 [node name="CreditsOverlay" parent="." unique_id=419086479 instance=ExtResource("60_credits")]
 

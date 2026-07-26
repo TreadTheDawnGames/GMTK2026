@@ -54,6 +54,7 @@ signal cinematic_frame_closed
 @export var zeb_textbox_texture: Texture2D
 @export var ayden_textbox_texture: Texture2D
 @export var coco_textbox_texture: Texture2D
+@export var lantern_keeper_textbox_texture: Texture2D
 @export var art_margin_left: int = 110
 @export var art_margin_top: int = 34
 @export var art_margin_right: int = 12
@@ -407,6 +408,8 @@ func _present_current_line() -> void:
 			textbox_texture = ayden_textbox_texture
 		&"mr_sitts", &"newspaper_reader":
 			textbox_texture = mr_sitts_textbox_texture
+		&"cloak_lantern", &"thief":
+			textbox_texture = lantern_keeper_textbox_texture
 	var uses_authored_textbox := textbox_texture != null
 	textbox_art.texture = textbox_texture
 	textbox_art.visible = uses_authored_textbox
