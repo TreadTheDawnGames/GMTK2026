@@ -197,7 +197,7 @@ func _process(delta: float) -> void:
 		or combo >= _combo_ceiling()
 	):
 		queue_redraw()
-	
+
 	#if combo_bar.value == combo_bar.max_value:
 		#combo_bar.
 
