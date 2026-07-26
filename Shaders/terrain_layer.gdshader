@@ -866,6 +866,15 @@ void fragment() {
 	float mask_alpha = packed_mask.a;
 	float fracture_value = packed_mask.r;
 	vec4 artwork = vec4(1.0);
+	// Buried strata use progressively darker, higher-contrast contour colors,
+	// so their otherwise one-pixel threshold exposes screen-pixel stair steps.
+	// Widen only that derivative AA band; this adds no texture reads and leaves
+	// the foreground's authored sharp edge and the 16 px mask density unchanged.
+	float cut_aa_half_width = mix(
+		0.5,
+		0.85,
+		smoothstep(0.65, 1.0, clamp(stratum_depth, 0.0, 1.0))
+	);
 
 	// The mask is authored below world resolution and drawn with linear
 	// filtering, so every cut arrives as a wide soft ramp. Re-thresholding it
@@ -876,8 +885,8 @@ void fragment() {
 	if (sharpen_mask_edges) {
 		float alpha_softness = max(fwidth(mask_alpha), 0.0001);
 		mask_alpha = smoothstep(
-			0.5 - alpha_softness * 0.5,
-			0.5 + alpha_softness * 0.5,
+			0.5 - alpha_softness * cut_aa_half_width,
+			0.5 + alpha_softness * cut_aa_half_width,
 			mask_alpha
 		);
 	}
@@ -966,8 +975,8 @@ void fragment() {
 			vec4(0.0001)
 		);
 		vec4 solid_neighbor = smoothstep(
-			vec4(0.5) - neighbor_softness * 0.5,
-			vec4(0.5) + neighbor_softness * 0.5,
+			vec4(0.5) - neighbor_softness * cut_aa_half_width,
+			vec4(0.5) + neighbor_softness * cut_aa_half_width,
 			neighbor_alpha
 		);
 		float nearest_solid_neighbor = min(
@@ -976,12 +985,14 @@ void fragment() {
 		);
 		// Four cardinal taps find the open side cheaply, but using their
 		// minimum directly measures Manhattan distance and stair-steps
-		// diagonal ink. Project one final tap along the recovered edge
-		// direction so curves keep a constant world-space line weight without
-		// raising the streamed mask density or adding four diagonal reads.
+		// diagonal ink. Recover direction from the raw filtered values instead
+		// of the thresholded coverage: thresholding quantizes shallow curves
+		// into horizontal/diagonal steps. The existing final projected tap then
+		// keeps a constant world-space line weight without raising the streamed
+		// mask density or adding any texture reads.
 		vec2 open_direction = vec2(
-			solid_neighbor.z - solid_neighbor.w,
-			solid_neighbor.x - solid_neighbor.y
+			neighbor_alpha.z - neighbor_alpha.w,
+			neighbor_alpha.x - neighbor_alpha.y
 		);
 		float open_direction_length = length(open_direction);
 		float projected_solid_neighbor = nearest_solid_neighbor;
@@ -994,8 +1005,8 @@ void fragment() {
 				0.0001
 			);
 			projected_solid_neighbor = smoothstep(
-				0.5 - projected_softness * 0.5,
-				0.5 + projected_softness * 0.5,
+				0.5 - projected_softness * cut_aa_half_width,
+				0.5 + projected_softness * cut_aa_half_width,
 				projected_alpha
 			);
 		}
