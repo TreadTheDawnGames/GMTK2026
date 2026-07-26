@@ -9,7 +9,7 @@ extends SceneTree
 const _SEQUENCE_PATH := (
 	"res://resources/cinematics/sequences/cheese_girl_first_sequence.tres"
 )
-const _EXPECTED_OFFSET := Vector2(48.0, 0.0)
+const _EXPECTED_OFFSET := Vector2(48.0, 14.0)
 const _EXPECTED_ZOOM := Vector2(1.4, 1.4)
 
 var _failures: PackedStringArray = []
@@ -59,7 +59,7 @@ func _verify_framing(sequence: CutsceneSequence) -> void:
 		return
 	_expect(
 		frame.camera_offset.is_equal_approx(_EXPECTED_OFFSET),
-		"Frame must centre the 96px two-person span."
+		"Frame must centre the two-person span on both axes."
 	)
 	_expect(
 		frame.camera_zoom.is_equal_approx(_EXPECTED_ZOOM),

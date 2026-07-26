@@ -48,9 +48,9 @@ script = ExtResource("1_j0luq")
 kind = 11
 start_seconds = 1.3
 duration_seconds = 0.8
-camera_offset = Vector2(48, 0)
+camera_offset = Vector2(48, 14)
 camera_zoom = Vector2(1.4, 1.4)
-notes = "The typed CAMERA/FRAME move closes onto the two speakers after Cheese Girl settles and before her first line. The encounter view begins centred on the Miner; Cheese Girl stands 96px to his right, so a 48px offset centres their shared midpoint. The 1.40 zoom matches Encounter 9's conversational framing while preserving both grounded silhouettes and the cave around them."
+notes = "The typed CAMERA/FRAME move closes onto the two speakers after Cheese Girl settles and before her first line. Cheese Girl stays on the rear floor plane while the Miner stands 28px nearer the camera, so the 48px horizontal and 14px vertical offsets centre their shared midpoint. The 1.40 zoom matches Encounter 9's conversational framing while preserving both grounded silhouettes and the cave around them."
 
 [sub_resource type="Resource" id="Resource_a5exc"]
 script = ExtResource("1_j0luq")
