@@ -33,6 +33,11 @@ class TerrainChunkVisual:
 	## GPU tile lazily when that tile is first changed; pending bits must remain
 	## until their own tile publishes or a later hit could carve a sibling.
 	var needs_private_texture_tiles: PackedInt32Array = PackedInt32Array()
+	## One fixed deadline and rectangle per stratum; mining replaces or unions
+	## these entries and retirement clears them. Growth is therefore bounded by
+	## the four authored terrain layers, never by impact count.
+	var impact_crush_deadlines_usec: PackedInt64Array = PackedInt64Array()
+	var impact_crush_rects: Array[Rect2i] = []
 
 
 class HoleMaskData:
@@ -47,6 +52,9 @@ class ImpactStamp:
 	var center: Vector2
 	var core_radius: float
 	var damage_bounds: Rect2
+	## Contact chunk is derived once with the stamp and reused by deferred
+	## presentation setup instead of repeating world-to-chunk math per layer.
+	var impact_chunk_index: int
 	var narrow_path_points: PackedVector2Array
 	var narrow_path_radius_scale: float = 1.0
 	var narrow_path_two_layer_fraction: float = 0.5
@@ -245,6 +253,9 @@ const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 128
 @export_category("Impact Reveal")
 ## Layer four remains covered until the active hit reaches this combo.
 @export_range(1, 100, 1) var deepest_layer_combo_threshold: int = 7
+## The mask is final and authoritative throughout this short presentation-only
+## window; only its shader reveal expands from the hammer contact into the dirt.
+@export_range(0.02, 0.20, 0.005) var impact_crush_duration_seconds: float = 0.09
 
 @export_category("Web Performance")
 ## Maximum CPU time spent starting queued mask layers in one rendered frame.
@@ -403,6 +414,7 @@ var _preparation_candidate_count: int = 0
 # images, while completed patches live only until contact or target replacement.
 var _prepared_layer_patches: Dictionary[String, PreparedLayerPatch] = {}
 var _preparing_layer_patches: Dictionary[String, PreparedLayerPatch] = {}
+var _active_impact_crush_count: int = 0
 
 
 ## Connects terrain events and loads the initial visible strata.
@@ -477,6 +489,7 @@ func _ready() -> void:
 ## Prediction only fills CPU caches; gameplay cells and visible textures remain
 ## unchanged until the real impact signal arrives.
 func _process(_delta: float) -> void:
+	_retire_completed_impact_crushes()
 	# Camera zoom can change while the logical mining view stays still (the
 	# title shot does exactly that). Recheck the cheap chunk bounds each frame
 	# so zooming out cannot expose the clear color below the streamed terrain.
@@ -1112,6 +1125,10 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 	for chunk_index in affected_chunk_lookup:
 		_queue_chunk_snapshot_refresh(chunk_index)
 	if _defer_impact_rasterization:
+		var impact_started_at_usec := Time.get_ticks_usec()
+		var impact_deadline_usec := impact_started_at_usec + roundi(
+			impact_crush_duration_seconds * 1_000_000.0
+		)
 		var layer_count: int = profile.get_gameplay_layer_count()
 		var grouped_work_start := _pending_impact_work.size()
 		var queued_authoritative_preparation := false
@@ -1191,6 +1208,20 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 							chunk_index * layer_count + layer_index
 						)
 					)
+					if (
+						prepared_patch != null
+						and chunk_index == stamp.impact_chunk_index
+					):
+						_accumulate_impact_crush(
+							chunk,
+							layer_index,
+							Rect2i(
+								prepared_patch.destination_position,
+								prepared_patch.image.get_size()
+							),
+							impact_started_at_usec,
+							impact_deadline_usec
+						)
 					if prepared_patch != null:
 						_append_impact_work(
 							stamp,
@@ -1215,6 +1246,14 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 						)
 						if not affected_rect.has_area():
 							continue
+						if chunk_index == stamp.impact_chunk_index:
+							_accumulate_impact_crush(
+								chunk,
+								layer_index,
+								affected_rect,
+								impact_started_at_usec,
+								impact_deadline_usec
+							)
 						raster_band_count = maxi(
 							ceili(
 								float(affected_rect.size.y)
@@ -1233,6 +1272,45 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 							raster_band_index,
 							raster_band_count
 						)
+		# Multiple lobes can touch the same stratum. Publish the union once per
+		# chunk/layer after queue construction instead of repeating material
+		# updates for every lobe and raster band in the resolved-hit hot path.
+		var impact_shader_started_at := fmod(
+			float(impact_started_at_usec) / 1_000_000.0,
+			3600.0
+		)
+		var mask_size := Vector2(_get_chunk_mask_size())
+		for chunk_index in affected_chunk_lookup:
+			if not _active_chunks.has(chunk_index):
+				continue
+			var chunk: TerrainChunkVisual = _active_chunks[chunk_index]
+			for layer_index in range(layer_count):
+				if (
+					chunk.impact_crush_deadlines_usec[layer_index]
+					!= impact_deadline_usec
+				):
+					continue
+				var crush_rect := chunk.impact_crush_rects[layer_index]
+				var material := (
+					chunk.layer_sprites[layer_index].material
+					as ShaderMaterial
+				)
+				material.set_shader_parameter(
+					&"impact_crush_uv_rect",
+					Vector4(
+						float(crush_rect.position.x) / mask_size.x,
+						float(crush_rect.position.y) / mask_size.y,
+						float(crush_rect.size.x) / mask_size.x,
+						float(crush_rect.size.y) / mask_size.y
+					)
+				)
+				material.set_shader_parameter(
+					&"impact_crush_timing",
+					Vector2(
+						impact_shader_started_at,
+						impact_crush_duration_seconds
+					)
+				)
 		# CPU masks still consume every stamp in order. The final item for each
 		# chunk/layer publishes its dirty GPU tiles one bounded slice at a time
 		# without allocating extra queue descriptors for multi-tile masks.
@@ -2291,6 +2369,10 @@ func _create_chunk_visual(layer_count: int) -> TerrainChunkVisual:
 	chunk.needs_private_texture_tiles.fill(0)
 	chunk.layer_revisions.resize(layer_count)
 	chunk.layer_revisions.fill(0)
+	chunk.impact_crush_deadlines_usec.resize(layer_count)
+	chunk.impact_crush_deadlines_usec.fill(0)
+	chunk.impact_crush_rects.resize(layer_count)
+	chunk.impact_crush_rects.fill(Rect2i())
 	for layer_index in range(layer_count):
 		var sprite := Sprite2D.new()
 		sprite.name = "TerrainLayer_%d" % layer_index
@@ -2664,6 +2746,58 @@ func _show_prepared_patch_overlay(
 	material.set_shader_parameter(&"use_impact_patch", true)
 
 
+## Accumulates one allocation-free compression front while queue building
+## already owns the exact affected rectangle. Material parameters are published
+## once after all lobes are merged, keeping repeated writes off the hot path.
+func _accumulate_impact_crush(
+	chunk: TerrainChunkVisual,
+	layer_index: int,
+	crush_rect: Rect2i,
+	started_at_usec: int,
+	deadline_usec: int
+) -> void:
+	if impact_crush_duration_seconds <= 0.0 or not crush_rect.has_area():
+		return
+	if chunk.impact_crush_deadlines_usec[layer_index] > started_at_usec:
+		crush_rect = chunk.impact_crush_rects[layer_index].merge(crush_rect)
+	else:
+		_active_impact_crush_count += 1
+	chunk.impact_crush_deadlines_usec[layer_index] = deadline_usec
+	chunk.impact_crush_rects[layer_index] = crush_rect
+
+
+## Retires elapsed shader fronts without creating per-hit tweens or timers.
+func _retire_completed_impact_crushes() -> void:
+	if _active_impact_crush_count <= 0:
+		return
+	var now_usec := Time.get_ticks_usec()
+	for chunk: TerrainChunkVisual in _active_chunks.values():
+		for layer_index in range(
+			chunk.impact_crush_deadlines_usec.size()
+		):
+			var deadline_usec := (
+				chunk.impact_crush_deadlines_usec[layer_index]
+			)
+			if deadline_usec <= 0 or deadline_usec > now_usec:
+				continue
+			_stop_impact_crush(chunk, layer_index)
+
+
+func _stop_impact_crush(
+	chunk: TerrainChunkVisual,
+	layer_index: int
+) -> void:
+	if chunk.impact_crush_deadlines_usec[layer_index] <= 0:
+		return
+	chunk.impact_crush_deadlines_usec[layer_index] = 0
+	chunk.impact_crush_rects[layer_index] = Rect2i()
+	_active_impact_crush_count = maxi(_active_impact_crush_count - 1, 0)
+	var material := (
+		chunk.layer_sprites[layer_index].material as ShaderMaterial
+	)
+	material.set_shader_parameter(&"impact_crush_timing", Vector2.ZERO)
+
+
 ## Removes the transient exact patch only after every dirty base tile published.
 func _clear_prepared_patch_overlay(
 	chunk: TerrainChunkVisual,
@@ -2900,6 +3034,8 @@ func _apply_layer_display_opacity() -> void:
 ## Retires a chunk's nodes for reuse while retaining their impact records.
 func _unload_chunk(chunk_index: int) -> void:
 	var chunk := _active_chunks[chunk_index]
+	for layer_index in range(chunk.impact_crush_deadlines_usec.size()):
+		_stop_impact_crush(chunk, layer_index)
 	_active_chunks.erase(chunk_index)
 	if _chunk_visual_pool.size() >= CHUNK_VISUAL_POOL_LIMIT:
 		# Streaming can cross many chunk boundaries in one frame during a fast
@@ -4126,6 +4262,7 @@ func _create_impact_stamp(
 			float(impact_origin_cell_x) + 0.5
 		) * float(cell_size)
 	stamp.damage_bounds = damage_rect
+	stamp.impact_chunk_index = _world_row_to_chunk(minimum_cell.y)
 	if is_narrow_path:
 		var combo_strength := clampf(
 			float(_active_impact_combo)
@@ -4216,6 +4353,7 @@ func _create_ordinary_impact_stamp_from_bounds(
 			float(impact_origin_cell_x) + 0.5
 		) * float(cell_size)
 	stamp.damage_bounds = damage_rect
+	stamp.impact_chunk_index = _world_row_to_chunk(minimum_cell.y)
 	stamp.core_radius = (
 		maxf(damage_rect.size.x, damage_rect.size.y) * 0.5
 	)

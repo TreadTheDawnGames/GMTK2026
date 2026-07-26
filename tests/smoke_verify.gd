@@ -8,6 +8,7 @@ extends SceneTree
 ## - Confirms damaged terrain restores byte-exactly without replaying history.
 ## - Checks fractional review travel, encounter stops, and upward preloading.
 ## - Guards the sample-neutral shader path that smooths buried cut contours.
+## - Confirms a real dig starts one bounded allocation-free crush transition.
 ## - Exits nonzero on any failed contract so agents get a fast merge gate.
 ## - This intentionally stays small; detailed behavior remains in local_tests.
 ## - The invariant is that a parseable game can complete one mining mutation.
@@ -69,6 +70,13 @@ func _run() -> void:
 			"neighbor_alpha.x - neighbor_alpha.y"
 		),
 		"Buried terrain contours must retain sample-neutral derivative smoothing."
+	)
+	_expect(
+		terrain_shader_source.contains("impact_crush_timing")
+		and terrain_shader_source.contains(
+			"mask_sample = mix(vec4(1.0), mask_sample, crush_reveal)"
+		),
+		"Mining impacts must retain the sample-neutral crushed-mask transition."
 	)
 	await _verify_mining_scene()
 	_verify_finale_text_resolves()
@@ -766,12 +774,71 @@ func _verify_mining_scene() -> void:
 		not terrain_manager.is_solid_cell(impact_cell),
 		"Removed terrain must become logically open."
 	)
-	# Drain only the bounded production scheduler, then retire and restore the
-	# impacted chunk. This catches stale or lossy snapshot changes; detailed
-	# timing remains in the non-blocking terrain benchmark so smoke stays fast.
 	var impact_chunk_index := terrain_renderer._world_row_to_chunk(
 		impact_cell.y
 	)
+	var impact_chunk: TerrainLayerRenderer.TerrainChunkVisual = (
+		terrain_renderer._active_chunks.get(impact_chunk_index)
+	)
+	var impact_crush_is_active := false
+	if impact_chunk != null:
+		for layer_index in range(impact_chunk.layer_sprites.size()):
+			var material := (
+				impact_chunk.layer_sprites[layer_index].material
+				as ShaderMaterial
+			)
+			var crush_timing: Vector2 = material.get_shader_parameter(
+				&"impact_crush_timing"
+			)
+			if crush_timing.y > 0.0:
+				impact_crush_is_active = true
+				break
+	_expect(
+		impact_crush_is_active
+		and terrain_renderer._active_impact_crush_count > 0,
+		"A production dig must start one bounded terrain crush transition."
+	)
+	# Expire the fixed deadlines directly instead of sleeping for the authored
+	# 90 ms. This keeps the branch gate deterministic and proves cleanup cannot
+	# leave a shader transition active without making the suite wait in real time.
+	if impact_chunk != null:
+		for layer_index in range(
+			impact_chunk.impact_crush_deadlines_usec.size()
+		):
+			if (
+				impact_chunk.impact_crush_deadlines_usec[layer_index]
+				> 0
+			):
+				impact_chunk.impact_crush_deadlines_usec[layer_index] = (
+					Time.get_ticks_usec() - 1
+				)
+	terrain_renderer._process(0.0)
+	var impact_crush_retired := (
+		terrain_renderer._active_impact_crush_count == 0
+	)
+	if impact_chunk != null:
+		for layer_index in range(impact_chunk.layer_sprites.size()):
+			var material := (
+				impact_chunk.layer_sprites[layer_index].material
+				as ShaderMaterial
+			)
+			var crush_timing: Variant = material.get_shader_parameter(
+				&"impact_crush_timing"
+			)
+			impact_crush_retired = (
+				impact_crush_retired
+				and (
+					crush_timing == null
+					or crush_timing == Vector2.ZERO
+				)
+			)
+	_expect(
+		impact_crush_retired,
+		"Expired terrain crush transitions must retire without timers."
+	)
+	# Drain only the bounded production scheduler, then retire and restore the
+	# impacted chunk. This catches stale or lossy snapshot changes; detailed
+	# timing remains in the non-blocking terrain benchmark so smoke stays fast.
 	for _terrain_frame in range(64):
 		terrain_renderer._process(1.0 / 60.0)
 		if terrain_renderer._compressed_chunk_snapshots.has(

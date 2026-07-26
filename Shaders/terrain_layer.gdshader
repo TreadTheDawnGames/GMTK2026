@@ -37,6 +37,13 @@ uniform sampler2D mask_tile_2 : filter_linear;
 uniform sampler2D impact_patch_texture : filter_linear;
 uniform bool use_impact_patch = false;
 uniform vec4 impact_patch_uv_rect = vec4(0.0);
+// Mining reveals the finished mask through a short top-down compression front.
+// The renderer retires this uniform after the bounded transition, so settled
+// terrain pays no extra branch and the final 16 px silhouette remains exact.
+uniform vec4 impact_crush_uv_rect = vec4(0.0);
+// X is shader-uptime start, Y is duration; zero duration disables the branch.
+// Packing them halves material updates compared with separate start/use values.
+uniform vec2 impact_crush_timing = vec2(0.0);
 
 // World-space period of optional fill art, independent of the mask resolution.
 uniform vec2 fill_texture_world_size = vec2(256.0);
@@ -241,27 +248,7 @@ uniform float ground_face_shade_strength = 0.24;
 uniform float ground_contact_depth_world_px = 6.0;
 uniform float ground_contact_strength = 0.42;
 
-vec4 sample_terrain_mask(vec2 chunk_uv) {
-	vec2 safe_uv = clamp(chunk_uv, vec2(0.0), vec2(1.0));
-	if (use_impact_patch) {
-		vec2 patch_position = impact_patch_uv_rect.xy;
-		vec2 patch_size = max(
-			impact_patch_uv_rect.zw,
-			vec2(0.000001)
-		);
-		vec2 patch_uv = (safe_uv - patch_position) / patch_size;
-		vec2 inside_low = step(vec2(0.0), patch_uv);
-		vec2 inside_high = step(patch_uv, vec2(1.0));
-		if (
-			inside_low.x * inside_low.y
-			* inside_high.x * inside_high.y > 0.5
-		) {
-			return texture(
-				impact_patch_texture,
-				clamp(patch_uv, vec2(0.0), vec2(1.0))
-			);
-		}
-	}
+vec4 sample_streamed_terrain_mask(vec2 safe_uv) {
 	vec2 tile_size = vec2(textureSize(mask_tile_0, 0));
 	float tile_content_width = max(tile_size.x - 2.0, 1.0);
 	float full_mask_width = tile_content_width * 3.0;
@@ -277,6 +264,79 @@ vec4 sample_terrain_mask(vec2 chunk_uv) {
 		return texture(mask_tile_1, tile_uv);
 	}
 	return texture(mask_tile_2, tile_uv);
+}
+
+vec4 sample_terrain_mask(vec2 chunk_uv) {
+	vec2 safe_uv = clamp(chunk_uv, vec2(0.0), vec2(1.0));
+	vec4 mask_sample;
+	bool sampled_patch = false;
+	if (use_impact_patch) {
+		vec2 patch_position = impact_patch_uv_rect.xy;
+		vec2 patch_size = max(
+			impact_patch_uv_rect.zw,
+			vec2(0.000001)
+		);
+		vec2 patch_uv = (safe_uv - patch_position) / patch_size;
+		vec2 patch_inside_low = step(vec2(0.0), patch_uv);
+		vec2 patch_inside_high = step(patch_uv, vec2(1.0));
+		float inside_patch = patch_inside_low.x * patch_inside_low.y
+			* patch_inside_high.x * patch_inside_high.y;
+		if (inside_patch > 0.5) {
+			mask_sample = texture(
+				impact_patch_texture,
+				clamp(patch_uv, vec2(0.0), vec2(1.0))
+			);
+			sampled_patch = true;
+		}
+	}
+	if (!sampled_patch) {
+		mask_sample = sample_streamed_terrain_mask(safe_uv);
+	}
+
+	if (impact_crush_timing.y > 0.0) {
+		vec2 crush_position = impact_crush_uv_rect.xy;
+		vec2 crush_size = max(
+			impact_crush_uv_rect.zw,
+			vec2(0.000001)
+		);
+		vec2 crush_uv = (safe_uv - crush_position) / crush_size;
+		vec2 crush_inside_low = step(vec2(0.0), crush_uv);
+		vec2 crush_inside_high = step(crush_uv, vec2(1.0));
+		float inside_crush = crush_inside_low.x * crush_inside_low.y
+			* crush_inside_high.x * crush_inside_high.y;
+		if (inside_crush > 0.5) {
+			// TIME and Time.get_ticks_usec() share engine uptime. Modulo handles
+			// Godot's default one-hour shader TIME rollover during a transition.
+			float elapsed = mod(
+				TIME - impact_crush_timing.x + 3600.0,
+				3600.0
+			);
+			float crush_progress = clamp(
+				elapsed / max(impact_crush_timing.y, 0.0001),
+				0.0,
+				1.0
+			);
+			float eased_progress = 1.0
+				- pow(1.0 - crush_progress, 3.0);
+			// The opening begins at the hammer-side top center and drives down
+			// through the dirt. A derivative-soft front prevents the transition
+			// from introducing a second pixel staircase around the final mask.
+			vec2 crush_offset = vec2(
+				(crush_uv.x - 0.5) * 0.95,
+				(crush_uv.y - 0.04) * 0.58
+			);
+			float crush_distance = length(crush_offset);
+			float crush_front = mix(-0.04, 0.80, eased_progress);
+			float crush_softness = max(fwidth(crush_distance), 0.001);
+			float crush_reveal = smoothstep(
+				crush_distance - crush_softness,
+				crush_distance + crush_softness,
+				crush_front
+			);
+			mask_sample = mix(vec4(1.0), mask_sample, crush_reveal);
+		}
+	}
+	return mask_sample;
 }
 
 // Darkens a solid pixel that sits near its own layer's cut edge and lights the
