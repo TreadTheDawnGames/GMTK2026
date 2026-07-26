@@ -7,6 +7,7 @@
 [sub_resource type="Resource" id="Line_meeting"]
 script = ExtResource("3_line")
 speaker_slot = &"treasure_hunter"
+speaker_pose = &"idle"
 text = "Hey! Do you always barge in on people?"
 
 [sub_resource type="Resource" id="Line_miner"]
@@ -17,11 +18,13 @@ text = "..."
 [sub_resource type="Resource" id="Line_spare"]
 script = ExtResource("3_line")
 speaker_slot = &"treasure_hunter"
+speaker_pose = &"idle"
 text = "My man, take this. It'll help.  But that treasure is MINE!"
 
 [sub_resource type="Resource" id="Line_warning"]
 script = ExtResource("3_line")
 speaker_slot = &"treasure_hunter"
+speaker_pose = &"idle"
 text = "Don’t take my act of kindness as me yielding the treasure, I’ve been hunting this for years!  I just can’t bear to watch someone try to mine with such a disgraceful piece of equipment."
 
 [sub_resource type="Resource" id="Participant_miner"]

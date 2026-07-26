@@ -4,74 +4,119 @@
 [ext_resource type="Resource" uid="uid://er6s47x6pn6j" path="res://resources/dialogue/treasure_hunter_first_conversation.tres" id="2_252o6"]
 [ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="3_l63c8"]
 
-[sub_resource type="Resource" id="Resource_2k5s6"]
+[sub_resource type="Resource" id="Resource_show"]
 script = ExtResource("1_al5fl")
 kind = 9
 actor = &"treasure_hunter"
+notes = "prepare() has already put him on the Entrance mark, which is inside his own bore and off the right of the frame at every landing column."
 
-[sub_resource type="Resource" id="Resource_hit_pose"]
+[sub_resource type="Resource" id="Resource_face_wall"]
+script = ExtResource("1_al5fl")
+kind = 2
+actor = &"treasure_hunter"
+facing = -1
+notes = "Facing the wall between the two of them, which is the direction he will eventually come through."
+
+[sub_resource type="Resource" id="Resource_swing_one"]
 script = ExtResource("1_al5fl")
 kind = 1
 actor = &"treasure_hunter"
 pose = &"hit"
-notes = "One visible mining contact before he steps through the side tunnel."
 
-[sub_resource type="Resource" id="Resource_hwkqq"]
+[sub_resource type="Resource" id="Resource_strike_one"]
+script = ExtResource("1_al5fl")
+kind = 8
+cue = &"WallStrike"
+notes = "The shared presentation strike: real dirt, smoke and shake at the bore mouth. He is still off frame, so the first thing the shot shows is the wall coming apart."
+
+[sub_resource type="Resource" id="Resource_recoil_one"]
+script = ExtResource("1_al5fl")
+kind = 1
+actor = &"treasure_hunter"
+start_seconds = 0.45
+pose = &"idle"
+
+[sub_resource type="Resource" id="Resource_swing_two"]
+script = ExtResource("1_al5fl")
+kind = 1
+actor = &"treasure_hunter"
+start_seconds = 0.6
+pose = &"hit"
+
+[sub_resource type="Resource" id="Resource_strike_two"]
+script = ExtResource("1_al5fl")
+kind = 8
+start_seconds = 0.6
+cue = &"WallStrike"
+
+[sub_resource type="Resource" id="Resource_recoil_two"]
+script = ExtResource("1_al5fl")
+kind = 1
+actor = &"treasure_hunter"
+start_seconds = 1.05
+pose = &"idle"
+
+[sub_resource type="Resource" id="Resource_swing_three"]
+script = ExtResource("1_al5fl")
+kind = 1
+actor = &"treasure_hunter"
+start_seconds = 1.2
+pose = &"hit"
+
+[sub_resource type="Resource" id="Resource_strike_three"]
+script = ExtResource("1_al5fl")
+kind = 8
+start_seconds = 1.2
+cue = &"WallStrike"
+notes = "The breakthrough. Three contacts rather than one, because a single thud reads as a noise and three read as somebody working."
+
+[sub_resource type="Resource" id="Resource_walk_in"]
 script = ExtResource("1_al5fl")
 kind = 0
 actor = &"treasure_hunter"
-start_seconds = 0.25
-duration_seconds = 0.9
+start_seconds = 1.35
+duration_seconds = 1.15
 target_marker = &"Conversation"
 starts_from_authored_point = true
 start_marker = &"Entrance"
 pose = &"walk"
+step_height = 9.0
+notes = "Staged from Entrance rather than chained off the swings, so the walk begins on its exact mark however the strikes above are retimed."
 
-[sub_resource type="Resource" id="Resource_al13m"]
+[sub_resource type="Resource" id="Resource_face_miner"]
 script = ExtResource("1_al5fl")
 kind = 2
 actor = &"treasure_hunter"
-start_seconds = 1.15
+start_seconds = 2.5
 facing = -1
+notes = "After the walk, never before it. A MOVE aims the actor along its own travel, so a facing set earlier is overwritten by the approach."
 
-[sub_resource type="Resource" id="Resource_1nh83"]
+[sub_resource type="Resource" id="Resource_settle"]
 script = ExtResource("1_al5fl")
 kind = 1
 actor = &"treasure_hunter"
-start_seconds = 1.15
+start_seconds = 2.5
 pose = &"idle"
 
-[sub_resource type="Resource" id="Resource_7j7gd"]
+[sub_resource type="Resource" id="Resource_indignant"]
 script = ExtResource("1_al5fl")
 kind = 3
 actor = &"treasure_hunter"
-start_seconds = 1.15
+start_seconds = 2.5
 duration_seconds = 0.3
+notes = "One bounce on arrival. This is the \"Hey!\" - he is already annoyed when he steps through, rather than becoming annoyed after the line appears."
 
-[sub_resource type="Resource" id="Resource_l8ac4"]
+[sub_resource type="Resource" id="Resource_dialogue"]
 script = ExtResource("1_al5fl")
 kind = 5
-start_seconds = 1.45
+start_seconds = 2.8
 duration_seconds = 6.0
 conversation = ExtResource("2_252o6")
-notes = "Brisk, barely stops. He has a pickaxe to hand over and the single bounce is him presenting it."
+notes = "The whole conversation, held for as long as the player takes to read it; the six seconds are nominal. The pickaxe changes hands inside it rather than here - the schedule ignores a beat's line_range, so a timeline cannot address one line. Line three carries the no_pickaxe speaker pose, which is what empties his hands on the line that gives the tool away.
 
-[sub_resource type="Resource" id="Resource_yq1co"]
-script = ExtResource("1_al5fl")
-kind = 0
-actor = &"treasure_hunter"
-start_seconds = 7.45
-duration_seconds = 1.8
-target_marker = &"Exit"
-pose = &"walk"
-
-[sub_resource type="Resource" id="Resource_djxbr"]
-script = ExtResource("1_al5fl")
-kind = 10
-actor = &"treasure_hunter"
-start_seconds = 9.25
+This is the last beat on purpose. The walk out belongs to the stage's own closing move, because play_closing() runs either way and a timeline that also walked him to Exit would move him twice."
 
 [resource]
 script = ExtResource("3_l63c8")
 sequence_id = &"treasure_hunter_first_sequence"
-beats = Array[ExtResource("1_al5fl")]([SubResource("Resource_2k5s6"), SubResource("Resource_hit_pose"), SubResource("Resource_hwkqq"), SubResource("Resource_al13m"), SubResource("Resource_1nh83"), SubResource("Resource_7j7gd"), SubResource("Resource_l8ac4"), SubResource("Resource_yq1co"), SubResource("Resource_djxbr")])
+beats = Array[ExtResource("1_al5fl")]([SubResource("Resource_show"), SubResource("Resource_face_wall"), SubResource("Resource_swing_one"), SubResource("Resource_strike_one"), SubResource("Resource_recoil_one"), SubResource("Resource_swing_two"), SubResource("Resource_strike_two"), SubResource("Resource_recoil_two"), SubResource("Resource_swing_three"), SubResource("Resource_strike_three"), SubResource("Resource_walk_in"), SubResource("Resource_face_miner"), SubResource("Resource_settle"), SubResource("Resource_indignant"), SubResource("Resource_dialogue")])
