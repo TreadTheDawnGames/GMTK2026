@@ -32,6 +32,9 @@ const TREASURE_HUNTER_TREASURE_CONVERSATION: DialogueConversation = preload(
 const THIEF_ENCRYPTED_DIALOGUE: EncryptedDialogueConversation = preload(
 	"res://resources/dialogue/thief_encrypted_dialogue.tres"
 )
+const OPENING_SURFACE_CONVERSATION: DialogueConversation = preload(
+	"res://resources/dialogue/opening_surface_conversation.tres"
+)
 
 var _failures: Array[String] = []
 var _presented_line_indices: PackedInt32Array = PackedInt32Array()
@@ -102,6 +105,24 @@ func _verify_entry_scene() -> void:
 		and MOODY_TEEN_APPEARANCE.frame == 0
 		and MOODY_TEEN_APPEARANCE.art_faces_left,
 		"Moody Teen must use Ayden's supplied single-frame character art."
+	)
+	var opening_uses_mr_sitts := (
+		OPENING_SURFACE_CONVERSATION.validate().is_empty()
+		and OPENING_SURFACE_CONVERSATION.participants.size() == 1
+		and OPENING_SURFACE_CONVERSATION.participants[0].slot
+			== &"newspaper_reader"
+		and OPENING_SURFACE_CONVERSATION.participants[0].display_name
+			== "Mr. Sitts"
+	)
+	for line in OPENING_SURFACE_CONVERSATION.lines:
+		opening_uses_mr_sitts = (
+			opening_uses_mr_sitts
+			and line != null
+			and line.speaker_slot == &"newspaper_reader"
+		)
+	_expect(
+		opening_uses_mr_sitts,
+		"The surface conversation must present every line as Mr. Sitts."
 	)
 	var entry_scene := ResourceLoader.load(
 		entry_scene_path,
