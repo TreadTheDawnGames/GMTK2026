@@ -145,11 +145,13 @@ func _run() -> void:
 			(
 				"DEPTH_COMBO depth=%d "
 				+ "configured_hit_ms=%.2f configured_queue=%d "
-				+ "configured_prep_ms=%.2f configured_max_work_ms=%.2f "
-				+ "configured_total_ms=%.2f "
+				+ "configured_prep_ms=%.2f configured_prep_kind=%s "
+				+ "configured_max_work_ms=%.2f "
+				+ "configured_total_ms=%.2f configured_overlay=%s "
 				+ "stacked_hit_ms=%.2f stacked_queue=%d "
-				+ "stacked_prep_ms=%.2f stacked_max_work_ms=%.2f "
-				+ "stacked_total_ms=%.2f "
+				+ "stacked_prep_ms=%.2f stacked_prep_kind=%s "
+				+ "stacked_max_work_ms=%.2f "
+				+ "stacked_total_ms=%.2f stacked_overlay=%s "
 				+ "static_mib=%.2f nodes=%d"
 			)
 			% [
@@ -157,13 +159,17 @@ func _run() -> void:
 				float(configured_metrics.hit_ms),
 				int(configured_metrics.queue),
 				float(configured_metrics.max_preparation_ms),
+				str(configured_metrics.max_preparation_kind),
 				float(configured_metrics.max_work_ms),
 				float(configured_metrics.total_ms),
+				str(configured_metrics.overlay_presented),
 				float(stacked_metrics.hit_ms),
 				int(stacked_metrics.queue),
 				float(stacked_metrics.max_preparation_ms),
+				str(stacked_metrics.max_preparation_kind),
 				float(stacked_metrics.max_work_ms),
 				float(stacked_metrics.total_ms),
+				str(stacked_metrics.overlay_presented),
 				(
 					Performance.get_monitor(Performance.MEMORY_STATIC)
 					/ (1024.0 * 1024.0)
@@ -186,6 +192,8 @@ func _run() -> void:
 			or float(stacked_metrics.total_ms) > MAX_TOTAL_MS
 			or int(configured_metrics.queue) > MAX_QUEUE_SIZE
 			or int(stacked_metrics.queue) > MAX_QUEUE_SIZE
+			or not bool(configured_metrics.overlay_presented)
+			or not bool(stacked_metrics.overlay_presented)
 		):
 			budget_failed = true
 			push_error(
@@ -249,17 +257,43 @@ func _measure_combo(
 		manager.config.maximum_effect_combo
 	)
 	var maximum_preparation_ms := 0.0
+	var maximum_preparation_kind := "none"
 	while (
 		renderer._pending_stamp_preparation_head
 		< renderer._pending_stamp_preparation.size()
 	):
+		var preparation_work := renderer._pending_stamp_preparation[
+			renderer._pending_stamp_preparation_head
+		] as TerrainLayerRenderer.ImpactStampPreparation
+		# Keep the benchmark actionable on slower hardware: the work kind names
+		# which bounded preparation phase must be split if its atomic slice grows.
+		var preparation_kind := "stamp_transform"
+		if preparation_work.private_texture_tile_index >= 0:
+			preparation_kind = "private_texture"
+		elif preparation_work.prepares_overlay_texture:
+			preparation_kind = "overlay_texture"
+		elif preparation_work.prepares_patch:
+			preparation_kind = "patch_band_%d_of_%d" % [
+				preparation_work.raster_band_index + 1,
+				preparation_work.raster_band_count,
+			]
 		var preparation_started_at := Time.get_ticks_usec()
 		renderer._prepare_next_pending_stamp_layer()
-		maximum_preparation_ms = maxf(
-			maximum_preparation_ms,
+		var preparation_ms := (
 			float(Time.get_ticks_usec() - preparation_started_at) / 1000.0
 		)
+		if preparation_ms > maximum_preparation_ms:
+			maximum_preparation_ms = preparation_ms
+			maximum_preparation_kind = preparation_kind
 	renderer._compact_pending_stamp_preparation()
+	# The new contact path is valid only when prediction finished the small
+	# exact GPU patch. This check protects the optimization from silently
+	# falling back to the old full-tile upload on every successful target.
+	var prepared_overlay_count := 0
+	for patch_value in renderer._prepared_layer_patches.values():
+		var patch := patch_value as TerrainLayerRenderer.PreparedLayerPatch
+		if patch != null and patch.overlay_texture != null:
+			prepared_overlay_count += 1
 	renderer._on_dig_visuals_preparation_started(true)
 	renderer._on_dig_visuals_preparation_requested(
 		position,
@@ -279,12 +313,18 @@ func _measure_combo(
 	)
 	var total_ms := 0.0
 	var maximum_work_ms := 0.0
+	var overlay_presented := false
 	while (
 		renderer._pending_impact_work_head
 		< renderer._pending_impact_work.size()
 	):
 		var work_started_at := Time.get_ticks_usec()
 		renderer._process_next_pending_impact_work()
+		if renderer._impact_overlay_presented_this_frame:
+			overlay_presented = true
+			# Production's frame scheduler clears this flag when it yields. The
+			# benchmark drains directly, so it mirrors that reset explicitly.
+			renderer._impact_overlay_presented_this_frame = false
 		var work_ms := (
 			float(Time.get_ticks_usec() - work_started_at) / 1000.0
 		)
@@ -295,6 +335,9 @@ func _measure_combo(
 		"hit_ms": hit_ms,
 		"queue": queue_size,
 		"max_preparation_ms": maximum_preparation_ms,
+		"max_preparation_kind": maximum_preparation_kind,
 		"max_work_ms": maximum_work_ms,
 		"total_ms": total_ms,
+		"overlay_presented":
+			overlay_presented and prepared_overlay_count > 0,
 	}

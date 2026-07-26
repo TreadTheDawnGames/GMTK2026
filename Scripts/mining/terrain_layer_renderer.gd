@@ -234,7 +234,10 @@ const MAX_FRACTURE_RADIUS_CELLS: float = 32.0
 # Sixteen-pixel profiling leaves enough atomic headroom for 192 rows. The larger
 # band removes repeated clipping/blit setup while the 7 ms benchmark still
 # guards the final band plus its one dirty-tile upload.
-const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 192
+# A 192-pixel band occasionally exceeded the 7 ms preparation ceiling on a
+# cold Web driver. A 128-pixel slice preserves the exact 16-pixel mask while
+# avoiding the fallback queue growth caused by splitting every band in half.
+const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 128
 @export_category("References")
 @export var terrain_manager: TerrainManager
 @export var profile: TerrainLayerProfile
