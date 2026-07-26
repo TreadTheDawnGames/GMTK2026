@@ -5,6 +5,7 @@ extends Node
 ## - Level zero is applied when the scene starts and whenever the run resets.
 ## - Completing encounter N applies level N + 1 when that level exists.
 ## - Mining and timing receive the same complete authored level atomically.
+## - Levels unlock combo groups; combo selects within the unlocked range.
 ## - Encounter ten has no level entry, so it intentionally changes nothing.
 ## - The invariant is that both consumers always reference the same level.
 
@@ -32,9 +33,17 @@ func _ready() -> void:
 	if config.progression_levels.size() != 10:
 		push_error("Encounter progression requires levels zero through nine.")
 		return
+	if not config.has_valid_combo_target_groups():
+		push_error("MiningConfig combo target groups are incomplete.")
+		return
 	for level_index in range(config.progression_levels.size()):
 		var definition := config.progression_levels[level_index]
-		if definition == null or not definition.is_valid():
+		if (
+			definition == null
+			or not definition.is_valid()
+			or definition.highest_unlocked_combo_target_group_index
+				>= config.combo_target_groups.size()
+		):
 			push_error(
 				"Encounter progression level %d is incomplete."
 				% level_index
@@ -69,15 +78,20 @@ func apply_level(level_index: int) -> bool:
 	):
 		return false
 	var definition := config.progression_levels[level_index]
-	if definition == null or not definition.is_valid():
+	if (
+		definition == null
+		or not definition.is_valid()
+		or definition.highest_unlocked_combo_target_group_index
+			>= config.combo_target_groups.size()
+	):
 		return false
 	current_level_index = level_index
 	mining_controller.set_progression_level(definition)
 	timing_window.set_progression_target_rules(
-		definition.target_scenes,
 		definition.slider_speed,
 		definition.starting_target_count,
-		definition.bonus_target_combos
+		definition.bonus_target_combos,
+		definition.highest_unlocked_combo_target_group_index
 	)
 	level_changed.emit(level_index, definition)
 	return true

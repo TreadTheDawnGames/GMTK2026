@@ -2,14 +2,14 @@ class_name ComboDirector
 extends Node
 
 ## How it works:
-## - Inputs: resolved hits, ended streaks, and the rewards characters hand over.
+## - Production inputs are resolved hits and ended streaks.
+## - Legacy reward callbacks remain isolated and are not connected in gameplay.
 ## - Output: one intensity step that music, camera, and impact presenters read
 ##   instead of each re-deriving combo / maximum_effect_combo on its own.
 ## - Owned state: the live combo, the tier it sits in, and the reward level.
-## - Intensity is max(reward floor, live combo tier), so gifts raise how loud the
-##   run rests and combos push above that.
-## - The invariant is that only reset_run() lowers the reward floor, so a run
-##   escalates and never quietly shrinks back to its opening.
+## - Production intensity follows the live combo tier because reward cutscenes
+##   now unlock timing-target groups instead of raising a permanent floor.
+## - The invariant is that shipped wiring cannot raise intensity without combo.
 
 signal intensity_changed(intensity: int, previous_intensity: int)
 ## Reports only the live combo portion, so a tier-up still reads as a moment
@@ -82,17 +82,17 @@ func _on_streak_ended(previous_combo: int) -> void:
 	streak_lost.emit(maxi(previous_combo, 0), lost_tier)
 
 
-## Raises the floor when a character hands over a pickaxe.
+## Legacy isolated-preview hook; production wiring does not connect rewards.
 func _on_upgrade_granted(_definition: PickaxeDefinition) -> void:
 	_raise_escalation()
 
 
-## Raises the floor when Quibble's coffee lands.
+## Legacy isolated-preview hook; production wiring does not connect rewards.
 func _on_coffee_boost_awarded(_speed_multiplier: float) -> void:
 	_raise_escalation()
 
 
-## Raises the floor when Rotini's colony starts mining alongside the player.
+## Legacy isolated-preview hook; production wiring does not connect rewards.
 func _on_rat_colony_support_requested() -> void:
 	_raise_escalation()
 
