@@ -16,7 +16,6 @@ var _page_state_callback: JavaScriptObject
 var _is_background_paused: bool = false
 var _is_page_hidden: bool = false
 var _window_has_focus: bool = true
-var _awaiting_resume_gesture: bool = false
 var _owns_tree_pause: bool = false
 
 
@@ -42,9 +41,6 @@ func _ready() -> void:
 	# Even a visible page begins under browser autoplay policy. Holding gameplay
 	# until its first gesture makes the conductor and the game start together.
 	_suspend_for_background()
-	_awaiting_resume_gesture = (
-		not _is_page_hidden and _window_has_focus
-	)
 
 
 func _exit_tree() -> void:
@@ -64,11 +60,14 @@ func _exit_tree() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if (
-		not _awaiting_resume_gesture
-		or _is_page_hidden
-		or not _window_has_focus
-	):
+	if not _is_background_paused:
+		return
+	# An input delivered by the canvas is stronger evidence than the browser's
+	# focus callback, whose ordering and iframe behavior vary by host. Refresh
+	# visibility, but let this real gesture establish focus itself.
+	if _document != null:
+		_is_page_hidden = bool(_document.hidden)
+	if _is_page_hidden:
 		return
 	var is_resume_gesture: bool = false
 	if event is InputEventKey:
@@ -78,9 +77,8 @@ func _input(event: InputEvent) -> void:
 		is_resume_gesture = (event as InputEventMouseButton).pressed
 	elif event is InputEventScreenTouch:
 		is_resume_gesture = (event as InputEventScreenTouch).pressed
-	elif event is InputEventJoypadButton:
-		is_resume_gesture = (event as InputEventJoypadButton).pressed
 	if is_resume_gesture:
+		_window_has_focus = true
 		_resume_after_gesture()
 
 
@@ -102,12 +100,9 @@ func _on_web_page_state_changed(arguments: Array) -> void:
 			_is_page_hidden = bool(_document.hidden)
 			_window_has_focus = bool(_document.hasFocus())
 	if _is_page_hidden or not _window_has_focus:
-		_awaiting_resume_gesture = false
 		_suspend_for_background()
-	else:
-		# Some browsers leave Web Audio suspended after returning. The next
-		# canvas gesture is the only cross-browser-safe point to resume it.
-		_awaiting_resume_gesture = true
+	# A visible, focused page deliberately stays paused here. Some browsers
+	# leave Web Audio suspended after returning, so only _input resumes it.
 
 
 ## Freezes gameplay and every live player under one ownership decision.
@@ -130,7 +125,6 @@ func _resume_after_gesture() -> void:
 		get_tree().paused = false
 	_owns_tree_pause = false
 	_is_background_paused = false
-	_awaiting_resume_gesture = false
 
 
 ## Traverses once per page hide; no tree scan runs per frame or per audio event.
