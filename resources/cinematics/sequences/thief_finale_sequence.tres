@@ -15,7 +15,6 @@ He is off screen when this runs. Nothing about showing him is visible for anothe
 
 [sub_resource type="Resource" id="Beat_landing_hold"]
 script = ExtResource("1_beat")
-kind = 4
 duration_seconds = 2.2
 notes = "The frame opens on an ordinary tunnel and holds there.
 
@@ -45,7 +44,6 @@ WHERE IT ENDS UP IS NOT EXACT. Tracking is off in this room, so 120 is measured 
 
 [sub_resource type="Resource" id="Beat_reveal_hold"]
 script = ExtResource("1_beat")
-kind = 4
 start_seconds = 9.2
 duration_seconds = 2.6
 notes = "The organ, playing, and nothing said.

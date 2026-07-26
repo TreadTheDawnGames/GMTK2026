@@ -63,7 +63,6 @@ start_seconds = 0.45
 duration_seconds = 0.9
 bounce_count = 4
 bounce_offset = Vector2(0, -9)
-bounce_style = 0
 notes = "The whooping the reference puts before the room even opens - Zephan slides Yippee and wahoo! in beside the miner while he is still falling, and the audio under those two cards is five seconds of it. Nothing here can present a line the miner is not there for, so it lands as the frame opens instead: this bounce plays him celebrating for the first 0.9s and the conversation then opens on Yippee! Wahoo!, so the ceiling comes in on a man already mid-celebration rather than on a man waiting to be spoken to. Left sequential rather than overlapped because DialogueDirector bounces the speaker again on each presented line, and two bounces on one beat is a jitter nobody asked for."
 
 [sub_resource type="Resource" id="Resource_dialogue"]

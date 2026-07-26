@@ -125,7 +125,6 @@ start_seconds = 2.35
 duration_seconds = 0.3
 bounce_count = 2
 bounce_offset = Vector2(-2, -8)
-bounce_style = 0
 notes = "Two bounces just before his first line, so 'Easy, lads. We're here.' reads as him calling the colony to a stop rather than as a reaction to his own dialogue box. He is the only one in the shot who is arriving - everybody else has been waiting - and this is the beat that says so.
 
 Two rather than one because one bounce reads as a nod and two reads as somebody shouting over a crowd."
