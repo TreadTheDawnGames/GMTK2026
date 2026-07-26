@@ -40,7 +40,7 @@ signal cinematic_frame_closed
 @export var ayden_textbox_texture: Texture2D
 @export var coco_textbox_texture: Texture2D
 @export var art_margin_left: int = 110
-@export var art_margin_top: int = 28
+@export var art_margin_top: int = 34
 @export var art_margin_right: int = 12
 @export var art_margin_bottom: int = 20
 @export var art_body_minimum_height: float = 40.0
