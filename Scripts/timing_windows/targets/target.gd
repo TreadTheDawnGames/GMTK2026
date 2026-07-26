@@ -3,6 +3,7 @@ extends Panel
 
 signal freeze(stopped : bool)
 signal ready_to_die()
+signal bounce_requested()
 ## Tracks whether one timing target has already been collected this set.
 
 @export var my_width : float = 16

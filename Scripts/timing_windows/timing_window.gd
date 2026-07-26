@@ -27,7 +27,7 @@ var stored_combo : int = 0
 
 @export var DEBUG_starting_targets : int = -1
 
-var _audio_handler: PlayerAudioHandler = AudioHandler
+var _audio_handler: PlayerAudioHandler
 var _target_unlocks: Array[PickaxeDefinition] = []
 var _progression_target_scenes: Array[PackedScene] = []
 var _progression_bonus_target_combos := PackedInt32Array()
@@ -177,7 +177,7 @@ func _mining_window_pressed(
 			# going somewhere instead of flattening out.
 			
 			# Those tones are all the notes in a scale, so it sounds good if they're together
-			_audio_handler.play_sound(
+			_play_sound(
 				AudioLibrary.MINE_SOUNDS[
 					clampi(combo - 1, 0, AudioLibrary.MINE_SOUNDS.size() - 1)
 				],
@@ -245,7 +245,7 @@ func _recovery_window_pressed(
 			(mining_config.recovery_speed_multiplier)
 		)
 		#play audio
-		_audio_handler.play_sound(AudioLibrary.SAVE)
+		_play_sound(AudioLibrary.SAVE)
 		#set animation color
 		recovery_window.animation_color = combo_saved_color
 	else:
@@ -254,7 +254,7 @@ func _recovery_window_pressed(
 		if not failed_recovery and mining_config.use_secondary_recovery:
 			#This is our first failure
 			failed_recovery = true
-			_audio_handler.play_sound(AudioLibrary.MISS_WITH_SAVE)
+			_play_sound(AudioLibrary.MISS_WITH_SAVE)
 			print("first failure")
 			recovery_window.animation_repeats = 2
 			#all we want to do is open the secondary save, so do nothing
@@ -288,7 +288,7 @@ func _recovery_window_pressed(
 		print("Option 2")
 		#Check if this is the first failure and if so,Start the secondary recovery process
 		recovery_window2.start()
-		_audio_handler.play_sound(AudioLibrary.SAVE_BUILDUP)
+		_play_sound(AudioLibrary.SAVE_BUILDUP)
 	else:
 		print("Option 3")
 		#this is the second time failing. Reset the main window, our visibility, and the recovery state
@@ -313,7 +313,7 @@ func _additional_recovery_window_pressed(
 			(mining_config.recovery_speed_multiplier)
 		)
 		#play audio
-		_audio_handler.play_sound(AudioLibrary.SAVE)
+		_play_sound(AudioLibrary.SAVE)
 		#set animation color
 		recovery_window2.animation_color = combo_saved_color
 	else:
@@ -354,4 +354,4 @@ func fail_combo():
 	stored_combo = 0
 	streak_ended.emit(lost_combo)
 	mining_window.speed_multiplier = 1.0
-	_audio_handler.play_sound(AudioLibrary.STREAK_LOST)
+	_play_sound(AudioLibrary.STREAK_LOST)

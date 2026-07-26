@@ -69,7 +69,10 @@ func slider_half_width() -> float:
 
 ## Shows the bar and prepares a fresh target for one-shot recovery.
 func start() -> void:
-	backing.size.x = size.x
+	# Reassigning an unchanged size still emits `resized`, which rerolls every
+	# target and loses a partially completed multi-target set after a pause.
+	if not is_equal_approx(backing.size.x, size.x):
+		backing.size.x = size.x
 	reset_one_shot()
 	show()
 	set_process(true)
@@ -115,6 +118,8 @@ func add_target() -> void:
 	new_target.initialize()
 	new_target.set_bounce_muted(_bounce_muted)
 	new_target.freeze.connect(on_freeze)
+	if not new_target.bounce_requested.is_connected(play_bounce_sound):
+		new_target.bounce_requested.connect(play_bounce_sound)
 	backing.add_child(new_target)
 	backing.move_child(new_target, desired_target_heirarchy_index)
 	targets.append(new_target)

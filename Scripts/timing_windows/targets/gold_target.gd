@@ -1,8 +1,6 @@
 extends TimingTarget
 class_name MovingTarget
 
-@onready var bounce_sound: AudioStreamPlayer2D = %BounceSound
-
 var track : float = 700
 var initial_position : float
 var direction : float = 1.0
@@ -22,6 +20,7 @@ func hit(_timing_window : SliderTimingWindow = null) -> void:
 
 
 func place(_placement_width : float) -> float:
+	track = _placement_width
 	initial_position = randf()*_placement_width
 	target_position = initial_position
 	
@@ -39,8 +38,7 @@ func _process(delta: float) -> void:
 	)
 	if hit_left_edge or hit_right_edge:
 		direction *= -1
-		if not _bounce_muted:
-			AudioHandler.play_sound(AudioLibrary.BOUNCE)
+		bounce_requested.emit()
 
 func slider_half_width() -> float:
 	return size.x * 0.5
