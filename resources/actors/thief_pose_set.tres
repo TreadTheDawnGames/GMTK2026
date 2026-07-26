@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ActorPoseSet" format=3]
+
+[ext_resource type="Script" uid="uid://tsaiph1d8kq7" path="res://resources/actors/actor_pose.gd" id="1_pose"]
+[ext_resource type="Script" uid="uid://dxi74xec11dh3" path="res://resources/actors/actor_pose_set.gd" id="2_pose_set"]
+[ext_resource type="Texture2D" path="res://Assets/Characters/thief/thief_playing_sheet.png" id="3_playing"]
+
+[sub_resource type="Resource" id="ActorPose_idle"]
+script = ExtResource("1_pose")
+pose_name = &"idle"
+texture = ExtResource("3_playing")
+horizontal_frames = 3
+first_frame = 0
+frame_count = 3
+frames_per_second = 5.0
+loops = true
+
+[resource]
+script = ExtResource("2_pose_set")
+poses = Array[ExtResource("1_pose")]([SubResource("ActorPose_idle")])
