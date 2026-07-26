@@ -291,7 +291,12 @@ func _rebuild_sprite() -> void:
 	target.vframes = appearance.vertical_frames
 	target.frame = appearance.frame
 	target.scale = appearance.sprite_scale
-	target.position = appearance.sprite_offset
+	# Use the runtime presenter's measurement so authored and played footing are
+	# the same even when a source texture has transparent space under its shoes.
+	target.position = Vector2(
+		appearance.sprite_offset.x,
+		ActorSoleMeasure.get_sprite_y(appearance)
+	)
 	target.modulate = appearance.tint
 	target.flip_h = appearance.flip_h
 

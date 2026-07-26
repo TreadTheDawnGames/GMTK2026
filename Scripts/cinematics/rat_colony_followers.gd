@@ -57,10 +57,10 @@ signal presentation_strike_requested(screen_position: Vector2)
 @export var rank_scales: PackedFloat32Array = PackedFloat32Array(
 	[1.0, 0.82, 0.66, 0.54]
 )
-## Draw order per rank. The front rank sits below the miner's cutscene order so
-## it never covers him, and each rank behind that goes further back.
+## Absolute draw order per rank. The front row shares the cast's second-stratum
+## order and each later row recedes behind one more terrain stratum.
 @export var rank_draw_orders: PackedInt32Array = PackedInt32Array(
-	[2, 1, 0, -1]
+	[1, 0, -1, -2]
 )
 ## Tint per rank, darkening the way the terrain's own strata do with depth. This
 ## sells distance harder than scale does.

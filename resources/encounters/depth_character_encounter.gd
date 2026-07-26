@@ -40,6 +40,9 @@ extends Resource
 ## the beat it belongs to - and the schedule stops starting the conversation
 ## itself.
 @export var plays_authored_timeline: bool = false
+## Reveals an already-present actor and set before the miner lands. Reserve this
+## for discoveries during the fall, not visitors who enter after landing.
+@export var prestage_before_landing: bool = false
 ## Used only when story text should remain encrypted in source control.
 @export var encrypted_conversation: EncryptedDialogueConversation
 @export var speaker_slot: StringName
