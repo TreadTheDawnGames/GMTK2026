@@ -304,6 +304,7 @@ func _activate_pending_encounter() -> void:
 	# He has hit the room's floor. Sprawl, then get up, while the frame opens
 	# around him.
 	miner_rig.show_cutscene_landing()
+	_apply_trodden_floor(encounter)
 	cinematic_flow.focus(FLOW_OWNER)
 	_begin_active_encounter.call_deferred()
 
@@ -603,6 +604,24 @@ func _begin_active_encounter() -> void:
 		final_encounter_reached.emit(encounter.encounter_id)
 		return
 	_fail_active_encounter()
+
+
+## Dresses this room's floor as walked-on ground, if the encounter asked for it.
+##
+## The floor line is derived from the encounter's own depth rather than passed in,
+## so a room can never dress a line it does not stand on. It is cleared in
+## _finish_cinematic_flow, which is the one place every ending goes through - a
+## completed shot, a cancelled one and a failed one all release there, and a
+## dressing left behind would follow the player down the rest of the run.
+func _apply_trodden_floor(encounter: DepthCharacterEncounter) -> void:
+	if not encounter.dresses_trodden_floor:
+		terrain_renderer.set_trodden_floor(false)
+		return
+	var floor_world_y := float(
+		mining_config.initial_surface_row
+		+ encounter.resolve_depth(mining_config.total_run_depth)
+	) * float(mining_config.terrain_cell_world_size)
+	terrain_renderer.set_trodden_floor(true, floor_world_y)
 
 
 ## Reports whether this conversation is the cast's shared cafe stop.
@@ -1039,6 +1058,7 @@ func has_pending_or_active_interaction() -> bool:
 ## Releases only this encounter's named ownership of mining and camera state.
 func _finish_cinematic_flow() -> void:
 	_reset_speech_reactions()
+	terrain_renderer.set_trodden_floor(false)
 	# Nobody is left face down when the shot releases him, whatever ended it. A
 	# stampede that was cancelled mid-run never reaches its own finished signal,
 	# and the miner would go back to mining lying on his face.
@@ -1131,14 +1151,15 @@ func _resolve_cast_member(actor_id: StringName) -> Node2D:
 ## read.
 func _on_sequence_dialogue_requested(
 	conversation: DialogueConversation,
-	_line_range: Vector2i
+	line_range: Vector2i
 ) -> void:
 	if conversation == null:
 		return
 	_active_conversation = conversation
 	_sequence_is_awaiting_dialogue = dialogue_director.start_conversation(
 		conversation,
-		true
+		true,
+		line_range
 	)
 	if not _sequence_is_awaiting_dialogue:
 		push_error(

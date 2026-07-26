@@ -265,6 +265,28 @@ const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 128
 @export_range(1, 16, 1) var chamber_circle_max_radius_cells: int = 8
 @export_range(0.0, 8.0, 0.5) var chamber_circle_jitter_cells: float = 3.0
 
+@export_category("Trodden Floor")
+## The packed, walked-on ground a cutscene room can dress its own floor with.
+##
+## This is the surface crust generalised. The crust is pinned to the one ground
+## line the whole run shares; a cutscene room's floor is hundreds of rows below
+## it, so these are pushed against a world y the caller supplies through
+## set_trodden_floor() instead of against the surface.
+##
+## Nothing here does anything until something asks for it - the flag is off, so
+## every existing room, and ordinary mining, draw exactly as before. It is a
+## shared service rather than one encounter's dressing: any cutscene can turn it
+## on at its own floor, and the settings below are tuning that stays put.
+@export_range(1.0, 64.0, 1.0) var trodden_depth_world_px: float = 14.0
+@export_range(1.0, 96.0, 1.0) var trodden_falloff_world_px: float = 18.0
+@export var trodden_color := Color(0.30, 0.24, 0.19, 1.0)
+@export_range(0.0, 1.0, 0.01) var trodden_strength: float = 0.55
+## How far the band's lower edge wanders. Zero rules a straight line across the
+## room, which is the one thing that gives it away as a shader.
+@export_range(0.0, 32.0, 0.5) var trodden_edge_wander_world_px: float = 7.0
+@export_range(0.0, 1.0, 0.01) var trodden_grain_strength: float = 0.35
+@export_range(4.0, 128.0, 1.0) var trodden_grain_world_px: float = 26.0
+
 @export_category("Editor Preview")
 ## Streams terrain inside the editor for this instance only. The mining scene
 ## leaves it off so opening it stays instant; cutscene previews turn it on.
@@ -274,6 +296,12 @@ const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 128
 ## Toggles the logical opening overlay without affecting terrain presentation.
 @export var logical_overlay_key: Key = KEY_F3
 @export var logical_overlay_color := Color(0.2, 1.0, 0.35, 0.45)
+
+## Whether a cutscene has asked for its floor to be dressed, and where that floor
+## is. Held here rather than exported because they belong to whichever shot is
+## running, not to the scene.
+var _trodden_floor_is_enabled: bool = false
+var _trodden_floor_world_y: float = 0.0
 
 var _active_chunks: Dictionary[int, TerrainChunkVisual] = {}
 # Nodes, sprites, and materials of chunks the view has left, waiting to be
@@ -1777,6 +1805,61 @@ func _restore_chunk_snapshot(
 ## Drops every streamed chunk and its stamp history so the next refresh draws
 ## intact terrain again. The editor preview needs this because moving a test
 ## impact has to un-break the rock the previous position broke.
+## Dresses the foreground stratum's top edge as walked-on ground at a world y,
+## or clears it. This is the cutscene system's shared floor treatment.
+##
+## A cutscene room's floor is hundreds of rows below the run's own surface, so
+## the crust the surface uses cannot reach it. This pushes the same idea against
+## whatever line the caller names, which is what makes it reusable: an encounter
+## turns it on at its own floor when the shot opens and clears it when the shot
+## releases, and no room needs its own shader or its own material.
+##
+## Live chunks are updated in place rather than rebuilt. The dressing is two
+## uniforms; rebuilding streamed chunks to change them would replay every mask
+## upload in view, which is exactly the per-frame cost the platform budget exists
+## to protect.
+func set_trodden_floor(enabled: bool, floor_world_y: float = 0.0) -> void:
+	if _trodden_floor_is_enabled == enabled and is_equal_approx(
+		_trodden_floor_world_y,
+		floor_world_y
+	):
+		return
+	_trodden_floor_is_enabled = enabled
+	_trodden_floor_world_y = floor_world_y
+	_publish_trodden_floor()
+
+
+## Pushes the two live values onto every chunk material already streamed, pooled
+## ones included - a pooled chunk is refilled without its material being rebuilt,
+## so one left behind would come back wearing the last shot's floor.
+func _publish_trodden_floor() -> void:
+	for chunk in _active_chunks.values():
+		_publish_trodden_floor_to_chunk(chunk)
+	for chunk in _chunk_visual_pool:
+		_publish_trodden_floor_to_chunk(chunk)
+
+
+func _publish_trodden_floor_to_chunk(chunk: TerrainChunkVisual) -> void:
+	for layer_index in range(chunk.layer_sprites.size()):
+		var sprite := chunk.layer_sprites[layer_index]
+		if not is_instance_valid(sprite):
+			continue
+		var material := sprite.material as ShaderMaterial
+		if material == null:
+			continue
+		# Foreground stratum only, the same rule the crust follows: it is the
+		# layer the cast stand on, so a mined opening takes the dressing with the
+		# ground it removed.
+		material.set_shader_parameter(
+			&"use_trodden_floor",
+			_trodden_floor_is_enabled and layer_index == 0
+		)
+		material.set_shader_parameter(
+			&"trodden_floor_world_y",
+			_trodden_floor_world_y
+		)
+
+
 func rebuild_all_chunks() -> void:
 	_impact_stamps_by_chunk.clear()
 	_compressed_chunk_snapshots.clear()
@@ -5861,6 +5944,39 @@ func _create_layer_material(
 	material.set_shader_parameter(
 		&"edge_light_strength",
 		profile.edge_light_strength
+	)
+	# Trodden floor, foreground stratum only, for whichever cutscene room has
+	# asked for it. Same rule as the crust below: it is the layer the cast stand
+	# on, so a mined opening takes the dressing away with the ground.
+	material.set_shader_parameter(
+		&"use_trodden_floor",
+		_trodden_floor_is_enabled and layer_index == 0
+	)
+	material.set_shader_parameter(
+		&"trodden_floor_world_y",
+		_trodden_floor_world_y
+	)
+	material.set_shader_parameter(
+		&"trodden_depth_world_px",
+		trodden_depth_world_px
+	)
+	material.set_shader_parameter(
+		&"trodden_falloff_world_px",
+		trodden_falloff_world_px
+	)
+	material.set_shader_parameter(&"trodden_color", trodden_color)
+	material.set_shader_parameter(&"trodden_strength", trodden_strength)
+	material.set_shader_parameter(
+		&"trodden_edge_wander_world_px",
+		trodden_edge_wander_world_px
+	)
+	material.set_shader_parameter(
+		&"trodden_grain_strength",
+		trodden_grain_strength
+	)
+	material.set_shader_parameter(
+		&"trodden_grain_world_px",
+		trodden_grain_world_px
 	)
 	# Only the foreground stratum grows the surface. Deeper layers keep their
 	# bare rock, and a mined opening removes grass and crust along with it.

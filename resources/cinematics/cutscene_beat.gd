@@ -24,6 +24,15 @@ enum Kind {
 	HIDE,
 }
 
+## The response curve used by BOUNCE. The stored value is presentation data;
+## CutsceneSequencePlayer maps it to the matching runtime and scrub-preview
+## motion so the editor and game cannot drift apart.
+enum BounceStyle {
+	GENTLE,
+	SNAPPY,
+	LINEAR,
+}
+
 ## The operation this timeline entry performs at its authored start time.
 @export var kind: Kind = Kind.WAIT
 ## The cast or prop id driven by this beat; empty is valid for stage-only beats.
@@ -77,6 +86,11 @@ enum Kind {
 @export var facing: int = 0
 ## Number of presentation bounces requested by BOUNCE.
 @export var bounce_count: int = 1
+## Peak visual-only displacement for BOUNCE. Godot coordinates apply: a
+## negative y bobs up, a positive y dips down, and x adds a sideways hop.
+@export var bounce_offset: Vector2 = Vector2(0.0, -7.0)
+## Motion response for BOUNCE without changing its authored timing.
+@export var bounce_style: BounceStyle = BounceStyle.GENTLE
 ## An authoring note for the editor; playback never presents it to players.
 @export_multiline var notes: String
 
@@ -118,6 +132,10 @@ func validate(known_actors: PackedStringArray) -> PackedStringArray:
 		Kind.BOUNCE:
 			if bounce_count <= 0:
 				errors.append("BOUNCE beat bounce_count must be positive.")
+			if duration_seconds <= 0.0:
+				errors.append("BOUNCE beat needs a positive duration.")
+			if bounce_offset.is_zero_approx():
+				errors.append("BOUNCE beat needs a non-zero visual offset.")
 		Kind.DIALOGUE:
 			if conversation == null:
 				errors.append("DIALOGUE beat needs a conversation.")

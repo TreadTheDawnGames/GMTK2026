@@ -1,0 +1,13 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Texture2D" path="res://Assets/Props/table_stiff.png" id="1_table"]
+
+[node name="CafeTableFlat" type="Sprite2D"]
+editor_description = "Zephan's flat cafe table, the pair to cafe_stool_flat: drawn side on, with no perspective in it.
+
+SCALE AND OFFSET ARE DERIVED, NOT EYED. local_tests/derive_flat_furniture.gd sizes it against a real 75cm table at the 0.666 world pixels per centimetre the game's other furniture already agrees on, which lands its top 50px up - the same top height the old table had. The offset is in TEXTURE pixels, applied before scale, and puts the opaque bottom on the node's origin.
+
+The perspective table it replaces is NOT deleted: cafe_table.tscn is still used in this room for the set standing further forward, where a little drawn depth is wanted."
+texture = ExtResource("1_table")
+offset = Vector2(0, -221)
+scale = Vector2(0.11509, 0.11509)

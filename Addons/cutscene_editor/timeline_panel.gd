@@ -125,7 +125,7 @@ class _TimelineCanvas extends Control:
 
 var _context: CutsceneEditorContext
 var _canvas: _TimelineCanvas
-var _toolbar: HBoxContainer
+var _toolbar: HFlowContainer
 var _status_bar: HBoxContainer
 var _playhead_readout: Label
 var _legend: HBoxContainer
@@ -331,9 +331,11 @@ func _build_valid_panel() -> void:
 
 
 func _build_toolbar() -> void:
-	_toolbar = HBoxContainer.new()
+	_toolbar = HFlowContainer.new()
 	_toolbar.name = "TimelineToolbar"
 	_toolbar.custom_minimum_size = Vector2(0.0, 34.0)
+	_toolbar.add_theme_constant_override(&"h_separation", 6)
+	_toolbar.add_theme_constant_override(&"v_separation", 4)
 	add_child(_toolbar)
 
 	var add_label := Label.new()
@@ -342,6 +344,7 @@ func _build_toolbar() -> void:
 	_kind_option = OptionButton.new()
 	_kind_option.name = "BeatKind"
 	_kind_option.custom_minimum_size = Vector2(112.0, 0.0)
+	_kind_option.tooltip_text = "Choose the action the next + Beat button will add."
 	for kind in range(CutsceneBeat.Kind.size()):
 		_kind_option.add_item(_kind_name(kind))
 	_toolbar.add_child(_kind_option)
@@ -351,6 +354,10 @@ func _build_toolbar() -> void:
 	_actor_option = OptionButton.new()
 	_actor_option.name = "BeatActor"
 	_actor_option.custom_minimum_size = Vector2(130.0, 0.0)
+	_actor_option.tooltip_text = (
+		"Choose the cast lane for the next actor-owned beat. Shared beats do "
+		+ "not target a character."
+	)
 	_populate_actor_option()
 	_toolbar.add_child(_actor_option)
 	if not _actor_option.item_selected.is_connected(_on_actor_selected):
@@ -374,7 +381,7 @@ func _build_toolbar() -> void:
 		delete_button.pressed.connect(_delete_selected)
 
 	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	spacer.custom_minimum_size.x = 12.0
 	_toolbar.add_child(spacer)
 
 	var zoom_label := Label.new()
@@ -388,6 +395,7 @@ func _build_toolbar() -> void:
 	_zoom_spin.value = _pixels_per_second
 	_zoom_spin.suffix = " px/s"
 	_zoom_spin.custom_minimum_size = Vector2(112.0, 0.0)
+	_zoom_spin.tooltip_text = "Horizontal timeline scale; authored seconds do not change."
 	_toolbar.add_child(_zoom_spin)
 	if not _zoom_spin.value_changed.is_connected(_on_zoom_changed):
 		_zoom_spin.value_changed.connect(_on_zoom_changed)
@@ -403,6 +411,9 @@ func _build_toolbar() -> void:
 	_grid_spin.value = _grid_seconds
 	_grid_spin.suffix = " s"
 	_grid_spin.custom_minimum_size = Vector2(88.0, 0.0)
+	_grid_spin.tooltip_text = (
+		"Time snapping interval. Hold Shift or Ctrl while dragging to bypass snapping."
+	)
 	_toolbar.add_child(_grid_spin)
 	if not _grid_spin.value_changed.is_connected(_on_grid_changed):
 		_grid_spin.value_changed.connect(_on_grid_changed)
@@ -412,6 +423,7 @@ func _build_toolbar() -> void:
 	_play_button.text = "Play"
 	_play_button.toggle_mode = true
 	_play_button.custom_minimum_size = Vector2(72.0, 0.0)
+	_play_button.tooltip_text = "Preview from the current playhead.  (Space)"
 	_toolbar.add_child(_play_button)
 	if not _play_button.toggled.is_connected(_on_play_toggled):
 		_play_button.toggled.connect(_on_play_toggled)
@@ -547,6 +559,11 @@ func _add_beat() -> void:
 	beat.kind = _selected_kind
 	beat.start_seconds = snap_time(_scrub_time)
 	beat.duration_seconds = _default_duration_for_kind(_selected_kind)
+	if (
+		_selected_kind == CutsceneBeat.Kind.DIALOGUE
+		and _context.encounter != null
+	):
+		beat.conversation = _context.encounter.conversation
 	if _kind_uses_actor(_selected_kind) and _actor_option.item_count > 0:
 		var selected_index := _actor_option.selected
 		if selected_index < 0:
@@ -979,6 +996,8 @@ func _apply_preview_at_time() -> void:
 		if state.has(&"pose"):
 			var pose: StringName = state[&"pose"]
 			preview.pose = pose
+		if state.has(&"visual_offset"):
+			preview.set_presentation_offset(state[&"visual_offset"])
 
 
 func _capture_preview_states() -> void:
@@ -996,6 +1015,7 @@ func _capture_preview_states() -> void:
 			"scale": preview.scale,
 			"pose": preview.pose,
 			"visible": preview.visible,
+			"visual_offset": preview.get_presentation_offset(),
 		}
 
 
@@ -1027,6 +1047,7 @@ func _restore_preview_states() -> void:
 		preview.scale = base_state["scale"]
 		preview.pose = base_state["pose"]
 		preview.visible = bool(base_state["visible"])
+		preview.set_presentation_offset(base_state["visual_offset"])
 
 
 func _resolve_preview_actor(actor_id: StringName) -> Node2D:
@@ -1291,6 +1312,12 @@ func _beat_detail_label(beat: CutsceneBeat) -> String:
 	match beat.kind:
 		CutsceneBeat.Kind.MOVE, CutsceneBeat.Kind.POSE:
 			return str(beat.pose) if not beat.pose.is_empty() else ""
+		CutsceneBeat.Kind.BOUNCE:
+			return "%dx to (%g, %g)" % [
+				beat.bounce_count,
+				beat.bounce_offset.x,
+				beat.bounce_offset.y,
+			]
 		CutsceneBeat.Kind.STAGE_CUE:
 			return str(beat.cue) if not beat.cue.is_empty() else ""
 		CutsceneBeat.Kind.DIALOGUE:
@@ -1518,6 +1545,7 @@ func _default_duration_for_kind(kind: int) -> float:
 	return 1.0 if kind in [
 		CutsceneBeat.Kind.MOVE,
 		CutsceneBeat.Kind.POSE,
+		CutsceneBeat.Kind.BOUNCE,
 		CutsceneBeat.Kind.WAIT,
 		CutsceneBeat.Kind.DIALOGUE,
 	] else 0.0

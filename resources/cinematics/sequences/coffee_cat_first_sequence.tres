@@ -62,6 +62,8 @@ actor = &"coffee_cat"
 start_seconds = 0.6
 duration_seconds = 0.35
 bounce_count = 4
+bounce_offset = Vector2(3, -10)
+bounce_style = 1
 notes = "Four bounces on arrival, before anybody has said anything. He is already wound up when he stops, rather than becoming wound up once his line appears.
 
 This is presentation bounce, which is a different motion from the stage script's fixed jitter and runs on top of it."
@@ -78,7 +80,7 @@ Line two stays one canonical line but its DialogueLine pauses after word counts 
 
 Six seconds is the authored estimate the editor scrubs against, not the real length. This beat blocks, so the clock holds here for exactly as long as the player takes to read.
 
-Do not split it to land a cue between the lines. line_range is authored and validated but depth_encounter_controller ignores it, so any DIALOGUE beat plays the whole conversation. The gift line carries the hold_cup speaker pose and that is how the cup is presented on the line that gives it away - though the caffeine loop will take it back a moment later, which is the character rather than a fault.
+This remains one blocking beat because nothing needs to interrupt the exchange. The editor can split it into inclusive line ranges if later staging needs animation between lines. The gift line carries the hold_cup speaker pose and that is how the cup is presented on the line that gives it away - though the caffeine loop will take it back a moment later, which is the character rather than a fault.
 
 This is the last beat on purpose. The exit belongs to the stage's own closing move, because play_closing() runs either way and a timeline that also walked him to Exit would move him twice. The generated placeholder this replaced did exactly that at 7.4s."
 
