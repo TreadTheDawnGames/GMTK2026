@@ -7,6 +7,7 @@ extends SceneTree
 ## - Resolves one real terrain dig through the production TerrainManager.
 ## - Confirms damaged terrain restores byte-exactly without replaying history.
 ## - Checks fractional review travel, encounter stops, and upward preloading.
+## - Guards the sample-neutral shader path that smooths buried cut contours.
 ## - Exits nonzero on any failed contract so agents get a fast merge gate.
 ## - This intentionally stays small; detailed behavior remains in local_tests.
 ## - The invariant is that a parseable game can complete one mining mutation.
@@ -49,6 +50,23 @@ func _run() -> void:
 	await process_frame
 	_verify_headless_history_isolation()
 	_verify_entry_scene()
+	# Headless smoke cannot judge antialiased pixels. Protect the implementation
+	# choice instead: buried contours use the existing raw mask taps for a
+	# continuous direction and depth-scaled derivative AA, so smoothing cannot
+	# silently regress into extra Web texture samples or a denser terrain mask.
+	var terrain_shader_source := FileAccess.get_file_as_string(
+		"res://Shaders/terrain_layer.gdshader"
+	)
+	_expect(
+		terrain_shader_source.contains("cut_aa_half_width")
+		and terrain_shader_source.contains(
+			"neighbor_alpha.z - neighbor_alpha.w"
+		)
+		and terrain_shader_source.contains(
+			"neighbor_alpha.x - neighbor_alpha.y"
+		),
+		"Buried terrain contours must retain sample-neutral derivative smoothing."
+	)
 	await _verify_mining_scene()
 	_verify_finale_text_resolves()
 	if _failures.is_empty():
