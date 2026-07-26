@@ -41,13 +41,15 @@ signal cinematic_frame_closed
 @export var ayden_textbox_texture: Texture2D
 @export var coco_textbox_texture: Texture2D
 @export var art_margin_left: int = 218
-@export var art_margin_top: int = 72
+@export var art_margin_top: int = 44
 @export var art_margin_right: int = 24
-@export var art_margin_bottom: int = 50
+@export var art_margin_bottom: int = 34
+@export var art_body_minimum_height: float = 64.0
 @export var fallback_margin_left: int = 22
 @export var fallback_margin_top: int = 16
 @export var fallback_margin_right: int = 22
 @export var fallback_margin_bottom: int = 14
+@export var fallback_body_minimum_height: float = 72.0
 
 @export_category("Typewriter")
 @export_range(0.001, 0.2, 0.001) var character_display_speed: float = 0.03
@@ -399,6 +401,11 @@ func _present_current_line() -> void:
 	dialogue_margin.add_theme_constant_override(
 		"margin_bottom",
 		art_margin_bottom if uses_authored_textbox else fallback_margin_bottom
+	)
+	body_label.custom_minimum_size.y = (
+		art_body_minimum_height
+		if uses_authored_textbox
+		else fallback_body_minimum_height
 	)
 	var continue_text := (
 		"Continuing..."

@@ -247,6 +247,16 @@ func _verify_mining_scene() -> void:
 				and dialogue_director.textbox_art.visible
 				and not dialogue_director.fallback_panel.visible
 				and not dialogue_director.speaker_label.visible
+				and is_equal_approx(
+					dialogue_director.bottom_panel.size.y,
+					173.0
+				)
+				and dialogue_director.textbox_art.stretch_mode
+					== TextureRect.STRETCH_SCALE
+				and is_equal_approx(
+					dialogue_director.body_label.custom_minimum_size.y,
+					dialogue_director.art_body_minimum_height
+				)
 				and (
 					dialogue_director.textbox_art.texture
 					== expected_textures[speaker_slot]
@@ -264,7 +274,11 @@ func _verify_mining_scene() -> void:
 			fallback_started
 			and not dialogue_director.textbox_art.visible
 			and dialogue_director.fallback_panel.visible
-			and dialogue_director.speaker_label.visible,
+			and dialogue_director.speaker_label.visible
+			and is_equal_approx(
+				dialogue_director.body_label.custom_minimum_size.y,
+				dialogue_director.fallback_body_minimum_height
+			),
 			"Speakers without supplied art must retain the readable fallback."
 		)
 		if fallback_started:
