@@ -74,6 +74,8 @@ duration_seconds = 6.0
 conversation = ExtResource("2_ehpe3")
 notes = "The whole conversation: 'I'M QUIB-QUIB-QUIB-QUIB-QUIBBLE!' / 'HAVE YOU SEEN SEEN SEEN THE CAFE? CAFE? COFFEE? COFFEE CAFE?' / '...' / 'THIS IS IS IS TRAVEL COFFEE. T-T-TAKE IT.' / 'IT MAKES EV-EV-EV-EVERYTHING GO F-F-FASTER!'
 
+Line two stays one canonical line but its DialogueLine pauses after word counts 3, 4, 7, 8, and 9. That delivers it as HAVE YOU SEEN / SEEN / SEEN THE CAFE? / CAFE? / COFFEE? / COFFEE CAFE? without adding punctuation or asking the player to advance six separate cards.
+
 Six seconds is the authored estimate the editor scrubs against, not the real length. This beat blocks, so the clock holds here for exactly as long as the player takes to read.
 
 Do not split it to land a cue between the lines. line_range is authored and validated but depth_encounter_controller ignores it, so any DIALOGUE beat plays the whole conversation. The gift line carries the hold_cup speaker pose and that is how the cup is presented on the line that gives it away - though the caffeine loop will take it back a moment later, which is the character rather than a fault.

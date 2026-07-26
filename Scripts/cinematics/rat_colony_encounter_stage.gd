@@ -21,6 +21,10 @@ signal persistent_colony_requested
 signal stampede_started
 ## The last of them is off screen. The miner can get up.
 signal stampede_finished
+## The approaching horde is close enough to shake the frame.
+signal stampede_rumble_started(strength_px: float)
+## The last mouse has passed and the frame can settle.
+signal stampede_rumble_finished
 
 @export_category("Rat Colony")
 @export var rat_scene: PackedScene
@@ -58,6 +62,18 @@ signal stampede_finished
 ## editing this stage. It is a lower-case verb phrase and not an animation name;
 ## an AnimationPlayer clip of the same name still plays if a stage authors one.
 @export var procession_cue: StringName
+## Advance warning between Rotini's call and the first mouse entering frame.
+##
+## The rumble starts immediately and stays active through the crossing. Zero
+## preserves the immediate procession used by stages without a telegraph.
+@export_range(0.0, 6.0, 0.1) var stampede_warning_seconds: float = 0.0
+@export_range(0.0, 20.0, 0.25) var stampede_rumble_strength_px: float = 5.0
+## Minimum time the spawn tap stays open after the warning. This keeps a fast
+## dialogue advance from reducing a whole stampede to its first mouse.
+@export_range(0.0, 8.0, 0.1) var stampede_minimum_run_seconds: float = 0.0
+## Optional authored stampede sound. Rotini's introduction owns this player so
+## audio can be dropped into the scene without changing procession code.
+@export var stampede_audio: AudioStreamPlayer
 ## How long the closing waits for the last of them to leave before it gives up
 ## and frees them where they stand. Only reached if a follower is stuck, which
 ## would otherwise hold the encounter open indefinitely.
@@ -113,6 +129,9 @@ var _is_spawning: bool = false
 var _spawn_generation: int = 0
 var _appearance_index: int = 0
 var _has_requested_persistent_colony: bool = false
+var _is_warning: bool = false
+var _is_rumbling: bool = false
+var _procession_started_msec: int = 0
 
 
 func prepare(
@@ -144,7 +163,7 @@ func play_cue(cue_id: StringName, line_index: int) -> bool:
 		and not procession_cue.is_empty()
 		and cue_id == procession_cue
 	):
-		_begin_procession()
+		_begin_stampede_warning()
 		return true
 	return super.play_cue(cue_id, line_index)
 
@@ -169,7 +188,20 @@ func play_closing() -> void:
 
 ## Stops new arrivals and waits for the ones already running to leave the frame.
 func _await_stampede_drained() -> void:
+	while _is_warning and _is_active:
+		await get_tree().process_frame
+	var minimum_run_deadline := (
+		_procession_started_msec
+		+ int(stampede_minimum_run_seconds * 1000.0)
+	)
+	while (
+		_is_spawning
+		and _is_active
+		and Time.get_ticks_msec() < minimum_run_deadline
+	):
+		await get_tree().process_frame
 	if not _is_spawning and _followers.is_empty():
+		_finish_stampede_rumble()
 		return
 	# Stop the tap first, then wait for the pipe to empty. Leaving it running
 	# means new followers keep spawning into a shot that is trying to end.
@@ -187,6 +219,7 @@ func _await_stampede_drained() -> void:
 		if not _is_active:
 			return
 	stampede_finished.emit()
+	_finish_stampede_rumble()
 
 
 func cancel_and_restore() -> void:
@@ -215,9 +248,47 @@ func _begin_procession() -> void:
 	if not _is_active or _is_spawning:
 		return
 	_is_spawning = true
+	_procession_started_msec = Time.get_ticks_msec()
 	_spawn_generation += 1
 	stampede_started.emit()
 	_spawn_next_follower(_spawn_generation)
+
+
+## Telegraphs the off-screen horde before any mouse enters the frame.
+func _begin_stampede_warning() -> void:
+	if not _is_active or _is_warning or _is_spawning:
+		return
+	_is_warning = true
+	_is_rumbling = true
+	stampede_rumble_started.emit(stampede_rumble_strength_px)
+	if stampede_audio != null and stampede_audio.stream != null:
+		stampede_audio.play()
+	if stampede_warning_seconds <= 0.0:
+		_finish_stampede_warning()
+		return
+	get_tree().create_timer(
+		stampede_warning_seconds,
+		true,
+		false,
+		true
+	).timeout.connect(_finish_stampede_warning, CONNECT_ONE_SHOT)
+
+
+func _finish_stampede_warning() -> void:
+	if not _is_warning:
+		return
+	_is_warning = false
+	if _is_active:
+		_begin_procession()
+
+
+func _finish_stampede_rumble() -> void:
+	if not _is_rumbling:
+		return
+	_is_rumbling = false
+	if stampede_audio != null:
+		stampede_audio.stop()
+	stampede_rumble_finished.emit()
 
 
 ## Reuses one timer at a time; the generation rejects stale callbacks.
@@ -396,11 +467,13 @@ func _get_live_follower_cap() -> int:
 
 
 func _stop_procession() -> void:
+	_is_warning = false
 	_is_spawning = false
 	_spawn_generation += 1
 	for rat in _followers.duplicate():
 		_remove_follower(rat)
 	_followers.clear()
+	_finish_stampede_rumble()
 
 
 func _prune_followers() -> void:

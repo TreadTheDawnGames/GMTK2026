@@ -20,6 +20,8 @@ signal encounter_completed(encounter_index: int)
 signal coffee_speed_boost_requested
 signal rat_colony_support_requested
 signal character_stage_strike_requested(screen_position: Vector2)
+signal stampede_rumble_started(strength_px: float)
+signal stampede_rumble_finished
 ## Relays a stage's request to open real rock where a strike landed.
 signal character_stage_rock_break_requested(
 	screen_position: Vector2,
@@ -69,6 +71,11 @@ const LANDING_FLOOR_TOLERANCE_ROWS: int = 4
 ## the two mistakes: a character floating slightly reads as a character, and a
 ## character sunk slightly reads as a bug.
 const CUTSCENE_FLOOR_LIFT_PIXELS: float = 14.0
+## The miner's authored sole marker sits above the lowest opaque boot pixels,
+## unlike CharacterPresenter roots whose origin is the visible foot line. Drop
+## only the MinerRig by this amount after using the shared support sample so he
+## plants on the same contour without sinking every visitor into the ground.
+const CUTSCENE_MINER_FOOT_DROP_PIXELS: float = 14.0
 ## How still the sampled floor has to be, and for how many readings, before the
 ## room counts as having arrived. Half a pixel is under the sub-cell resolution
 ## the mask is written at, so it cannot be met by a room still travelling.
@@ -119,6 +126,7 @@ var _sequence_is_awaiting_dialogue: bool = false
 ## True once a timeline's DIALOGUE beat has run the encounter's conversation, so
 ## the schedule knows not to start it again when the timeline finishes.
 var _timeline_presented_conversation: bool = false
+var _prestaged_encounter_index: int = -1
 var _game_state: RunState
 
 
@@ -211,6 +219,13 @@ func _on_credits_completed() -> void:
 
 ## Restores only the run-scoped credits prerequisite.
 func _on_run_reset() -> void:
+	if (
+		_prestaged_encounter_index >= 0
+		and _prestaged_encounter_index < _presenters.size()
+	):
+		_presenters[_prestaged_encounter_index].hide()
+	_prestaged_encounter_index = -1
+	_exit_cast_cutscene_draw_order()
 	_credits_have_completed = false
 	_is_final_breakthrough_armed = false
 	_is_final_breakthrough_resolving = false
@@ -227,6 +242,33 @@ func _schedule_next_encounter() -> bool:
 	if not cinematic_flow.try_begin(FLOW_OWNER):
 		return false
 	_pending_encounter_index = _next_encounter_index
+	var encounter := encounter_config.encounters[_pending_encounter_index]
+	if encounter.prestage_before_landing:
+		var stage := _stages[_pending_encounter_index]
+		var presenter := _presenters[_pending_encounter_index]
+		if stage != null:
+			var encounter_anchor := _encounter_positions[
+				_pending_encounter_index
+			]
+			stage.position = encounter_anchor
+			presenter.apply_appearance(encounter.appearance)
+			if stage.conversation_tracks_miner:
+				_align_actor_markers_to_miner(stage)
+			if (
+				stage.props_track_tracked_cast
+				and stage.prop_markers_root != null
+			):
+				stage.prop_markers_root.position.x = (
+					stage.actor_markers_root.position.x
+				)
+			presenter.global_position = stage.entrance_marker.global_position
+			if presenter.has_pose(stage.conversation_pose):
+				presenter.play_pose(stage.conversation_pose)
+			if stage.conversation_facing != 0:
+				presenter.set_facing_direction(stage.conversation_facing)
+			presenter.show()
+			_prestaged_encounter_index = _pending_encounter_index
+			_enter_cast_cutscene_draw_order()
 	# He is on his way down into the room from this moment. The pose holds until
 	# the landing promotes the encounter, which is the only thing that knows he
 	# has arrived.
@@ -248,7 +290,11 @@ func _activate_pending_encounter() -> void:
 	var encounter := encounter_config.encounters[_active_encounter_index]
 	presenter.apply_appearance(encounter.appearance)
 	var encounter_anchor := _encounter_positions[_active_encounter_index]
-	presenter.position = encounter_anchor
+	# A prestaged actor is already standing at the set's entrance while the
+	# miner falls. Moving him back to the room anchor here would create the
+	# exact landing-frame pop that pre-staging exists to remove.
+	if not encounter.prestage_before_landing:
+		presenter.position = encounter_anchor
 	var stage := _stages[_active_encounter_index]
 	if stage != null:
 		stage.position = encounter_anchor
@@ -488,7 +534,14 @@ func _begin_active_encounter() -> void:
 		# untouched.
 		miner_rig.seat_landing_foot_at_screen_y(
 			floor_sampler.call(miner_rig.get_landing_foot_screen_x())
+			+ CUTSCENE_MINER_FOOT_DROP_PIXELS
 		)
+		# prepare() owns restoration and therefore must snapshot the actor's
+		# original hidden state. This hide/show pair has no frame between it;
+		# it transfers an already-visible prestage into normal stage ownership
+		# without a visible pop or leaving him behind after cancellation.
+		if encounter.prestage_before_landing:
+			presenter.hide()
 		if not _active_stage.prepare(presenter, floor_sampler):
 			push_error(
 				"Encounter '%s' could not prepare its stage."
@@ -496,6 +549,8 @@ func _begin_active_encounter() -> void:
 			)
 			_fail_active_encounter()
 			return
+		if encounter.prestage_before_landing:
+			_prestaged_encounter_index = -1
 		# After prepare, not before it. prepare() stands the stage's own visitor
 		# on the entrance mark at that marker's authored y, which is the dig line
 		# - and a visitor who is already in place and never walks is never
@@ -919,6 +974,14 @@ func _prepare_authored_characters() -> bool:
 					colony_stage.stampede_finished,
 					_on_stampede_finished
 				)
+				_connect_once(
+					colony_stage.stampede_rumble_started,
+					_on_stampede_rumble_started
+				)
+				_connect_once(
+					colony_stage.stampede_rumble_finished,
+					_on_stampede_rumble_finished
+				)
 			if encounter.starts_rat_colony_support:
 				if not stage is RatColonyEncounterStage:
 					push_error(
@@ -1077,6 +1140,15 @@ func _on_stampede_started() -> void:
 ## Picks him back up once the last of them has left the frame.
 func _on_stampede_finished() -> void:
 	miner_rig.release_cutscene_landing()
+
+
+## Relays the stage-local warning to the shared camera presentation.
+func _on_stampede_rumble_started(strength_px: float) -> void:
+	stampede_rumble_started.emit(strength_px)
+
+
+func _on_stampede_rumble_finished() -> void:
+	stampede_rumble_finished.emit()
 
 
 ## Relays a stage-local action through the cross-system wiring boundary.

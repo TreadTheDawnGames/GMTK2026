@@ -57,8 +57,18 @@ func get_encounter_ceiling_depth(
 ) -> int:
 	if encounter == null:
 		return -1
+	var fall_clearance_rows := chamber_height_rows
+	if (
+		encounter.terrain_sculpt != null
+		and encounter.terrain_sculpt.enabled
+		and encounter.terrain_sculpt.get_sculpt_error().is_empty()
+	):
+		fall_clearance_rows = maxi(
+			encounter.terrain_sculpt.get_center_fall_clearance_rows(),
+			1
+		)
 	return maxi(
-		encounter.resolve_depth(total_run_depth) - chamber_height_rows,
+		encounter.resolve_depth(total_run_depth) - fall_clearance_rows,
 		0
 	)
 

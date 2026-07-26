@@ -23,6 +23,11 @@ extends Resource
 ## a burst of panic. Punctuation still stretches from whatever speed applies, so
 ## an override changes the tempo without flattening the phrasing.
 @export_range(0.0, 0.2, 0.001) var character_display_speed_override: float = 0.0
+## One-based word counts after which the typewriter holds before continuing.
+## The visible text stays canonical; this authors delivery without adding
+## punctuation or splitting one spoken line into extra player advances.
+@export var typing_pause_after_word_counts: PackedInt32Array
+@export_range(0.0, 2.0, 0.05) var typing_pause_seconds: float = 0.0
 
 
 ## Returns the seconds this line takes to type out at a given base speed, with
@@ -54,4 +59,8 @@ func get_typing_seconds(
 			total += speed * 3.0
 		else:
 			total += speed
+	total += (
+		float(typing_pause_after_word_counts.size())
+		* typing_pause_seconds
+	)
 	return total

@@ -2264,7 +2264,7 @@ func _build_chunk_masks(
 			chunk_contains_sculpt
 		)
 	var back_layer_mask: Image
-	if profile.keep_back_layer_solid:
+	if profile.keep_back_layer_solid and not chunk_has_per_layer_sculpt:
 		back_layer_mask = (
 			_build_chunk_base_mask(
 				chunk_index,
@@ -2292,9 +2292,12 @@ func _build_chunk_masks(
 		)
 		var layer_mask := source_mask
 		# A room whose strata were sculpted apart needs its own rock per
-		# stratum. Only then is the extra build paid for, and only for the
-		# gameplay strata: the reserved back wall stays the shared backdrop.
-		if chunk_has_per_layer_sculpt and not uses_backdrop_source:
+		# stratum, including its authored fourth-layer back wall. The old
+		# retained chamber backdrop knew only the procedural chamber's narrow
+		# horizontal band, so a tall sculpt showed the fourth stratum as a line
+		# across its middle. The room mask is solid across the full authored
+		# footprint and therefore remains visible wherever layers 1-3 open.
+		if chunk_has_per_layer_sculpt:
 			layer_mask = _build_chunk_base_mask(
 				chunk_index,
 				false,
