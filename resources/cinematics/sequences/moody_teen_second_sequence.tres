@@ -1,0 +1,54 @@
+[gd_resource type="Resource" script_class="CutsceneSequence" load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://resources/cinematics/cutscene_beat.gd" id="1_beat"]
+[ext_resource type="Resource" path="res://resources/dialogue/moody_teen_first_conversation.tres" id="2_dialogue"]
+[ext_resource type="Script" path="res://resources/cinematics/cutscene_sequence.gd" id="3_sequence"]
+
+[sub_resource type="Resource" id="Beat_show"]
+script = ExtResource("1_beat")
+kind = 9
+actor = &"moody_teen"
+notes = "Ayden is already waiting in the lower bell. Prestage Before Landing lets the descent reveal him through the throat."
+
+[sub_resource type="Resource" id="Beat_face"]
+script = ExtResource("1_beat")
+kind = 2
+actor = &"moody_teen"
+facing = -1
+notes = "He looks left toward the miner and never changes direction."
+
+[sub_resource type="Resource" id="Beat_stare"]
+script = ExtResource("1_beat")
+kind = 4
+duration_seconds = 0.75
+notes = "The same short silent settle as Encounter 4.5 establishes the repeated gag."
+
+[sub_resource type="Resource" id="Beat_frame_conversation"]
+script = ExtResource("1_beat")
+kind = 11
+start_seconds = 0.75
+duration_seconds = 0.8
+camera_offset = Vector2(66.4, -24)
+camera_zoom = Vector2(1.25, 1.25)
+notes = "Centres the measured 132.8px two-shot, lifts 24px toward the entry throat, and retains more of the bell shoulders than Encounter 4.5's tighter 1.40 frame."
+
+[sub_resource type="Resource" id="Beat_dialogue"]
+script = ExtResource("1_beat")
+kind = 5
+start_seconds = 1.55
+duration_seconds = 8.0
+conversation = ExtResource("2_dialogue")
+notes = "Reuses the complete authorized seven-line Ayden exchange without duplicating or paraphrasing its dialogue."
+
+[sub_resource type="Resource" id="Beat_reset_camera"]
+script = ExtResource("1_beat")
+kind = 11
+start_seconds = 9.55
+duration_seconds = 0.9
+camera_action = 2
+notes = "Restores neutral encounter framing before mining resumes. Shared cancellation owns the same reset."
+
+[resource]
+script = ExtResource("3_sequence")
+sequence_id = &"moody_teen_second_sequence"
+beats = Array[ExtResource("1_beat")]([SubResource("Beat_show"), SubResource("Beat_face"), SubResource("Beat_stare"), SubResource("Beat_frame_conversation"), SubResource("Beat_dialogue"), SubResource("Beat_reset_camera")])

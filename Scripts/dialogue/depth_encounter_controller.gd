@@ -263,6 +263,7 @@ func _on_run_reset() -> void:
 	_is_final_breakthrough_resolving = false
 	_pending_release_recession_ratio = 0.0
 	terrain_renderer.set_trodden_floor(false)
+	terrain_renderer.set_cutscene_floor_plane(false)
 	_latest_landing_world_y = (
 		mining_config.initial_surface_row
 		if mining_config != null
@@ -282,6 +283,7 @@ func _schedule_next_encounter() -> bool:
 	# Publish it before the fall pose so the first frame entering this chamber
 	# already has its complete 2.5D surface and layer-occlusion contract.
 	_apply_trodden_floor(encounter)
+	_apply_cutscene_floor_plane(encounter)
 	if encounter.prestage_before_landing:
 		var stage := _stages[_pending_encounter_index]
 		var presenter := _presenters[_pending_encounter_index]

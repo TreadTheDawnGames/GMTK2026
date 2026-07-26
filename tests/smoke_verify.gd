@@ -512,7 +512,66 @@ func _verify_mining_scene() -> void:
 				+ "releasing its mask seal for real terrain deformation."
 		)
 		terrain_renderer.set_trodden_floor(false)
+		# This direct lifecycle check bypasses MiningController, so restore the
+		# production combo input before later prepared-patch assertions use this
+		# same renderer. Otherwise the test prepares combo 0 while the renderer
+		# intentionally retains combo 1 from the synthetic contact above.
+		terrain_renderer._on_dig_presentation_started(0)
 	if encounter_controller != null:
+		var expected_encounter_ids: Array[StringName] = [
+			&"cheese_girl_first",
+			&"cloak_lantern_first",
+			&"rutini_first",
+			&"treasure_hunter_first",
+			&"moody_teen_first",
+			&"cloak_lantern_warning",
+			&"treasure_hunter_treasure",
+			&"coffee_cat_first",
+			&"moody_teen_second",
+			&"rutini_second",
+			&"cafe_gathering",
+			&"cloak_lantern_post_credits",
+			&"thief_finale",
+		]
+		var expected_encounter_depths: Array[int] = [
+			300,
+			1_400,
+			2_500,
+			4_000,
+			5_000,
+			5_600,
+			7_400,
+			9_200,
+			10_500,
+			11_200,
+			14_000,
+			15_400,
+			100_000,
+		]
+		var schedule_matches := (
+			encounter_controller.encounter_config.encounters.size()
+				== expected_encounter_ids.size()
+		)
+		if schedule_matches:
+			for encounter_index in range(expected_encounter_ids.size()):
+				var scheduled_encounter := (
+					encounter_controller.encounter_config.encounters[
+						encounter_index
+					]
+				)
+				if (
+					scheduled_encounter.encounter_id
+						!= expected_encounter_ids[encounter_index]
+					or scheduled_encounter.resolve_depth(
+						encounter_controller.mining_config.total_run_depth
+					) != expected_encounter_depths[encounter_index]
+				):
+					schedule_matches = false
+					break
+		_expect(
+			schedule_matches,
+			"The thirteen encounter resources must remain in canonical depth order."
+		)
 		var cafe_is_prestaged := false
 		var cafe_framing_is_authored := false
 		for encounter: DepthCharacterEncounter in (

@@ -43,7 +43,7 @@ var _body_offset_from_node_x: float = 0.0
 var _resting_pose: StringName = &"idle"
 
 ## Opaque-body measurements, keyed by texture path. get_used_rect() scans every
-## pixel of a 2224x1668 sheet, and apply_appearance runs for all eleven encounters
+## pixel of a 2224x1668 sheet, and apply_appearance runs for all thirteen encounters
 ## at startup and again on every visit; there are only eight distinct textures, so
 ## measuring each once is the difference between a boot cost and a boot stall.
 static var _body_centre_cache: Dictionary = {}

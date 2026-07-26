@@ -329,7 +329,7 @@ the point: the harness can only give a true answer.
 ## House rules for authoring one encounter
 
 Read this before changing a room or a stage. Every rule below cost a bug to
-learn, and each of the eleven encounters is expected to follow it.
+learn, and each of the thirteen encounters is expected to follow it.
 
 ### Own only your own files
 
@@ -339,8 +339,8 @@ An encounter is authored through exactly two files: its room in
 `resources/encounters/` is wiring and should already be correct.
 
 `sculpt_baker.gd`, `character_encounter_stage.gd`, `rat_colony_encounter_stage.gd`
-and `depth_encounter_controller.gd` are shared by all eleven. Changing them to
-suit one shot changes the other ten. If a shot needs something they do not do,
+and `depth_encounter_controller.gd` are shared by all thirteen. Changing them to
+suit one shot changes the other twelve. If a shot needs something they do not do,
 add it as an opt-in export whose default preserves current behaviour — the way
 `closing_fade_seconds`, the facing trio and `procession_mines` were added — and
 say so in the handoff. Scene merges are unrecoverable, so two people must never
