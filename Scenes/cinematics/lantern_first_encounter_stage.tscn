@@ -105,23 +105,23 @@ conversation_facing = 1
 closing_facing = -1
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
-editor_description = "Seven terrain cells left of Conversation, on the fractured unsupported tip. Runtime samples layer-one support at this x; y remains the ledge's authored -64px editor reference."
-position = Vector2(-648, -64)
+editor_description = "Seven terrain cells left of Conversation, on the fractured tip, at the authoring tool's verified Keeper entrance column 133. Runtime samples layer-one support at this x; y remains the ledge's authored -64px editor reference."
+position = Vector2(-472, -64)
 
 [node name="Conversation" parent="ActorMarkers" index="1"]
-editor_description = "Near the tip of the overhang, eight terrain rows above the miner's floor and over open shaft. Runtime footing comes from the real layer-one ledge support at this x."
-position = Vector2(-592, -64)
+editor_description = "The authoring tool's verified Keeper conversation column 140, eight terrain rows above the miner's floor on the overhang's supported root. The earlier -592 mark sat 22 cells past the ledge tip over open shaft, which put him at the very edge of frame with nothing under him."
+position = Vector2(-416, -64)
 
 [node name="Work" parent="ActorMarkers" index="2"]
-editor_description = "The very end of the overhang, kept as the spot to aim any later beat that walks him out to the edge."
-position = Vector2(-632, -64)
+editor_description = "The very end of the overhang at the ledge's authored tip column 132, kept as the spot to aim any later beat that walks him out to the edge."
+position = Vector2(-480, -64)
 
 [node name="Rest" parent="ActorMarkers" index="3"]
-position = Vector2(-592, -64)
+position = Vector2(-416, -64)
 
 [node name="Exit" parent="ActorMarkers" index="4"]
 editor_description = "His own mark: he does not leave by walking. Closing Fade Seconds hops him once and fades him out where he stands, and Closing Facing turns him back to the drop first."
-position = Vector2(-592, -64)
+position = Vector2(-416, -64)
 
 [node name="LanternStaff" parent="PropMarkers" index="0" unique_id=2096771290 instance=ExtResource("6_staff")]
 texture_filter = 1
@@ -130,8 +130,8 @@ position = Vector2(-689, 764)
 scale = Vector2(0.2462, 0.2462)
 
 [node name="Bench" parent="PropMarkers" index="1" instance=ExtResource("7_bench")]
-editor_description = "The approved Lantern Keeper bench composition, restored for the first meeting. It remains 118px right of his conversation mark, matching the measured character/bench clearance used by his later warning scene. This room's ledge is directly authored rather than loose tunnel dressing, so the bench uses the ledge's exact -64px reference; visual capture confirms its feet are flush with the top of layer one. Closing fades its alpha with the Keeper over 0.9s, and RESET restores it for cancellation or replay."
-position = Vector2(-474, -64)
+editor_description = "The approved Lantern Keeper bench composition, restored for the first meeting. It remains 118px right of his conversation mark, matching the measured character/bench clearance used by his later warning scene, so it travelled with him when that mark moved onto the supported ledge. This room's ledge is directly authored rather than loose tunnel dressing, so the bench uses the ledge's exact -64px reference; visual capture confirms its feet are flush with the top of layer one. Closing fades its alpha with the Keeper over 0.9s, and RESET restores it for cancellation or replay."
+position = Vector2(-298, -64)
 
 [node name="AnimationPlayer" parent="." index="3"]
 libraries/ = SubResource("AnimationLibrary_lantern_first")
@@ -143,7 +143,7 @@ preview_depth_rows = 1400
 
 [node name="cloak_lantern" type="Node2D" parent="." index="5" unique_id=1905941146]
 z_index = 1
-position = Vector2(-592, -64)
+position = Vector2(-416, -64)
 scale = Vector2(0.8, 0.8)
 script = ExtResource("2_hbiw8")
 actor_id = &"cloak_lantern"

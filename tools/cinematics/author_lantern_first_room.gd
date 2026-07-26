@@ -3,6 +3,7 @@ extends SceneTree
 ## How it works:
 ## - Rebuilds encounter 2 from the shared mined-tunnel cut.
 ## - Raises and fractures the cavern, then opens the canonical 37-cell shaft.
+## - Opens the arrival throat so every snaking column falls to the room floor.
 ## - Builds the Keeper's connected ledge after clearing unsafe hanging rock.
 ## - Derives the shared four visual depth masks and verifies every critical span.
 ## - Saves only when the landing, ledge, shaft, roof, and bottom floor all pass.
@@ -36,6 +37,11 @@ const LEDGE_TOP_ROW: int = 102
 const LEDGE_WALL_X: int = 160
 const KEEPER_ENTRANCE_X: int = 133
 const KEEPER_CONVERSATION_X: int = 140
+## How far past the snaking band the throat walls are allowed to wander. The
+## band itself is what has to be open; the chips only stop the break-in reading
+## as a bored rectangle, so they are kept small enough never to reach the
+## Keeper's ledge columns.
+const THROAT_CHIP_CELLS: float = 2.0
 
 var _failures: Array[String] = []
 
@@ -48,7 +54,7 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	_cut_room(sculpt)
+	_cut_room(sculpt, mining_config)
 	_verify_room(sculpt, mining_config)
 	if not _failures.is_empty():
 		for failure: String in _failures:
@@ -73,7 +79,10 @@ func _initialize() -> void:
 	quit(0)
 
 
-func _cut_room(sculpt: CutsceneTerrainSculpt) -> void:
+func _cut_room(
+	sculpt: CutsceneTerrainSculpt,
+	mining_config: MiningConfig
+) -> void:
 	sculpt.enabled = true
 	sculpt.grid_size = GRID_SIZE
 	sculpt.anchor_offset_cells = ANCHOR_OFFSET
@@ -93,6 +102,7 @@ func _cut_room(sculpt: CutsceneTerrainSculpt) -> void:
 		RIGHT_WALL_FACE_X
 	)
 	_clear_hanging_rock(sculpt)
+	_carve_arrival_throat(sculpt, mining_config.snake_half_span_cells)
 	_carve_deep_shaft(sculpt)
 	_shape_staff_pit(sculpt)
 	_build_keeper_ledge(sculpt)
@@ -178,6 +188,46 @@ func _clear_hanging_rock(sculpt: CutsceneTerrainSculpt) -> void:
 		):
 			ground_row -= 1
 		for local_y in range(first_open_row, ground_row):
+			sculpt.set_solid_local(Vector2i(local_x, local_y), false)
+	sculpt.end_edit()
+
+
+## Opens the break-in the miner actually arrives through.
+##
+## The raised cavern still leaves roughly seventy rows of intact rock capping
+## the room between its ceiling and the grid's top edge. The snaking fall can
+## arrive down any column in the band, so the miner drops into the room's own
+## grid and comes to rest on that cap thirty rows above the floor: the landing
+## never reaches the encounter's floor row, the encounter never promotes, and
+## the run stops with him held in the ceiling.
+##
+## Every column of the band is therefore opened from the top edge down to the
+## cavern, and the walls are chipped outward so the break-in reads as rock the
+## miner dug through rather than as a rectangular chute. The chips only ever
+## widen the throat, which is what keeps the guaranteed band a guarantee.
+func _carve_arrival_throat(
+	sculpt: CutsceneTerrainSculpt,
+	half_span_cells: int
+) -> void:
+	var centre_x := -sculpt.anchor_offset_cells.x
+	var floor_row := sculpt.get_floor_local_row()
+	sculpt.begin_edit()
+	for local_y in range(floor_row):
+		var left_chip := maxi(
+			roundi(sin(float(local_y) * 0.37) * THROAT_CHIP_CELLS),
+			0
+		)
+		var right_chip := maxi(
+			roundi(cos(float(local_y) * 0.29 + 0.8) * THROAT_CHIP_CELLS),
+			0
+		)
+		for local_x in range(
+			maxi(centre_x - half_span_cells - left_chip, 0),
+			mini(
+				centre_x + half_span_cells + right_chip + 1,
+				sculpt.grid_size.x
+			)
+		):
 			sculpt.set_solid_local(Vector2i(local_x, local_y), false)
 	sculpt.end_edit()
 
@@ -329,6 +379,15 @@ func _verify_room(
 				"Landing column %d stops %d rows high (limit %d)."
 				% [landing_x, shortfall, tolerance]
 			)
+		# A column the fall cannot pass through is the ceiling catching him,
+		# which reads in game as a soft lock rather than as a hard landing.
+		for local_y in range(floor_row):
+			if sculpt.is_solid_local(Vector2i(landing_x, local_y)):
+				_failures.append(
+					"Arrival column %d is capped by rock at row %d."
+					% [landing_x, local_y]
+				)
+				break
 
 	var minimum_headroom := 10_000
 	for local_x in [168, 192, 216]:
