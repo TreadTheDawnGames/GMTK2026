@@ -78,6 +78,22 @@ func _run() -> void:
 		),
 		"Mining impacts must retain the sample-neutral crushed-mask transition."
 	)
+	# Same reasoning for the mining dust: headless cannot judge whether a cloud
+	# shimmers, so protect the three choices that stopped it. The noise domain is
+	# measured in world pixels recovered from the instance transform, so a lobe
+	# growing or stretching no longer re-scales its own field; the fine octaves
+	# fade out by screen footprint instead of aliasing; and the tone bands are
+	# softened by their own derivative instead of being hard-stepped.
+	var smoke_shader_source := FileAccess.get_file_as_string(
+		"res://Shaders/mining_smoke.gdshader"
+	)
+	_expect(
+		smoke_shader_source.contains("MODEL_MATRIX")
+		and smoke_shader_source.contains("quad_half_size")
+		and smoke_shader_source.contains("cell_span")
+		and smoke_shader_source.contains("fwidth"),
+		"Mining dust must keep its world-anchored, derivative-aware noise field."
+	)
 	await _verify_mining_scene()
 	_verify_finale_text_resolves()
 	if _failures.is_empty():
@@ -883,8 +899,83 @@ func _verify_mining_scene() -> void:
 		terrain_manager,
 		terrain_renderer
 	)
+	_verify_impact_smoke(
+		game_root.get_node_or_null(
+			"MiningScene/MiningImpactSmoke"
+		) as MiningImpactSmoke
+	)
 	game_root.queue_free()
 	await process_frame
+
+
+## Guards the two dust contracts a still frame cannot show.
+##
+## Mining at the lobe cap used to reset the puff receiving each strike to a full
+## lifetime, which snapped a half-faded puff back to full opacity: continuous
+## digging read as the dust flickering brighter rather than thickening. A strike
+## may now only top a puff up by a bounded share of its life.
+##
+## The shader also flattens a puff against rock it is touching, and it decides
+## that from the confinement the open-space scan measures, so that value has to
+## stay inside the 0..1 range custom data can carry.
+func _verify_impact_smoke(smoke: MiningImpactSmoke) -> void:
+	_expect(smoke != null, "MiningImpactSmoke must exist in the mining scene.")
+	if smoke == null:
+		return
+	var impact_position := Vector2(
+		smoke.terrain_manager.config.terrain_screen_center_x,
+		smoke.terrain_manager.config.mining_face_screen_y
+	)
+	# Dust must be leaving the rock the moment it appears. Buoyancy alone takes
+	# about half a second to overcome a fresh puff's own growth, and for that
+	# half second the drawn shape spread downward off the strike; the detailed
+	# frame-by-frame check is local_tests/trace_smoke_rise.gd.
+	smoke.play_at_impact(impact_position, 40, 0.5, 1.0, 1)
+	_expect(
+		smoke._cloud != null
+		and not smoke._cloud.lobes.is_empty()
+		and smoke._cloud.lobes[0].velocity.y <= -smoke.initial_rise_speed * 0.9,
+		"A puff must be born already rising, not waiting for buoyancy."
+	)
+
+	var lobe_budget := smoke.maximum_lobes
+	if OS.has_feature("web"):
+		lobe_budget = mini(lobe_budget, smoke.web_maximum_lobes)
+	for _fill_index in range(lobe_budget + 2):
+		smoke.play_at_impact(impact_position, 40, 0.5, 1.0, 1)
+	_expect(
+		smoke._cloud != null and smoke._cloud.lobes.size() == lobe_budget,
+		"Repeated strikes must fill to the lobe cap and stop there."
+	)
+	if smoke._cloud == null or smoke._cloud.lobes.is_empty():
+		return
+
+	# Take a puff most of the way through its life, then strike it again.
+	var fading_lobe: MiningImpactSmoke.SmokeLobe = smoke._cloud.lobes[0]
+	for lobe in smoke._cloud.lobes:
+		lobe.remaining_lifetime = lobe.total_lifetime * 0.1
+	var life_before := fading_lobe.remaining_lifetime
+	smoke.play_at_impact(impact_position, 40, 0.5, 1.0, 1)
+	var largest_life_ratio := 0.0
+	var confinement_stays_normalised := true
+	for lobe in smoke._cloud.lobes:
+		largest_life_ratio = maxf(
+			largest_life_ratio,
+			lobe.remaining_lifetime / maxf(lobe.total_lifetime, 0.001)
+		)
+		if lobe.wall_confinement < 0.0 or lobe.wall_confinement > 1.0:
+			confinement_stays_normalised = false
+	_expect(
+		largest_life_ratio <= 0.1 + smoke.lobe_refresh_share + 0.001,
+		(
+			"A strike at the lobe cap must top a fading puff up by at most "
+			+ "lobe_refresh_share, not reset it (life went to %.2f from %.2f)."
+		) % [largest_life_ratio, life_before / fading_lobe.total_lifetime]
+	)
+	_expect(
+		confinement_stays_normalised,
+		"Measured wall confinement must stay inside the 0..1 custom data range."
+	)
 
 
 ## Proves the finale's lines still finish themselves.
