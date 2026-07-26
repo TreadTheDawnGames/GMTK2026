@@ -90,14 +90,6 @@ actor = &"moody_teen"
 facing = -1
 notes = "Looks left from behind the dining set toward the gathering. His Y 6 origin is behind the Y 36 furniture, so its lower screen position correctly occludes his lower silhouette."
 
-[sub_resource type="Resource" id="Beat_open_silence"]
-script = ExtResource("1_beat")
-start_seconds = 1.0
-duration_seconds = 0.6
-notes = "Held silence on the cafe framing before anybody speaks. The miner has just come through the ceiling into the one place the entire run has been walking toward, and the shot needs a moment for the player to read the sign over his head before a dialogue box covers the bottom of the frame.
-
-Longer than encounter 5's 0.6 on purpose. That shot had two people in it; this one has a building, four characters and a colony of rats, and it is worth the extra third of a second."
-
 [sub_resource type="Resource" id="Beat_frame_cafe"]
 script = ExtResource("1_beat")
 kind = 11
@@ -107,6 +99,14 @@ camera_zoom = Vector2(1.3, 1.3)
 notes = "The opening typed CAMERA/FRAME beat establishes the occupied cafe before isolating speakers. Its positive Y offset lifts the extended 2.5D ground and every depth lane above the dialogue strip.
 
 CutsceneActionPresenter owns the shared camera and view offset. No stage-local zoom signal or AnimationPlayer track duplicates that ownership."
+
+[sub_resource type="Resource" id="Beat_open_silence"]
+script = ExtResource("1_beat")
+start_seconds = 1.0
+duration_seconds = 0.6
+notes = "Held silence on the cafe framing before anybody speaks. The miner has just come through the ceiling into the one place the entire run has been walking toward, and the shot needs a moment for the player to read the sign over his head before a dialogue box covers the bottom of the frame.
+
+Longer than encounter 5's 0.6 on purpose. That shot had two people in it; this one has a building, four characters and a colony of rats, and it is worth the extra third of a second."
 
 [sub_resource type="Resource" id="Beat_frame_rutini"]
 script = ExtResource("1_beat")

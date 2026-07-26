@@ -9,6 +9,8 @@ signal return_requested
 @export_category("References")
 @export var return_button: Button
 @export var timing_window: TimingWindowTask
+@export var timing_window_feedback: TimingBarFeedback
+
 @export var mining_controller: MiningController
 
 const RETURN_BUTTON_SLIDE_PIXELS: float = 12.0
@@ -71,6 +73,7 @@ func _on_review_started() -> void:
 	mining_controller.set_swing_queue_paused(true)
 	timing_window.process_mode = Node.PROCESS_MODE_DISABLED
 	timing_window.hide()
+	timing_window_feedback.hide()
 	return_button.disabled = false
 	_fade_return_button_in()
 
@@ -83,6 +86,8 @@ func _on_miner_view_reached() -> void:
 	mining_controller.set_swing_queue_paused(false)
 	timing_window.process_mode = Node.PROCESS_MODE_INHERIT
 	timing_window.show()
+	timing_window_feedback.show()
+	
 
 
 ## Requests the accelerated return and prevents repeated clicks.

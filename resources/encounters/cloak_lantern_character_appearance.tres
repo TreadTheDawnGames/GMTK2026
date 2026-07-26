@@ -1,11 +1,15 @@
-[gd_resource type="Resource" script_class="CharacterAppearance" load_steps=4 format=3 uid="uid://dq5euoa1catq7"]
+[gd_resource type="Resource" script_class="CharacterAppearance" format=3 uid="uid://dq5euoa1catq7"]
 
 [ext_resource type="Script" uid="uid://bpg6fvsw6y7ai" path="res://resources/encounters/character_appearance.gd" id="1_appearance"]
 [ext_resource type="Texture2D" uid="uid://dvfe08c8l1d2" path="res://Assets/Characters/lantern_man/forboding_figure.png" id="2_texture"]
-[ext_resource type="Shader" path="res://Shaders/lantern_keeper_glow.gdshader" id="3_glow_shader"]
+[ext_resource type="Shader" uid="uid://d2hx8ur41tbim" path="res://Shaders/lantern_keeper_glow.gdshader" id="3_glow_shader"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_lantern_glow"]
 shader = ExtResource("3_glow_shader")
+shader_parameter/lantern_uv = Vector2(0.44, 0.566)
+shader_parameter/glow_color = Color(1, 0.62, 0.16, 1)
+shader_parameter/glow_radius = 0.3
+shader_parameter/glow_strength = 0.3
 
 [resource]
 script = ExtResource("1_appearance")

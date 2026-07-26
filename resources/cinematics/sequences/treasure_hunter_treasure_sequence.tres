@@ -7,17 +7,17 @@
 [sub_resource type="Resource" id="Beat_frame_contact"]
 script = ExtResource("1_g737l")
 kind = 11
-camera_zoom = Vector2(1.9, 1.9)
 blocks = false
+camera_zoom = Vector2(1.9, 1.9)
 notes = "The first drawn frame of the shot, snapped rather than tweened. play_opening runs immediately after the room has settled and the miner has been seated on the rock, so sequence time zero IS the moment of contact: pushing in here reads as the camera having ridden him down the shaft, and pulling back out over the next beat is what turns the landing into the discovery of the room. Duration zero because a tween from the neutral frame would show the push-in starting after he had already stopped. Non-blocking so the jolt, the reveal and the pull-out all run under one another instead of queueing."
 
 [sub_resource type="Resource" id="Beat_contact_shake"]
 script = ExtResource("1_g737l")
 kind = 11
 duration_seconds = 0.3
+blocks = false
 camera_action = 1
 camera_shake_strength = 11.0
-blocks = false
 notes = "The contact jolt, through the shared ImpactShake the pickaxe already uses rather than a second shake owner. It stacks with the dirt burst MiningSceneWiring already fires from the encounter-floor landing."
 
 [sub_resource type="Resource" id="Beat_contact_dust"]
@@ -50,9 +50,9 @@ script = ExtResource("1_g737l")
 kind = 11
 start_seconds = 0.3
 duration_seconds = 1.3
+blocks = false
 camera_offset = Vector2(75, 0)
 camera_zoom = Vector2(1.3, 1.3)
-blocks = false
 notes = "The pull-out. It eases from the tight contact frame to the shot the conversation is composed for, which is what makes the room arrive rather than merely be there. 75px centres the shared midpoint of the miner and the Treasure Hunter 150px to his right, the same half-the-separation rule Encounter 1 uses at 48px for 96px. 1.30 rather than Encounter 1's 1.40 because this shot carries a third subject: at 1.30 the frame reaches 443px right of centre, so the hoard's tail at roughly 400px runs off the edge exactly as section 6 asks - what is in shot is the near end of something bigger."
 
 [sub_resource type="Resource" id="Resource_celebrate"]
@@ -78,8 +78,8 @@ script = ExtResource("1_g737l")
 kind = 11
 start_seconds = 7.6
 duration_seconds = 0.9
-camera_action = 2
 blocks = false
+camera_action = 2
 notes = "The typed CAMERA/RESET move gives neutral framing back before he leaves, so the handoff to mining opens on the same view the run had before the shot. Pan and zoom return together through CutsceneActionPresenter, and a cancelled or failed encounter restores the same neutral state through reset_presentation rather than relying on this beat having run."
 
 [sub_resource type="Resource" id="Resource_leave"]

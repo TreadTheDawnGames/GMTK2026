@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="CutsceneSequence" load_steps=9 format=3]
+[gd_resource type="Resource" script_class="CutsceneSequence" format=3 uid="uid://fqe0274nn771"]
 
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_beat.gd" id="1_beat"]
-[ext_resource type="Resource" path="res://resources/dialogue/moody_teen_first_conversation.tres" id="2_dialogue"]
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_sequence.gd" id="3_sequence"]
+[ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="1_beat"]
+[ext_resource type="Resource" uid="uid://e5attao08g1g" path="res://resources/dialogue/moody_teen_first_conversation.tres" id="2_dialogue"]
+[ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="3_sequence"]
 
 [sub_resource type="Resource" id="Beat_show"]
 script = ExtResource("1_beat")
@@ -19,7 +19,6 @@ notes = "He looks left toward the miner and never changes direction."
 
 [sub_resource type="Resource" id="Beat_stare"]
 script = ExtResource("1_beat")
-kind = 4
 duration_seconds = 0.75
 notes = "A short silent discovery hold after landing. The remaining awkward pauses are the dialogue advances themselves."
 
