@@ -523,8 +523,8 @@ editor_description = "Animate this for whole-character bounce, squash, recoil, a
 
 [node name="DrawnMinerSprite" type="Sprite2D" parent="VisualRoot" unique_id=611169088]
 texture_filter = 2
-position = Vector2(0, 6)
-scale = Vector2(0.27, 0.27)
+position = Vector2(0, -20)
+scale = Vector2(0.203, 0.203)
 texture = ExtResource("2_6q48d")
 
 [node name="LandingFootAnchor" type="Marker2D" parent="VisualRoot" unique_id=410620658]
