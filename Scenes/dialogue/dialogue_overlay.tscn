@@ -130,7 +130,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 expand_mode = 1
-stretch_mode = 0
+stretch_mode = 5
 
 [node name="Margin" type="MarginContainer" parent="DialogueRoot/BottomPanel" unique_id=1636964935]
 layout_mode = 1
