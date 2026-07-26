@@ -116,6 +116,7 @@ func _finish_intro() -> void:
 func _on_start_button_pressed() -> void:
 	if _is_starting:
 		return
+
 	_is_starting = true
 	start_button.disabled = true
 	options_button.disabled = true
@@ -137,6 +138,8 @@ func _on_start_button_pressed() -> void:
 	set_process_unhandled_input(false)
 	await _fade_interface_out()
 	queue_free()
+
+	
 
 
 ## Takes every menu element off the live shot without touching the world.

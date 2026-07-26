@@ -114,6 +114,7 @@ var _drawn_is_recovering: bool = false
 
 ## Prepares the additive canvas and starts the idle state watch.
 func _ready() -> void:
+	combo_bar.value = 0.0
 	combo_bar.set_maximum(_combo_ceiling())
 	combo_bar.add_tick(_recovery_threshold())
 	timing_window.recovery_window.pressed.connect(_on_timing_pressed)

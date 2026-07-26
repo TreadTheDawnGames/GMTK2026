@@ -107,7 +107,7 @@ const MAX_PLAYABLE_DEPTH: int = 2_000_000_000
 @export_range(1.0, 10.0, 0.1) var maximum_stack_width_multiplier: float = 2.0
 @export_range(1.0, 10.0, 0.1) var maximum_stack_swing_speed_multiplier: float = 2.5
 @export_range(1.0, 10.0, 0.1) var maximum_stack_debris_multiplier: float = 3.0
-
+@export var use_secondary_recovery : bool = false
 
 ## Returns the practical coordinate ceiling for the otherwise endless mine.
 func get_bottom_surface_row() -> int:

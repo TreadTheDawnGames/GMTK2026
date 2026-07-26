@@ -26,6 +26,8 @@ enum SpecialEffect {
 @export_range(0.1, 5.0, 0.05) var swing_speed_multiplier: float = 1.0
 ## Multiplies the dirt pieces emitted at impact.
 @export_range(0.0, 5.0, 0.05) var debris_multiplier: float = 1.0
+## Toggles whether to use the secondary recovery bar
+@export var secondary_recovery : bool = false
 
 @export_category("Special Effect")
 @export var special_effect: SpecialEffect = SpecialEffect.NONE

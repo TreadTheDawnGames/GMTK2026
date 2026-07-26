@@ -159,7 +159,6 @@ func _mining_window_pressed(
 			mining_window.play_animation(Color.RED)
 
 var failed_recovery : bool = false
-var use_second_recovery : bool = false
 
 ## Resolves recovery and restarts the main timing bar.
 func _recovery_window_pressed(
@@ -180,7 +179,7 @@ func _recovery_window_pressed(
 	else:
 		#if failed
 		# we want one shot at additional recovery
-		if not failed_recovery and use_second_recovery:
+		if not failed_recovery and mining_config.use_secondary_recovery:
 			#This is our first failure
 			failed_recovery = true
 			_audio_handler.play_sound(AudioLibrary.MISS_WITH_SAVE)

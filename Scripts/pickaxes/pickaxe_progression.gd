@@ -16,22 +16,27 @@ signal target_unlocks_changed(definitions: Array[PickaxeDefinition])
 
 @export_category("Starting Equipment")
 @export var starter_pickaxe: PickaxeDefinition
+@export var use_debug_tool : bool = false
+
 const DEBUG_PICKAXE = preload("uid://bktf56q4v503t")
 
 var loadout: PickaxeLoadout
 
-
 ## Creates the run stack and applies its starting pickaxe.
 func _ready() -> void:
-	
-	if Input.is_action_pressed("aim_right") and OS.has_feature("editor"):
+	%DebugLabel.hide()
+
+	if use_debug_tool and OS.has_feature("editor"):
+		print("Running with Debug Tool")
 		starter_pickaxe = DEBUG_PICKAXE
+		%DebugLabel.show()
 	
 	loadout = PickaxeLoadout.new(starter_pickaxe)
 	if not loadout.equipped_changed.is_connected(
 		_apply_visible_pickaxe
 	):
 		loadout.equipped_changed.connect(_apply_visible_pickaxe)
+
 	_apply_stack()
 
 
@@ -60,4 +65,7 @@ func _apply_stack() -> void:
 func _apply_visible_pickaxe(definition: PickaxeDefinition) -> void:
 	if definition == null:
 		return
+	print("applying: ", definition.display_name)
 	miner_rig.set_hammer_head_color(definition.hammer_head_color)
+	mining_controller.config.use_secondary_recovery = definition.secondary_recovery
+	

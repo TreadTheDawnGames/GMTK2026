@@ -102,9 +102,6 @@ shader_parameter/sun_screen_position = Vector2(676, 284)
 shader_parameter/surface_screen_y = 260.0
 shader_parameter/viewport_size = Vector2(1152, 648)
 
-[sub_resource type="LabelSettings" id="LabelSettings_6ko1l"]
-font_size = 91
-
 [node name="GameRoot" type="Node" unique_id=1769413368]
 
 [node name="MiningScene" type="Node2D" parent="." unique_id=165087963]
@@ -243,24 +240,7 @@ script = ExtResource("19_pickaxe_progression")
 miner_rig = NodePath("../../MinerRig")
 mining_controller = NodePath("../MiningController")
 starter_pickaxe = ExtResource("20_basic_pickaxe")
-
-[node name="DebugLabel" type="Label" parent="MiningScene/Systems/PickaxeProgression" unique_id=978076157]
-unique_name_in_owner = true
-anchors_preset = 7
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_left = -578.0
-offset_top = -646.0
-offset_right = 575.0
-offset_bottom = -393.0
-grow_horizontal = 2
-grow_vertical = 0
-text = "pickaxeprogression
-is in debug mode"
-label_settings = SubResource("LabelSettings_6ko1l")
-uppercase = true
+use_debug_tool = true
 
 [node name="CinematicFlow" type="Node" parent="MiningScene/Systems" unique_id=1252243757 node_paths=PackedStringArray("timing_window", "mining_controller", "gameplay_hud", "impact_feedback_layer")]
 script = ExtResource("45_cinematic_flow")
