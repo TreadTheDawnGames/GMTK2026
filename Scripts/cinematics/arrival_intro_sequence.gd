@@ -22,7 +22,13 @@ extends Node2D
 signal arrival_finished
 signal attendant_picked_up
 
-const _AUDIO_HANDLER_PATH: NodePath = ^"/root/AudioHandler"
+var _audio_handler: PlayerAudioHandler
+
+
+## Receives the shared audio service from the mining composition root.
+func set_audio_handler(audio_handler: PlayerAudioHandler) -> void:
+	_audio_handler = audio_handler
+
 
 @export_category("References")
 @export var miner_rig: MinerRig
@@ -161,9 +167,6 @@ var _wheel_material: ShaderMaterial
 var _wheel_radius_pixels: float = 1.0
 var _wheel_spin_phase: float = 0.0
 var _previous_bus_x: float = 0.0
-@onready var _audio_handler: PlayerAudioHandler = (
-	get_node_or_null(_AUDIO_HANDLER_PATH) as PlayerAudioHandler
-)
 
 
 func _ready() -> void:

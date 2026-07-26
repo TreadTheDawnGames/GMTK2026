@@ -174,6 +174,9 @@ func _verify_mining_scene() -> void:
 	var scene_wiring := game_root.get_node_or_null(
 		"MiningScene/Systems/SceneWiring"
 	) as MiningSceneWiring
+	var run_intro_controller := game_root.get_node_or_null(
+		"MiningScene/Systems/RunIntroController"
+	) as RunIntroController
 	var mining_controller := game_root.get_node_or_null(
 		"MiningScene/Systems/MiningController"
 	) as MiningController
@@ -502,6 +505,13 @@ func _verify_mining_scene() -> void:
 		timing_window != null
 		and timing_window._audio_handler == audio_handler,
 		"SceneWiring must inject AudioHandler into TimingWindowTask."
+	)
+	_expect(
+		run_intro_controller != null
+		and run_intro_controller.arrival_sequence != null
+		and run_intro_controller.arrival_sequence._audio_handler
+			== audio_handler,
+		"SceneWiring must inject AudioHandler into ArrivalIntroSequence."
 	)
 	_expect(
 		TREASURE_HUNTER_APPEARANCE.pose_set != null

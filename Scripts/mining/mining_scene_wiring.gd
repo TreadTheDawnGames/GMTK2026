@@ -86,6 +86,9 @@ func _ready() -> void:
 	hud.set_save_game(_game_state.save_game)
 	miner_rig.set_audio_handler(_audio_handler)
 	timing_window.set_audio_handler(_audio_handler)
+	# The opening sequence owns bus playback, while this composition root owns
+	# the one discoverable dependency on the AudioHandler autoload.
+	run_intro_controller.arrival_sequence.set_audio_handler(_audio_handler)
 	# Built here rather than placed in the scene, because it owns one decision
 	# and no picture: two depths on the way to the Thief where the run's music
 	# dies and where the organ starts. Nothing else in the mining scene needs to
