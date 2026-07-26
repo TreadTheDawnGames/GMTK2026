@@ -14,8 +14,6 @@
 [ext_resource type="Resource" uid="uid://2g3sn8h0mk7t" path="res://resources/encounters/depth_encounter_config.tres" id="12_vtugv"]
 [ext_resource type="Shader" uid="uid://basjt8wi65bkp" path="res://Shaders/sunset_prop.gdshader" id="13_sunset_prop"]
 [ext_resource type="Texture2D" uid="uid://bkgia2xwepbwk" path="res://Assets/Terrain/grass_band.png" id="14_grass_band"]
-[ext_resource type="AudioStream" uid="uid://cxrfceg3n2vh0" path="res://Assets/Audio/SFX/Bus.wav" id="15_uvbvv"]
-[ext_resource type="AudioStream" uid="uid://bnf6pj6dv2rad" path="res://Assets/Audio/SFX/BusDriveAway.wav" id="16_ky7hn"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_grass_far"]
 resource_local_to_scene = true
@@ -92,13 +90,6 @@ shader_parameter/bounce_strength = 0.2
 shader_parameter/bounce_height = 0.28
 shader_parameter/haze_color = Color(1, 0.55, 0.3, 1)
 shader_parameter/haze_strength = 0.06
-
-[sub_resource type="AudioStreamSynchronized" id="AudioStreamSynchronized_6ko1l"]
-stream_count = 2
-stream_0/stream = ExtResource("15_uvbvv")
-stream_0/volume = 0.0
-stream_1/stream = ExtResource("16_ky7hn")
-stream_1/volume = -60.0
 
 [node name="ArrivalIntro" type="Node2D" unique_id=1350024243 node_paths=PackedStringArray("bus", "bus_sprite", "station", "attendant", "bus_arrival_anchor", "bus_stop_anchor", "bus_exit_anchor", "door_step_anchor", "bus_rear_edge_anchor", "miner_drop_off_anchor", "attendant_pickup_stop_anchor")]
 process_mode = 3
@@ -236,6 +227,3 @@ preview_in_editor = true
 
 [node name="TestImpacts" type="Node2D" parent="EditorTerrainPreview" unique_id=881216552]
 editor_description = "Empty on the surface: the arrival plays against intact ground. Add a Marker2D here to dig a real opening and check a prop against broken ground."
-
-[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=1665074781]
-stream = SubResource("AudioStreamSynchronized_6ko1l")

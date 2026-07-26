@@ -263,6 +263,12 @@ func begin() -> bool:
 func play_arrival() -> void:
 	if not _is_playing:
 		return
+
+	var bus_audio := AudioHandler.play_sound(AudioLibrary.BUS_FULL)
+	create_tween().tween_property(bus_audio, "volume_linear", 0.0, 0.0)
+	create_tween().tween_property(bus_audio, "volume_linear", 1, 1)
+	
+	
 	await _drive_bus_to(_bus_rest_position.x, bus_arrival_seconds, true)
 	if not _is_playing:
 		return
@@ -278,7 +284,10 @@ func play_arrival() -> void:
 	# someone standing there for the departure to pull away from.
 	_place_miner_at_drop_off()
 	_begin_bus_departure()
+	
+	create_tween().tween_property(bus_audio, "volume_linear", 0, 3)
 	await _await_prop_tween()
+
 	if not _is_playing:
 		return
 	if hold_before_dialogue_seconds > 0.0:
@@ -457,6 +466,7 @@ func _run_drive_past() -> void:
 	# first is also what keeps the pass in shot, since the road scrolls away
 	# behind him as he descends.
 	await _await_miner_below_ground()
+
 	await get_tree().create_timer(
 		maxf(drive_past_delay_seconds, 0.01),
 		true
@@ -467,6 +477,13 @@ func _run_drive_past() -> void:
 		bus_exit_anchor.position.x,
 		bus_stop_anchor.position.y
 	)
+	var bus_audio := AudioHandler.PlaySoundAtGlobalPosition(AudioLibrary.BUS, bus.global_position, bus)
+	bus_audio.volume_db = 0
+	var t : Tween = create_tween()
+	t.tween_property(bus_audio, "volume_linear", 0.0, 0.0)
+	t.tween_property(bus_audio, "volume_linear", 1.0, drive_past_seconds/2)
+	t.tween_property(bus_audio, "volume_linear", 0, drive_past_seconds/2)
+
 	_previous_bus_x = bus.position.x
 	_begin_ambient_pass()
 	await _drive_bus_to(
