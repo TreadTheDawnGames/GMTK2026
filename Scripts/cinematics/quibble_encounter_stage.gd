@@ -46,6 +46,18 @@ enum CoffeePhase {
 ## Which dialogue slot is Quibble's own. Exported rather than hard-coded so this
 ## stays in step with the encounter resource if the slot is ever renamed.
 @export var speaking_slot: StringName = &"coffee_cat"
+## The absolute draw order Quibble holds for the whole encounter.
+##
+## One, which is MinerRig's buried_draw_order and the stratum the miner occupies
+## while he is digging: behind the foreground rock at z 2 and in front of the
+## next one at z 0. Zephan's direction is that the cast belong in the ground the
+## same way the player does, rather than being cut out in front of it.
+##
+## This has to be absolute. DepthEncounterController lifts the whole CharacterLayer
+## to cutscene_draw_order for the duration of a shot, so a relative order would be
+## measured from that lift and land back in front of everything. Setting
+## z_as_relative off is what makes this number mean the stratum it names.
+@export_range(0, 16, 1) var cutscene_draw_order: int = 1
 
 var _motion_presenter: CharacterPresenter
 var _sprite_rest_position: Vector2
@@ -55,6 +67,9 @@ var _phase_elapsed_seconds: float = 0.0
 var _jitter_index: int = 0
 var _coffee_phase: CoffeePhase = CoffeePhase.WAITING
 var _is_speaking: bool = false
+var _restore_z_index: int = 0
+var _restore_z_as_relative: bool = true
+var _has_borrowed_draw_order: bool = false
 
 
 ## Takes stage ownership and starts the bounded actor-specific routine.
@@ -72,8 +87,35 @@ func prepare(
 	_jitter_index = 0
 	_coffee_phase = CoffeePhase.WAITING
 	_is_speaking = false
+	_borrow_cutscene_draw_order()
 	set_process(true)
 	return true
+
+
+## Puts Quibble on the miner's mining stratum for the length of the shot.
+##
+## Reversible, and it has to be: this presenter is the same node again at the
+## cafe, so an encounter that walked off leaving him on a borrowed layer would
+## take that layer to the gathering with him and nothing there would explain it.
+func _borrow_cutscene_draw_order() -> void:
+	if _has_borrowed_draw_order or not is_instance_valid(_motion_presenter):
+		return
+	_restore_z_index = _motion_presenter.z_index
+	_restore_z_as_relative = _motion_presenter.z_as_relative
+	_has_borrowed_draw_order = true
+	_motion_presenter.z_as_relative = false
+	_motion_presenter.z_index = cutscene_draw_order
+
+
+## Hands the authored draw order back exactly as it was found.
+func _return_cutscene_draw_order() -> void:
+	if not _has_borrowed_draw_order:
+		return
+	_has_borrowed_draw_order = false
+	if not is_instance_valid(_motion_presenter):
+		return
+	_motion_presenter.z_as_relative = _restore_z_as_relative
+	_motion_presenter.z_index = _restore_z_index
 
 
 ## Stops the coffee while Quibble's own line is on screen, and lets it run again
@@ -188,6 +230,7 @@ func _exit_tree() -> void:
 func _stop_quibble_motion() -> void:
 	set_process(false)
 	_is_speaking = false
+	_return_cutscene_draw_order()
 	if is_instance_valid(_motion_presenter):
 		_motion_presenter.character_sprite.position = _sprite_rest_position
 	_motion_presenter = null
