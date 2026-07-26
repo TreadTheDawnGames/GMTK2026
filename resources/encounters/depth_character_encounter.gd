@@ -95,6 +95,13 @@ extends Resource
 ## reads as a wall the cast stand in front of. It is separate from
 ## `dresses_trodden_floor` because form and dressing are separate choices.
 @export var lights_floor_as_plane: bool = false
+## Optional screen-space depth between the Miner and this encounter's cast.
+##
+## Negative preserves the established shared staging: gathering encounters use
+## the cafe depth and ordinary encounters share the cast's floor line. A
+## non-negative value lets one room move only the Miner toward the camera while
+## its visitor remains on the authored rear plane.
+@export_range(-1.0, 128.0, 1.0) var miner_cutscene_depth_offset_pixels: float = -1.0
 ## Replaces this encounter's procedural chamber with an authored sculpted room.
 ## Leave it null and terrain generation is unchanged.
 @export var terrain_sculpt: CutsceneTerrainSculpt
@@ -112,3 +119,12 @@ func resolve_chamber_height_rows(default_height_rows: int) -> int:
 	if chamber_height_rows_override > 0:
 		return chamber_height_rows_override
 	return maxi(default_height_rows, 1)
+
+
+## Resolves this room's Miner depth without changing legacy encounter staging.
+func resolve_miner_cutscene_depth_offset(
+	default_offset_pixels: float
+) -> float:
+	if miner_cutscene_depth_offset_pixels >= 0.0:
+		return miner_cutscene_depth_offset_pixels
+	return maxf(default_offset_pixels, 0.0)

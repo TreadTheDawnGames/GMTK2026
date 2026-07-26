@@ -608,10 +608,13 @@ func _begin_active_encounter() -> void:
 		# contour. MinerRig owns its own measured overlap contract, so undo only
 		# that cast lift and hand it the raw terrain support. This keeps every
 		# cutscene on the same footing as surface play and ordinary mining.
-		var miner_depth_offset := (
+		var default_miner_depth_offset := (
 			CAFE_MINER_DEPTH_OFFSET_PIXELS
 			if _is_gathering_encounter(_active_encounter_index)
 			else 0.0
+		)
+		var miner_depth_offset := encounter.resolve_miner_cutscene_depth_offset(
+			default_miner_depth_offset
 		)
 		miner_rig.seat_landing_foot_at_screen_y(
 			floor_sampler.call(miner_rig.get_landing_foot_screen_x())

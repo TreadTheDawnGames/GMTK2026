@@ -129,6 +129,10 @@ uniform float foreground_gem_maximum_height = 42.0;
 // chunk_world_size, so it is independent of mask resolution.
 // Snaps the filtered mask back to a crisp cut edge instead of a soft ramp.
 uniform bool sharpen_mask_edges = true;
+// Authored rooms can widen the derivative AA band without changing ordinary
+// mining masks. The renderer keeps this at one unless an overlapping sculpt
+// explicitly requests cell-scale contour rounding.
+uniform float authored_contour_aa_scale = 1.0;
 
 uniform bool use_layer_edge_shading = true;
 uniform float edge_shade_world_pixels = 6.0;
@@ -1028,7 +1032,10 @@ void fragment() {
 	// not. Neighbour taps below intentionally keep reading the raw ramp,
 	// because the bevel wants the gradual falloff this removes here.
 	if (sharpen_mask_edges) {
-		float alpha_softness = max(fwidth(mask_alpha), 0.0001);
+		float alpha_softness = max(
+			fwidth(mask_alpha) * authored_contour_aa_scale,
+			0.0001
+		);
 		mask_alpha = smoothstep(
 			0.5 - alpha_softness * cut_aa_half_width,
 			0.5 + alpha_softness * cut_aa_half_width,
@@ -1128,7 +1135,7 @@ void fragment() {
 		// that threshold over one screen pixel. A binary step here was the
 		// remaining source of stair-stepped ink even with a dense terrain mask.
 		vec4 neighbor_softness = max(
-			fwidth(neighbor_alpha),
+			fwidth(neighbor_alpha) * authored_contour_aa_scale,
 			vec4(0.0001)
 		);
 		vec4 solid_neighbor = smoothstep(
@@ -1158,7 +1165,7 @@ void fragment() {
 				UV + open_direction / open_direction_length * edge_step
 			).a;
 			float projected_softness = max(
-				fwidth(projected_alpha),
+				fwidth(projected_alpha) * authored_contour_aa_scale,
 				0.0001
 			);
 			projected_solid_neighbor = smoothstep(
