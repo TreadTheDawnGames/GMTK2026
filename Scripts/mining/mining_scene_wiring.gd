@@ -410,6 +410,10 @@ func _ready() -> void:
 		rat_colony_followers.activate_followers
 	)
 	_connect_once(
+		encounter_controller.rat_colony_support_requested_leave,
+		rat_colony_followers.deactivate_followers
+	)
+	_connect_once(
 		credits_overlay.credits_completed,
 		encounter_controller._on_credits_completed
 	)

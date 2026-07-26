@@ -66,11 +66,21 @@ script = ExtResource("2_q3b56")
 tracks = Array[AudioStream]([ExtResource("16_uk2l4"), ExtResource("17_i3qdj"), ExtResource("18_brern"), ExtResource("19_ynokk")])
 metadata/_custom_type_script = "uid://s4frj7oy6eh"
 
+[sub_resource type="AudioStreamPlaylist" id="AudioStreamPlaylist_ccwyb"]
+stream_count = 2
+stream_0 = ExtResource("3_ccwyb")
+stream_1 = ExtResource("4_3clkn")
+
 [node name="MusicManager" type="Node" unique_id=1863380187]
 process_mode = 3
 script = ExtResource("1_a0ngj")
 tracks = Array[ExtResource("2_q3b56")]([SubResource("Resource_ikl7l"), SubResource("Resource_hmpdo"), SubResource("Resource_65g0b"), SubResource("Resource_nmsjp"), SubResource("Resource_libwa"), SubResource("Resource_8ytv7")])
 fills = Array[AudioStream]([ExtResource("17_knyyj"), ExtResource("18_4e8v3"), ExtResource("19_md4lg"), ExtResource("20_ccwyb"), ExtResource("21_3clkn"), ExtResource("22_hpsl2"), ExtResource("23_clf6b"), ExtResource("24_tso0d"), ExtResource("25_hva2u"), ExtResource("26_462tb")])
+playlist = SubResource("AudioStreamPlaylist_ccwyb")
+
+[node name="MasterMusic" type="AudioStreamPlayer" parent="." unique_id=41980090]
+unique_name_in_owner = true
+stream = SubResource("AudioStreamPlaylist_ccwyb")
 
 [node name="Track1" type="AudioStreamPlayer" parent="." unique_id=1408430976]
 unique_name_in_owner = true

@@ -19,6 +19,7 @@ signal final_encounter_reached(encounter_id: StringName)
 signal encounter_completed(encounter_index: int)
 signal coffee_speed_boost_requested
 signal rat_colony_support_requested
+signal rat_colony_support_requested_leave
 signal character_stage_strike_requested(screen_position: Vector2)
 signal stampede_rumble_started(strength_px: float)
 signal stampede_rumble_finished
@@ -1232,6 +1233,11 @@ func _prepare_authored_characters() -> bool:
 						.persistent_colony_requested,
 					_on_persistent_colony_requested
 				)
+			elif encounter.ends_rat_colony_support:
+				_connect_once(
+					encounter.persistent_colony_requested_leave,
+					_on_persistent_colony_requested_leave
+				)
 		_stages.append(stage)
 	for actor_id in encounter_config.gathering_actor_ids:
 		if not _presenters_by_actor_id.has(actor_id):
@@ -1510,6 +1516,9 @@ func _on_character_stage_vfx_action_requested(
 ## Relays the clean stage transition through the cross-system wiring boundary.
 func _on_persistent_colony_requested() -> void:
 	rat_colony_support_requested.emit()
+
+func _on_persistent_colony_requested_leave() -> void:
+	rat_colony_support_requested_leave.emit()
 
 
 ## Restores reversible stage state and skips malformed authored dialogue.

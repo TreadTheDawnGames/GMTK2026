@@ -1,11 +1,11 @@
-[gd_resource type="Resource" script_class="DepthCharacterEncounter" format=3]
+[gd_resource type="Resource" script_class="DepthCharacterEncounter" format=3 uid="uid://36op0l6c3fj2"]
 
-[ext_resource type="Script" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
-[ext_resource type="Resource" path="res://resources/encounters/cloak_lantern_character_appearance.tres" id="2_appearance"]
-[ext_resource type="Resource" path="res://resources/dialogue/cafe_gathering_conversation.tres" id="3_dialogue"]
-[ext_resource type="PackedScene" path="res://Scenes/cinematics/cafe_gathering_encounter_stage.tscn" id="4_3ct70"]
-[ext_resource type="Resource" path="res://resources/cinematics/sequences/cafe_gathering_sequence.tres" id="4_57dlj"]
-[ext_resource type="Resource" path="res://resources/cinematics/sculpts/cafe_gathering_room.tres" id="6_57dlj"]
+[ext_resource type="Script" uid="uid://sqs37vj87ep8" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
+[ext_resource type="Resource" uid="uid://dq5euoa1catq7" path="res://resources/encounters/cloak_lantern_character_appearance.tres" id="2_appearance"]
+[ext_resource type="Resource" uid="uid://btlq5nsfh84a6" path="res://resources/dialogue/cafe_gathering_conversation.tres" id="3_dialogue"]
+[ext_resource type="PackedScene" uid="uid://bel0rbfjitp3o" path="res://Scenes/cinematics/cafe_gathering_encounter_stage.tscn" id="4_3ct70"]
+[ext_resource type="Resource" uid="uid://bls5tpjbahtrq" path="res://resources/cinematics/sequences/cafe_gathering_sequence.tres" id="4_57dlj"]
+[ext_resource type="Resource" uid="uid://dtuho3k8kfiu1" path="res://resources/cinematics/sculpts/cafe_gathering_room.tres" id="6_57dlj"]
 
 [resource]
 script = ExtResource("1_encounter")
@@ -22,7 +22,9 @@ prestage_before_landing = true
 cinematic_focus_viewport_y_ratio = 0.72
 cinematic_bar_height_ratio = 0.08
 post_cinematic_recession_ratio = 0.06
+speaker_slot = &"cloak_lantern"
+locks_speaker_pose_after = null
+ends_rat_colony_support = true
 dresses_trodden_floor = true
 lights_floor_as_plane = true
-speaker_slot = &"cloak_lantern"
 terrain_sculpt = ExtResource("6_57dlj")

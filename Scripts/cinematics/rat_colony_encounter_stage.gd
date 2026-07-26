@@ -17,7 +17,7 @@ const RatAppearanceType = preload(
 )
 
 ## Requests the separate gameplay colony only after the encounter closes cleanly.
-signal persistent_colony_requested
+signal persistent_colony_requested()
 ## The horde has started pouring through. Whoever owns the miner floors him.
 signal stampede_started
 ## The last of them is off screen. The miner can get up.

@@ -17,6 +17,8 @@ var beats_per_measure : int = 4
 @onready var track_1: AudioStreamPlayer = %Track1
 @onready var track_2: AudioStreamPlayer = %Track2
 @onready var track_3: AudioStreamPlayer = %Track3
+@onready var master_music: AudioStreamPlayer = %MasterMusic
+@export var playlist : AudioStreamPlaylist
 
 var music_intensity : int = 0 : 
 	set(value):
@@ -26,6 +28,8 @@ var current_intensity : int = 0
 var fill_playing : bool = false
 
 func _ready() -> void:
+	#master_music.stream = playlist
+	#playlist.set_list_stream()
 	Conductor.set_song(tracks[0].first(), bpm, beats_per_measure)
 	Conductor.play()
 	Conductor.finished.connect(_transition_to)

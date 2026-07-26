@@ -1,45 +1,41 @@
-[gd_scene load_steps=26 format=3]
+[gd_scene format=3 uid="uid://bel0rbfjitp3o"]
 
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
 [ext_resource type="Script" uid="uid://7qy8qeox17tk" path="res://Scripts/cinematics/cutscene_actor_preview.gd" id="2_preview"]
 [ext_resource type="PackedScene" path="res://Scenes/props/das_queso_cafe.tscn" id="5_cafe"]
-[ext_resource type="PackedScene" path="res://Scenes/props/cafe_stool_flat.tscn" id="13_stool_flat"]
-[ext_resource type="PackedScene" path="res://Scenes/props/cafe_table.tscn" id="14_table_depth"]
-[ext_resource type="PackedScene" path="res://Scenes/props/cafe_stool.tscn" id="20_chair_depth"]
 [ext_resource type="Script" uid="uid://bpg6fvsw6y7ai" path="res://resources/encounters/character_appearance.gd" id="6_appearance"]
 [ext_resource type="Texture2D" uid="uid://bq8qwl3xn5qny" path="res://Assets/Characters/miner_idle-Pickaxe.png" id="7_miner"]
 [ext_resource type="Resource" uid="uid://dq5euoa1catq7" path="res://resources/encounters/cloak_lantern_character_appearance.tres" id="8_lantern"]
-[ext_resource type="Resource" path="res://resources/encounters/treasure_hunter_character_appearance.tres" id="9_treasure"]
+[ext_resource type="Resource" uid="uid://3qhs3t5ixptj" path="res://resources/encounters/treasure_hunter_character_appearance.tres" id="9_treasure"]
 [ext_resource type="Resource" uid="uid://ckltv12x6klri" path="res://resources/encounters/rutini_character_appearance.tres" id="10_rutini"]
-[ext_resource type="Resource" path="res://resources/encounters/coffee_cat_character_appearance.tres" id="11_quibble"]
+[ext_resource type="Resource" uid="uid://bc1ilyydfavn" path="res://resources/encounters/coffee_cat_character_appearance.tres" id="11_quibble"]
 [ext_resource type="Resource" uid="uid://bls5tpjbahtrq" path="res://resources/cinematics/sequences/cafe_gathering_sequence.tres" id="12_sequence"]
-[ext_resource type="Script" path="res://Scripts/cinematics/cafe_gathering_encounter_stage.gd" id="15_cafe_stage"]
-[ext_resource type="Shader" path="res://Shaders/cafe_speaker_highlight.gdshader" id="16_coco_shader"]
+[ext_resource type="PackedScene" path="res://Scenes/props/cafe_stool_flat.tscn" id="13_stool_flat"]
+[ext_resource type="PackedScene" path="res://Scenes/props/cafe_table.tscn" id="14_table_depth"]
+[ext_resource type="Script" uid="uid://ccg5lj1t0xk1y" path="res://Scripts/cinematics/cafe_gathering_encounter_stage.gd" id="15_cafe_stage"]
+[ext_resource type="Shader" uid="uid://ckb4iw32mvxg" path="res://Shaders/cafe_speaker_highlight.gdshader" id="16_coco_shader"]
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/rat_miner.tscn" id="18_rat"]
 [ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_clump.tres" id="19_rat_clump"]
+[ext_resource type="PackedScene" path="res://Scenes/props/cafe_stool.tscn" id="20_chair_depth"]
 [ext_resource type="Resource" path="res://resources/encounters/moody_teen_character_appearance.tres" id="22_moody_teen"]
-[ext_resource type="Texture2D" path="res://Assets/Props/cafe_cup.png" id="23_cup"]
+[ext_resource type="Texture2D" uid="uid://dhqoean1hswx3" path="res://Assets/Props/cafe_cup.png" id="23_cup"]
 
-[sub_resource type="Resource" id="Resource_miner_preview"]
-script = ExtResource("6_appearance")
-texture = ExtResource("7_miner")
-sprite_scale = Vector2(0.203, 0.203)
-sprite_offset = Vector2(0, -88)
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_coco_speaker"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_you84"]
 resource_local_to_scene = true
 shader = ExtResource("16_coco_shader")
+shader_parameter/coco_speaking = 0.0
+shader_parameter/speaking_color = Color(1, 0.72, 0.24, 1)
 
 [sub_resource type="Animation" id="Animation_reset"]
 resource_name = "RESET"
 length = 0.001
 
-[sub_resource type="Animation" id="Animation_opening"]
-resource_name = "opening"
-length = 0.01
-
 [sub_resource type="Animation" id="Animation_closing"]
 resource_name = "closing"
+length = 0.01
+
+[sub_resource type="Animation" id="Animation_opening"]
+resource_name = "opening"
 length = 0.01
 
 [sub_resource type="AnimationLibrary" id="AnimationLibrary_cafe"]
@@ -49,7 +45,13 @@ _data = {
 &"opening": SubResource("Animation_opening")
 }
 
-[node name="CafeGatheringEncounterStage" instance=ExtResource("1_stage")]
+[sub_resource type="Resource" id="Resource_miner_preview"]
+script = ExtResource("6_appearance")
+texture = ExtResource("7_miner")
+sprite_scale = Vector2(0.203, 0.203)
+sprite_offset = Vector2(0, -88)
+
+[node name="CafeGatheringEncounterStage" unique_id=1611677733 instance=ExtResource("1_stage")]
 editor_description = "Encounter 9, depth 14,000: the Cheese Cafe. The latest supplied composition drawing is the spatial authority.
 
 LEFT TO RIGHT: the Lantern Keeper is the far-left endpoint; Treasure Hunter and the rat crowd occupy the left-middle; the Miner lands in front-middle; Rotini and the separate dining table sit in the centre-right; Moody Teen stands behind that dining set; and the enlarged cafe is the right-middle anchor. Coco is painted into its serving window, exactly two stools sit under the sill, and Quibble occupies the right stool.
@@ -71,7 +73,6 @@ script = ExtResource("15_cafe_stage")
 opening_move_seconds = 0.4
 closing_move_seconds = 1.2
 opening_step_height = 5.0
-conversation_pose = &"idle"
 hide_actor_after_closing = true
 closing_fade_seconds = 1.2
 entrance_facing = -1
@@ -102,31 +103,31 @@ position = Vector2(-530, 58)
 editor_description = "His own mark. He does not leave by walking - Closing Fade Seconds hops him once and fades him out where he stands, which is Zephan's 'and then he goes shoom' and the same departure his warning at 5,600 uses."
 position = Vector2(-530, 58)
 
-[node name="cheese_girl" type="Marker2D" parent="ActorMarkers" index="5"]
+[node name="cheese_girl" type="Marker2D" parent="ActorMarkers" index="5" unique_id=311881947]
 editor_description = "The serving window, 20px right of the storefront's centre, where she is painted. Her presenter is placed here and left HIDDEN, because Actors Drawn Into Set names her. The mark exists so the schedule has somewhere to say she is and so the roster's left-to-right order stays true. Named for her actor id, which is how DepthEncounterController finds it and how an ordinary text search for the character finds her mark along with everything else about her."
 position = Vector2(191, 12)
 
-[node name="treasure_hunter" type="Marker2D" parent="ActorMarkers" index="6"]
+[node name="treasure_hunter" type="Marker2D" parent="ActorMarkers" index="6" unique_id=1011589624]
 editor_description = "In front of the colony in the left-middle, holding his no_pickaxe pose as drawn. The Miner and cafe are to his right."
 position = Vector2(-300, 54)
 
-[node name="rutini" type="Marker2D" parent="ActorMarkers" index="7"]
+[node name="rutini" type="Marker2D" parent="ActorMarkers" index="7" unique_id=1395643579]
 editor_description = "Immediately left of the cafe, seated behind the left chair at the separate dining table as Zephan dictated. His lowered 30px lane settles him into the chair while remaining behind its 36px foreground base."
 position = Vector2(-70, 30)
 
-[node name="coffee_cat" type="Marker2D" parent="ActorMarkers" index="8"]
+[node name="coffee_cat" type="Marker2D" parent="ActorMarkers" index="8" unique_id=1477348919]
 editor_description = "ON THE RIGHT-HAND STOOL, IN FRONT OF THE CAFE WINDOW. Zephan's layout: two stools stand at the serving window Cheese Girl is painted in, and the cat sits on the right one with the coffee he has been carrying since 9,200. The cat and stool share the 12px rear lane; the stool's foreground draw order hides the standing-only art below its seat so Quibble reads as sitting without changing his shared grounding elsewhere."
 position = Vector2(235, 12)
 
-[node name="cloak_lantern" type="Marker2D" parent="ActorMarkers" index="9"]
+[node name="cloak_lantern" type="Marker2D" parent="ActorMarkers" index="9" unique_id=25536306]
 editor_description = "The identity-aware gathering mark for the stage's own visitor. It matches the far-left Conversation mark so the final camera cue resolves the Keeper rather than the fallback spread."
 position = Vector2(-530, 58)
 
-[node name="moody_teen" type="Marker2D" parent="ActorMarkers" index="10"]
+[node name="moody_teen" type="Marker2D" parent="ActorMarkers" index="10" unique_id=179349102]
 editor_description = "Moody Teen's identity-aware gathering mark. His reusable run-wide presenter stands in the Y 6 rear lane behind the Y 36 dining furniture, matching Eve's background silhouette."
 position = Vector2(20, 6)
 
-[node name="DasQuesoCafe" parent="PropMarkers" index="0" instance=ExtResource("5_cafe")]
+[node name="DasQuesoCafe" parent="PropMarkers" index="0" unique_id=1312626718 instance=ExtResource("5_cafe")]
 editor_description = "THE LARGE RIGHT-MIDDLE ANCHOR from Zephan's paper layout and verbatim direction. The door remains on the building's left and the serving window Coco is painted in remains on its right.
 
 SCALE AND THE ROOM ARE ONE DECISION. 0.16 is another 25 percent increase over the previous 0.12836 pass and makes the 1558px-tall drawing about 249px tall before camera zoom. Its room is re-carved to a 32-cell base clearance in the same change.
@@ -137,89 +138,86 @@ Z -1, WHICH IS A NUMBER RATHER THAN A TIE. The room now orders strictly: storefr
 
 It sat at 0, the same plane as its own stools, on the assumption that equal z falls back to tree order and index 0 draws first. It does not do so reliably for nodes added to an INHERITED scene, where the index is a hint rather than the child order - and the building drew over its own stools and table, which vanished. Quibble stayed visible only because the cast are a plane in front. Ordering that depends on tree position is ordering that breaks the next time somebody adds a prop. Re-run local_tests/carve_cafe_gathering_room.gd after changing this scale; it refuses to save rather than put the shop's roof in the stone."
 z_index = -1
-material = SubResource("ShaderMaterial_coco_speaker")
+material = SubResource("ShaderMaterial_you84")
 position = Vector2(170, 0)
 scale = Vector2(0.16, 0.16)
 
-[node name="CafeStoolWindowLeft" parent="PropMarkers" index="2" instance=ExtResource("13_stool_flat")]
+[node name="CafeStoolWindowLeft" parent="PropMarkers" index="1" unique_id=1929332073 instance=ExtResource("13_stool_flat")]
 editor_description = "The empty left stool directly under the serving sill. Two stools remain the explicit ruling even though the composition sketch draws a third."
-z_index = 0
 position = Vector2(191, 12)
 scale = Vector2(0.121, 0.121)
 
-[node name="CafeStoolWindowRight" parent="PropMarkers" index="3" instance=ExtResource("13_stool_flat")]
+[node name="CafeStoolWindowRight" parent="PropMarkers" index="2" unique_id=1328643317 instance=ExtResource("13_stool_flat")]
 editor_description = "Quibble's stool. It draws one plane in front of the cat so its seat hides the lower part of his standing-only art; together with the cat's lowered root, that overlap reads as sitting rather than hovering."
 z_index = 1
 position = Vector2(235, 12)
 scale = Vector2(0.121, 0.121)
 
-[node name="DiningChairLeft" parent="PropMarkers" index="4" instance=ExtResource("20_chair_depth")]
+[node name="DiningChairLeft" parent="PropMarkers" index="3" unique_id=590675238 instance=ExtResource("20_chair_depth")]
 editor_description = "Rotini's dining chair, left of the separate table and 36px into the shader's lit middle shelf. This is not one of the two flat stools under the cafe window."
-z_index = 0
 position = Vector2(-70, 36)
 
-[node name="DiningChairRight" parent="PropMarkers" index="5" instance=ExtResource("20_chair_depth")]
+[node name="DiningChairRight" parent="PropMarkers" index="4" unique_id=724046852 instance=ExtResource("20_chair_depth")]
 editor_description = "The second chair Zephan drew at the separate centre table. It shares the left chair's foreground contact lane and remains distinct from the cafe's exactly two window stools."
-z_index = 0
 position = Vector2(30, 36)
 
-[node name="DiningTable" parent="PropMarkers" index="6" instance=ExtResource("14_table_depth")]
+[node name="DiningTable" parent="PropMarkers" index="5" unique_id=1519577406 instance=ExtResource("14_table_depth")]
 editor_description = "The separate three-quarter dining table immediately left of the cafe, in the centre of the whole area as Zephan dictated. Unlike the flat window stools, this is the perspective table assigned to the middle ground lane. Its base stands 36px into the 72px lit shelf and draws in front of seated Rotini."
 z_index = 1
 position = Vector2(-20, 36)
 
-[node name="DiningCup" type="Sprite2D" parent="PropMarkers" index="7"]
+[node name="DiningCup" type="Sprite2D" parent="PropMarkers" index="6" unique_id=455691244]
 editor_description = "The supplied blue cup on Rotini's separate dining table. Its feet and scaling are authored against the perspective tabletop rather than either of the two cafe-window stools."
-texture_filter = 4
 z_index = 2
+texture_filter = 4
 position = Vector2(-20, -24)
 scale = Vector2(0.025, 0.025)
 texture = ExtResource("23_cup")
 
-[node name="RatCrowd" type="Node2D" parent="PropMarkers" index="8"]
+[node name="RatCrowd" type="Node2D" parent="PropMarkers" index="7" unique_id=1910182028]
 editor_description = "A bounded cafe-only rat mass behind Treasure Hunter. Five clump actors depict 120 rats while three foreground singles break up the repeated silhouette. Runtime never adds to this authored eight-node pool."
 
-[node name="ClumpBackLeft" parent="PropMarkers/RatCrowd" index="0" instance=ExtResource("18_rat")]
+[node name="ClumpBackLeft" parent="PropMarkers/RatCrowd" index="0" unique_id=984873183 instance=ExtResource("18_rat")]
 z_index = -1
 position = Vector2(-270, 6)
 scale = Vector2(1.05, 1.05)
 default_appearance = ExtResource("19_rat_clump")
 
-[node name="ClumpBackCentre" parent="PropMarkers/RatCrowd" index="1" instance=ExtResource("18_rat")]
+[node name="ClumpBackCentre" parent="PropMarkers/RatCrowd" index="1" unique_id=790893077 instance=ExtResource("18_rat")]
 z_index = -1
 position = Vector2(-205, 2)
 scale = Vector2(1.1, 1.1)
 default_appearance = ExtResource("19_rat_clump")
 
-[node name="ClumpBackRight" parent="PropMarkers/RatCrowd" index="2" instance=ExtResource("18_rat")]
+[node name="ClumpBackRight" parent="PropMarkers/RatCrowd" index="2" unique_id=1946112016 instance=ExtResource("18_rat")]
 z_index = -1
 position = Vector2(-140, 8)
 scale = Vector2(1.05, 1.05)
 default_appearance = ExtResource("19_rat_clump")
 
-[node name="ClumpMidLeft" parent="PropMarkers/RatCrowd" index="3" instance=ExtResource("18_rat")]
+[node name="ClumpMidLeft" parent="PropMarkers/RatCrowd" index="3" unique_id=1705355549 instance=ExtResource("18_rat")]
 z_index = -1
 position = Vector2(-245, 22)
 scale = Vector2(1.18, 1.18)
 default_appearance = ExtResource("19_rat_clump")
 
-[node name="ClumpMidRight" parent="PropMarkers/RatCrowd" index="4" instance=ExtResource("18_rat")]
+[node name="ClumpMidRight" parent="PropMarkers/RatCrowd" index="4" unique_id=713768045 instance=ExtResource("18_rat")]
 z_index = -1
 position = Vector2(-165, 26)
 scale = Vector2(1.18, 1.18)
 default_appearance = ExtResource("19_rat_clump")
 
-[node name="RatFrontLeft" parent="PropMarkers/RatCrowd" index="5" instance=ExtResource("18_rat")]
+[node name="RatFrontLeft" parent="PropMarkers/RatCrowd" index="5" unique_id=686298042 instance=ExtResource("18_rat")]
 z_index = 0
 position = Vector2(-335, 50)
 scale = Vector2(0.78, 0.78)
 
-[node name="RatFrontCentre" parent="PropMarkers/RatCrowd" index="6" instance=ExtResource("18_rat")]
+[node name="RatFrontCentre" parent="PropMarkers/RatCrowd" index="6" unique_id=380703103 instance=ExtResource("18_rat")]
 z_index = 0
 position = Vector2(-200, 58)
 scale = Vector2(0.82, 0.82)
 
-[node name="RatFrontRight" parent="PropMarkers/RatCrowd" index="7" instance=ExtResource("18_rat")]
+[node name="RatFrontRight" parent="PropMarkers/RatCrowd" index="7" unique_id=1554556645 instance=ExtResource("18_rat")]
 z_index = 0
 position = Vector2(-125, 64)
 scale = Vector2(0.76, 0.76)
@@ -232,7 +230,7 @@ editor_description = "Previews cafe_gathering at its authored depth."
 encounter_id = &"cafe_gathering"
 preview_depth_rows = 14000
 
-[node name="Miner" type="Node2D" parent="." index="5"]
+[node name="Miner" type="Node2D" parent="." index="5" unique_id=628400576]
 editor_description = "The foreground Miner landing preview. Runtime starts on the rear support line, then DepthEncounterController settles his sole 56px down the visible shader plane. Editor-only; it frees itself before a running game can pay for it."
 z_index = 1
 position = Vector2(-176, 56)
@@ -241,7 +239,7 @@ actor_id = &"miner"
 appearance = SubResource("Resource_miner_preview")
 metadata/_edit_group_ = true
 
-[node name="treasure_hunter" type="Node2D" parent="." index="6"]
+[node name="treasure_hunter" type="Node2D" parent="." index="6" unique_id=46207624]
 editor_description = "Standing in front of the left-middle rat crowd with nothing left to carry. no_pickaxe is the pose his own art already has for exactly this - he gave the second one away at 7,400 - and it is the only visual in the shot that says his story finished."
 z_index = 1
 position = Vector2(-300, 54)
@@ -251,7 +249,7 @@ appearance = ExtResource("9_treasure")
 pose = &"no_pickaxe"
 metadata/_edit_group_ = true
 
-[node name="rutini" type="Node2D" parent="." index="7"]
+[node name="rutini" type="Node2D" parent="." index="7" unique_id=2010335917]
 editor_description = "At the separate dining table immediately left of the enlarged right-middle cafe."
 z_index = 1
 position = Vector2(-70, 30)
@@ -260,7 +258,7 @@ actor_id = &"rutini"
 appearance = ExtResource("10_rutini")
 metadata/_edit_group_ = true
 
-[node name="coffee_cat" type="Node2D" parent="." index="8"]
+[node name="coffee_cat" type="Node2D" parent="." index="8" unique_id=970809876]
 editor_description = "Seated on the right-hand stool. The shared art has no seated pose, so this stage lowers it into the seat and lets the stool's z 2 top edge occlude the lower body. That is deliberately local: changing the appearance would sink Quibble into the floor at 9,200 and everywhere else."
 z_index = 1
 position = Vector2(235, 12)
@@ -270,7 +268,7 @@ appearance = ExtResource("11_quibble")
 pose = &"hold_cup"
 metadata/_edit_group_ = true
 
-[node name="cloak_lantern" type="Node2D" parent="." index="9"]
+[node name="cloak_lantern" type="Node2D" parent="." index="9" unique_id=991461357]
 z_index = 1
 position = Vector2(-530, 58)
 script = ExtResource("2_preview")
@@ -279,13 +277,10 @@ appearance = ExtResource("8_lantern")
 pose = &"idle"
 metadata/_edit_group_ = true
 
-[node name="moody_teen" type="Node2D" parent="." index="10"]
+[node name="moody_teen" type="Node2D" parent="." index="10" unique_id=2038495639]
 editor_description = "Behind the centre-right dining set at the same Y 6 rear depth used by the runtime presenter. The Y 36 table and chair sit lower and therefore correctly overlap him in the 2.5D composition."
 position = Vector2(20, 6)
 script = ExtResource("2_preview")
 actor_id = &"moody_teen"
 appearance = ExtResource("22_moody_teen")
 metadata/_edit_group_ = true
-
-[editable path="ActorMarkers"]
-[editable path="PropMarkers"]

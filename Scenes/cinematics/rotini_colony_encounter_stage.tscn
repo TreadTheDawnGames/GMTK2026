@@ -1,11 +1,11 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene format=3 uid="uid://bc6e0o4a8dol7"]
 
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/rat_colony_encounter_stage.tscn" id="1_stage"]
 [ext_resource type="Script" uid="uid://7qy8qeox17tk" path="res://Scripts/cinematics/cutscene_actor_preview.gd" id="2_preview"]
 [ext_resource type="Resource" uid="uid://ckltv12x6klri" path="res://resources/encounters/rutini_character_appearance.tres" id="3_rutini"]
 [ext_resource type="Script" uid="uid://bpg6fvsw6y7ai" path="res://resources/encounters/character_appearance.gd" id="4_appearance"]
 [ext_resource type="Texture2D" uid="uid://bq8qwl3xn5qny" path="res://Assets/Characters/miner_idle-Pickaxe.png" id="5_miner"]
-[ext_resource type="Script" path="res://Scripts/cinematics/cinematic_rat_appearance.gd" id="6_rat_appearance"]
+[ext_resource type="Script" uid="uid://bnwk2upes76ot" path="res://Scripts/cinematics/cinematic_rat_appearance.gd" id="6_rat_appearance"]
 [ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_brown.tres" id="8_brown"]
 [ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_grey.tres" id="9_grey"]
 [ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_white.tres" id="10_white"]
@@ -16,25 +16,27 @@ texture = ExtResource("5_miner")
 sprite_scale = Vector2(0.203, 0.203)
 sprite_offset = Vector2(0, -88)
 
-[node name="RotiniColonyEncounterStage" instance=ExtResource("1_stage")]
+[node name="RotiniColonyEncounterStage" unique_id=164779342 instance=ExtResource("1_stage")]
 editor_description = "Encounter 8, Rotini and the Colony, depth 11,200. The mirror of his introduction: Rotini arrives from the LEFT and holds the conversation on the miner's LEFT. Nothing moves when the frame opens. On \"Come on boys! Dig!\", twenty-four normal-size individual mice flood into four depth lanes, take deterministic work roots across both halves of the floor, and start swinging without entering the miner's protected 132px center lane. Clump drawings are deliberately excluded: the colony's density comes from readable individual mice, overlap, lighting, shadows and lane depth. Arrival facing and the approach belong to rutini_second_sequence; only the closing walk is authored here. The rutini_* resource names refer to Rotini until a coordinated rename is approved."
-closing_move_seconds = 1.6
-entrance_facing = 1
-closing_facing = 1
-conversation_tracks_miner = true
-conversation_root_offset_from_miner_x = -110.0
-hide_actor_after_closing = true
-procession_cue = &"begin_colony_mining"
 rat_appearances = Array[ExtResource("6_rat_appearance")]([ExtResource("8_brown"), ExtResource("9_grey"), ExtResource("10_white"), ExtResource("8_brown"), ExtResource("9_grey"), ExtResource("10_white")])
-single_scale_multiplier = 1.35
 max_live_followers = 24
 web_max_live_followers = 16
 spawn_interval_seconds = 0.1
 run_seconds = 1.15
 exit_seconds = 1.2
+strike_interval_seconds = 0.08
 strikes_per_rat = 4
 floor_offset_y = 0.0
+procession_mines = true
+procession_cue = &"begin_colony_mining"
+stampede_warning_seconds = 0.0
+stampede_rumble_strength_px = 5.0
 stampede_minimum_run_seconds = 4.0
+stampede_drain_timeout_seconds = 6.0
+clump_draw_order = -1
+single_draw_order = 0
+clump_scale_multiplier = 1.0
+single_scale_multiplier = 1.35
 procession_rows = 4
 procession_row_rise_pixels = 18.0
 procession_row_scale_falloff = 0.96
@@ -42,6 +44,12 @@ procession_hop_pixels = 24.0
 mining_floor_half_span_pixels = 520.0
 mining_center_clearance_pixels = 132.0
 mining_slot_spacing_pixels = 96.0
+closing_move_seconds = 1.6
+hide_actor_after_closing = true
+entrance_facing = 1
+closing_facing = 1
+conversation_tracks_miner = true
+conversation_root_offset_from_miner_x = -110.0
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
 editor_description = "600px LEFT of Conversation, which puts Rotini and every mouse past the frame edge at any landing column: the frame is 1152 wide and centred on the miner, so anything closer than 480px would have them appear out of nothing in open shot. The colony spawns here too, so the flood comes in behind him rather than past him."
@@ -68,7 +76,7 @@ editor_description = "Previews rutini_second at its authored depth."
 encounter_id = &"rutini_second"
 preview_depth_rows = 11200
 
-[node name="rutini" type="Node2D" parent="." index="6"]
+[node name="rutini" type="Node2D" parent="." index="6" unique_id=472040310]
 z_index = 1
 position = Vector2(-110, 0)
 script = ExtResource("2_preview")
@@ -77,11 +85,9 @@ appearance = ExtResource("3_rutini")
 pose = &"idle"
 metadata/_edit_group_ = true
 
-[node name="Miner" type="Node2D" parent="." index="7"]
+[node name="Miner" type="Node2D" parent="." index="7" unique_id=1905009487]
 z_index = 1
 script = ExtResource("2_preview")
 actor_id = &"miner"
 appearance = SubResource("Resource_miner")
 metadata/_edit_group_ = true
-
-[editable path="ActorMarkers"]

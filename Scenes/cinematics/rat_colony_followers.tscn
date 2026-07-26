@@ -1,13 +1,15 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene format=3 uid="uid://ddduqvmutou3p"]
 
-[ext_resource type="Script" path="res://Scripts/cinematics/rat_colony_followers.gd" id="1_followers"]
+[ext_resource type="Script" uid="uid://nlsstk41vgng" path="res://Scripts/cinematics/rat_colony_followers.gd" id="1_followers"]
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/rat_miner.tscn" id="2_rat"]
-[ext_resource type="Script" path="res://Scripts/cinematics/cinematic_rat_appearance.gd" id="3_appearance"]
+[ext_resource type="Script" uid="uid://bnwk2upes76ot" path="res://Scripts/cinematics/cinematic_rat_appearance.gd" id="3_appearance"]
 [ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_brown.tres" id="4_brown"]
 [ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_grey.tres" id="5_grey"]
 [ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_white.tres" id="6_white"]
 [ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_red.tres" id="7_red"]
-[node name="RatColonyFollowers" type="Node2D" node_paths=PackedStringArray("followers")]
+
+[node name="RatColonyFollowers" type="Node2D" unique_id=1757510028 node_paths=PackedStringArray("followers")]
+process_mode = 3
 editor_description = "Persistent mining colony activated after Rotini's second encounter. Assign Follow Target to the production MinerRig when instanced. The fixed pool below is the whole colony: rank, tint, draw order and slot position are derived at runtime, so moving an authored pool child changes nothing. Web lights a smaller even slice of the same pool.
 
 The formation is rebuilt from the player outward on both sides, with 132px of protected center clearance. All thirty-two actors use the normal-size individual mouse art; no clump drawing is used. Four staggered depth ranks share the miner's ground face while overlap, shadows and lighting fill the floor. Every visible mouse swings on every successful player hit and removes terrain at its own pickaxe-contact frame.
@@ -21,121 +23,115 @@ Target preference alternates left and right through Caspian's public set_preferr
 Draw order puts the front rank on the SECOND layer - z 1, between terrain strata 0 and 1 - which is exactly where MinerRig.buried_draw_order stands the miner while he is mining. That is the directive for every character: the colony digs beside him, so it is layered as he is, and the foreground rock closes over them together. It used to sit at z 2, level with the frontmost stratum, which drew the nearest rats in front of the rock the miner is buried in. Each rank behind the front recedes one stratum.
 
 These four numbers only mean anything against TerrainLayerProfile.layer_z_indices, currently (2, 0, -1, -2), and nothing ties the two together. Renumber the strata and the colony silently changes which rock it is in front of."
-process_mode = 3
 script = ExtResource("1_followers")
-followers = Array[NodePath]([NodePath("Formation/Rat00"), NodePath("Formation/Rat01"), NodePath("Formation/Rat02"), NodePath("Formation/Rat03"), NodePath("Formation/Rat04"), NodePath("Formation/Rat05"), NodePath("Formation/Rat06"), NodePath("Formation/Rat07"), NodePath("Formation/Rat08"), NodePath("Formation/Rat09"), NodePath("Formation/Rat10"), NodePath("Formation/Rat11"), NodePath("Formation/Rat12"), NodePath("Formation/Rat13"), NodePath("Formation/Rat14"), NodePath("Formation/Rat15"), NodePath("Formation/Rat16"), NodePath("Formation/Rat17"), NodePath("Formation/Rat18"), NodePath("Formation/Rat19"), NodePath("Formation/Rat20"), NodePath("Formation/Rat21"), NodePath("Formation/Rat22"), NodePath("Formation/Rat23"), NodePath("Formation/Rat24"), NodePath("Formation/Rat25"), NodePath("Formation/Rat26"), NodePath("Formation/Rat27"), NodePath("Formation/Rat28"), NodePath("Formation/Rat29"), NodePath("Formation/Rat30"), NodePath("Formation/Rat31")])
+followers = [NodePath("Formation/Rat00"), NodePath("Formation/Rat01"), NodePath("Formation/Rat02"), NodePath("Formation/Rat03"), NodePath("Formation/Rat04"), NodePath("Formation/Rat05"), NodePath("Formation/Rat06"), NodePath("Formation/Rat07"), NodePath("Formation/Rat08"), NodePath("Formation/Rat09"), NodePath("Formation/Rat10"), NodePath("Formation/Rat11"), NodePath("Formation/Rat12"), NodePath("Formation/Rat13"), NodePath("Formation/Rat14"), NodePath("Formation/Rat15"), NodePath("Formation/Rat16"), NodePath("Formation/Rat17"), NodePath("Formation/Rat18"), NodePath("Formation/Rat19"), NodePath("Formation/Rat20"), NodePath("Formation/Rat21"), NodePath("Formation/Rat22"), NodePath("Formation/Rat23"), NodePath("Formation/Rat24"), NodePath("Formation/Rat25"), NodePath("Formation/Rat26"), NodePath("Formation/Rat27"), NodePath("Formation/Rat28"), NodePath("Formation/Rat29"), NodePath("Formation/Rat30"), NodePath("Formation/Rat31")]
 rat_appearances = Array[ExtResource("3_appearance")]([ExtResource("4_brown"), ExtResource("5_grey"), ExtResource("6_white"), ExtResource("7_red")])
-rank_scales = PackedFloat32Array(1.35, 1.3, 1.25, 1.2)
-rank_tints = PackedColorArray(1, 1, 1, 1, 0.97, 0.96, 0.95, 1, 0.93, 0.92, 0.91, 1, 0.88, 0.87, 0.86, 1)
-rank_vertical_offsets = PackedFloat32Array(40, 40, 40, 40)
-rank_draw_orders = PackedInt32Array(1, 0, -1, -2)
-rank_spacing_pixels = 86.0
-miner_clearance_pixels = 132.0
 clump_first_rank = 1
 clump_minimum_distance_pixels = 216.0
+rank_scales = PackedFloat32Array(1.35, 1.3, 1.25, 1.2)
+rank_draw_orders = PackedInt32Array(1, 0, -1, -2)
+rank_tints = PackedColorArray(1, 1, 1, 1, 0.97, 0.96, 0.95, 1, 0.93, 0.92, 0.91, 1, 0.88, 0.87, 0.86, 1)
+rank_vertical_offsets = PackedFloat32Array(40, 40, 40, 40)
+rank_spacing_pixels = 86.0
+miner_clearance_pixels = 132.0
 max_visible_followers = 32
 web_max_visible_followers = 16
-presentation_contacts_per_impact = 8
-web_presentation_contacts_per_impact = 4
-impacts_per_idle_hop = 2
-idle_hop_seconds = 0.38
-idle_hop_height_pixels = 30.0
 
-[node name="Formation" type="Node2D" parent="."]
+[node name="Formation" type="Node2D" parent="." unique_id=1190155047]
 editor_description = "Fixed thirty-two-actor growth bound. Index modulo four decides a rat's rank, so trimming the live count for web thins all four ranks evenly instead of deleting the back of the crowd."
 
-[node name="Rat00" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat00" parent="Formation" unique_id=714569347 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat01" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat01" parent="Formation" unique_id=627999738 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat02" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat02" parent="Formation" unique_id=1350671997 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat03" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat03" parent="Formation" unique_id=2099001360 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat04" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat04" parent="Formation" unique_id=1905739999 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat05" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat05" parent="Formation" unique_id=971535716 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat06" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat06" parent="Formation" unique_id=1575618142 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat07" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat07" parent="Formation" unique_id=1589925752 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat08" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat08" parent="Formation" unique_id=1388737617 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat09" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat09" parent="Formation" unique_id=1041527522 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat10" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat10" parent="Formation" unique_id=1290012929 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat11" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat11" parent="Formation" unique_id=1150421649 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat12" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat12" parent="Formation" unique_id=941300128 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat13" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat13" parent="Formation" unique_id=1281470795 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat14" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat14" parent="Formation" unique_id=819762002 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat15" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat15" parent="Formation" unique_id=687630439 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat16" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat16" parent="Formation" unique_id=1107158510 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat17" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat17" parent="Formation" unique_id=806773514 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat18" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat18" parent="Formation" unique_id=532117317 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat19" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat19" parent="Formation" unique_id=710071886 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat20" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat20" parent="Formation" unique_id=771147558 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat21" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat21" parent="Formation" unique_id=1944011151 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat22" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat22" parent="Formation" unique_id=1334064299 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat23" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat23" parent="Formation" unique_id=963138113 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat24" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat24" parent="Formation" unique_id=357282818 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat25" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat25" parent="Formation" unique_id=28109337 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat26" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat26" parent="Formation" unique_id=619557529 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat27" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat27" parent="Formation" unique_id=601854311 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat28" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat28" parent="Formation" unique_id=1436879028 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat29" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat29" parent="Formation" unique_id=1684561925 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat30" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat30" parent="Formation" unique_id=40571458 instance=ExtResource("2_rat")]
 visible = false
 
-[node name="Rat31" parent="Formation" instance=ExtResource("2_rat")]
+[node name="Rat31" parent="Formation" unique_id=966028505 instance=ExtResource("2_rat")]
 visible = false

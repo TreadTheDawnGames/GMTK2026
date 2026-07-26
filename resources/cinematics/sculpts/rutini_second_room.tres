@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="CutsceneTerrainSculpt" format=4]
+[gd_resource type="Resource" script_class="CutsceneTerrainSculpt" format=4 uid="uid://cwbey5nxbi724"]
 
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_terrain_sculpt.gd" id="1_oiheo"]
+[ext_resource type="Script" uid="uid://dsexeufmvrsb7" path="res://resources/cinematics/cutscene_terrain_sculpt.gd" id="1_oiheo"]
 
 [resource]
 script = ExtResource("1_oiheo")

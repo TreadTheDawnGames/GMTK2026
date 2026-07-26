@@ -12,6 +12,7 @@ extends Resource
 ## - The invariant is that large hits cannot skip an encounter threshold.
 ## @tool because the cutscene editor resolves encounter depth and authored room
 ## data in editor context; non-tool resources become placeholder instances.
+signal persistent_colony_requested_leave()
 
 @export var encounter_id: StringName
 ## Stable story identity; repeated visits reuse the same presenter.
@@ -82,6 +83,7 @@ extends Resource
 @export var locks_speaker_pose_after: StringName = &""
 ## Starts bounded rat-colony support after dialogue.
 @export var starts_rat_colony_support: bool = false
+@export var ends_rat_colony_support: bool = false
 ## Holds this encounter until the non-blocking credits presentation completes.
 @export var requires_credits_complete: bool = false
 ## Opens the chamber through its right wall for authored choreography.
