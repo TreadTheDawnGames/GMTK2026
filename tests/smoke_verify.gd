@@ -177,6 +177,9 @@ func _verify_mining_scene() -> void:
 	var run_intro_controller := game_root.get_node_or_null(
 		"MiningScene/Systems/RunIntroController"
 	) as RunIntroController
+	var cutscene_action_presenter := game_root.get_node_or_null(
+		"MiningScene/Systems/SceneWiring/CutsceneActionPresenter"
+	) as CutsceneActionPresenter
 	var mining_controller := game_root.get_node_or_null(
 		"MiningScene/Systems/MiningController"
 	) as MiningController
@@ -210,6 +213,10 @@ func _verify_mining_scene() -> void:
 	_expect(terrain_manager != null, "TerrainManager must exist.")
 	_expect(terrain_renderer != null, "TerrainLayerRenderer must exist.")
 	_expect(scene_wiring != null, "MiningSceneWiring must exist.")
+	_expect(
+		cutscene_action_presenter != null,
+		"CutsceneActionPresenter must exist under the composition root."
+	)
 	_expect(mining_controller != null, "MiningController must exist.")
 	_expect(view_controller != null, "ViewController must exist.")
 	if (
@@ -605,6 +612,40 @@ func _verify_mining_scene() -> void:
 		scene_wiring.mining_controller == mining_controller,
 		"SceneWiring must reference the production MiningController."
 	)
+	if encounter_controller != null and cutscene_action_presenter != null:
+		_expect(
+			encounter_controller.character_stage_camera_action_requested
+				.is_connected(
+					cutscene_action_presenter.present_camera_action
+				),
+			"Typed cutscene camera actions must cross SceneWiring."
+		)
+		_expect(
+			encounter_controller.character_stage_audio_action_requested
+				.is_connected(
+					cutscene_action_presenter.present_audio_action
+				),
+			"Typed cutscene audio actions must cross SceneWiring."
+		)
+		_expect(
+			encounter_controller.character_stage_vfx_action_requested
+				.is_connected(
+					cutscene_action_presenter.present_vfx_action
+				),
+			"Typed cutscene VFX actions must cross SceneWiring."
+		)
+		_expect(
+			scene_wiring.cinematic_flow.flow_finished.is_connected(
+				cutscene_action_presenter.reset_presentation
+			),
+			"Cutscene actions must reset when cinematic flow actually ends."
+		)
+		_expect(
+			not encounter_controller.encounter_completed.is_connected(
+				cutscene_action_presenter.reset_presentation
+			),
+			"Cutscene actions must survive closing presentation until flow ends."
+		)
 	_expect(
 		terrain_manager.view_position_changed.is_connected(
 			terrain_renderer._on_view_position_changed

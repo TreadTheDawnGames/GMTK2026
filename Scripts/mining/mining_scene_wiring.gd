@@ -70,6 +70,9 @@ const MINER_FLOOR_LAYER_INDEX: int = 0
 
 ## Owns the two depth thresholds where the run's music dies and the organ starts.
 var _finale_music: FinaleApproachMusic
+## Owns bounded cutscene-only camera, audio, and VFX presentation. Constructed
+## here because every signal it consumes crosses the mining composition boundary.
+var _cutscene_action_presenter: CutsceneActionPresenter
 
 
 ## Establishes every signal that crosses a mining subsystem boundary.
@@ -98,6 +101,16 @@ func _ready() -> void:
 	_finale_music.name = "FinaleApproachMusic"
 	add_child(_finale_music)
 	_finale_music.configure(_conductor as AudioStreamPlayer)
+	_cutscene_action_presenter = CutsceneActionPresenter.new()
+	_cutscene_action_presenter.name = "CutsceneActionPresenter"
+	add_child(_cutscene_action_presenter)
+	_cutscene_action_presenter.configure(
+		view_controller,
+		impact_shake.camera,
+		impact_shake,
+		terrain_renderer.get_parent(),
+		float(view_controller.config.terrain_cell_world_size)
+	)
 	_connect_once(
 		_game_state.run_reset,
 		_finale_music._on_run_reset
@@ -416,6 +429,26 @@ func _ready() -> void:
 	_connect_once(
 		encounter_controller.character_stage_camera_pan_requested,
 		view_controller.set_encounter_view_offset_cells
+	)
+	_connect_once(
+		encounter_controller.character_stage_camera_action_requested,
+		_cutscene_action_presenter.present_camera_action
+	)
+	_connect_once(
+		encounter_controller.character_stage_audio_action_requested,
+		_cutscene_action_presenter.present_audio_action
+	)
+	_connect_once(
+		encounter_controller.character_stage_vfx_action_requested,
+		_cutscene_action_presenter.present_vfx_action
+	)
+	_connect_once(
+		cinematic_flow.flow_finished,
+		_cutscene_action_presenter.reset_presentation
+	)
+	_connect_once(
+		_game_state.run_reset,
+		_cutscene_action_presenter.reset_presentation
 	)
 	_connect_once(
 		encounter_controller.stampede_rumble_started,

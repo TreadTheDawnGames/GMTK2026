@@ -29,6 +29,28 @@ signal character_stage_rock_break_requested(
 )
 ## Relays a stage's requested two-axis displacement from encounter focus.
 signal character_stage_camera_pan_requested(offset_cells: Vector2)
+signal character_stage_camera_action_requested(
+	action: int,
+	offset: Vector2,
+	zoom: Vector2,
+	shake_strength: float,
+	duration_seconds: float
+)
+signal character_stage_audio_action_requested(
+	action: int,
+	stream: AudioStream,
+	bus: StringName,
+	volume_db: float,
+	pitch_scale: float,
+	fade_seconds: float
+)
+signal character_stage_vfx_action_requested(
+	action: int,
+	effect_id: StringName,
+	scene: PackedScene,
+	world_position: Vector2,
+	duration_seconds: float
+)
 
 const FLOW_OWNER: StringName = &"depth_encounter"
 const MINER_SPEAKER_SLOT: StringName = &"miner"
@@ -1005,6 +1027,18 @@ func _prepare_authored_characters() -> bool:
 				stage.presentation_camera_pan_requested,
 				_on_character_stage_camera_pan_requested
 			)
+			_connect_once(
+				stage.sequence_camera_action_requested,
+				_on_character_stage_camera_action_requested
+			)
+			_connect_once(
+				stage.sequence_audio_action_requested,
+				_on_character_stage_audio_action_requested
+			)
+			_connect_once(
+				stage.sequence_vfx_action_requested,
+				_on_character_stage_vfx_action_requested
+			)
 			# A stampede floors the miner for as long as it runs. The stage owns
 			# the horde and knows when the last of them is gone; it does not own
 			# the miner, so it says what happened and this decides what that
@@ -1219,6 +1253,56 @@ func _on_character_stage_rock_break_requested(
 ## the mining wiring and a cutscene stage owns actors, props and local effects.
 func _on_character_stage_camera_pan_requested(offset_cells: Vector2) -> void:
 	character_stage_camera_pan_requested.emit(offset_cells)
+
+
+func _on_character_stage_camera_action_requested(
+	action: int,
+	offset: Vector2,
+	zoom: Vector2,
+	shake_strength: float,
+	duration_seconds: float
+) -> void:
+	character_stage_camera_action_requested.emit(
+		action,
+		offset,
+		zoom,
+		shake_strength,
+		duration_seconds
+	)
+
+
+func _on_character_stage_audio_action_requested(
+	action: int,
+	stream: AudioStream,
+	bus: StringName,
+	volume_db: float,
+	pitch_scale: float,
+	fade_seconds: float
+) -> void:
+	character_stage_audio_action_requested.emit(
+		action,
+		stream,
+		bus,
+		volume_db,
+		pitch_scale,
+		fade_seconds
+	)
+
+
+func _on_character_stage_vfx_action_requested(
+	action: int,
+	effect_id: StringName,
+	scene: PackedScene,
+	world_position: Vector2,
+	duration_seconds: float
+) -> void:
+	character_stage_vfx_action_requested.emit(
+		action,
+		effect_id,
+		scene,
+		world_position,
+		duration_seconds
+	)
 
 
 ## Relays the clean stage transition through the cross-system wiring boundary.

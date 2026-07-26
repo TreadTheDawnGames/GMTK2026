@@ -21,7 +21,9 @@ const FIELD_STARTS_FROM_AUTHORED_POINT: StringName = (
 )
 const FIELD_START_MARKER: StringName = &"start_marker"
 const FIELD_START_OFFSET: StringName = &"start_offset"
+const FIELD_MOVEMENT_WAYPOINTS: StringName = &"movement_waypoints"
 const FIELD_POSE: StringName = &"pose"
+const FIELD_HOLDS_POSE: StringName = &"holds_pose"
 const FIELD_STEP_HEIGHT: StringName = &"step_height"
 const FIELD_FACING: StringName = &"facing"
 const FIELD_BOUNCE_COUNT: StringName = &"bounce_count"
@@ -30,6 +32,19 @@ const FIELD_BOUNCE_STYLE: StringName = &"bounce_style"
 const FIELD_CONVERSATION: StringName = &"conversation"
 const FIELD_LINE_RANGE: StringName = &"line_range"
 const FIELD_CUE: StringName = &"cue"
+const FIELD_CAMERA_ACTION: StringName = &"camera_action"
+const FIELD_CAMERA_OFFSET: StringName = &"camera_offset"
+const FIELD_CAMERA_ZOOM: StringName = &"camera_zoom"
+const FIELD_CAMERA_SHAKE_STRENGTH: StringName = &"camera_shake_strength"
+const FIELD_AUDIO_ACTION: StringName = &"audio_action"
+const FIELD_AUDIO_STREAM: StringName = &"audio_stream"
+const FIELD_AUDIO_BUS: StringName = &"audio_bus"
+const FIELD_AUDIO_VOLUME_DB: StringName = &"audio_volume_db"
+const FIELD_AUDIO_PITCH_SCALE: StringName = &"audio_pitch_scale"
+const FIELD_AUDIO_FADE_SECONDS: StringName = &"audio_fade_seconds"
+const FIELD_VFX_ACTION: StringName = &"vfx_action"
+const FIELD_VFX_ID: StringName = &"vfx_id"
+const FIELD_VFX_SCENE: StringName = &"vfx_scene"
 
 ## The DialogueDirector's own typewriter settings, mirrored so the editor can
 ## say how long a line runs without a director in the scene to ask. Keep these
@@ -92,10 +107,12 @@ func get_visible_fields_for_kind(kind: int) -> PackedStringArray:
 			fields.append(str(FIELD_START_OFFSET))
 			fields.append(str(FIELD_TARGET_MARKER))
 			fields.append(str(FIELD_TARGET_OFFSET))
+			fields.append(str(FIELD_MOVEMENT_WAYPOINTS))
 			fields.append(str(FIELD_POSE))
 			fields.append(str(FIELD_STEP_HEIGHT))
 		CutsceneBeat.Kind.POSE:
 			fields.append(str(FIELD_POSE))
+			fields.append(str(FIELD_HOLDS_POSE))
 		CutsceneBeat.Kind.FACE:
 			fields.append(str(FIELD_FACING))
 		CutsceneBeat.Kind.BOUNCE:
@@ -110,6 +127,31 @@ func get_visible_fields_for_kind(kind: int) -> PackedStringArray:
 		CutsceneBeat.Kind.PROP:
 			fields.append(str(FIELD_TARGET_MARKER))
 			fields.append(str(FIELD_TARGET_OFFSET))
+			fields.append(str(FIELD_MOVEMENT_WAYPOINTS))
+		CutsceneBeat.Kind.CAMERA:
+			fields.append_array(PackedStringArray([
+				str(FIELD_CAMERA_ACTION),
+				str(FIELD_CAMERA_OFFSET),
+				str(FIELD_CAMERA_ZOOM),
+				str(FIELD_CAMERA_SHAKE_STRENGTH),
+			]))
+		CutsceneBeat.Kind.AUDIO:
+			fields.append_array(PackedStringArray([
+				str(FIELD_AUDIO_ACTION),
+				str(FIELD_AUDIO_STREAM),
+				str(FIELD_AUDIO_BUS),
+				str(FIELD_AUDIO_VOLUME_DB),
+				str(FIELD_AUDIO_PITCH_SCALE),
+				str(FIELD_AUDIO_FADE_SECONDS),
+			]))
+		CutsceneBeat.Kind.VFX:
+			fields.append_array(PackedStringArray([
+				str(FIELD_VFX_ACTION),
+				str(FIELD_VFX_ID),
+				str(FIELD_VFX_SCENE),
+				str(FIELD_TARGET_MARKER),
+				str(FIELD_TARGET_OFFSET),
+			]))
 		_:
 			pass
 	return fields
@@ -201,6 +243,7 @@ func _rebuild() -> void:
 				)
 			_add_marker_field()
 			_add_vector_field("Target offset", FIELD_TARGET_OFFSET, _selected_beat.target_offset)
+			_add_waypoint_fields()
 			_add_pose_field()
 			_add_number_field(
 				"Step height",
@@ -212,6 +255,11 @@ func _rebuild() -> void:
 			)
 		CutsceneBeat.Kind.POSE:
 			_add_pose_field()
+			_add_check_field(
+				"Hold through dialogue",
+				FIELD_HOLDS_POSE,
+				_selected_beat.holds_pose
+			)
 		CutsceneBeat.Kind.FACE:
 			_add_facing_field()
 		CutsceneBeat.Kind.BOUNCE:
@@ -240,6 +288,92 @@ func _rebuild() -> void:
 		CutsceneBeat.Kind.PROP:
 			_add_marker_field()
 			_add_vector_field("Target offset", FIELD_TARGET_OFFSET, _selected_beat.target_offset)
+			_add_waypoint_fields()
+		CutsceneBeat.Kind.CAMERA:
+			_add_enum_field(
+				"Camera action",
+				FIELD_CAMERA_ACTION,
+				CutsceneBeat.CameraAction.keys(),
+				_selected_beat.camera_action
+			)
+			_add_vector_field(
+				"Frame offset",
+				FIELD_CAMERA_OFFSET,
+				_selected_beat.camera_offset
+			)
+			_add_vector_field(
+				"Zoom",
+				FIELD_CAMERA_ZOOM,
+				_selected_beat.camera_zoom
+			)
+			_add_number_field(
+				"Shake strength",
+				FIELD_CAMERA_SHAKE_STRENGTH,
+				_selected_beat.camera_shake_strength,
+				0.0,
+				128.0,
+				0.1
+			)
+		CutsceneBeat.Kind.AUDIO:
+			_add_enum_field(
+				"Audio action",
+				FIELD_AUDIO_ACTION,
+				CutsceneBeat.AudioAction.keys(),
+				_selected_beat.audio_action
+			)
+			_add_resource_field(
+				"Stream",
+				FIELD_AUDIO_STREAM,
+				"AudioStream",
+				_selected_beat.audio_stream
+			)
+			_add_text_field("Bus", FIELD_AUDIO_BUS, _selected_beat.audio_bus)
+			_add_number_field(
+				"Volume",
+				FIELD_AUDIO_VOLUME_DB,
+				_selected_beat.audio_volume_db,
+				-80.0,
+				24.0,
+				0.1
+			)
+			_add_number_field(
+				"Pitch",
+				FIELD_AUDIO_PITCH_SCALE,
+				_selected_beat.audio_pitch_scale,
+				0.01,
+				4.0,
+				0.01
+			)
+			_add_number_field(
+				"Fade",
+				FIELD_AUDIO_FADE_SECONDS,
+				_selected_beat.audio_fade_seconds,
+				0.0,
+				16.0,
+				0.05
+			)
+		CutsceneBeat.Kind.VFX:
+			_add_enum_field(
+				"VFX action",
+				FIELD_VFX_ACTION,
+				CutsceneBeat.VfxAction.keys(),
+				_selected_beat.vfx_action
+			)
+			_add_text_field("Effect id", FIELD_VFX_ID, _selected_beat.vfx_id)
+			_add_resource_field(
+				"Scene",
+				FIELD_VFX_SCENE,
+				"PackedScene",
+				_selected_beat.vfx_scene
+			)
+			_add_marker_field()
+			_add_vector_field(
+				"Position offset",
+				FIELD_TARGET_OFFSET,
+				_selected_beat.target_offset,
+				"Stage-local when no marker or actor is selected; otherwise "
+				+ "an offset from that target."
+			)
 		_:
 			pass
 	_add_notes_field()
@@ -441,6 +575,96 @@ func _add_vector_field(
 		x_spin.value_changed.connect(_on_vector_x_changed.bind(y_spin, property_name))
 	if not y_spin.value_changed.is_connected(_on_vector_y_changed):
 		y_spin.value_changed.connect(_on_vector_y_changed.bind(x_spin, property_name))
+
+
+func _add_waypoint_fields() -> void:
+	var heading := Label.new()
+	heading.text = "Path waypoints"
+	heading.tooltip_text = (
+		"Optional stage-local points visited in order. Empty makes a straight "
+		+ "path. Drag waypoint handles in the 2D view for faster staging."
+	)
+	_form.add_child(heading)
+	for index in range(_selected_beat.movement_waypoints.size()):
+		var point := _selected_beat.movement_waypoints[index]
+		var row := HBoxContainer.new()
+		row.name = "%s%d" % [FIELD_MOVEMENT_WAYPOINTS, index]
+		var index_label := Label.new()
+		index_label.text = "%d" % (index + 1)
+		index_label.custom_minimum_size.x = 24.0
+		row.add_child(index_label)
+		var x_spin := SpinBox.new()
+		x_spin.min_value = -10000.0
+		x_spin.max_value = 10000.0
+		x_spin.step = 1.0
+		x_spin.value = point.x
+		x_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		x_spin.value_changed.connect(
+			_on_waypoint_component_changed.bind(index, true)
+		)
+		row.add_child(x_spin)
+		var y_spin := SpinBox.new()
+		y_spin.min_value = -10000.0
+		y_spin.max_value = 10000.0
+		y_spin.step = 1.0
+		y_spin.value = point.y
+		y_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		y_spin.value_changed.connect(
+			_on_waypoint_component_changed.bind(index, false)
+		)
+		row.add_child(y_spin)
+		var remove_button := Button.new()
+		remove_button.text = "×"
+		remove_button.tooltip_text = "Remove this waypoint."
+		remove_button.pressed.connect(_on_remove_waypoint.bind(index))
+		row.add_child(remove_button)
+		_form.add_child(row)
+	var add_button := Button.new()
+	add_button.text = "+ Waypoint"
+	add_button.tooltip_text = (
+		"Add a stage-local path point before the destination. You can then "
+		+ "drag it in the 2D viewport."
+	)
+	add_button.pressed.connect(_on_add_waypoint)
+	_form.add_child(add_button)
+
+
+func _add_enum_field(
+	caption: String,
+	property_name: StringName,
+	names: Array,
+	current_value: int
+) -> void:
+	var row := _make_row(caption)
+	var option := OptionButton.new()
+	option.name = String(property_name)
+	option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for index in range(names.size()):
+		option.add_item(str(names[index]).capitalize())
+		option.set_item_metadata(index, index)
+	option.select(clampi(current_value, 0, maxi(names.size() - 1, 0)))
+	option.item_selected.connect(
+		_on_enum_changed.bind(option, property_name)
+	)
+	row.add_child(option)
+
+
+func _add_resource_field(
+	caption: String,
+	property_name: StringName,
+	base_type: String,
+	current_resource: Resource
+) -> void:
+	var row := _make_row(caption)
+	var picker := EditorResourcePicker.new()
+	picker.name = String(property_name)
+	picker.base_type = base_type
+	picker.edited_resource = current_resource
+	picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	picker.resource_changed.connect(
+		_on_resource_changed.bind(property_name)
+	)
+	row.add_child(picker)
 
 
 func _add_facing_field() -> void:
@@ -1054,6 +1278,87 @@ func _on_vector_y_changed(value: float, x_spin: SpinBox, property_name: StringNa
 	)
 
 
+func _on_waypoint_component_changed(
+	value: float,
+	waypoint_index: int,
+	is_x: bool
+) -> void:
+	if (
+		_selected_beat == null
+		or waypoint_index < 0
+		or waypoint_index >= _selected_beat.movement_waypoints.size()
+	):
+		return
+	var waypoints: Array[Vector2] = _selected_beat.movement_waypoints.duplicate()
+	var point := waypoints[waypoint_index]
+	if is_x:
+		point.x = value
+	else:
+		point.y = value
+	waypoints[waypoint_index] = point
+	_commit_property(
+		FIELD_MOVEMENT_WAYPOINTS,
+		waypoints,
+		"Move cutscene waypoint"
+	)
+
+
+func _on_add_waypoint() -> void:
+	if _selected_beat == null:
+		return
+	var waypoints: Array[Vector2] = _selected_beat.movement_waypoints.duplicate()
+	var start := _selected_beat.start_offset
+	if not waypoints.is_empty():
+		start = waypoints.back()
+	waypoints.append(start.lerp(_selected_beat.target_offset, 0.5))
+	_commit_property(
+		FIELD_MOVEMENT_WAYPOINTS,
+		waypoints,
+		"Add cutscene waypoint"
+	)
+
+
+func _on_remove_waypoint(waypoint_index: int) -> void:
+	if (
+		_selected_beat == null
+		or waypoint_index < 0
+		or waypoint_index >= _selected_beat.movement_waypoints.size()
+	):
+		return
+	var waypoints: Array[Vector2] = _selected_beat.movement_waypoints.duplicate()
+	waypoints.remove_at(waypoint_index)
+	_commit_property(
+		FIELD_MOVEMENT_WAYPOINTS,
+		waypoints,
+		"Remove cutscene waypoint"
+	)
+
+
+func _on_enum_changed(
+	index: int,
+	option: OptionButton,
+	property_name: StringName
+) -> void:
+	if _selected_beat == null or option == null or index < 0:
+		return
+	_commit_property(
+		property_name,
+		int(option.get_item_metadata(index)),
+		"Edit %s" % property_name
+	)
+
+
+func _on_resource_changed(
+	resource: Resource,
+	property_name: StringName
+) -> void:
+	_commit_property(
+		property_name,
+		resource,
+		"Edit %s" % property_name
+	)
+
+
 func _on_facing_changed(index: int) -> void:
 	if _selected_beat == null:
 		return
@@ -1202,4 +1507,5 @@ func _kind_uses_actor(kind: int) -> bool:
 		CutsceneBeat.Kind.PROP,
 		CutsceneBeat.Kind.SHOW,
 		CutsceneBeat.Kind.HIDE,
+		CutsceneBeat.Kind.VFX,
 	]

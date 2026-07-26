@@ -6,6 +6,7 @@ extends Node2D
 ## - prepare() snapshots one presenter and places it at the authored entrance.
 ## - Opening/closing movement follows an injected production-floor sampler.
 ## - Dialogue stage_cue values play same-named AnimationPlayer animations.
+## - Typed sequence actions are forwarded without making the stage their owner.
 ## - Closing may leave the actor at a persistent rest marker for review mode.
 ## - cancel_and_restore() stops motion/animation and restores the exact snapshot.
 ## - The stage never owns dialogue, rewards, mining gates, or encounter order.
@@ -28,6 +29,30 @@ signal presentation_camera_pan_requested(offset_cells: Vector2)
 signal sequence_dialogue_requested(
 	conversation: DialogueConversation,
 	line_range: Vector2i
+)
+## Typed timeline requests are forwarded to the encounter owner. If nothing is
+## connected, playback still completes and the request is a safe no-op.
+signal sequence_camera_action_requested(
+	action: int,
+	offset: Vector2,
+	zoom: Vector2,
+	shake_strength: float,
+	duration_seconds: float
+)
+signal sequence_audio_action_requested(
+	action: int,
+	stream: AudioStream,
+	bus: StringName,
+	volume_db: float,
+	pitch_scale: float,
+	fade_seconds: float
+)
+signal sequence_vfx_action_requested(
+	action: int,
+	effect_id: StringName,
+	scene: PackedScene,
+	screen_position: Vector2,
+	duration_seconds: float
 )
 
 ## Terrain cells the framed view is displaced from the encounter focus.
@@ -565,6 +590,24 @@ func _ensure_sequence_player() -> void:
 		_sequence_player.dialogue_requested.connect(
 			_on_sequence_dialogue_requested
 		)
+	if not _sequence_player.camera_action_requested.is_connected(
+		_on_sequence_camera_action_requested
+	):
+		_sequence_player.camera_action_requested.connect(
+			_on_sequence_camera_action_requested
+		)
+	if not _sequence_player.audio_action_requested.is_connected(
+		_on_sequence_audio_action_requested
+	):
+		_sequence_player.audio_action_requested.connect(
+			_on_sequence_audio_action_requested
+		)
+	if not _sequence_player.vfx_action_requested.is_connected(
+		_on_sequence_vfx_action_requested
+	):
+		_sequence_player.vfx_action_requested.connect(
+			_on_sequence_vfx_action_requested
+		)
 
 
 ## Resolves a timeline's actor id to something on screen.
@@ -605,6 +648,56 @@ func _on_sequence_dialogue_requested(
 	line_range: Vector2i
 ) -> void:
 	sequence_dialogue_requested.emit(conversation, line_range)
+
+
+func _on_sequence_camera_action_requested(
+	action: int,
+	offset: Vector2,
+	zoom: Vector2,
+	shake_strength: float,
+	duration_seconds: float
+) -> void:
+	sequence_camera_action_requested.emit(
+		action,
+		offset,
+		zoom,
+		shake_strength,
+		duration_seconds
+	)
+
+
+func _on_sequence_audio_action_requested(
+	action: int,
+	stream: AudioStream,
+	bus: StringName,
+	volume_db: float,
+	pitch_scale: float,
+	fade_seconds: float
+) -> void:
+	sequence_audio_action_requested.emit(
+		action,
+		stream,
+		bus,
+		volume_db,
+		pitch_scale,
+		fade_seconds
+	)
+
+
+func _on_sequence_vfx_action_requested(
+	action: int,
+	effect_id: StringName,
+	scene: PackedScene,
+	screen_position: Vector2,
+	duration_seconds: float
+) -> void:
+	sequence_vfx_action_requested.emit(
+		action,
+		effect_id,
+		scene,
+		screen_position,
+		duration_seconds
+	)
 
 
 ## Releases a timeline that is holding for dialogue it asked somebody else to run.

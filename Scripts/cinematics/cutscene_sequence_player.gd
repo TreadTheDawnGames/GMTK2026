@@ -5,9 +5,10 @@ extends Node
 ## How it works:
 ## - An injected resolver supplies actors, global markers, terrain, and stage.
 ## - The authored clock starts eligible beats together and holds at blocking ends.
-## - Presenter moves use sampled GroundWalk paths; props use plain position tweening.
+## - MOVE and PROP routes share distance-weighted waypoint path evaluation.
 ## - Dialogue is only requested; the owner completes it with notify_dialogue_finished().
-## - evaluate_at simulates the same cached path position math without mutations.
+## - Camera, audio, and VFX beats emit typed requests; absent consumers are no-ops.
+## - evaluate_at simulates the same path/action state math without mutations.
 ## - stop kills owned motion and invalidates every stale callback by generation.
 ## - The invariant is that a stopped or superseded sequence can emit nothing later.
 
@@ -16,6 +17,28 @@ signal beat_finished(beat: CutsceneBeat, index: int)
 signal dialogue_requested(
 	conversation: DialogueConversation,
 	line_range: Vector2i
+)
+signal camera_action_requested(
+	action: int,
+	offset: Vector2,
+	zoom: Vector2,
+	shake_strength: float,
+	duration_seconds: float
+)
+signal audio_action_requested(
+	action: int,
+	stream: AudioStream,
+	bus: StringName,
+	volume_db: float,
+	pitch_scale: float,
+	fade_seconds: float
+)
+signal vfx_action_requested(
+	action: int,
+	effect_id: StringName,
+	scene: PackedScene,
+	screen_position: Vector2,
+	duration_seconds: float
 )
 signal finished
 
@@ -58,17 +81,22 @@ func bind(
 	floor_sampler: Callable,
 	stage: CharacterEncounterStage = null
 ) -> void:
-	if is_instance_valid(_stage):
-		if _stage.cue_finished.is_connected(_on_stage_cue_finished):
-			_stage.cue_finished.disconnect(_on_stage_cue_finished)
+	if (
+		is_instance_valid(_stage)
+		and _stage.has_signal(&"cue_finished")
+		and _stage.is_connected(&"cue_finished", _on_stage_cue_finished)
+	):
+		_stage.disconnect(&"cue_finished", _on_stage_cue_finished)
 	_actor_resolver = actor_resolver
 	_marker_resolver = marker_resolver
 	_floor_sampler = floor_sampler
 	_stage = stage
-	if is_instance_valid(_stage) and not _stage.cue_finished.is_connected(
-		_on_stage_cue_finished
+	if (
+		is_instance_valid(_stage)
+		and _stage.has_signal(&"cue_finished")
+		and not _stage.is_connected(&"cue_finished", _on_stage_cue_finished)
 	):
-		_stage.cue_finished.connect(_on_stage_cue_finished)
+		_stage.connect(&"cue_finished", _on_stage_cue_finished)
 
 
 ## Starts a sequence; completion is reported through the finished signal.
@@ -155,6 +183,9 @@ func evaluate_at(
 		result[&"actors"] = {}
 		result[&"stage_cue"] = StringName()
 		result[&"dialogue"] = null
+		result[&"camera"] = _default_camera_state()
+		result[&"audio"] = _default_audio_state()
+		result[&"vfx"] = {}
 		return result
 	var actor_states: Dictionary = {}
 	var evaluation_seconds := maxf(seconds, 0.0)
@@ -175,6 +206,9 @@ func evaluate_at(
 		sequence,
 		evaluation_seconds
 	)
+	result[&"camera"] = _evaluate_camera_at(sequence, evaluation_seconds)
+	result[&"audio"] = _evaluate_audio_at(sequence, evaluation_seconds)
+	result[&"vfx"] = _evaluate_vfx_at(sequence, evaluation_seconds)
 	return result
 
 
@@ -262,6 +296,12 @@ func _start_beat(
 			_start_visibility(beat, beat_index, generation, true)
 		CutsceneBeat.Kind.HIDE:
 			_start_visibility(beat, beat_index, generation, false)
+		CutsceneBeat.Kind.CAMERA:
+			_start_camera(beat, beat_index, generation)
+		CutsceneBeat.Kind.AUDIO:
+			_start_audio(beat, beat_index, generation)
+		CutsceneBeat.Kind.VFX:
+			_start_vfx(beat, beat_index, generation)
 		_:
 			_finish_beat(beat_index, generation)
 
@@ -277,6 +317,8 @@ func _start_move(
 		push_warning("Cutscene actor '%s' is unavailable." % beat.actor)
 		_finish_beat(beat_index, generation)
 		return
+	if beat.starts_from_authored_point:
+		actor.global_position = _resolve_start_position(beat)
 	var target_position := _resolve_target_position(beat)
 	if not beat.pose.is_empty() and actor is CharacterPresenter:
 		(actor as CharacterPresenter).play_pose(beat.pose)
@@ -298,7 +340,11 @@ func _start_move(
 		_finish_beat(beat_index, generation)
 		return
 	var tween: Tween
-	if grounded and actor is CharacterPresenter:
+	if (
+		grounded
+		and actor is CharacterPresenter
+		and beat.movement_waypoints.is_empty()
+	):
 		tween = (actor as CharacterPresenter).move_grounded_to(
 			target_position,
 			beat.duration_seconds,
@@ -307,15 +353,21 @@ func _start_move(
 			beat.step_height
 		)
 	else:
-		_set_actor_facing(actor, signi(target_position.x - actor.global_position.x))
-		tween = actor.create_tween()
-		tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-		tween.tween_property(
-			actor,
-			"global_position",
+		if actor is CharacterPresenter:
+			(actor as CharacterPresenter).reset_speech_motion()
+			(actor as CharacterPresenter).cancel_grounded_motion()
+		var path := _build_move_path(
+			actor.global_position,
 			target_position,
-			maxf(beat.duration_seconds, 0.01)
-		).set_trans(Tween.TRANS_LINEAR)
+			grounded,
+			beat
+		)
+		tween = GroundWalkType.walk_along(
+			actor,
+			path,
+			beat.duration_seconds,
+			beat.step_height if grounded else 0.0
+		)
 	if tween == null:
 		_finish_beat(beat_index, generation)
 		return
@@ -390,6 +442,52 @@ func _start_visibility(
 	var actor := _resolve_actor(beat.actor)
 	if actor != null:
 		actor.visible = visible
+	_schedule_delay(beat_index, beat.duration_seconds, generation)
+
+
+func _start_camera(
+	beat: CutsceneBeat,
+	beat_index: int,
+	generation: int
+) -> void:
+	camera_action_requested.emit(
+		beat.camera_action,
+		beat.camera_offset,
+		beat.camera_zoom,
+		beat.camera_shake_strength,
+		beat.duration_seconds
+	)
+	_schedule_delay(beat_index, beat.duration_seconds, generation)
+
+
+func _start_audio(
+	beat: CutsceneBeat,
+	beat_index: int,
+	generation: int
+) -> void:
+	audio_action_requested.emit(
+		beat.audio_action,
+		beat.audio_stream,
+		beat.audio_bus,
+		beat.audio_volume_db,
+		beat.audio_pitch_scale,
+		beat.audio_fade_seconds
+	)
+	_schedule_delay(beat_index, beat.duration_seconds, generation)
+
+
+func _start_vfx(
+	beat: CutsceneBeat,
+	beat_index: int,
+	generation: int
+) -> void:
+	vfx_action_requested.emit(
+		beat.vfx_action,
+		beat.vfx_id,
+		beat.vfx_scene,
+		_resolve_vfx_position(beat),
+		beat.duration_seconds
+	)
 	_schedule_delay(beat_index, beat.duration_seconds, generation)
 
 
@@ -562,11 +660,11 @@ func _evaluate_actor_at(
 				var target_position := _resolve_target_position(beat)
 				var is_grounded := beat.kind == CutsceneBeat.Kind.MOVE
 				if is_grounded:
-					var path := GroundWalkType.build_path(
+					var path := _build_move_path(
 						start_position,
 						target_position,
-						_floor_sampler,
-						GroundWalkType.DEFAULT_STRIDE_PIXELS
+						true,
+						beat
 					)
 					active_move = {
 						"start": start_position,
@@ -579,12 +677,19 @@ func _evaluate_actor_at(
 						"step_height": beat.step_height,
 					}
 				else:
+					var prop_path := _build_move_path(
+						start_position,
+						target_position,
+						false,
+						beat
+					)
 					active_move = {
 						"start": start_position,
 						"target": target_position,
 						"start_seconds": beat.start_seconds,
 						"end": beat.get_end_seconds(),
 						"duration": beat.duration_seconds,
+						"path": prop_path,
 						"grounded": false,
 					}
 				if (
@@ -671,7 +776,50 @@ func _position_for_move(move: Dictionary, seconds: float) -> Vector2:
 			progress,
 			float(move["step_height"])
 		)
-	return (move["start"] as Vector2).lerp(move["target"], progress)
+	var path: PackedVector2Array = move.get(
+		"path",
+		PackedVector2Array([move["start"], move["target"]])
+	)
+	return GroundWalkType.position_along_path(path, progress, 0.0)
+
+
+## Builds one distance-weighted route through every authored intermediate point.
+##
+## Path storage is bounded by waypoint count plus the terrain samples already
+## bounded by GroundWalk's stride. It is created once per runtime move or scrub
+## query and released with that operation; no per-frame accumulation occurs.
+func _build_move_path(
+	start_position: Vector2,
+	target_position: Vector2,
+	grounded: bool,
+	beat: CutsceneBeat
+) -> PackedVector2Array:
+	var authored_points := PackedVector2Array([start_position])
+	for waypoint in beat.movement_waypoints:
+		authored_points.append(_resolve_stage_position(waypoint))
+	authored_points.append(target_position)
+
+	var route := PackedVector2Array()
+	for point_index in range(1, authored_points.size()):
+		var segment: PackedVector2Array
+		if grounded:
+			segment = GroundWalkType.build_path(
+				authored_points[point_index - 1],
+				authored_points[point_index],
+				_floor_sampler,
+				GroundWalkType.DEFAULT_STRIDE_PIXELS
+			)
+		else:
+			segment = PackedVector2Array([
+				authored_points[point_index - 1],
+				authored_points[point_index],
+			])
+		for segment_point in segment:
+			if route.is_empty() or not route[-1].is_equal_approx(segment_point):
+				route.append(segment_point)
+	if route.is_empty():
+		route.append(target_position)
+	return route
 
 
 ## Returns the visual displacement for one bounce at an arbitrary scrub time.
@@ -753,6 +901,158 @@ func _evaluate_dialogue_at(
 	}
 
 
+## Returns the frame target and a deterministic shake sample for editor scrubbing.
+func _evaluate_camera_at(
+	sequence: CutsceneSequence,
+	seconds: float
+) -> Dictionary:
+	var state := _default_camera_state()
+	for beat in sequence.get_beats_sorted():
+		if (
+			beat.kind != CutsceneBeat.Kind.CAMERA
+			or beat.start_seconds > seconds + 0.00001
+		):
+			continue
+		match beat.camera_action:
+			CutsceneBeat.CameraAction.FRAME:
+				var start_offset: Vector2 = state[&"offset"]
+				var start_zoom: Vector2 = state[&"zoom"]
+				var progress := _beat_progress_at(beat, seconds)
+				var response := float(Tween.interpolate_value(
+					0.0,
+					1.0,
+					progress,
+					1.0,
+					Tween.TRANS_SINE,
+					Tween.EASE_IN_OUT
+				))
+				state[&"action"] = beat.camera_action
+				state[&"offset"] = start_offset.lerp(
+					beat.camera_offset,
+					response
+				)
+				state[&"zoom"] = start_zoom.lerp(
+					beat.camera_zoom,
+					response
+				)
+				state[&"active"] = _beat_is_active_at(beat, seconds)
+				state[&"progress"] = progress
+			CutsceneBeat.CameraAction.SHAKE:
+				if _beat_is_active_at(beat, seconds):
+					var elapsed := maxf(
+						seconds - beat.start_seconds,
+						0.0
+					)
+					var strength := beat.camera_shake_strength
+					state[&"action"] = beat.camera_action
+					state[&"shake_strength"] = strength
+					state[&"shake_offset"] = Vector2(
+						sin(elapsed * 37.0),
+						cos(elapsed * 53.0)
+					) * strength
+					state[&"active"] = true
+					state[&"progress"] = _beat_progress_at(beat, seconds)
+			CutsceneBeat.CameraAction.RESET:
+				state = _default_camera_state()
+				state[&"action"] = beat.camera_action
+	return state
+
+
+## Returns persistent music state plus one-shots whose authored windows are active.
+func _evaluate_audio_at(
+	sequence: CutsceneSequence,
+	seconds: float
+) -> Dictionary:
+	var state := _default_audio_state()
+	var active_sfx: Array[Dictionary] = []
+	for beat in sequence.get_beats_sorted():
+		if (
+			beat.kind != CutsceneBeat.Kind.AUDIO
+			or beat.start_seconds > seconds + 0.00001
+		):
+			continue
+		var event := {
+			&"action": beat.audio_action,
+			&"stream": beat.audio_stream,
+			&"bus": beat.audio_bus,
+			&"volume_db": beat.audio_volume_db,
+			&"pitch_scale": beat.audio_pitch_scale,
+			&"fade_seconds": beat.audio_fade_seconds,
+			&"start_seconds": beat.start_seconds,
+		}
+		match beat.audio_action:
+			CutsceneBeat.AudioAction.PLAY_SFX:
+				if _beat_is_active_at(beat, seconds):
+					active_sfx.append(event)
+			CutsceneBeat.AudioAction.PLAY_MUSIC:
+				state[&"music"] = event
+			CutsceneBeat.AudioAction.STOP_MUSIC:
+				state[&"music"] = null
+	state[&"sfx"] = active_sfx
+	return state
+
+
+## Returns effect instances that should exist at an arbitrary scrub time.
+func _evaluate_vfx_at(
+	sequence: CutsceneSequence,
+	seconds: float
+) -> Dictionary:
+	var active_effects: Dictionary = {}
+	for beat in sequence.get_beats_sorted():
+		if (
+			beat.kind != CutsceneBeat.Kind.VFX
+			or beat.start_seconds > seconds + 0.00001
+		):
+			continue
+		if beat.vfx_action == CutsceneBeat.VfxAction.STOP:
+			active_effects.erase(beat.vfx_id)
+			continue
+		if (
+			beat.duration_seconds > 0.0
+			and seconds > beat.get_end_seconds() + 0.00001
+		):
+			active_effects.erase(beat.vfx_id)
+			continue
+		active_effects[beat.vfx_id] = {
+			&"action": beat.vfx_action,
+			&"id": beat.vfx_id,
+			&"scene": beat.vfx_scene,
+			&"position": _resolve_vfx_position(beat),
+			&"start_seconds": beat.start_seconds,
+			&"duration_seconds": beat.duration_seconds,
+		}
+	return active_effects
+
+
+func _default_camera_state() -> Dictionary:
+	return {
+		&"action": CutsceneBeat.CameraAction.RESET,
+		&"offset": Vector2.ZERO,
+		&"zoom": Vector2.ONE,
+		&"shake_strength": 0.0,
+		&"shake_offset": Vector2.ZERO,
+		&"active": false,
+		&"progress": 1.0,
+	}
+
+
+func _default_audio_state() -> Dictionary:
+	return {
+		&"music": null,
+		&"sfx": Array([], TYPE_DICTIONARY, &"", null),
+	}
+
+
+func _beat_progress_at(beat: CutsceneBeat, seconds: float) -> float:
+	if beat.duration_seconds <= 0.0:
+		return 1.0
+	return clampf(
+		(seconds - beat.start_seconds) / beat.duration_seconds,
+		0.0,
+		1.0
+	)
+
+
 func _resolve_actor(actor_id: StringName) -> Node2D:
 	if not _actor_resolver.is_valid():
 		return null
@@ -787,6 +1087,22 @@ func _resolve_target_position(beat: CutsceneBeat) -> Vector2:
 	if is_instance_valid(_stage):
 		return _stage.to_global(beat.target_offset)
 	return beat.target_offset
+
+
+func _resolve_stage_position(local_position: Vector2) -> Vector2:
+	if is_instance_valid(_stage):
+		return _stage.to_global(local_position)
+	return local_position
+
+
+func _resolve_vfx_position(beat: CutsceneBeat) -> Vector2:
+	if not beat.target_marker.is_empty():
+		return _resolve_target_position(beat)
+	if not beat.actor.is_empty():
+		var actor := _resolve_actor(beat.actor)
+		if actor != null:
+			return actor.global_position + beat.target_offset
+	return _resolve_stage_position(beat.target_offset)
 
 
 func _get_actor_state(actor: Node2D) -> Dictionary:
