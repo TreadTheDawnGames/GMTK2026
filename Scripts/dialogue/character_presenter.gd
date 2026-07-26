@@ -83,7 +83,12 @@ func apply_appearance(appearance: CharacterAppearance) -> void:
 	character_sprite.vframes = appearance.vertical_frames
 	character_sprite.frame = appearance.frame
 	character_sprite.scale = appearance.sprite_scale
-	character_sprite.position = appearance.sprite_offset
+	# The actor origin is its feet. Measuring the lowest opaque row keeps art
+	# padding from making runtime placement disagree with the editor preview.
+	character_sprite.position = Vector2(
+		appearance.sprite_offset.x,
+		ActorSoleMeasure.get_sprite_y(appearance)
+	)
 	character_sprite.modulate = appearance.tint
 	character_sprite.flip_h = appearance.flip_h
 	_art_faces_left = appearance.art_faces_left

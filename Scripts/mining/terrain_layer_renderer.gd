@@ -69,6 +69,9 @@ class PreparedLayerPatch:
 	var destination_position: Vector2i
 	var source_revision: int
 	var dirty_tile_bits: int
+	## One exact patch texture per candidate/chunk/layer is uploaded during
+	## wind-up and discarded at target replacement or after its mask folds in.
+	var overlay_texture: ImageTexture
 
 
 class ImpactRasterWork:
@@ -96,6 +99,7 @@ class ImpactStampPreparation:
 	var raster_band_index: int = 0
 	var raster_band_count: int = 1
 	var prepares_patch: bool = false
+	var prepares_overlay_texture: bool = false
 	## A nonnegative index detaches one candidate-independent GPU mask tile.
 	## At most three tiles per active stratum can ever remain allocated.
 	var private_texture_tile_index: int = -1
@@ -241,8 +245,9 @@ const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 192
 
 @export_category("Web Performance")
 ## Maximum CPU time spent starting queued mask layers in one rendered frame.
-## A layer already in progress completes atomically so textures never tear.
-@export_range(1.0, 16.0, 0.5) var web_impact_frame_budget_ms: float = 3.0
+## GPU-ready prediction work is spread across frames; a layer already in
+## progress completes atomically so textures never tear.
+@export_range(1.0, 16.0, 0.5) var web_impact_frame_budget_ms: float = 1.5
 ## Limits reusable resized masks so repeated hit sizes avoid image allocations.
 @export_range(0, 48, 1) var resized_stamp_cache_limit: int = 48
 ## Oversized combo openings are one-off and must not occupy the reusable cache.
@@ -343,6 +348,7 @@ var _active_impact_combo: int = 0
 var _pending_impact_work: Array[ImpactRasterWork] = []
 var _pending_impact_work_head: int = 0
 var _impact_work_pool: Array[ImpactRasterWork] = []
+var _impact_overlay_presented_this_frame: bool = false
 var _pending_chunk_texture_publishes: Array[ChunkTexturePublishWork] = []
 var _pending_chunk_texture_publish_head: int = 0
 var _chunk_texture_publish_pool: Array[ChunkTexturePublishWork] = []
@@ -492,6 +498,9 @@ func _process(_delta: float) -> void:
 		and _pending_impact_work_head < _pending_impact_work.size()
 	):
 		_process_next_pending_impact_work()
+		if _impact_overlay_presented_this_frame:
+			_impact_overlay_presented_this_frame = false
+			return
 		if (
 			Time.get_ticks_usec() - frame_started_at
 			>= frame_budget_usec
@@ -558,6 +567,7 @@ func _on_dig_visuals_preparation_started(
 		work.raster_band_index = 0
 		work.raster_band_count = 1
 		work.prepares_patch = false
+		work.prepares_overlay_texture = false
 		work.private_texture_tile_index = -1
 		work.image_preparation = null
 		if (
@@ -663,10 +673,27 @@ func _prepare_next_pending_stamp_layer() -> void:
 		):
 			return
 		# Allocate the private GPU destination during target wind-up while it
-		# still contains the unchanged terrain. Impact then performs an update,
-		# avoiding first-use texture allocation inside the protected queue.
+		# still contains unchanged terrain. The exact patch overlay hides the
+		# later authoritative fold-in, so contact performs no full-tile upload.
 		work.chunk.dirty_mask_tiles[layer_index] |= tile_bit
 		_publish_layer_texture(work.chunk, layer_index, tile_bit)
+		return
+	if work.prepares_overlay_texture:
+		var patch: PreparedLayerPatch = _prepared_layer_patches.get(
+			_get_prepared_layer_patch_key(
+				work.stamp,
+				work.chunk_index,
+				work.layer_index
+			)
+		)
+		if (
+			patch != null
+			and patch.source_revision
+				== work.chunk.layer_revisions[layer_index]
+		):
+			patch.overlay_texture = ImageTexture.create_from_image(
+				patch.image
+			)
 		return
 	if work.prepares_patch:
 		_prepare_stamp_layer_patch_band(work)
@@ -773,6 +800,7 @@ func _obtain_stamp_preparation_work() -> ImpactStampPreparation:
 	work.raster_band_index = 0
 	work.raster_band_count = 1
 	work.prepares_patch = false
+	work.prepares_overlay_texture = false
 	work.private_texture_tile_index = -1
 	work.image_preparation = null
 	return work
@@ -824,6 +852,15 @@ func _queue_stamp_layer_patch_preparation(
 		work.raster_band_count = raster_band_count
 		work.prepares_patch = true
 		_pending_stamp_preparation.append(work)
+	# Keep the patch upload as its own measured slice. Combining it with the
+	# final raster band can exceed the 7 ms atomic Web budget on a cold driver.
+	var overlay_work := _obtain_stamp_preparation_work()
+	overlay_work.stamp = stamp
+	overlay_work.layer_index = layer_index
+	overlay_work.chunk = chunk
+	overlay_work.chunk_index = chunk_index
+	overlay_work.prepares_overlay_texture = true
+	_pending_stamp_preparation.append(overlay_work)
 	# GPU texture creation is candidate-independent once the CPU stratum has
 	# detached. Queue one bounded tile allocation after its patch raster bands.
 	var dirty_tile_bits := _get_stamp_dirty_tile_bits(stamp, layer_index)
@@ -970,6 +1007,7 @@ func _compact_pending_stamp_preparation() -> void:
 		work.raster_band_index = 0
 		work.raster_band_count = 1
 		work.prepares_patch = false
+		work.prepares_overlay_texture = false
 		work.private_texture_tile_index = -1
 		work.image_preparation = null
 		if (
@@ -1253,6 +1291,7 @@ func _process_next_pending_impact_work() -> void:
 		return
 	var work := _pending_impact_work[_pending_impact_work_head]
 	_pending_impact_work_head += 1
+	var presented_prepared_overlay := false
 	if not work.raster_complete and work.prepared_patch != null:
 		if _active_chunks.get(work.chunk_index) == work.chunk:
 			_make_layer_writable(work.chunk, work.layer_index)
@@ -1272,6 +1311,14 @@ func _process_next_pending_impact_work() -> void:
 				)
 				work.chunk.dirty_mask_tiles[work.layer_index] |= (
 					work.prepared_patch.dirty_tile_bits
+				)
+				_show_prepared_patch_overlay(
+					work.chunk,
+					work.layer_index,
+					work.prepared_patch
+				)
+				presented_prepared_overlay = (
+					work.prepared_patch.overlay_texture != null
 				)
 				work.chunk.layer_revisions[work.layer_index] += 1
 			else:
@@ -1306,6 +1353,12 @@ func _process_next_pending_impact_work() -> void:
 		work.raster_complete = true
 	else:
 		work.raster_complete = true
+	# The exact small patch is already visible. Resume this same descriptor next
+	# frame for the expensive full-tile fold-in instead of doing both at contact.
+	if presented_prepared_overlay:
+		_pending_impact_work_head -= 1
+		_impact_overlay_presented_this_frame = true
+		return
 	# A final descriptor resumes at the same head until every dirty tile has
 	# uploaded. Queue size stays bounded while the 7 ms guard sees each slice.
 	# A preparation-only item owns no chunk, so it has no texture to publish.
@@ -2225,6 +2278,7 @@ func _share_intact_masks(
 			chunk.layer_sprites[layer_index],
 			texture_tiles
 		)
+		_clear_prepared_patch_overlay(chunk, layer_index)
 		chunk.dirty_mask_tiles[layer_index] = 0
 		chunk.layer_revisions[layer_index] = 0
 	chunk.shared_layers = (1 << layer_count) - 1
@@ -2264,7 +2318,7 @@ func _build_chunk_masks(
 			chunk_contains_sculpt
 		)
 	var back_layer_mask: Image
-	if profile.keep_back_layer_solid:
+	if profile.keep_back_layer_solid and not chunk_has_per_layer_sculpt:
 		back_layer_mask = (
 			_build_chunk_base_mask(
 				chunk_index,
@@ -2291,22 +2345,28 @@ func _build_chunk_masks(
 			else base_mask
 		)
 		var layer_mask := source_mask
-		# A room whose strata were sculpted apart needs its own rock per
-		# stratum. Only then is the extra build paid for, and only for the
-		# gameplay strata: the reserved back wall stays the shared backdrop.
-		if chunk_has_per_layer_sculpt and not uses_backdrop_source:
-			layer_mask = _build_chunk_base_mask(
-				chunk_index,
-				false,
-				chunk_contains_chamber,
-				chunk_contains_sculpt,
-				layer_index
+		# Authored foreground strata need their own room masks. Every shipped
+		# fourth-layer room wall is fully solid, so reuse the immutable pristine
+		# mask instead of rasterizing a fourth full room during traversal.
+		if chunk_has_per_layer_sculpt:
+			layer_mask = (
+				_get_pristine_mask_image()
+				if uses_backdrop_source
+				else _build_chunk_base_mask(
+					chunk_index,
+					false,
+					chunk_contains_chamber,
+					chunk_contains_sculpt,
+					layer_index
+				)
 			)
 		chunk.mask_images[layer_index] = layer_mask
 		chunk.dirty_mask_tiles[layer_index] = ALL_MASK_TILES_DIRTY
 	# Mark every image used by more than one stratum as copy-on-write. A later
 	# impact detaches only the layer it changes.
 	for layer_index in range(layer_count):
+		if chunk.mask_images[layer_index] == _pristine_mask_image:
+			chunk.shared_layers |= 1 << layer_index
 		for previous_layer_index in range(layer_index):
 			if (
 				chunk.mask_images[layer_index]
@@ -2344,6 +2404,8 @@ func _make_layer_writable(
 func _publish_chunk_textures(chunk: TerrainChunkVisual) -> void:
 	var shared_tiles_by_image_id: Dictionary[int, Array] = {}
 	for layer_index in range(chunk.mask_images.size()):
+		if _bind_pristine_layer_texture(chunk, layer_index):
+			continue
 		var mask_image: Image = chunk.mask_images[layer_index]
 		var image_id := mask_image.get_instance_id()
 		if (
@@ -2377,6 +2439,8 @@ func _queue_chunk_textures(
 	var layers_by_image_id: Dictionary[int, PackedInt32Array] = {}
 	for layer_index in range(chunk.mask_images.size()):
 		if chunk.dirty_mask_tiles[layer_index] == 0:
+			continue
+		if _bind_pristine_layer_texture(chunk, layer_index):
 			continue
 		var image_id := chunk.mask_images[layer_index].get_instance_id()
 		if chunk.shared_layers & (1 << layer_index) == 0:
@@ -2446,6 +2510,26 @@ func _process_next_chunk_texture_publish() -> void:
 		_chunk_texture_publish_pool.append(work)
 
 
+## Binds the one immutable solid GPU mask without rebuilding or uploading it.
+## The layer remains copy-on-write, so the first impact detaches its CPU image.
+func _bind_pristine_layer_texture(
+	chunk: TerrainChunkVisual,
+	layer_index: int
+) -> bool:
+	if chunk.mask_images[layer_index] != _pristine_mask_image:
+		return false
+	var texture_tiles: Array[ImageTexture] = []
+	texture_tiles.resize(MASK_HORIZONTAL_TILE_COUNT)
+	texture_tiles.fill(_pristine_mask_texture)
+	chunk.mask_texture_tiles[layer_index] = texture_tiles
+	_set_sprite_mask_textures(
+		chunk.layer_sprites[layer_index],
+		texture_tiles
+	)
+	chunk.dirty_mask_tiles[layer_index] = 0
+	return true
+
+
 func _compact_pending_chunk_texture_publishes() -> void:
 	if _pending_chunk_texture_publish_head <= 0:
 		return
@@ -2464,6 +2548,47 @@ func _compact_pending_chunk_texture_publishes() -> void:
 		)
 	)
 	_pending_chunk_texture_publish_head = 0
+
+
+## Displays the exact prepared pixels while the authoritative full tile folds
+## in behind them. Every mask sample, including outline probes, uses this patch.
+func _show_prepared_patch_overlay(
+	chunk: TerrainChunkVisual,
+	layer_index: int,
+	patch: PreparedLayerPatch
+) -> void:
+	if patch.overlay_texture == null:
+		return
+	var mask_size := Vector2(_get_chunk_mask_size())
+	var material := (
+		chunk.layer_sprites[layer_index].material as ShaderMaterial
+	)
+	material.set_shader_parameter(
+		&"impact_patch_texture",
+		patch.overlay_texture
+	)
+	material.set_shader_parameter(
+		&"impact_patch_uv_rect",
+		Vector4(
+			float(patch.destination_position.x) / mask_size.x,
+			float(patch.destination_position.y) / mask_size.y,
+			float(patch.image.get_width()) / mask_size.x,
+			float(patch.image.get_height()) / mask_size.y
+		)
+	)
+	material.set_shader_parameter(&"use_impact_patch", true)
+
+
+## Removes the transient exact patch only after every dirty base tile published.
+func _clear_prepared_patch_overlay(
+	chunk: TerrainChunkVisual,
+	layer_index: int
+) -> void:
+	var material := (
+		chunk.layer_sprites[layer_index].material as ShaderMaterial
+	)
+	material.set_shader_parameter(&"use_impact_patch", false)
+	material.set_shader_parameter(&"impact_patch_texture", null)
 
 
 ## Uploads one stratum, reusing its texture unless the mask it draws changed
@@ -2533,6 +2658,8 @@ func _publish_layer_texture(
 	chunk.mask_texture_tiles[layer_index] = texture_tiles
 	_set_sprite_mask_textures(sprite, texture_tiles)
 	chunk.dirty_mask_tiles[layer_index] &= ~dirty_tiles
+	if chunk.dirty_mask_tiles[layer_index] == 0:
+		_clear_prepared_patch_overlay(chunk, layer_index)
 
 
 ## Binds one layer's fixed tile set to its single full-width sprite.
@@ -2750,6 +2877,7 @@ func _release_chunk_masks(chunk: TerrainChunkVisual) -> void:
 			chunk.layer_sprites[layer_index],
 			texture_tiles
 		)
+		_clear_prepared_patch_overlay(chunk, layer_index)
 		chunk.dirty_mask_tiles[layer_index] = 0
 		chunk.layer_revisions[layer_index] = 0
 	chunk.shared_layers = (1 << chunk.mask_images.size()) - 1

@@ -20,6 +20,8 @@ signal encounter_completed(encounter_index: int)
 signal coffee_speed_boost_requested
 signal rat_colony_support_requested
 signal character_stage_strike_requested(screen_position: Vector2)
+signal stampede_rumble_started(strength_px: float)
+signal stampede_rumble_finished
 ## Relays a stage's request to open real rock where a strike landed.
 signal character_stage_rock_break_requested(
 	screen_position: Vector2,
@@ -29,10 +31,11 @@ signal character_stage_rock_break_requested(
 const FLOW_OWNER: StringName = &"depth_encounter"
 const MINER_SPEAKER_SLOT: StringName = &"miner"
 const FINAL_BREAKTHROUGH_CUE: StringName = &"resume_mining"
-## Which terrain stratum the cast's feet are placed against. Zero is the
-## foreground layer, which is the ground the player sees them standing on now
-## that TerrainLayerProfile no longer lowers it over a chamber floor.
-const CAST_FLOOR_LAYER_INDEX: int = 0
+## The cast draws between terrain strata zero and one, so its feet stand above
+## the second stratum's visible support. Rooms that cut fully through that
+## stratum fall back to the front layer instead of inventing a floor.
+const CAST_FLOOR_LAYER_INDEX: int = 1
+const CAST_FLOOR_FALLBACK_LAYER_INDEX: int = 0
 ## How far above its floor row a landing still counts as having arrived.
 ##
 ## A cutscene room's ground is not its floor row. The level tunnel lays up to
@@ -60,19 +63,10 @@ const LANDING_FLOOR_TOLERANCE_ROWS: int = 4
 ## stage's walking sampler go through this, so the cast cannot drift apart from
 ## the man they are talking to.
 ##
-## Zero. The cast stand ON the surface the sampler reports, with no gap at all.
-##
-## This has been seven and then fourteen, each time to clear the drawn outline
-## stroked outward from the rock boundary. Fourteen is visibly too much now that
-## the characters draw on the second stratum: the miner reads as hovering above
-## the floor rather than standing on it, which is worse than the sinking the lift
-## was added to prevent - a floating character has no weight, and this game's whole
-## read is a man putting his weight into a pickaxe.
-##
-## Zero puts everyone's soles on the top of the rock the sampler found. If a
-## character ever looks half-buried again, the fix is the sampler picking the
-## right stratum, not padding on top of whatever it returned.
-const CUTSCENE_FLOOR_LIFT_PIXELS: float = 0.0
+## Three pixels clears the inked edge and the idle pose's two-pixel dip now that
+## CharacterPresenter measures the actual drawn sole rather than an authored
+## canvas offset.
+const CUTSCENE_FLOOR_LIFT_PIXELS: float = 3.0
 ## How still the sampled floor has to be, and for how many readings, before the
 ## room counts as having arrived. Half a pixel is under the sub-cell resolution
 ## the mask is written at, so it cannot be met by a room still travelling.
@@ -123,6 +117,7 @@ var _sequence_is_awaiting_dialogue: bool = false
 ## True once a timeline's DIALOGUE beat has run the encounter's conversation, so
 ## the schedule knows not to start it again when the timeline finishes.
 var _timeline_presented_conversation: bool = false
+var _prestaged_encounter_index: int = -1
 var _game_state: RunState
 
 
@@ -215,6 +210,13 @@ func _on_credits_completed() -> void:
 
 ## Restores only the run-scoped credits prerequisite.
 func _on_run_reset() -> void:
+	if (
+		_prestaged_encounter_index >= 0
+		and _prestaged_encounter_index < _presenters.size()
+	):
+		_presenters[_prestaged_encounter_index].hide()
+	_prestaged_encounter_index = -1
+	_exit_cast_cutscene_draw_order()
 	_credits_have_completed = false
 	_is_final_breakthrough_armed = false
 	_is_final_breakthrough_resolving = false
@@ -231,6 +233,44 @@ func _schedule_next_encounter() -> bool:
 	if not cinematic_flow.try_begin(FLOW_OWNER):
 		return false
 	_pending_encounter_index = _next_encounter_index
+	var encounter := encounter_config.encounters[_pending_encounter_index]
+	if encounter.prestage_before_landing:
+		var stage := _stages[_pending_encounter_index]
+		var presenter := _presenters[_pending_encounter_index]
+		if stage != null:
+			var encounter_anchor := _encounter_positions[
+				_pending_encounter_index
+			]
+			stage.position = encounter_anchor
+			presenter.apply_appearance(encounter.appearance)
+			if stage.conversation_tracks_miner:
+				_align_actor_markers_to_miner(stage)
+			if (
+				stage.props_track_tracked_cast
+				and stage.prop_markers_root != null
+			):
+				stage.prop_markers_root.position.x = (
+					stage.actor_markers_root.position.x
+				)
+			var entrance_position := stage.entrance_marker.global_position
+			var encounter_floor_row := (
+				mining_config.initial_surface_row
+				+ encounter.resolve_depth(mining_config.total_run_depth)
+			)
+			var entrance_floor_y := _sample_cutscene_floor(
+				entrance_position.x,
+				encounter_floor_row
+			)
+			if not is_nan(entrance_floor_y) and not is_inf(entrance_floor_y):
+				entrance_position.y = entrance_floor_y
+			presenter.global_position = entrance_position
+			if presenter.has_pose(stage.conversation_pose):
+				presenter.play_pose(stage.conversation_pose)
+			if stage.conversation_facing != 0:
+				presenter.set_facing_direction(stage.conversation_facing)
+			presenter.show()
+			_prestaged_encounter_index = _pending_encounter_index
+			_enter_cast_cutscene_draw_order()
 	# He is on his way down into the room from this moment. The pose holds until
 	# the landing promotes the encounter, which is the only thing that knows he
 	# has arrived.
@@ -252,7 +292,10 @@ func _activate_pending_encounter() -> void:
 	var encounter := encounter_config.encounters[_active_encounter_index]
 	presenter.apply_appearance(encounter.appearance)
 	var encounter_anchor := _encounter_positions[_active_encounter_index]
-	presenter.position = encounter_anchor
+	# A prestaged actor already stands at the entrance during the fall; moving
+	# him back to the room anchor here would create a landing-frame pop.
+	if not encounter.prestage_before_landing:
+		presenter.position = encounter_anchor
 	var stage := _stages[_active_encounter_index]
 	if stage != null:
 		stage.position = encounter_anchor
@@ -316,6 +359,12 @@ func _sample_cutscene_floor(screen_x: float, landing_world_row: int) -> float:
 			CAST_FLOOR_LAYER_INDEX
 		)
 	)
+	if is_nan(support):
+		support = terrain_renderer.get_layer_opening_floor_support_screen_y(
+			screen_x,
+			landing_world_row,
+			CAST_FLOOR_FALLBACK_LAYER_INDEX
+		)
 	if is_nan(support):
 		return support
 	return support - CUTSCENE_FLOOR_LIFT_PIXELS
@@ -493,6 +542,10 @@ func _begin_active_encounter() -> void:
 		miner_rig.seat_landing_foot_at_screen_y(
 			floor_sampler.call(miner_rig.get_landing_foot_screen_x())
 		)
+		if encounter.prestage_before_landing:
+			# prepare() must snapshot the actor's original hidden state so a
+			# cancellation can restore it after taking over the visible prestage.
+			presenter.hide()
 		if not _active_stage.prepare(presenter, floor_sampler):
 			push_error(
 				"Encounter '%s' could not prepare its stage."
@@ -500,6 +553,8 @@ func _begin_active_encounter() -> void:
 			)
 			_fail_active_encounter()
 			return
+		if encounter.prestage_before_landing:
+			_prestaged_encounter_index = -1
 		# After prepare, not before it. prepare() stands the stage's own visitor
 		# on the entrance mark at that marker's authored y, which is the dig line
 		# - and a visitor who is already in place and never walks is never
@@ -938,6 +993,14 @@ func _prepare_authored_characters() -> bool:
 					colony_stage.stampede_finished,
 					_on_stampede_finished
 				)
+				_connect_once(
+					colony_stage.stampede_rumble_started,
+					_on_stampede_rumble_started
+				)
+				_connect_once(
+					colony_stage.stampede_rumble_finished,
+					_on_stampede_rumble_finished
+				)
 			if encounter.starts_rat_colony_support:
 				if not stage is RatColonyEncounterStage:
 					push_error(
@@ -1098,6 +1161,14 @@ func _on_stampede_finished() -> void:
 	miner_rig.release_cutscene_landing()
 
 
+func _on_stampede_rumble_started(strength_px: float) -> void:
+	stampede_rumble_started.emit(strength_px)
+
+
+func _on_stampede_rumble_finished() -> void:
+	stampede_rumble_finished.emit()
+
+
 ## Relays a stage-local action through the cross-system wiring boundary.
 func _on_character_stage_strike_requested(
 	screen_position: Vector2
@@ -1121,6 +1192,12 @@ func _on_persistent_colony_requested() -> void:
 
 ## Restores reversible stage state and skips malformed authored dialogue.
 func _fail_active_encounter() -> void:
+	if (
+		_prestaged_encounter_index >= 0
+		and _prestaged_encounter_index < _presenters.size()
+	):
+		_presenters[_prestaged_encounter_index].hide()
+	_prestaged_encounter_index = -1
 	if _active_stage != null:
 		_active_stage.cancel_and_restore()
 		_active_stage = null
