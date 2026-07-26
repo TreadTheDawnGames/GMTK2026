@@ -79,6 +79,20 @@ signal sequence_dialogue_requested(
 @export var conversation_tracks_miner: bool = false
 ## Presenter-root offset; actor sprite offsets remain authored by appearance.
 @export_range(-256.0, 256.0, 1.0) var conversation_root_offset_from_miner_x: float = 0.0
+## Slides this stage's props with its tracked cast instead of leaving them
+## pinned to the room.
+##
+## Off, and props belong to the rock: a ledge, a shaft, anything the terrain
+## itself holds. On, and they belong to the conversation: the Treasure Hunter's
+## hoard is the thing he is standing at and the thing the miner is looking past,
+## so it has to keep the same relationship to both of them however far the
+## snaking descent moved them. Left pinned, a miner landing on the hoard's side
+## of the room ends up standing inside the pile.
+##
+## Only meaningful with conversation_tracks_miner on, because it copies the
+## shift that tracking already applied. Off by default, so every room whose
+## props are authored against its own terrain is untouched.
+@export var props_track_tracked_cast: bool = false
 ## Optional visual-editor timeline. Null preserves the legacy opening walk.
 @export var sequence: CutsceneSequence
 ## Actors already painted into this stage's own artwork, by actor id.
@@ -178,6 +192,7 @@ func prepare(
 		return false
 	_presenter = presenter
 	_floor_sampler = floor_sampler
+	_follow_tracked_cast_with_props()
 	_restore_position = presenter.global_position
 	_restore_visible = presenter.visible
 	_restore_flip_h = presenter.character_sprite.flip_h
@@ -403,6 +418,29 @@ func _finish_closing_fade() -> void:
 		return
 	_presenter.hide()
 	_presenter.modulate = _restore_modulate
+
+
+## Puts this stage's props under the same shift tracking gave its actor markers.
+##
+## DepthEncounterController slides ActorMarkers to the miner's landing column and
+## leaves everything else where the room put it, which is right for a prop that
+## belongs to the terrain and wrong for one that belongs to the conversation. The
+## shift is read back off the marker root rather than recomputed, because the
+## controller has already done that arithmetic against the miner's real foot
+## position and a second derivation could only ever disagree with it.
+##
+## ActorMarkers is authored at the stage origin, so its x is exactly the
+## accumulated shift. Assigning rather than adding keeps this correct on a repeat
+## visit, where the root still carries the previous encounter's offset.
+func _follow_tracked_cast_with_props() -> void:
+	if (
+		not props_track_tracked_cast
+		or not conversation_tracks_miner
+		or not is_instance_valid(actor_markers_root)
+		or not is_instance_valid(prop_markers_root)
+	):
+		return
+	prop_markers_root.position.x = actor_markers_root.position.x
 
 
 ## Turns the actor to face a world direction, or leaves them as they are on zero.

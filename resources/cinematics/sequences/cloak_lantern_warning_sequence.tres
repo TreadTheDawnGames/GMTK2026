@@ -1,62 +1,46 @@
 [gd_resource type="Resource" script_class="CutsceneSequence" format=3 uid="uid://06ho6eb366wd"]
 
-[ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="1_duuv6"]
-[ext_resource type="Resource" uid="uid://dgdmgvl3mietr" path="res://resources/dialogue/cloak_lantern_warning_conversation.tres" id="2_qpjyh"]
-[ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="3_k6b3r"]
+[ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="1_beat"]
+[ext_resource type="Resource" uid="uid://dgdmgvl3mietr" path="res://resources/dialogue/cloak_lantern_warning_conversation.tres" id="2_conversation"]
+[ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="3_sequence"]
 
-[sub_resource type="Resource" id="Resource_eb3br"]
-script = ExtResource("1_duuv6")
+[sub_resource type="Resource" id="Beat_show"]
+script = ExtResource("1_beat")
 kind = 9
 actor = &"cloak_lantern"
+notes = "prepare() has already stood him at Entrance, which is the bench, and shown him. This beat states it anyway so the timeline is the whole account of the shot and does not depend on the stage having done half of it first."
 
-[sub_resource type="Resource" id="Resource_k8h3i"]
-script = ExtResource("1_duuv6")
-kind = 0
-actor = &"cloak_lantern"
-duration_seconds = 1.7
-target_marker = &"Conversation"
-starts_from_authored_point = true
-start_marker = &"Entrance"
-pose = &"walk"
-
-[sub_resource type="Resource" id="Resource_g2tww"]
-script = ExtResource("1_duuv6")
+[sub_resource type="Resource" id="Beat_face"]
+script = ExtResource("1_beat")
 kind = 2
 actor = &"cloak_lantern"
-start_seconds = 1.7
 facing = -1
+notes = "Looking left, at the miner, who is one measured miner-width to his left. Facing is a world direction; the presenter folds art_faces_left in, so -1 is looking left whichever way the art was drawn."
 
-[sub_resource type="Resource" id="Resource_ev6e8"]
-script = ExtResource("1_duuv6")
-kind = 1
-actor = &"cloak_lantern"
-start_seconds = 1.7
-pose = &"idle"
-
-[sub_resource type="Resource" id="Resource_60yun"]
-script = ExtResource("1_duuv6")
+[sub_resource type="Resource" id="Beat_dialogue"]
+script = ExtResource("1_beat")
 kind = 5
-start_seconds = 3.0999999999999996
+start_seconds = 0.6
 duration_seconds = 6.0
-conversation = ExtResource("2_qpjyh")
-notes = "Slower than his first visit and holds longer. The return should read as the same man pressing a point."
+conversation = ExtResource("2_conversation")
+notes = "The whole conversation: 'You kept digging.' / '...' / 'Everyone thinks the Thief is waiting below. They never notice what goes missing on the way.'
 
-[sub_resource type="Resource" id="Resource_nsp2h"]
-script = ExtResource("1_duuv6")
-kind = 0
-actor = &"cloak_lantern"
-start_seconds = 9.1
-duration_seconds = 3.0
-target_marker = &"Exit"
-pose = &"walk"
+Six seconds is the authored estimate the editor scrubs against, not the real length. This beat blocks, so the clock holds here for exactly as long as the player takes to read and every beat after it slides by the same amount.
 
-[sub_resource type="Resource" id="Resource_bjt2e"]
-script = ExtResource("1_duuv6")
-kind = 10
-actor = &"cloak_lantern"
-start_seconds = 12.1
+Do not split this into two beats to land a cue between the lines. line_range is authored and validated but depth_encounter_controller currently ignores it, so any DIALOGUE beat plays the whole conversation.
+
+The 0.6s of held silence before he speaks is deliberate: the miner has just come through the ceiling, and the Keeper is already standing there waiting for him to look up."
+
+[sub_resource type="Resource" id="Beat_wait"]
+script = ExtResource("1_beat")
+kind = 4
+start_seconds = 6.6
+duration_seconds = 0.9
+notes = "A held beat on the two of them after the last line, before the timeline ends and play_closing takes him. Without it the shot cuts straight from the dialogue box closing to him fading, and the line does not get to land.
+
+This is the last beat. The timeline deliberately does not walk him off or hide him: play_closing owns the departure, and that is what fades him and the bench out together over the same 1.2s."
 
 [resource]
-script = ExtResource("3_k6b3r")
+script = ExtResource("3_sequence")
 sequence_id = &"cloak_lantern_warning_sequence"
-beats = Array[ExtResource("1_duuv6")]([SubResource("Resource_eb3br"), SubResource("Resource_k8h3i"), SubResource("Resource_g2tww"), SubResource("Resource_ev6e8"), SubResource("Resource_60yun"), SubResource("Resource_nsp2h"), SubResource("Resource_bjt2e")])
+beats = Array[ExtResource("1_beat")]([SubResource("Beat_show"), SubResource("Beat_face"), SubResource("Beat_dialogue"), SubResource("Beat_wait")])

@@ -1,0 +1,15 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Texture2D" path="res://Assets/Props/bench.png" id="1_bench"]
+
+[node name="Bench" type="Sprite2D"]
+editor_description = "A bench, underground, 5,600 rows down, where there is no reason for a bench to be. The Lantern Keeper is standing at it when the miner breaks in, and it leaves when he does.
+
+Scale was measured, not eyed. The source art is 1357x730 opaque pixels and its own proportions are already a real bench's - 1.85 long to tall, against a real 165cm by 88cm - so one scale gets both. At 0.081 it stands 110px long and 59px tall, which puts its back at 52% of the Lantern Keeper's measured 113.2px height; a real bench back reaches 50% of a standing adult. Cross-checked against the cafe furniture, which is the only other seating in the game: the stool's seat sits 32px up and the table 50px, both landing on 0.666 world px per real cm, and this bench agrees with them.
+
+The drawing's own legs are long and its back is short, so its seat reads high for its size. That is the drawing's character and it costs nothing here, because nobody sits on it - the Keeper has one standing texture and stands beside it.
+
+The offset undoes the Sprite2D centring and the source canvas's padding together, so the feet land on the node's origin and dropping this on a floor marker plants it rather than floating it."
+texture = ExtResource("1_bench")
+offset = Vector2(-89, -423)
+scale = Vector2(0.081, 0.081)
