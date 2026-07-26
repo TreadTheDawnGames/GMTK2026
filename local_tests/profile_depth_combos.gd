@@ -13,10 +13,10 @@ const PROFILE_DEPTHS: Array[int] = [10_000, 50_000, 100_000]
 const MAX_CONFIGURED_HIT_MS: float = 4.0
 const MAX_STACKED_HIT_MS: float = 8.0
 const MAX_WORK_MS: float = 7.0
-# The jam shipping ceiling is 50 ms for a fully drained impact. The tighter
+# The jam shipping ceiling is 45 ms for a fully drained impact. The tighter
 # hit, per-item, and queue guards stay unchanged so this cannot mask a frame
 # spike or unbounded backlog merely to accept a longer aggregate drain.
-const MAX_TOTAL_MS: float = 50.0
+const MAX_TOTAL_MS: float = 45.0
 const MAX_QUEUE_SIZE: int = 192
 # The deep traversal is intentionally broader than the 20-second microbenches,
 # but it still terminates below one minute so a broken stream cannot pin CI.
