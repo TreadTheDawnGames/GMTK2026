@@ -64,6 +64,7 @@ func _ready() -> void:
 		#_game_state.depth_changed.connect(_update_depth_label)
 	if not _target_unlocks.is_empty():
 		_apply_pickaxe_target_unlocks()
+	set_audio_handler(_audio_handler)
 	set_bounce_muted(_bounce_muted)
 	show_displayed_distance(_displayed_distance)
 
@@ -71,6 +72,11 @@ func _ready() -> void:
 ## Supplies the cross-scene audio service at the composition boundary.
 func set_audio_handler(audio_handler: PlayerAudioHandler) -> void:
 	_audio_handler = audio_handler
+	if not is_node_ready():
+		return
+	mining_window.set_audio_handler(audio_handler)
+	recovery_window.set_audio_handler(audio_handler)
+	recovery_window2.set_audio_handler(audio_handler)
 
 
 ## Plays optional feedback when this reusable timing scene has an audio owner.
