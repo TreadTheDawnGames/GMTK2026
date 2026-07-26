@@ -35,7 +35,6 @@ offset_top = -128.0
 offset_right = 349.0
 offset_bottom = -47.0
 target_packed_scenes = Array[PackedScene]([ExtResource("4_ndmun")])
-preferred_side = -1
 
 [node name="Control" type="Control" parent="MiningWindow" unique_id=1770024605]
 show_behind_parent = true

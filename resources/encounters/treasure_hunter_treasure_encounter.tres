@@ -1,12 +1,12 @@
-[gd_resource type="Resource" script_class="DepthCharacterEncounter" format=3]
+[gd_resource type="Resource" script_class="DepthCharacterEncounter" format=3 uid="uid://pxolfwsy5ug2"]
 
-[ext_resource type="Script" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
-[ext_resource type="Resource" path="res://resources/encounters/treasure_hunter_character_appearance.tres" id="2_appearance"]
-[ext_resource type="Resource" path="res://resources/dialogue/treasure_hunter_treasure_conversation.tres" id="3_dialogue"]
-[ext_resource type="Resource" path="res://resources/pickaxes/seismic_pickaxe.tres" id="4_pickaxe"]
+[ext_resource type="Script" uid="uid://sqs37vj87ep8" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
+[ext_resource type="Resource" uid="uid://3qhs3t5ixptj" path="res://resources/encounters/treasure_hunter_character_appearance.tres" id="2_appearance"]
+[ext_resource type="Resource" uid="uid://yigtckpqgod" path="res://resources/dialogue/treasure_hunter_treasure_conversation.tres" id="3_dialogue"]
+[ext_resource type="Resource" uid="uid://clbcnexuivy42" path="res://resources/pickaxes/seismic_pickaxe.tres" id="4_pickaxe"]
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/treasure_hunter_hoard_encounter_stage.tscn" id="5_stage"]
-[ext_resource type="Resource" path="res://resources/cinematics/sequences/treasure_hunter_treasure_sequence.tres" id="5_uctft"]
-[ext_resource type="Resource" path="res://resources/cinematics/sculpts/treasure_hunter_treasure_room.tres" id="7_uctft"]
+[ext_resource type="Resource" uid="uid://64nlrieobjnb" path="res://resources/cinematics/sequences/treasure_hunter_treasure_sequence.tres" id="5_uctft"]
+[ext_resource type="Resource" uid="uid://b1l1ay14xqgl" path="res://resources/cinematics/sculpts/treasure_hunter_treasure_room.tres" id="7_uctft"]
 
 [resource]
 script = ExtResource("1_encounter")
