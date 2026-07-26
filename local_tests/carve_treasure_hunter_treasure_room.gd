@@ -176,10 +176,71 @@ func _run() -> void:
 		_finish()
 		return
 
+	# The header has to be taken before the save, because the save is what
+	# destroys it. ResourceSaver writes this room back without its `uid=` and
+	# without the script's, and the encounter resource refers to the room BY
+	# uid: re-running this carve therefore silently breaks the reference every
+	# time, and the only symptom is an encounter that stops finding its room.
+	# Restoring the two lines here is what makes the script safe to re-run.
+	var original_header := _read_resource_header()
 	var save_result := ResourceSaver.save(sculpt, ROOM_PATH)
 	if save_result != OK:
 		_fail("Saving the room returned %d." % save_result)
+		_finish()
+		return
+	_restore_resource_header(original_header)
 	_finish()
+
+
+## Returns the two identity lines a save is about to drop, keyed by their line
+## prefix so a restore can put each back exactly where it was.
+func _read_resource_header() -> Dictionary:
+	var file := FileAccess.open(ROOM_PATH, FileAccess.READ)
+	if file == null:
+		return {}
+	var header := {}
+	while not file.eof_reached():
+		var line := file.get_line()
+		if line.begins_with("[gd_resource "):
+			header["[gd_resource "] = line
+		elif line.begins_with("[ext_resource "):
+			header["[ext_resource "] = line
+		elif line.begins_with("[resource]"):
+			break
+	file.close()
+	return header
+
+
+## Puts the saved file's identity lines back, and fails the run rather than
+## leaving a room whose uid no longer matches the encounter pointing at it.
+func _restore_resource_header(original_header: Dictionary) -> void:
+	if original_header.is_empty():
+		_fail("Could not read the room's original resource header.")
+		return
+	var file := FileAccess.open(ROOM_PATH, FileAccess.READ)
+	if file == null:
+		_fail("Could not reopen the saved room to restore its identity.")
+		return
+	var body := file.get_as_text()
+	file.close()
+	var lines := body.split("\n")
+	var restored: PackedStringArray = []
+	for line in lines:
+		var replacement := line
+		for prefix in original_header:
+			if line.begins_with(prefix):
+				replacement = original_header[prefix]
+		restored.append(replacement)
+	var out := FileAccess.open(ROOM_PATH, FileAccess.WRITE)
+	if out == null:
+		_fail("Could not rewrite the saved room's identity.")
+		return
+	out.store_string("\n".join(restored))
+	out.close()
+	if not FileAccess.get_file_as_string(ROOM_PATH).contains("uid://"):
+		_fail("The saved room still has no uid; the encounter would lose it.")
+		return
+	print("identity: resource and script uids preserved across the save")
 
 
 ## Sweeps the cavern out of the seeded tunnel's roof.
