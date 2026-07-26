@@ -1,70 +1,84 @@
-[gd_resource type="Resource" script_class="CutsceneSequence" format=3 uid="uid://plb4bjuyjgov"]
+﻿[gd_resource type="Resource" script_class="CutsceneSequence" format=3 uid="uid://plb4bjuyjgov"]
 
 [ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="1_ti7jl"]
 [ext_resource type="Resource" uid="uid://bpovruhocqc5" path="res://resources/dialogue/coffee_cat_first_conversation.tres" id="2_ehpe3"]
 [ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="3_huvwr"]
 
-[sub_resource type="Resource" id="Resource_m7fue"]
+[sub_resource type="Resource" id="Resource_show"]
 script = ExtResource("1_ti7jl")
 kind = 9
 actor = &"coffee_cat"
+notes = "prepare() has already put him on the Entrance mark, which is 600px right of the conversation stop and so past the frame edge at every landing column. Nothing is revealed in shot."
 
-[sub_resource type="Resource" id="Resource_2g18f"]
-script = ExtResource("1_ti7jl")
-kind = 0
-actor = &"coffee_cat"
-duration_seconds = 1.1
-target_marker = &"Conversation"
-starts_from_authored_point = true
-start_marker = &"Entrance"
-pose = &"walk"
-
-[sub_resource type="Resource" id="Resource_fle6v"]
-script = ExtResource("1_ti7jl")
-kind = 2
-actor = &"coffee_cat"
-start_seconds = 1.1
-facing = -1
-
-[sub_resource type="Resource" id="Resource_cy8d2"]
+[sub_resource type="Resource" id="Resource_arrive_holding"]
 script = ExtResource("1_ti7jl")
 kind = 1
 actor = &"coffee_cat"
-start_seconds = 1.1
-pose = &"idle"
+pose = &"hold_cup"
+notes = "He comes in mid-swig rather than presenting the cup. The mug is already up when the shot starts, so the offer later reads as a change of mind rather than as the pose he has been holding all along."
 
-[sub_resource type="Resource" id="Resource_sn48r"]
-script = ExtResource("1_ti7jl")
-kind = 3
-actor = &"coffee_cat"
-start_seconds = 1.1
-duration_seconds = 0.3
-bounce_count = 4
-
-[sub_resource type="Resource" id="Resource_5qxba"]
-script = ExtResource("1_ti7jl")
-kind = 5
-start_seconds = 1.4
-duration_seconds = 6.0
-conversation = ExtResource("2_ehpe3")
-notes = "Quibble is over-caffeinated. The bounces stand in for his jitter until that becomes a beat of its own."
-
-[sub_resource type="Resource" id="Resource_c4n17"]
+[sub_resource type="Resource" id="Resource_dart_in"]
 script = ExtResource("1_ti7jl")
 kind = 0
 actor = &"coffee_cat"
-start_seconds = 7.4
-duration_seconds = 1.7
-target_marker = &"Exit"
-pose = &"walk"
+start_seconds = 2.0
+duration_seconds = 0.35
+target_marker = &"Conversation"
+starts_from_authored_point = true
+start_marker = &"Entrance"
+step_height = 12.0
+notes = "600px in 0.35s, against Cheese Girl's 600px in 2.1s. This is the whole characterisation and the number is deliberate: fast enough that the eye reads an arrival rather than a walk, slow enough that he is on screen for three or four frames of it instead of teleporting.
 
-[sub_resource type="Resource" id="Resource_eo0g8"]
+Staged from Entrance rather than chained off wherever he was left, so the dart begins on its exact mark however the beats above it are retimed. It blocks, so everything after it slides if rough ground makes it run long.
+
+No pose is set, so hold_cup carries through the dart: he crosses the room without lowering the mug. The 12px step lift is high for a walk and right for this - at that speed it reads as a bounce, not a stride. There is no walk pose in his set to fall back on and none is wanted."
+
+[sub_resource type="Resource" id="Resource_face_miner"]
 script = ExtResource("1_ti7jl")
-kind = 10
+kind = 2
 actor = &"coffee_cat"
-start_seconds = 9.1
+start_seconds = 2.35
+facing = -1
+notes = "After the dart, never before it: a MOVE aims the actor along its own travel, so a facing set earlier is overwritten by the approach. The dart already arrives leftward, so this is belt and braces against a later edit that moves Entrance.
+
+Facing is a world direction and the presenter folds Art Faces Left in, which is on for him. -1 therefore leaves his art unflipped, and unflipped is the one that puts the mug on the miner's side."
+
+[sub_resource type="Resource" id="Resource_cup_out"]
+script = ExtResource("1_ti7jl")
+kind = 1
+actor = &"coffee_cat"
+start_seconds = 2.35
+pose = &"idle"
+notes = "The mug swings out toward the miner the instant he stops. idle is the cup-out frame; the pose names came from the art, not from what the character is doing.
+
+The stage's own caffeine loop takes the poses back over within about a second and will cycle him through hold_cup and drink for the rest of the shot. That is intended - this beat only decides what the first held frame of the conversation is."
+
+[sub_resource type="Resource" id="Resource_jitter"]
+script = ExtResource("1_ti7jl")
+kind = 3
+actor = &"coffee_cat"
+start_seconds = 2.35
+duration_seconds = 0.35
+bounce_count = 4
+notes = "Four bounces on arrival, before anybody has said anything. He is already wound up when he stops, rather than becoming wound up once his line appears.
+
+This is presentation bounce, which is a different motion from the stage script's fixed jitter and runs on top of it."
+
+[sub_resource type="Resource" id="Resource_dialogue"]
+script = ExtResource("1_ti7jl")
+kind = 5
+start_seconds = 2.7
+duration_seconds = 6.0
+conversation = ExtResource("2_ehpe3")
+notes = "The whole conversation: 'I'M QUIB-QUIB-QUIB-QUIB-QUIBBLE!' / 'HAVE YOU SEEN SEEN SEEN THE CAFE? CAFE? COFFEE? COFFEE CAFE?' / '...' / 'THIS IS IS IS TRAVEL COFFEE. T-T-TAKE IT.' / 'IT MAKES EV-EV-EV-EVERYTHING GO F-F-FASTER!'
+
+Six seconds is the authored estimate the editor scrubs against, not the real length. This beat blocks, so the clock holds here for exactly as long as the player takes to read.
+
+Do not split it to land a cue between the lines. line_range is authored and validated but depth_encounter_controller ignores it, so any DIALOGUE beat plays the whole conversation. The gift line carries the hold_cup speaker pose and that is how the cup is presented on the line that gives it away - though the caffeine loop will take it back a moment later, which is the character rather than a fault.
+
+This is the last beat on purpose. The exit belongs to the stage's own closing move, because play_closing() runs either way and a timeline that also walked him to Exit would move him twice. The generated placeholder this replaced did exactly that at 7.4s."
 
 [resource]
 script = ExtResource("3_huvwr")
 sequence_id = &"coffee_cat_first_sequence"
-beats = Array[ExtResource("1_ti7jl")]([SubResource("Resource_m7fue"), SubResource("Resource_2g18f"), SubResource("Resource_fle6v"), SubResource("Resource_cy8d2"), SubResource("Resource_sn48r"), SubResource("Resource_5qxba"), SubResource("Resource_c4n17"), SubResource("Resource_eo0g8")])
+beats = Array[ExtResource("1_ti7jl")]([SubResource("Resource_show"), SubResource("Resource_arrive_holding"), SubResource("Resource_dart_in"), SubResource("Resource_face_miner"), SubResource("Resource_cup_out"), SubResource("Resource_jitter"), SubResource("Resource_dialogue")])
