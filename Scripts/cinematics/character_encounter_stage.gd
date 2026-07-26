@@ -22,15 +22,15 @@ signal presentation_rock_break_requested(
 	screen_position: Vector2,
 	radius_cells: int
 )
-## Asks the owner to slide the framed view sideways, in terrain cells from the
-## miner's own column, for a shot whose subject is not where he landed.
-signal presentation_camera_pan_requested(offset_cells: float)
+## Asks the owner to slide the framed view off the framing this encounter settled
+## on, in terrain cells, for a shot whose subject is not where the miner landed.
+signal presentation_camera_pan_requested(offset_cells: Vector2)
 signal sequence_dialogue_requested(
 	conversation: DialogueConversation,
 	line_range: Vector2i
 )
 
-## Terrain cells the framed view is displaced sideways from the miner.
+## Terrain cells the framed view is displaced from the encounter focus.
 ##
 ## This exists to be animated. Every other way a cutscene moves is authored as a
 ## beat, but a pan is a continuous motion with its own easing, and an
@@ -42,9 +42,9 @@ signal sequence_dialogue_requested(
 ## The Thief finale is the only encounter that animates it. Left at zero it emits
 ## nothing and costs the other ten nothing, and the view controller ignores a pan
 ## outside an encounter it is already framing.
-var camera_pan_offset_cells: float = 0.0:
+var camera_pan_offset_cells := Vector2.ZERO:
 	set(value):
-		if is_equal_approx(camera_pan_offset_cells, value):
+		if camera_pan_offset_cells.is_equal_approx(value):
 			return
 		camera_pan_offset_cells = value
 		presentation_camera_pan_requested.emit(value)

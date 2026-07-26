@@ -26,6 +26,14 @@ const OUTPUT_DIRECTORY: String = "user://finale_capture"
 const VIEWPORT_SIZE := Vector2i(1152, 648)
 ## Where a dead-centre landing puts the miner, in the stage's own coordinates.
 const MINER_STAGE_X: float = -176.0
+## The rightmost column the snaking fall can arrive down, in the same space.
+##
+## This is the framing that decides whether the reveal survives: the miner's band
+## is 49 columns wide and the organ does not track him, so his worst landing is
+## the one that brings the instrument closest to being on screen before the pan.
+## Checking only the dead-centre case answers an easier question than the game
+## asks.
+const MINER_WORST_LANDING_STAGE_X: float = 16.0
 ## Where the organ stands, and therefore where the pan ends.
 const ORGAN_STAGE_X: float = 784.0
 ## The cinematic frame's bar_height_ratio against the viewport height.
@@ -90,6 +98,23 @@ func _run() -> void:
 		(MINER_STAGE_X + ORGAN_STAGE_X) * 0.5,
 		"03_mid_pan.png"
 	) else 0
+	# The reveal's worst case: the frame the player sees on arrival when the fall
+	# put them as close to the organ as it can. Nothing of the instrument may be
+	# in this picture.
+	captured += 1 if await _capture(
+		viewport,
+		camera,
+		MINER_WORST_LANDING_STAGE_X,
+		"04_worst_landing.png"
+	) else 0
+	# And where that same landing leaves the organ once the pan has run, since the
+	# pan is a fixed 120 cells rather than a measured distance.
+	captured += 1 if await _capture(
+		viewport,
+		camera,
+		MINER_WORST_LANDING_STAGE_X + 960.0,
+		"05_worst_landing_panned.png"
+	) else 0
 
 	if preview != null and preview.has_method(&"get_preview_error"):
 		var preview_error: String = preview.get_preview_error()
@@ -100,7 +125,7 @@ func _run() -> void:
 		"THIEF_FINALE_CAPTURE: %d frames in %s"
 		% [captured, ProjectSettings.globalize_path(OUTPUT_DIRECTORY)]
 	)
-	quit(0 if captured == 3 else 1)
+	quit(0 if captured == 5 else 1)
 
 
 ## Points the camera at one stage column and writes that frame to disk.

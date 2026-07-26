@@ -56,6 +56,9 @@ var _last_miner_screen_offset := Vector2(NAN, NAN)
 var _is_encounter_focus_active: bool = false
 var _is_encounter_release_active: bool = false
 var _encounter_view_tween: Tween
+## The frame the encounter focus settled on, which authored camera moves during
+## that encounter are measured from.
+var _encounter_focus_view := Vector2.ZERO
 
 
 ## Starts the view at the ground surface.
@@ -126,6 +129,10 @@ func focus_miner_for_encounter(subject_rest_screen_y: float = NAN) -> void:
 	_mining_fall_velocity = 0.0
 	_return_velocity = 0.0
 	_view_mode = ViewMode.FOLLOWING_MINER
+	# Recorded before the tween rather than after it, so an authored move that
+	# starts on the same frame the focus arrives still has a frame to measure
+	# from instead of a zero.
+	_encounter_focus_view = Vector2(target_view_position.x, focus_view_y)
 	_tween_encounter_view_to(
 		Vector2(target_view_position.x, focus_view_y),
 		encounter_focus_duration,
@@ -133,24 +140,33 @@ func focus_miner_for_encounter(subject_rest_screen_y: float = NAN) -> void:
 	)
 
 
-## Slides the framed view sideways from the miner's own column, in terrain cells.
+## Slides the framed view off the framing an encounter settled on, in terrain
+## cells, on both axes.
 ##
 ## Every other camera move here is a tween this file owns, because every other
 ## camera move is a transition between two framings. A pan is not: it is the
 ## shot, it wants an authored curve, and the caller is already animating one. So
 ## this takes a position rather than a destination and is expected to be called
-## every frame while the pan runs.
+## every frame while the move runs.
 ##
-## It refuses outside an encounter focus on purpose. The pan is a displacement
-## from `target_view_position`, which only means the miner's landing column while
-## a cutscene holds the view still; during ordinary mining that value is chasing
-## him and the same offset would read as the camera drifting for no reason.
-## Nothing has to undo a pan either - `release_encounter_focus` already tweens
-## back to `target_view_position`, so the view walks home when the shot ends.
-func set_encounter_view_pan_cells(offset_cells: float) -> void:
+## It is measured from `_encounter_focus_view`, the frame the focus tween
+## actually arrived at, rather than from `target_view_position`. Horizontally the
+## two agree, because the focus tween only ever moves vertically. Vertically they
+## do not: `target_view_position.y` is the miner's own cell, while the focus
+## framing has already lifted the view to put his feet at the authored screen
+## ratio, and offsetting from the raw cell would throw that away and jump the
+## camera the moment a move began.
+##
+## It refuses outside an encounter focus on purpose, because outside one
+## `target_view_position` is chasing the miner and the same offset would read as
+## the camera drifting for no reason. Nothing has to undo a move either -
+## `release_encounter_focus` already tweens back to `target_view_position`, so
+## the view walks home when the shot ends.
+func set_encounter_view_offset_cells(offset_cells: Vector2) -> void:
 	if not _is_encounter_focus_active:
 		return
-	current_view_x = target_view_position.x + offset_cells
+	current_view_x = _encounter_focus_view.x + offset_cells.x
+	current_view_y = _encounter_focus_view.y + offset_cells.y
 
 
 ## Exposes the last published view displacement for presentation composition.
