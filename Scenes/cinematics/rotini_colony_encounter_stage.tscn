@@ -1,10 +1,15 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/rat_colony_encounter_stage.tscn" id="1_stage"]
 [ext_resource type="Script" uid="uid://7qy8qeox17tk" path="res://Scripts/cinematics/cutscene_actor_preview.gd" id="2_preview"]
 [ext_resource type="Resource" uid="uid://ckltv12x6klri" path="res://resources/encounters/rutini_character_appearance.tres" id="3_rutini"]
 [ext_resource type="Script" uid="uid://bpg6fvsw6y7ai" path="res://resources/encounters/character_appearance.gd" id="4_appearance"]
 [ext_resource type="Texture2D" uid="uid://bq8qwl3xn5qny" path="res://Assets/Characters/miner_idle-Pickaxe.png" id="5_miner"]
+[ext_resource type="Script" path="res://Scripts/cinematics/cinematic_rat_appearance.gd" id="6_rat_appearance"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_clump.tres" id="7_clump"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_brown.tres" id="8_brown"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_grey.tres" id="9_grey"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_white.tres" id="10_white"]
 
 [sub_resource type="Resource" id="Resource_miner"]
 script = ExtResource("4_appearance")
@@ -21,6 +26,9 @@ conversation_tracks_miner = true
 conversation_root_offset_from_miner_x = -110.0
 hide_actor_after_closing = true
 procession_cue = &"begin_colony_mining"
+rat_appearances = Array[ExtResource("6_rat_appearance")]([ExtResource("7_clump"), ExtResource("8_brown"), ExtResource("7_clump"), ExtResource("9_grey"), ExtResource("7_clump"), ExtResource("10_white")])
+clump_scale_multiplier = 3.0
+single_scale_multiplier = 1.35
 max_live_followers = 10
 web_max_live_followers = 6
 spawn_interval_seconds = 0.2
