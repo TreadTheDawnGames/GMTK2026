@@ -2308,13 +2308,7 @@ func _build_chunk_masks(
 	# Per-layer rooms replace every foreground source. A chamber backdrop has
 	# its own source below, so building the logical full-resolution mask here
 	# would allocate and fill an image no stratum ever consumes.
-	if (
-		not chunk_has_per_layer_sculpt
-		or (
-			profile.keep_back_layer_solid
-			and not chunk_contains_chamber
-		)
-	):
+	if not chunk_has_per_layer_sculpt:
 		base_mask = _build_chunk_base_mask(
 			chunk_index,
 			false,
