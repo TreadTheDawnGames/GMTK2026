@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://ddnjxw2smtees"
+path="res://.godot/imported/The Lantern Keeper.wav-028e923beb30136f087f728dc7a05646.sample"
+
+[deps]
+
+source_file="res://Assets/Audio/Voices/The Lantern Keeper.wav"
+dest_files=["res://.godot/imported/The Lantern Keeper.wav-028e923beb30136f087f728dc7a05646.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2
