@@ -114,9 +114,11 @@ var _drawn_is_recovering: bool = false
 
 ## Prepares the additive canvas and starts the idle state watch.
 func _ready() -> void:
+	combo_bar.value = 0.0
 	combo_bar.set_maximum(_combo_ceiling())
-	combo_bar.add_tick(_recovery_threshold()-1)
+	combo_bar.add_tick(_recovery_threshold())
 	timing_window.recovery_window.pressed.connect(_on_timing_pressed)
+	timing_window.recovery_window2.pressed.connect(_on_timing_pressed)
 	#combo_bar.add_ticks(_tier_thresholds())
 	#print("tiers: ", _tier_thresholds())
 	
@@ -528,12 +530,19 @@ func _is_recovering() -> bool:
 		and timing_window.recovery_window.visible
 	)
 
-
+func _is_second_recovering() -> bool:
+	return (
+		timing_window != null
+		and timing_window.recovery_window != null
+		and timing_window.recovery_window2.visible
+	)
 ## Returns whichever of the two bars is on screen. Recovery wins while it is up,
 ## because that is the bar the player is actually reading.
 func _get_active_bar() -> SliderTimingWindow:
 	if timing_window == null:
 		return null
+	if _is_second_recovering():
+		return timing_window.recovery_window2
 	if _is_recovering():
 		return timing_window.recovery_window
 	return timing_window.mining_window

@@ -5,6 +5,7 @@ class_name TimingWindowTask
 
 @onready var mining_window: SliderTimingWindow = %MiningWindow
 @onready var recovery_window: SliderTimingWindow = %RecoveryWindow
+@onready var recovery_window2: SliderTimingWindow = %RecoveryWindow2
 @onready var combo_label: Label = %ComboLabel
 @onready var depth_label: Label = %DepthLabel
 
@@ -53,7 +54,14 @@ func _ready() -> void:
 		_recovery_window_pressed
 	):
 		recovery_window.pressed.connect(_recovery_window_pressed)
-	
+	if not recovery_window2.pressed.is_connected(
+		_additional_recovery_window_pressed
+	):
+		recovery_window2.pressed.connect(_additional_recovery_window_pressed)
+		
+	#_update_depth_label(_game_state.depth)
+	#if not _game_state.depth_changed.is_connected(_update_depth_label):
+		#_game_state.depth_changed.connect(_update_depth_label)
 	if not _target_unlocks.is_empty():
 		_apply_pickaxe_target_unlocks()
 	set_bounce_muted(_bounce_muted)
@@ -161,16 +169,13 @@ func _mining_window_pressed(
 			# The sample ladder runs out at MINE_SOUNDS.size(); past that the
 			# pitch keeps climbing so a long streak still sounds like it is
 			# going somewhere instead of flattening out.
-			var steps_past_ladder = maxi(
-				combo - AudioLibrary.MINE_SOUNDS.size(), 0
-			)
-			_play_sound(
+			
+			# Those tones are all the notes in a scale, so it sounds good if they're together
+			_audio_handler.play_sound(
 				AudioLibrary.MINE_SOUNDS[
 					clampi(combo - 1, 0, AudioLibrary.MINE_SOUNDS.size() - 1)
 				],
-				"SFX",
-				false,
-				minf(1.0 + 0.03 * float(steps_past_ladder), 1.6)
+				"SFX"
 			)
 
 		var unlocked_target_scenes: Array[PackedScene] = []
@@ -215,50 +220,133 @@ func _mining_window_pressed(
 			recovery_window.start()
 			_play_sound(AudioLibrary.SAVE_BUILDUP)
 		else:
-			var lost_combo := combo
-			pressed.emit(false, combo, 0)
-			combo = 0
-			stored_combo = 0
-			streak_ended.emit(lost_combo)
+			fail_combo()
 			mining_window.remove_all_extra_targets()
-			mining_window.speed_multiplier = 1.0
 			mining_window.play_animation(Color.RED)
-			_play_sound(AudioLibrary.STREAK_LOST)
-			mining_window.reset_all_targets()
 
+var failed_recovery : bool = false
 
 ## Resolves recovery and restarts the main timing bar.
 func _recovery_window_pressed(
 	success: bool,
 	_hit_direction: int = 0,
-	consecutive_hits = 0
+	_consecutive_hits = 0
 ) -> void:
-	if not success:
-		var lost_combo := combo
-		stored_combo = 0
-		combo = 0
-		mining_window.reset_all_targets()
-		pressed.emit(false, combo, 0)
-		streak_ended.emit(lost_combo)
-		_play_sound(AudioLibrary.STREAK_LOST)
-		#recovery_window.stop()
-
-		mining_window.speed_multiplier = 1.0
-		mining_window.remove_all_extra_targets()
-		recovery_window.animation_color = combo_lost_color
-		recovery_window.speed_multiplier = 1.0
-
-	else:
+	## If successfully recovered
+	if success:
+		# Increase the recovery slider speed
 		recovery_window.speed_multiplier *= (
 			(mining_config.recovery_speed_multiplier)
 		)
-		_play_sound(AudioLibrary.SAVE)
+		#play audio
+		_audio_handler.play_sound(AudioLibrary.SAVE)
+		#set animation color
 		recovery_window.animation_color = combo_saved_color
-		
+	else:
+		#if failed
+		# we want one shot at additional recovery
+		if not failed_recovery and mining_config.use_secondary_recovery:
+			#This is our first failure
+			failed_recovery = true
+			_audio_handler.play_sound(AudioLibrary.MISS_WITH_SAVE)
+			print("first failure")
+			recovery_window.animation_repeats = 2
+			#all we want to do is open the secondary save, so do nothing
+		else:
+			#We've failed this track once already
+			#reset combo
+			fail_combo()
+			#reset window speeds
+			mining_window.speed_multiplier = 1.0
+			recovery_window.speed_multiplier = 1.0
+			recovery_window2.speed_multiplier = 1.0
+			#reset targets
+			recovery_window.animation_repeats = 3
+			
+			mining_window.remove_all_extra_targets()
+			#Set animation color
+			recovery_window.animation_color = combo_lost_color
+			failed_recovery = false
+	
+	#Wait for the animation to play
 	await recovery_window.pause(true)
 	
+	#after the animation, if it was a success
 	if success:
+		print("Option 1")
+		#targets call themselves and we clamp them to make sure they're within the allowed area
 		mining_window.recovery_action()
 		mining_window.clamp_all_targets()
+		recovery_window.stop()
+		mining_window.start()
+	elif failed_recovery:
+		print("Option 2")
+		#Check if this is the first failure and if so,Start the secondary recovery process
+		recovery_window2.start()
+		_audio_handler.play_sound(AudioLibrary.SAVE_BUILDUP)
+	else:
+		print("Option 3")
+		#this is the second time failing. Reset the main window, our visibility, and the recovery state
+		recovery_window.stop()
+		mining_window.start()
+		failed_recovery = false
 		
-	mining_window.start()
+	
+	#Regardless of whether we succeeded or failed, start the mining window
+
+## Resolves recovery and restarts the first recovery timing bar.
+func _additional_recovery_window_pressed(
+	success: bool,
+	_hit_direction: int = 0,
+	_consecutive_hits = 0
+) -> void:
+	# If successfully recovered, we want to return to the main recovery
+	if success:
+		# Increase the recovery slider speed
+		recovery_window2.speed_multiplier *= (
+			(mining_config.recovery_speed_multiplier)
+		)
+		#play audio
+		_audio_handler.play_sound(AudioLibrary.SAVE)
+		#set animation color
+		recovery_window2.animation_color = combo_saved_color
+	else:
+		#if failed
+		#reset combo
+		fail_combo()
+		#reset window speeds
+		mining_window.speed_multiplier = 1.0
+		recovery_window.speed_multiplier = 1.0
+		recovery_window2.speed_multiplier = 1.0
+		#reset targets
+		mining_window.remove_all_extra_targets()
+		#Set animation color
+		recovery_window2.animation_color = combo_lost_color
+		#reset recovery state
+		failed_recovery = false
+	
+	#Wait our animation to play
+	await recovery_window2.pause(true)
+	
+	#after the animation, if it was a success
+	if success:
+		#targets call themselves and we clamp them to make sure they're within the allowed area
+		mining_window.recovery_action()
+		mining_window.clamp_all_targets()
+		recovery_window.start()
+	#Regardless of whether we succeeded or failed, start the mining window
+	else:
+		recovery_window.stop()
+		mining_window.recovery_action()
+		mining_window.clamp_all_targets()
+		mining_window.start()
+
+
+func fail_combo():
+	var lost_combo := combo
+	pressed.emit(false, combo, 0)
+	combo = 0
+	stored_combo = 0
+	streak_ended.emit(lost_combo)
+	mining_window.speed_multiplier = 1.0
+	_audio_handler.play_sound(AudioLibrary.STREAK_LOST)

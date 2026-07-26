@@ -12,8 +12,7 @@
 [ext_resource type="Texture2D" uid="uid://c58c74om01fyj" path="res://Assets/UI/Kenney/Sprite-scrollbar_horizontal.png" id="8_gpvyk"]
 [ext_resource type="Texture2D" uid="uid://c30ydfesje06b" path="res://Assets/UI/Kenney/progress_white.png" id="8_okgy0"]
 [ext_resource type="FontFile" uid="uid://yn3pahibw5ow" path="res://Assets/UI/ComicRelief-Bold.ttf" id="11_unykb"]
-[ext_resource type="Texture2D" uid="uid://dwximflfngpaf" path="res://Assets/UI/Kenney/progress_white-longt.png" id="12_gpvyk"]
-[ext_resource type="Texture2D" uid="uid://bykuvfj57ts48" path="res://Assets/UI/Kenney/progress_blue_full.png" id="12_r7wsn"]
+[ext_resource type="Texture2D" uid="uid://w8g7tuvgppd4" path="res://Assets/UI/TimeBar/ComboBack.png" id="12_r7wsn"]
 
 [sub_resource type="CompressedTexture2D" id="CompressedTexture2D_31y5o"]
 load_path = "res://.godot/imported/button_grey.png-8d90c526dbb1180c05e5deff31db6635.ctex"
@@ -87,13 +86,13 @@ texture_margin_right = 6.0
 texture_margin_bottom = 8.0
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_okgy0"]
-texture = ExtResource("12_gpvyk")
+texture = ExtResource("12_r7wsn")
 axis_stretch_horizontal = 1
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_gpvyk"]
 texture = ExtResource("12_r7wsn")
-expand_margin_left = 1.0
 axis_stretch_horizontal = 1
+modulate_color = Color(0.33333334, 0.34509805, 0.6, 1)
 
 [resource]
 default_font = ExtResource("11_unykb")

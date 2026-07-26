@@ -32,6 +32,8 @@ enum SpecialEffect {
 @export_range(0.1, 5.0, 0.05) var swing_speed_multiplier: float = 1.0
 ## Legacy-preview-only debris multiplier. Neutral is 1.0.
 @export_range(0.0, 5.0, 0.05) var debris_multiplier: float = 1.0
+## Toggles whether to use the secondary recovery bar
+@export var secondary_recovery : bool = false
 
 @export_category("Special Effect")
 ## Legacy-preview-only while production EncounterProgression is active.

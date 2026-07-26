@@ -237,7 +237,8 @@ func _process(delta: float) -> void:
 		play_bounce_sound()
 		if one_shot:
 			pressed.emit(false, 0, consecutive_hits)
-			stop()
+			if stop_one_shot_when_done:
+				stop()
 	
 	#slider.position.x = slider_position
 	#queue_redraw()

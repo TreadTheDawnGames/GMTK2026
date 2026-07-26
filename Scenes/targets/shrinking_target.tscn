@@ -12,10 +12,10 @@ shrink_rate = 0.9
 
 [node name="TextureRect" parent="." index="0" unique_id=1601954937]
 visible = true
-offset_left = -13.5
-offset_top = -18.202026
-offset_right = 13.5
-offset_bottom = 18.202026
+offset_left = -22.75
+offset_top = -44.77527
+offset_right = 22.75
+offset_bottom = 44.77527
 offset_transform_enabled = true
 expand_mode = 5
 stretch_mode = 5
