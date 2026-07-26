@@ -345,6 +345,9 @@ func randomize_all_targets():
 				_backing_size - minimum_center_x,
 				minimum_center_x
 			)
+			if OS.has_feature("editor") and Input.is_action_pressed("aim_right"):
+				extents[2] = slider_position + (100 * direction)
+				pass
 
 			target.set_target_position(clampf(
 				extents[2],
@@ -354,6 +357,7 @@ func randomize_all_targets():
 			printerr("Not an error: Rerolls = ", total_rerolls)
 			break
 		total_rerolls += 1
+	
 	
 	pass
 

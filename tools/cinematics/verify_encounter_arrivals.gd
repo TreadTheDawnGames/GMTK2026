@@ -42,6 +42,8 @@ func _initialize() -> void:
 			))
 			continue
 		_verify_encounter(encounter, config, half_span, tolerance)
+		if encounter.ends_rat_colony_support:
+			encounter.persistent_colony_requested_leave.emit()
 
 	if _failures.is_empty():
 		print("ENCOUNTER_ARRIVALS_VERIFY_PASS")
