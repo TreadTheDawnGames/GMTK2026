@@ -98,7 +98,10 @@ func _run() -> void:
 		float(maximum_half_width_cells)
 		* manager.config.maximum_stack_width_multiplier
 	)
-	var budget_failed := false
+	# This new scheduling check is deliberately outside every timed sample. It
+	# protects the optimization that prepares the next reachable direction
+	# first without turning lightweight adapter work into terrain benchmark time.
+	var budget_failed := not _verify_timing_candidate_priority()
 
 	for target_depth in PROFILE_DEPTHS:
 		# Depth changes chunk indices and world-space mask coordinates; it does
@@ -218,6 +221,84 @@ func _run() -> void:
 	await process_frame
 	_finished = true
 	quit(1 if budget_failed else 0)
+
+
+## Checks five targets collapse to unique directions in next-hit order.
+func _verify_timing_candidate_priority() -> bool:
+	# Build only the public timing-bar contract used by TimingBridge. Avoiding a
+	# scene boot keeps this rudimentary correctness check effectively constant.
+	var slider_window := SliderTimingWindow.new()
+	var backing := Control.new()
+	backing.size = Vector2(700.0, 80.0)
+	slider_window.backing = backing
+	var slider := Panel.new()
+	slider.size = Vector2(5.0, 80.0)
+	slider_window.slider = slider
+	var backing_width := backing.size.x
+	for target_position in PackedFloat32Array([
+		backing_width * 0.12,
+		backing_width * 0.20,
+		backing_width * 0.72,
+		backing_width * 0.80,
+		backing_width * 0.88,
+	]):
+		var target := TimingTarget.new()
+		target.set_target_position(target_position)
+		slider_window.targets.append(target)
+
+	var timing_bridge := TimingBridge.new()
+	slider_window.slider_position = backing_width * 0.40
+	slider_window.direction = 1.0
+	var rightward_priority := (
+		timing_bridge._get_candidate_hit_directions(slider_window)
+	)
+	slider_window.direction = -1.0
+	var leftward_priority := (
+		timing_bridge._get_candidate_hit_directions(slider_window)
+	)
+	var priority_is_valid := (
+		rightward_priority == PackedInt32Array([1, -1])
+		and leftward_priority == PackedInt32Array([-1, 1])
+	)
+	var mining_controller := MiningController.new()
+	mining_controller._latest_candidate_combo = 8
+	mining_controller._latest_candidate_directions = (
+		PackedInt32Array([1, -1])
+	)
+	var reorder_keeps_completed := (
+		mining_controller._candidate_keys_match(
+			8,
+			PackedInt32Array([-1, 1])
+		)
+	)
+	var regeneration_clears_completed := (
+		not mining_controller._candidate_keys_match(
+			8,
+			PackedInt32Array([1, 0])
+		)
+	)
+	priority_is_valid = (
+		priority_is_valid
+		and reorder_keeps_completed
+		and regeneration_clears_completed
+	)
+	if not priority_is_valid:
+		push_error(
+			(
+				"Timing prediction did not prioritize the next reachable "
+				+ "direction or retain completed reordered candidates."
+			)
+		)
+
+	mining_controller.free()
+	timing_bridge.free()
+	for synthetic_target in slider_window.targets:
+		synthetic_target.free()
+	slider_window.targets.clear()
+	slider.free()
+	backing.free()
+	slider_window.free()
+	return priority_is_valid
 
 
 ## Restores one cold, intact measurement case without rebuilding the prior

@@ -517,16 +517,41 @@ func _on_impact_candidates_changed(
 	next_combo: int,
 	hit_directions: PackedInt32Array
 ) -> void:
+	var keeps_completed_candidates := _candidate_keys_match(
+		next_combo,
+		hit_directions
+	)
 	_latest_candidate_combo = maxi(next_combo, 1)
 	_latest_candidate_directions = hit_directions.duplicate()
 	if _is_swing_pending or _is_swing_queue_paused:
 		return
-	_prepare_latest_impact_candidates()
+	_prepare_latest_impact_candidates(keeps_completed_candidates)
+
+
+## Separates a priority-only reorder from regenerated candidate identities.
+func _candidate_keys_match(
+	next_combo: int,
+	hit_directions: PackedInt32Array
+) -> bool:
+	var keys_match := (
+		maxi(next_combo, 1) == _latest_candidate_combo
+		and hit_directions.size() == _latest_candidate_directions.size()
+	)
+	if keys_match:
+		for previous_direction in _latest_candidate_directions:
+			if previous_direction not in hit_directions:
+				keys_match = false
+				break
+	return keys_match
 
 
 ## Expands the current target set into bounded terrain-transform candidates.
-func _prepare_latest_impact_candidates() -> void:
-	dig_visuals_preparation_started.emit(false)
+func _prepare_latest_impact_candidates(
+	keep_completed: bool = false
+) -> void:
+	# Time-to-hit reordering changes urgency, not candidate identity. Preserve
+	# finished images across that reorder while replacing unfinished queue work.
+	dig_visuals_preparation_started.emit(keep_completed)
 	if _latest_candidate_directions.is_empty():
 		return
 	var start_cell := Vector2i(
