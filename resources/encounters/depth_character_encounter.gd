@@ -26,6 +26,20 @@ extends Resource
 @export var stage_scene: PackedScene
 ## Optional timeline played by the stage during its opening choreography.
 @export var sequence: CutsceneSequence
+## Whether that timeline actually drives this encounter at runtime.
+##
+## Off by default, and deliberately separate from `sequence` being set, because
+## every encounter in the project already carries a generated placeholder
+## timeline. Those were authored as starting points and no run has ever played
+## one: switching them all on at once would replace the choreography each stage
+## has been tuned to, and their DIALOGUE beats would run the conversation a
+## second time on top of the one the schedule starts.
+##
+## Turn it on for an encounter whose timeline has genuinely been authored. The
+## stage then owns the whole shot - movement, poses, and asking for dialogue at
+## the beat it belongs to - and the schedule stops starting the conversation
+## itself.
+@export var plays_authored_timeline: bool = false
 ## Used only when story text should remain encrypted in source control.
 @export var encrypted_conversation: EncryptedDialogueConversation
 @export var speaker_slot: StringName
