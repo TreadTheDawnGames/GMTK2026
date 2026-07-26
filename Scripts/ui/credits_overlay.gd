@@ -2,7 +2,7 @@ class_name CreditsOverlay
 extends Node2D
 
 ## How it works:
-## - CreditEntry resources place authored inscriptions from depth 15,000-16,000.
+## - CreditEntry resources place authored inscriptions from depth 15,000-15,400.
 ## - View updates keep the inscription layer registered with terrain cells.
 ## - Foreground dirt draws above the text, so mining naturally reveals it.
 ## - Deeper terrain draws below the text, preserving its carved-in-ground look.
@@ -37,7 +37,7 @@ const UNCONSTRAINED_SNAKE_HALF_SPAN_CELLS: int = 64
 
 @export_category("Trigger")
 @export_range(0, 100_000, 100) var trigger_depth: int = 15_000
-@export_range(0, 100_000, 100) var completion_depth: int = 16_000
+@export_range(0, 100_000, 100) var completion_depth: int = 15_400
 
 @export_category("Terrain")
 @export var mining_config: MiningConfig

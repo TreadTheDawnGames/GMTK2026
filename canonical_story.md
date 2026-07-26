@@ -45,8 +45,8 @@ these beats without Jared or Zephan approving the narrative change.
 | Scene 7 / Encounter 7 — Quibble | 9,200 | 9:00 | Quibble is introduced while searching for the Cafe and gives the Miner a permanent coffee speed boost. Existing `coffee_cat_*` resource names refer to Quibble. |
 | Scene 8 / Encounter 8 — Rotini and the Colony | 11,200 | 11:00 | The Miner tells Rotini that the cheese Cafe is straight down. Rotini’s rat colony joins the Miner and digs downward. |
 | Scene 9 / Encounter 9 — The Cheese Cafe | 14,000 | 14:00 | The Miner reaches the Cafe gathering with Cheese Girl, the Treasure Hunter, Rotini and his rats, Quibble, and the Lantern Keeper. |
-| Credits transition — not a scene | 15,000–16,000 | 15:00 | Credits begin while the player remains able to dig. Continuing through the credits is intentional. The section runs to 16,000 so every credit has room; Jared approved widening it on 2026-07-26. |
-| Scene 10 — Post-credits Lantern Keeper | 16,000 | Post-credits | The Lantern Keeper remarks on how long the player has been digging and says only a zillion more swings remain before the Thief. |
+| Credits transition — not a scene | 15,000–15,400 | 15:00 | Credits begin while the player remains able to dig. Continuing through the credits is intentional. The section ends shortly after the last inscription so no empty shaft sits between it and the Lantern Keeper; Jared approved the depths on 2026-07-26. |
+| Scene 10 — Post-credits Lantern Keeper | 15,400 | Post-credits | The Lantern Keeper remarks on how long the player has been digging and says only a zillion more swings remain before the Thief. |
 | Scene 11 — The Thief | 100,000 | Long-term objective | The player finally reaches the Thief. The exact reveal and dialogue remain intentionally unspecified here. |
 
 ## Approved Dialogue and Action

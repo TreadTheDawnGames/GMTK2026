@@ -11,7 +11,7 @@
 script = ExtResource("1_encounter")
 encounter_id = &"cloak_lantern_post_credits"
 actor_id = &"cloak_lantern"
-depth_from_surface = 16000
+depth_from_surface = 15400
 appearance = ExtResource("2_appearance")
 conversation = ExtResource("3_dialogue")
 stage_scene = ExtResource("4_dn0dd")
