@@ -17,6 +17,9 @@ const MINING_SCENE: PackedScene = preload(
 const TREASURE_HUNTER_APPEARANCE: CharacterAppearance = preload(
 	"res://resources/encounters/treasure_hunter_character_appearance.tres"
 )
+const MOODY_TEEN_APPEARANCE: CharacterAppearance = preload(
+	"res://resources/encounters/moody_teen_character_appearance.tres"
+)
 const TREASURE_HUNTER_FIRST_SEQUENCE: CutsceneSequence = preload(
 	"res://resources/cinematics/sequences/treasure_hunter_first_sequence.tres"
 )
@@ -63,6 +66,15 @@ func _verify_entry_scene() -> void:
 	_expect(
 		ResourceLoader.exists(entry_scene_path, "PackedScene"),
 		"Configured entry scene must resolve: %s" % entry_scene_path
+	)
+	_expect(
+		MOODY_TEEN_APPEARANCE.texture != null
+		and MOODY_TEEN_APPEARANCE.texture.resource_path
+			== "res://Assets/Characters/moody_teen/moody_teen.png"
+		and MOODY_TEEN_APPEARANCE.horizontal_frames == 1
+		and MOODY_TEEN_APPEARANCE.frame == 0
+		and MOODY_TEEN_APPEARANCE.art_faces_left,
+		"Moody Teen must use Ayden's supplied single-frame character art."
 	)
 	var entry_scene := ResourceLoader.load(
 		entry_scene_path,
