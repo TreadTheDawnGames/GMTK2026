@@ -5,8 +5,8 @@ extends Node
 
 signal attempt_resolved(success: bool, combo: int, hit_direction: int)
 ## Reports the unique left/center/right outcomes covered by up to five targets.
-## The adapter observes Caspian's public target collection without changing his
-## timing scene or making terrain code depend on target implementations.
+## The adapter observes Caspian's public target collection and the moving
+## target's public motion state without changing his adapt-only timing code.
 signal impact_candidates_changed(
 	next_combo: int,
 	hit_directions: PackedInt32Array
@@ -52,9 +52,9 @@ func _process(_delta: float) -> void:
 	impact_candidates_changed.emit(next_combo, directions)
 
 
-## Resolves every possible direction in time-to-hit order. Slider speed is
-## shared by all targets, so travel distance along its bounce path is the same
-## ordering without per-frame division or target-array sorting allocations.
+## Resolves every possible direction in live time-to-hit order. Stationary
+## targets use the slider's bounce path; moving targets use relative velocity
+## until either participant bounces, when the next frame recalculates the path.
 func _get_candidate_hit_directions(
 	window: SliderTimingWindow
 ) -> PackedInt32Array:
@@ -70,6 +70,7 @@ func _get_candidate_hit_directions(
 		travel_right
 	)
 	var moving_right := window.direction >= 0.0
+	var slider_speed := absf(window.speed * window.speed_multiplier)
 	# Fixed scalars avoid dictionaries, temporary sort arrays, and callables in
 	# this per-frame adapter. The output remains bounded to three directions.
 	var left_travel := INF
@@ -91,6 +92,47 @@ func _get_candidate_hit_directions(
 		hit_left = maxf(hit_left, travel_left)
 		hit_right = minf(hit_right, travel_right)
 		if hit_left > hit_right:
+			continue
+		if target is MovingTarget:
+			# A moving target can eventually cross every direction. Queue all
+			# three, but promote only a collision proven before the next bounce.
+			var fallback_travel := (
+				(travel_right - travel_left) * 4.0
+			)
+			left_travel = minf(left_travel, fallback_travel)
+			center_travel = minf(
+				center_travel,
+				fallback_travel + 0.001
+			)
+			right_travel = minf(
+				right_travel,
+				fallback_travel + 0.002
+			)
+			var moving_hit := _get_moving_target_segment_hit(
+				window,
+				target as MovingTarget,
+				slider_position,
+				travel_left,
+				travel_right,
+				slider_speed
+			)
+			if not is_inf(moving_hit.x):
+				var moving_hit_travel := moving_hit.x * slider_speed
+				if is_equal_approx(moving_hit.y, midpoint):
+					center_travel = minf(
+						center_travel,
+						moving_hit_travel
+					)
+				elif moving_hit.y < midpoint:
+					left_travel = minf(
+						left_travel,
+						moving_hit_travel
+					)
+				else:
+					right_travel = minf(
+						right_travel,
+						moving_hit_travel
+					)
 			continue
 		if hit_left < midpoint:
 			left_travel = minf(
@@ -133,12 +175,13 @@ func _get_candidate_hit_directions(
 	for _direction_count in range(3):
 		var nearest_travel := INF
 		var nearest_direction := 0
-		if left_travel < nearest_travel:
-			nearest_travel = left_travel
-			nearest_direction = -1
+		# Center owns exact ties because gameplay resolves the midpoint as zero.
 		if center_travel < nearest_travel:
 			nearest_travel = center_travel
 			nearest_direction = 0
+		if left_travel < nearest_travel:
+			nearest_travel = left_travel
+			nearest_direction = -1
 		if right_travel < nearest_travel:
 			nearest_travel = right_travel
 			nearest_direction = 1
@@ -153,6 +196,72 @@ func _get_candidate_hit_directions(
 			1:
 				right_travel = INF
 	return directions
+
+
+## Predicts a moving target only through the next constant-velocity segment.
+func _get_moving_target_segment_hit(
+	window: SliderTimingWindow,
+	target: MovingTarget,
+	slider_position: float,
+	travel_left: float,
+	travel_right: float,
+	slider_speed: float
+) -> Vector2:
+	var slider_velocity := (
+		slider_speed if window.direction >= 0.0 else -slider_speed
+	)
+	var target_velocity := target.speed * target.direction
+	var target_half_width := target.my_width * 0.5
+	var target_travel_right := maxf(
+		target.track - target_half_width,
+		target_half_width
+	)
+	var target_position := clampf(
+		target.target_position,
+		target_half_width,
+		target_travel_right
+	)
+	var relative_position := slider_position - target_position
+	var hit_radius := target_half_width + window.grace
+	if absf(relative_position) <= hit_radius:
+		return Vector2(0.0, slider_position)
+
+	var segment_seconds := INF
+	if slider_velocity > 0.0:
+		segment_seconds = (
+			(travel_right - slider_position) / slider_velocity
+		)
+	elif slider_velocity < 0.0:
+		segment_seconds = (
+			(slider_position - travel_left) / -slider_velocity
+		)
+	if target_velocity > 0.0:
+		segment_seconds = minf(
+			segment_seconds,
+			(target_travel_right - target_position) / target_velocity
+		)
+	elif target_velocity < 0.0:
+		segment_seconds = minf(
+			segment_seconds,
+			(target_position - target_half_width) / -target_velocity
+		)
+
+	var relative_velocity := slider_velocity - target_velocity
+	var hit_seconds := INF
+	if relative_position < -hit_radius and relative_velocity > 0.0:
+		hit_seconds = (
+			(-hit_radius - relative_position) / relative_velocity
+		)
+	elif relative_position > hit_radius and relative_velocity < 0.0:
+		hit_seconds = (
+			(hit_radius - relative_position) / relative_velocity
+		)
+	if hit_seconds < 0.0 or hit_seconds > segment_seconds:
+		return Vector2(INF, 0.0)
+	return Vector2(
+		hit_seconds,
+		slider_position + slider_velocity * hit_seconds
+	)
 
 
 ## Measures the next intersection with one hit interval along a bouncing bar.

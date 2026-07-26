@@ -260,6 +260,42 @@ func _verify_timing_candidate_priority() -> bool:
 		rightward_priority == PackedInt32Array([1, -1])
 		and leftward_priority == PackedInt32Array([-1, 1])
 	)
+	for synthetic_target in slider_window.targets:
+		synthetic_target.free()
+	slider_window.targets.clear()
+	var center_target := TimingTarget.new()
+	center_target.set_target_position(backing_width * 0.5)
+	slider_window.targets.append(center_target)
+	slider_window.slider_position = backing_width * 0.5
+	slider_window.direction = 1.0
+	var midpoint_priority := (
+		timing_bridge._get_candidate_hit_directions(slider_window)
+	)
+	priority_is_valid = (
+		priority_is_valid
+		and midpoint_priority[0] == 0
+	)
+
+	center_target.free()
+	slider_window.targets.clear()
+	var fleeing_target := MovingTarget.new()
+	fleeing_target.track = backing_width
+	fleeing_target.speed = 500.0
+	fleeing_target.direction = 1.5
+	fleeing_target.set_target_position(backing_width * 0.52)
+	slider_window.targets.append(fleeing_target)
+	var stationary_left_target := TimingTarget.new()
+	stationary_left_target.set_target_position(backing_width * 0.28)
+	slider_window.targets.append(stationary_left_target)
+	slider_window.slider_position = backing_width * 0.43
+	slider_window.direction = 1.0
+	var moving_target_priority := (
+		timing_bridge._get_candidate_hit_directions(slider_window)
+	)
+	priority_is_valid = (
+		priority_is_valid
+		and moving_target_priority[0] == -1
+	)
 	var mining_controller := MiningController.new()
 	mining_controller._latest_candidate_combo = 8
 	mining_controller._latest_candidate_directions = (
@@ -277,10 +313,27 @@ func _verify_timing_candidate_priority() -> bool:
 			PackedInt32Array([1, 0])
 		)
 	)
+	# Observe the real controller route, then clear its synthetic directions in
+	# the synchronous signal callback so this unit check never enters terrain.
+	var forwarded_keep_completed: Array[bool] = []
+	mining_controller.dig_visuals_preparation_started.connect(
+		func(keep_completed: bool) -> void:
+			forwarded_keep_completed.append(keep_completed)
+			mining_controller._latest_candidate_directions.clear(),
+		CONNECT_ONE_SHOT
+	)
+	mining_controller._on_impact_candidates_changed(
+		8,
+		PackedInt32Array([-1, 1])
+	)
+	var reorder_forwards_completed := (
+		forwarded_keep_completed == [true]
+	)
 	priority_is_valid = (
 		priority_is_valid
 		and reorder_keeps_completed
 		and regeneration_clears_completed
+		and reorder_forwards_completed
 	)
 	if not priority_is_valid:
 		push_error(
