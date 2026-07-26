@@ -190,17 +190,26 @@ uniform float trodden_floor_world_y = 0.0;
 // How deep the packed band reaches before it starts giving way, and how far it
 // then takes to fade out. Two numbers rather than one because a band that ends
 // where it stops fading reads as a painted stripe.
-uniform float trodden_depth_world_px = 14.0;
-uniform float trodden_falloff_world_px = 18.0;
+uniform float trodden_depth_world_px = 10.0;
+uniform float trodden_falloff_world_px = 26.0;
 uniform vec4 trodden_color : source_color = vec4(0.30, 0.24, 0.19, 1.0);
 uniform float trodden_strength = 0.55;
 // How far the lower edge of the band wanders, in world pixels. Zero rules a
 // straight line across the room, which is the one thing that would give it away
 // as a shader rather than as ground.
-uniform float trodden_edge_wander_world_px = 7.0;
+uniform float trodden_edge_wander_world_px = 2.0;
 // Grain within the band, so the walked surface is not a flat wash of colour.
-uniform float trodden_grain_strength = 0.35;
+uniform float trodden_grain_strength = 0.10;
 uniform float trodden_grain_world_px = 26.0;
+// How much the walked band clears the scattered rock off itself.
+//
+// This is what makes the treatment read as ground rather than as a tint. The
+// strata pass scatters drawn rocks across every stratum at one strength; a
+// surface people have been walking on does not keep its loose stones, so the
+// ramp is handed to that pass and thins them out in step with it. At 1.0 the
+// band is swept bare and the stones resume exactly where the transition fades,
+// which is what puts a visible edge on the walking area without drawing a line.
+uniform float trodden_rock_clearing = 0.85;
 
 // Packed earth on the exposed top of the surface, in place of the old overlay.
 uniform float crust_depth_world_px = 10.0;
@@ -693,7 +702,11 @@ vec4 sample_surface_grass(vec2 world_position) {
 
 // Applies all presentation-only geological detail to one already-tinted pixel.
 // This remains separate from fragment() so mask composition stays easy to audit.
-vec3 apply_strata_texture(vec3 surface_color, vec2 world_position) {
+vec3 apply_strata_texture(
+	vec3 surface_color,
+	vec2 world_position,
+	float trodden_ramp
+) {
 	// Protect every downstream division from an accidentally authored zero.
 	float safe_detail_scale = max(dirt_detail_scale, 1.0);
 
@@ -771,7 +784,11 @@ vec3 apply_strata_texture(vec3 surface_color, vec2 world_position) {
 	// Every pass is bedded against dirt_only_surface, not against the rocks
 	// already drawn, so recession is measured from the ground the pile sits in.
 	float near_cell_px = safe_detail_scale * ROCK_GRID_SCALE;
-	float rock_strength = clamp(rock_detail_strength, 0.0, 1.0);
+	// Loose stone is swept off the walked band in step with the ramp, so the
+	// scatter thins toward the top edge and resumes as the transition fades.
+	float rock_strength = clamp(rock_detail_strength, 0.0, 1.0) * (
+		1.0 - clamp(trodden_ramp * trodden_rock_clearing, 0.0, 1.0)
+	);
 	vec3 clustered_surface = dirt_only_surface;
 
 	vec4 far_rock = sample_drawn_rock(
@@ -881,11 +898,30 @@ void fragment() {
 
 	// Tint first so procedural variation always works from the layer's authored
 	// palette, regardless of whether fill artwork is assigned.
+	// The trodden ramp is resolved BEFORE the strata pass, because the rock
+	// scatter needs it too - the band is only convincing if the stones answer to
+	// it as well as the colour does.
+	float trodden_ramp = 0.0;
+	if (use_trodden_floor) {
+		float trodden_below = world_position.y - trodden_floor_world_y;
+		float trodden_wobble = (
+			dirt_noise(vec2(world_position.x / 53.0, 0.0)) - 0.5
+		) * 2.0 * trodden_edge_wander_world_px;
+		trodden_ramp = smoothstep(-2.0, 2.0, trodden_below) * (
+			1.0 - smoothstep(
+				0.0,
+				max(trodden_depth_world_px + trodden_falloff_world_px, 1.0),
+				trodden_below - trodden_wobble
+			)
+		);
+	}
+
 	vec3 surface_color = artwork.rgb * layer_tint.rgb;
 	if (use_strata_texture) {
 		surface_color = apply_strata_texture(
 			surface_color,
-			world_position
+			world_position,
+			trodden_ramp
 		);
 	}
 	// Keep the terrain beneath a gem so fracture ink can reveal that terrain
@@ -1041,41 +1077,23 @@ void fragment() {
 	// tint alpha are preserved, while RGB remains the fully shaded dirt color.
 	float final_alpha = artwork.a * layer_tint.a * mask_alpha;
 
-	// Trodden floor, foreground stratum only. Keyed to a world y the caller
-	// supplies, so any cutscene room can dress the ground its cast stand on.
-	if (use_trodden_floor) {
-		float trodden_below = world_position.y - trodden_floor_world_y;
-		// The edge wanders per column, so the band ends on a broken line rather
-		// than on a ruled one. Sampled in world space, so it holds still while
-		// the room scrolls past.
-		float trodden_wobble = (
-			dirt_noise(vec2(world_position.x / 37.0, 0.0)) - 0.5
-		) * 2.0 * trodden_edge_wander_world_px;
-		float trodden_edge = max(trodden_depth_world_px + trodden_wobble, 1.0);
-		float trodden_band = step(-1.0, trodden_below) * (
-			1.0 - smoothstep(
-				trodden_edge,
-				trodden_edge + max(trodden_falloff_world_px, 1.0),
-				trodden_below
-			)
+	// The colour half of the trodden floor. The ramp itself was resolved above,
+	// before the strata pass, so the rock scatter could thin out in step with it.
+	if (trodden_ramp > 0.0) {
+		// Grain is a whisper. It exists so a long flat floor is not one clean
+		// gradient, not to texture the rock - the strata pass already did that,
+		// and it has just been told to leave this band alone.
+		float trodden_grain = dirt_noise(
+			world_position / max(trodden_grain_world_px, 1.0)
 		);
-		if (trodden_band > 0.0) {
-			// Grain across the walked surface. Two samples at different scales so
-			// it reads as scuffed ground rather than as one tiling pattern.
-			float trodden_grain = mix(
-				dirt_noise(world_position / max(trodden_grain_world_px, 1.0)),
-				dirt_noise(world_position / max(trodden_grain_world_px * 0.4, 1.0)),
-				0.45
-			);
-			vec3 packed_color = trodden_color.rgb * (
-				1.0 + (trodden_grain - 0.5) * trodden_grain_strength
-			);
-			surface_color = mix(
-				surface_color,
-				packed_color,
-				clamp(trodden_band * trodden_strength, 0.0, 1.0)
-			);
-		}
+		vec3 packed_color = trodden_color.rgb * (
+			1.0 + (trodden_grain - 0.5) * trodden_grain_strength
+		);
+		surface_color = mix(
+			surface_color,
+			packed_color,
+			clamp(trodden_ramp * trodden_strength, 0.0, 1.0)
+		);
 	}
 
 	// Surface dressing, foreground stratum only. Grass grows out of this

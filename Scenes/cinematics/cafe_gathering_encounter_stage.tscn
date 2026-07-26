@@ -104,8 +104,10 @@ Y IS -16, AND THAT IS WHAT STOPS THE FRONT ROCK EATING IT.
 
 Its base used to sit on the dig line - sixteen pixels UNDER the surface the cast are floor-sampled onto - so the floor band drew across its lower third and the shop could not be seen whole. It now stands on the same measured floor line the furniture uses. That was the whole fix; the z was a red herring.
 
-Z 0, THE SAME PLANE AS ITS OWN FURNITURE, AND FIRST IN THE TREE. Lifting it to z 1 to "get it in front of the rock" put it in front of its own stools and the cat sitting on one of them, which is worse than the problem it was solving. At equal z, draw order is tree order, and DasQuesoCafe is index 0 while the stools are 1 to 3 - so the furniture draws over the building and the cast at z 1 draw over both. Re-run local_tests/carve_cafe_gathering_room.gd after changing this scale; it refuses to save rather than put the shop's roof in the stone."
-z_index = 0
+Z -1, WHICH IS A NUMBER RATHER THAN A TIE. The room now orders strictly: storefront -1, its furniture 0, the cast 1, the foreground set and the front stratum 2.
+
+It sat at 0, the same plane as its own stools, on the assumption that equal z falls back to tree order and index 0 draws first. It does not do so reliably for nodes added to an INHERITED scene, where the index is a hint rather than the child order - and the building drew over its own stools and table, which vanished. Quibble stayed visible only because the cast are a plane in front. Ordering that depends on tree position is ordering that breaks the next time somebody adds a prop. Re-run local_tests/carve_cafe_gathering_room.gd after changing this scale; it refuses to save rather than put the shop's roof in the stone."
+z_index = -1
 position = Vector2(159, -16)
 scale = Vector2(0.10269, 0.10269)
 

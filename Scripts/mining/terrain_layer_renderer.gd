@@ -274,14 +274,15 @@ const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 192
 ## every existing room, and ordinary mining, draw exactly as before. It is a
 ## shared service rather than one encounter's dressing: any cutscene can turn it
 ## on at its own floor, and the settings below are tuning that stays put.
-@export_range(1.0, 64.0, 1.0) var trodden_depth_world_px: float = 14.0
-@export_range(1.0, 96.0, 1.0) var trodden_falloff_world_px: float = 18.0
+@export_range(1.0, 64.0, 1.0) var trodden_depth_world_px: float = 10.0
+@export_range(1.0, 96.0, 1.0) var trodden_falloff_world_px: float = 26.0
 @export var trodden_color := Color(0.30, 0.24, 0.19, 1.0)
 @export_range(0.0, 1.0, 0.01) var trodden_strength: float = 0.55
-## How far the band's lower edge wanders. Zero rules a straight line across the
-## room, which is the one thing that gives it away as a shader.
-@export_range(0.0, 32.0, 0.5) var trodden_edge_wander_world_px: float = 7.0
-@export_range(0.0, 1.0, 0.01) var trodden_grain_strength: float = 0.35
+## How far the ramp's START wanders. The falloff is a smooth transition into the
+## dirt with no edge to tear, so this is a small number - it exists so the
+## strongest part of the treatment does not begin on a ruled line.
+@export_range(0.0, 32.0, 0.5) var trodden_edge_wander_world_px: float = 2.0
+@export_range(0.0, 1.0, 0.01) var trodden_grain_strength: float = 0.10
 @export_range(4.0, 128.0, 1.0) var trodden_grain_world_px: float = 26.0
 
 @export_category("Editor Preview")
