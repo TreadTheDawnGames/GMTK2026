@@ -92,25 +92,53 @@ func _verify_sequence(
 ) -> void:
 	var errors := sequence.validate(PackedStringArray(["moody_teen"]))
 	_expect(errors.is_empty(), "Timeline validation failed: %s" % "; ".join(errors))
-	_expect(sequence.beats.size() == 4, "Timeline must have exactly four beats.")
+	_expect(sequence.beats.size() == 6, "Timeline must have exactly six beats.")
 	var expected_kinds := [
 		CutsceneBeat.Kind.SHOW,
 		CutsceneBeat.Kind.FACE,
 		CutsceneBeat.Kind.WAIT,
+		CutsceneBeat.Kind.CAMERA,
 		CutsceneBeat.Kind.DIALOGUE,
+		CutsceneBeat.Kind.CAMERA,
 	]
 	for index in range(mini(sequence.beats.size(), expected_kinds.size())):
 		_expect(
 			sequence.beats[index].kind == expected_kinds[index],
 			"Timeline beat %d has the wrong kind." % (index + 1)
 		)
-	if sequence.beats.size() == 4:
-		var dialogue_beat := sequence.beats[3]
+	if sequence.beats.size() == 6:
+		var frame_beat := sequence.beats[3]
+		var dialogue_beat := sequence.beats[4]
+		var reset_beat := sequence.beats[5]
+		_expect(
+			frame_beat.camera_action == CutsceneBeat.CameraAction.FRAME,
+			"Conversation camera beat must frame the cast."
+		)
+		_expect(
+			frame_beat.camera_offset.is_equal_approx(Vector2(66.4, 0.0)),
+			"Conversation camera must centre the 132.8px two-shot."
+		)
+		_expect(
+			frame_beat.camera_zoom.is_equal_approx(Vector2(1.4, 1.4)),
+			"Conversation camera must use the shared 1.40 zoom."
+		)
+		_expect(
+			dialogue_beat.start_seconds >= frame_beat.get_end_seconds(),
+			"Dialogue must wait for the close frame."
+		)
 		_expect(dialogue_beat.conversation == conversation, "Timeline dialogue drifted.")
 		_expect(dialogue_beat.blocks, "Dialogue must block for reading.")
 		_expect(
 			dialogue_beat.line_range == Vector2i(-1, -1),
 			"Dialogue must play the complete exchange."
+		)
+		_expect(
+			reset_beat.camera_action == CutsceneBeat.CameraAction.RESET,
+			"Final camera beat must restore neutral framing."
+		)
+		_expect(
+			reset_beat.start_seconds >= dialogue_beat.get_end_seconds(),
+			"Camera reset must follow the nominal dialogue end."
 		)
 
 

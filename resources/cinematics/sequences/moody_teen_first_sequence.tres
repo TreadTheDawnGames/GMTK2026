@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="CutsceneSequence" load_steps=7 format=3]
+[gd_resource type="Resource" script_class="CutsceneSequence" load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://resources/cinematics/cutscene_beat.gd" id="1_beat"]
 [ext_resource type="Resource" path="res://resources/dialogue/moody_teen_first_conversation.tres" id="2_dialogue"]
@@ -23,15 +23,32 @@ kind = 4
 duration_seconds = 0.75
 notes = "A short silent discovery hold after landing. The remaining awkward pauses are the dialogue advances themselves."
 
+[sub_resource type="Resource" id="Beat_frame_conversation"]
+script = ExtResource("1_beat")
+kind = 11
+start_seconds = 0.75
+duration_seconds = 0.8
+camera_offset = Vector2(66.4, 0)
+camera_zoom = Vector2(1.4, 1.4)
+notes = "Closes onto the exact midpoint of the 132.8px two-person span after the discovery hold. The typed 1.40 frame is the same conversational language now shared by Encounters 1 and 9; the camera moves, but neither character does."
+
 [sub_resource type="Resource" id="Beat_dialogue"]
 script = ExtResource("1_beat")
 kind = 5
-start_seconds = 0.75
+start_seconds = 1.55
 duration_seconds = 8.0
 conversation = ExtResource("2_dialogue")
 notes = "The complete seven-line exchange. It blocks for the player's reading pace, then the same-place closing handoff returns mining control."
 
+[sub_resource type="Resource" id="Beat_reset_camera"]
+script = ExtResource("1_beat")
+kind = 11
+start_seconds = 9.55
+duration_seconds = 0.9
+camera_action = 2
+notes = "Restores neutral encounter framing after the miner's final dots and before the stage releases mining. Cancellation uses the same shared camera reset contract."
+
 [resource]
 script = ExtResource("3_sequence")
 sequence_id = &"moody_teen_first_sequence"
-beats = Array[ExtResource("1_beat")]([SubResource("Beat_show"), SubResource("Beat_face"), SubResource("Beat_stare"), SubResource("Beat_dialogue")])
+beats = Array[ExtResource("1_beat")]([SubResource("Beat_show"), SubResource("Beat_face"), SubResource("Beat_stare"), SubResource("Beat_frame_conversation"), SubResource("Beat_dialogue"), SubResource("Beat_reset_camera")])
