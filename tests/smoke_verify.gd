@@ -2099,13 +2099,13 @@ func _verify_combo_target_groups(
 ) -> void:
 	var expected_minimums := PackedInt32Array([0, 4, 8, 15, 20])
 	var expected_paths: Array[Array] = [
-		["res://Scenes/targets/target_base.tscn"],
+		["res://Scenes/targets/shrinking_target.tscn"],
 		[
-			"res://Scenes/targets/target_base.tscn",
+			"res://Scenes/targets/shrinking_target.tscn",
 			"res://Scenes/targets/reverse_target.tscn",
 		],
 		[
-			"res://Scenes/targets/target_base.tscn",
+			"res://Scenes/targets/shrinking_target.tscn",
 			"res://Scenes/targets/reverse_target.tscn",
 			"res://Scenes/targets/multi-hit_target.tscn",
 		],
@@ -2173,8 +2173,10 @@ func _verify_combo_target_groups(
 			and timing_window.mining_window.target_packed_scenes.size() == 1
 			and timing_window.mining_window.target_packed_scenes[0]
 				.resource_path
-				== "res://Scenes/targets/target_base.tscn",
-		"Production timing must start with the plain green target pool."
+				== "res://Scenes/targets/shrinking_target.tscn"
+			and timing_window.mining_window.targets.size() == 1
+			and timing_window.mining_window.targets[0].my_width == 128.0,
+		"Production timing must start with the wide green target."
 	)
 
 

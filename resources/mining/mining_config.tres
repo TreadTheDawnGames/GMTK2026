@@ -13,7 +13,7 @@
 [ext_resource type="Resource" uid="uid://bsvqjl3da48mn" path="res://resources/mining/progression_level_8.tres" id="10_level_8"]
 [ext_resource type="Resource" uid="uid://po156e267vbx" path="res://resources/mining/progression_level_9.tres" id="11_level_9"]
 [ext_resource type="Script" path="res://resources/mining/combo_target_group.gd" id="12_combo_group"]
-[ext_resource type="PackedScene" uid="uid://16edwc1adi0x" path="res://Scenes/targets/target_base.tscn" id="13_green"]
+[ext_resource type="PackedScene" uid="uid://bcoaf8y2mxx7" path="res://Scenes/targets/shrinking_target.tscn" id="13_green"]
 [ext_resource type="PackedScene" uid="uid://cv457nmc4e8qy" path="res://Scenes/targets/reverse_target.tscn" id="14_yellow"]
 [ext_resource type="PackedScene" uid="uid://ct5832k6hpwck" path="res://Scenes/targets/multi-hit_target.tscn" id="15_stationary_blue"]
 [ext_resource type="PackedScene" uid="uid://gx2i6oqtq8fi" path="res://Scenes/targets/moving_target.tscn" id="16_moving_blue"]
