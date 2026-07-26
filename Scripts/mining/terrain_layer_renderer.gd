@@ -311,6 +311,8 @@ const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 128
 ## running, not to the scene.
 var _trodden_floor_is_enabled: bool = false
 var _trodden_floor_world_y: float = 0.0
+var _cutscene_floor_plane_is_enabled: bool = false
+var _cutscene_floor_plane_world_y: float = 0.0
 
 var _active_chunks: Dictionary[int, TerrainChunkVisual] = {}
 # Nodes, sprites, and materials of chunks the view has left, waiting to be
@@ -1837,20 +1839,46 @@ func set_trodden_floor(enabled: bool, floor_world_y: float = 0.0) -> void:
 		return
 	_trodden_floor_is_enabled = enabled
 	_trodden_floor_world_y = floor_world_y
-	_publish_trodden_floor()
+	_publish_cutscene_floor()
+
+
+## Lights a cutscene room's floor as a horizontal plane instead of flat rock.
+##
+## Deliberately separate from set_trodden_floor even though both key off the same
+## line. The trodden floor is dressing - packed earth where feet have been - and
+## this is form: the lit top face, its far edge, the cut face below it, and the
+## bounce band on rock standing on it. A room can want either without the other,
+## and folding them into one flag would mean a room that wants 2.5D form has to
+## accept walked-on ground it never earned.
+##
+## The look itself is not authored twice. The shader reuses the same ground
+## tunables the world surface uses, so a room floor and the surface are the same
+## ground seen at two depths rather than two looks drifting apart.
+func set_cutscene_floor_plane(
+	enabled: bool,
+	floor_world_y: float = 0.0
+) -> void:
+	if _cutscene_floor_plane_is_enabled == enabled and is_equal_approx(
+		_cutscene_floor_plane_world_y,
+		floor_world_y
+	):
+		return
+	_cutscene_floor_plane_is_enabled = enabled
+	_cutscene_floor_plane_world_y = floor_world_y
+	_publish_cutscene_floor()
 
 
 ## Pushes the two live values onto every chunk material already streamed, pooled
 ## ones included - a pooled chunk is refilled without its material being rebuilt,
 ## so one left behind would come back wearing the last shot's floor.
-func _publish_trodden_floor() -> void:
+func _publish_cutscene_floor() -> void:
 	for chunk in _active_chunks.values():
-		_publish_trodden_floor_to_chunk(chunk)
+		_publish_cutscene_floor_to_chunk(chunk)
 	for chunk in _chunk_visual_pool:
-		_publish_trodden_floor_to_chunk(chunk)
+		_publish_cutscene_floor_to_chunk(chunk)
 
 
-func _publish_trodden_floor_to_chunk(chunk: TerrainChunkVisual) -> void:
+func _publish_cutscene_floor_to_chunk(chunk: TerrainChunkVisual) -> void:
 	for layer_index in range(chunk.layer_sprites.size()):
 		var sprite := chunk.layer_sprites[layer_index]
 		if not is_instance_valid(sprite):
@@ -1868,6 +1896,14 @@ func _publish_trodden_floor_to_chunk(chunk: TerrainChunkVisual) -> void:
 		material.set_shader_parameter(
 			&"trodden_floor_world_y",
 			_trodden_floor_world_y
+		)
+		material.set_shader_parameter(
+			&"use_cutscene_floor_plane",
+			_cutscene_floor_plane_is_enabled and layer_index == 0
+		)
+		material.set_shader_parameter(
+			&"cutscene_floor_world_y",
+			_cutscene_floor_plane_world_y
 		)
 
 
@@ -6049,6 +6085,14 @@ func _create_layer_material(
 	material.set_shader_parameter(
 		&"trodden_floor_world_y",
 		_trodden_floor_world_y
+	)
+	material.set_shader_parameter(
+		&"use_cutscene_floor_plane",
+		_cutscene_floor_plane_is_enabled and layer_index == 0
+	)
+	material.set_shader_parameter(
+		&"cutscene_floor_world_y",
+		_cutscene_floor_plane_world_y
 	)
 	material.set_shader_parameter(
 		&"trodden_depth_world_px",

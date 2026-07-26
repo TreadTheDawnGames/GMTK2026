@@ -337,6 +337,7 @@ func _activate_pending_encounter() -> void:
 	# around him.
 	miner_rig.show_cutscene_landing()
 	_apply_trodden_floor(encounter)
+	_apply_cutscene_floor_plane(encounter)
 	cinematic_flow.focus(FLOW_OWNER)
 	_begin_active_encounter.call_deferred()
 
@@ -648,11 +649,33 @@ func _apply_trodden_floor(encounter: DepthCharacterEncounter) -> void:
 	if not encounter.dresses_trodden_floor:
 		terrain_renderer.set_trodden_floor(false)
 		return
-	var floor_world_y := float(
+	var floor_world_y := _resolve_encounter_floor_world_y(encounter)
+	terrain_renderer.set_trodden_floor(true, floor_world_y)
+
+
+## Lights the room's floor as a plane for the length of the shot.
+##
+## Same line as the trodden floor and the same release path, but its own opt-in:
+## form and dressing are separate choices, and a room that wants depth should not
+## have to accept walked-on ground to get it.
+func _apply_cutscene_floor_plane(encounter: DepthCharacterEncounter) -> void:
+	if not encounter.lights_floor_as_plane:
+		terrain_renderer.set_cutscene_floor_plane(false)
+		return
+	terrain_renderer.set_cutscene_floor_plane(
+		true,
+		_resolve_encounter_floor_world_y(encounter)
+	)
+
+
+## The world y of the row this encounter's cast stand on.
+func _resolve_encounter_floor_world_y(
+	encounter: DepthCharacterEncounter
+) -> float:
+	return float(
 		mining_config.initial_surface_row
 		+ encounter.resolve_depth(mining_config.total_run_depth)
 	) * float(mining_config.terrain_cell_world_size)
-	terrain_renderer.set_trodden_floor(true, floor_world_y)
 
 
 ## Reports whether this conversation is the cast's shared cafe stop.
@@ -1108,6 +1131,7 @@ func has_pending_or_active_interaction() -> bool:
 func _finish_cinematic_flow() -> void:
 	_reset_speech_reactions()
 	terrain_renderer.set_trodden_floor(false)
+	terrain_renderer.set_cutscene_floor_plane(false)
 	# Nobody is left face down when the shot releases him, whatever ended it. A
 	# stampede that was cancelled mid-run never reaches its own finished signal,
 	# and the miner would go back to mining lying on his face.

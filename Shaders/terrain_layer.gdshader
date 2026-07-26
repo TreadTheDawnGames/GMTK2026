@@ -1,5 +1,7 @@
 shader_type canvas_item;
 
+#include "res://Shaders/ground_plane_light.gdshaderinc"
+
 // How it works:
 // - mask_tile_0..2 supply one continuous three-tile terrain mask.
 // - Optional authored fill art and the layer tint establish the base color.
@@ -249,6 +251,31 @@ uniform float ground_face_shade_strength = 0.24;
 // printed on the dirt instead of growing out of it.
 uniform float ground_contact_depth_world_px = 6.0;
 uniform float ground_contact_strength = 0.42;
+
+// The same ground stack, moved down onto a cutscene room's own floor.
+//
+// The block above is pinned to surface_world_y, the one ground line the whole
+// run shares, so every room below it drew its floor as flat rock and the shot
+// lost the depth the surface gets for free. These key the identical masks to a
+// floor line the caller supplies, reusing the tunables above rather than
+// introducing a second ground look to keep in step with the first.
+//
+// Foreground stratum only, the same rule the crust and the trodden floor follow.
+uniform bool use_cutscene_floor_plane = false;
+uniform float cutscene_floor_world_y = 0.0;
+// Bounce the lit floor throws up onto rock standing on it. A wall that runs
+// continuously out of the floor otherwise meets it as a hard seam at exactly
+// the place the 2.5D read has to hold; this is the transition band above that
+// junction. Zero disables the branch, which is what keeps the surface path
+// byte-identical to what it drew before this existed.
+uniform float ground_wall_rise_world_px = 52.0;
+uniform vec4 ground_wall_rise_color : source_color = vec4(
+	0.86,
+	0.64,
+	0.42,
+	1.0
+);
+uniform float ground_wall_rise_strength : hint_range(0.0, 1.0) = 0.22;
 
 vec4 sample_streamed_terrain_mask(vec2 safe_uv) {
 	vec2 tile_size = vec2(textureSize(mask_tile_0, 0));
@@ -1230,84 +1257,71 @@ void fragment() {
 				}
 			}
 		} else {
-			// The top of the ground, built from the widest band to the
-			// tightest so each one shades what the last laid down: the lit
-			// shelf, the shadow off its far edge, the packed lip on it, then
-			// the grass's contact shade over all of it. Read together they
-			// give the dirt a top face, a far edge, and a cut face below.
-			float depth_below_surface = world_position.y - surface_world_y;
-			float shelf_depth = max(ground_shelf_depth_world_px, 1.0);
-			float shelf_edge = shelf_depth
-				* clamp(ground_shelf_plateau, 0.0, 0.99);
-
-			// Sunlit top plane, held flat to its far edge and then turned
-			// down. Fading it from the ground line instead would read as a
-			// gradient painted on a wall rather than as a surface.
-			float shelf = step(-1.0, depth_below_surface) * (
-				1.0 - smoothstep(
-					shelf_edge,
-					shelf_depth,
-					depth_below_surface
-				)
-			);
-			surface_color = mix(
+			// The top of the ground: lit shelf, the shadow off its far edge,
+			// the packed lip on it, then the grass's contact shade over all of
+			// it. Read together they give the dirt a top face, a far edge, and
+			// a cut face below. The stack lives in ground_plane_light so the
+			// cutscene floor below can be the same ground rather than a second
+			// one drifting out of step with this.
+			//
+			// Rise strength is zero here: the world surface has open sky above
+			// it, not a wall standing on it, and passing zero keeps this path
+			// exactly the pixels it drew before the stack moved out of line.
+			surface_color = apply_ground_plane(
 				surface_color,
+				world_position.y,
+				surface_world_y,
+				ground_shelf_depth_world_px,
+				ground_shelf_plateau,
 				ground_shelf_light_color.rgb,
-				clamp(shelf * ground_shelf_light_strength, 0.0, 1.0)
-			);
-
-			// The corner itself: darkest just past the shelf's far edge, back
-			// to open dirt over its own depth.
-			float face_shade = smoothstep(
-				shelf_edge,
-				shelf_depth,
-				depth_below_surface
-			) * (
-				1.0 - smoothstep(
-					shelf_depth,
-					shelf_depth + max(
-						ground_face_shade_depth_world_px,
-						1.0
-					),
-					depth_below_surface
-				)
-			);
-			surface_color *= 1.0 - clamp(
-				face_shade * ground_face_shade_strength,
-				0.0,
-				0.9
-			);
-
-			// Packed earth on the exposed top of the original ground line.
-			float crust = step(-1.0, depth_below_surface) * (
-				1.0 - smoothstep(
-					0.0,
-					max(crust_depth_world_px, 1.0),
-					depth_below_surface
-				)
-			);
-			surface_color = mix(
-				surface_color,
+				ground_shelf_light_strength,
+				ground_face_shade_depth_world_px,
+				ground_face_shade_strength,
+				crust_depth_world_px,
 				crust_color.rgb,
-				clamp(crust * crust_strength, 0.0, 1.0)
-			);
-
-			// Contact shade last, so it darkens the finished lip rather than
-			// being covered by it. It is tighter than the crust, which leaves
-			// the order dark line, bright lip, falling face.
-			float contact = step(-1.0, depth_below_surface) * (
-				1.0 - smoothstep(
-					0.0,
-					max(ground_contact_depth_world_px, 1.0),
-					depth_below_surface
-				)
-			);
-			surface_color *= 1.0 - clamp(
-				contact * ground_contact_strength,
+				crust_strength,
+				ground_contact_depth_world_px,
+				ground_contact_strength,
 				0.0,
-				0.9
+				vec3(0.0),
+				0.0
 			);
 		}
+
+	}
+
+	// The same ground again, on the room's own floor. A cutscene stands its
+	// cast hundreds of rows below the surface, where none of the above reaches,
+	// so without this the floor they stand on is flat rock and the shot loses
+	// the depth the surface gets for free.
+	//
+	// Outside the surface-grass branch deliberately. That flag is about grass,
+	// and a room 2,500 rows down has none: nesting this under it would tie a
+	// cutscene floor to whether the stratum above it grows anything.
+	//
+	// Here the rise is on. A room has rock standing on its floor, and the band
+	// above that junction is what stops the wall and the floor meeting as a
+	// seam.
+	if (use_cutscene_floor_plane) {
+		surface_color = apply_ground_plane(
+			surface_color,
+			world_position.y,
+			cutscene_floor_world_y,
+			ground_shelf_depth_world_px,
+			ground_shelf_plateau,
+			ground_shelf_light_color.rgb,
+			ground_shelf_light_strength,
+			ground_face_shade_depth_world_px,
+			ground_face_shade_strength,
+			crust_depth_world_px,
+			crust_color.rgb,
+			crust_strength,
+			ground_contact_depth_world_px,
+			ground_contact_strength,
+			ground_wall_rise_world_px,
+			ground_wall_rise_color.rgb,
+			ground_wall_rise_strength
+		);
 	}
 
 	COLOR = vec4(surface_color, final_alpha);
