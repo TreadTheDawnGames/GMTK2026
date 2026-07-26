@@ -6,9 +6,14 @@
 
 [node name="ReverseTarget" unique_id=980051362 instance=ExtResource("1_yvcbw")]
 self_modulate = Color(1, 1, 0.3254902, 1)
+offset_right = 36.0
 script = ExtResource("2_ylfck")
 my_width = 48.0
 
 [node name="TextureRect" parent="." index="0" unique_id=1601954937]
 visible = true
+offset_left = -20.775269
+offset_top = -20.775269
+offset_right = 20.775269
+offset_bottom = 20.775269
 texture = ExtResource("3_ylfck")

@@ -64,6 +64,7 @@ func _get_candidate_hit_directions(
 		if inspected_targets >= MAX_PREDICTED_TARGETS:
 			break
 		if target == null or target.is_hit or not target.visible:
+			print("target's hit")
 			continue
 		inspected_targets += 1
 		var hit_left: float = (

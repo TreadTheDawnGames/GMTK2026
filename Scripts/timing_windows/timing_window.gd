@@ -19,12 +19,15 @@ var combo: int = 0:
 	set(value):
 		combo = value
 		combo_label.text = "Combo: " + str(-combo)
+			
 var stored_combo : int = 0
 
 @export var combo_saved_color: Color = Color.CYAN
 @export var combo_lost_color: Color = Color.RED
 
-var _audio_handler: PlayerAudioHandler
+@export var DEBUG_starting_targets : int = -1
+
+var _audio_handler: PlayerAudioHandler = AudioHandler
 var _target_unlocks: Array[PickaxeDefinition] = []
 var _progression_target_scenes: Array[PackedScene] = []
 var _progression_bonus_target_combos := PackedInt32Array()
@@ -34,6 +37,8 @@ var _displayed_distance: int = 0
 
 ## Connects both timing bars to the combo flow.
 func _ready() -> void:
+	if DEBUG_starting_targets > 0:
+		mining_window._starting_target_count = DEBUG_starting_targets
 	if mining_config == null:
 		push_error("TimingWindowTask requires a MiningConfig.")
 		return
@@ -68,7 +73,6 @@ func _ready() -> void:
 	set_bounce_muted(_bounce_muted)
 	show_displayed_distance(_displayed_distance)
 
-
 ## Supplies the cross-scene audio service at the composition boundary.
 func set_audio_handler(audio_handler: PlayerAudioHandler) -> void:
 	_audio_handler = audio_handler
@@ -77,7 +81,6 @@ func set_audio_handler(audio_handler: PlayerAudioHandler) -> void:
 	mining_window.set_audio_handler(audio_handler)
 	recovery_window.set_audio_handler(audio_handler)
 	recovery_window2.set_audio_handler(audio_handler)
-
 
 ## Plays optional feedback when this reusable timing scene has an audio owner.
 func _play_sound(
@@ -95,7 +98,6 @@ func _play_sound(
 		pitch_scale
 	)
 
-
 ## Applies the saved bounce preference to both authored timing bars.
 func set_bounce_muted(is_muted: bool) -> void:
 	_bounce_muted = is_muted
@@ -104,14 +106,14 @@ func set_bounce_muted(is_muted: bool) -> void:
 	mining_window.set_bounce_muted(is_muted)
 	recovery_window.set_bounce_muted(is_muted)
 
-
 ## Shows distance to the Thief, then distance travelled beyond the Thief.
 func show_displayed_distance(displayed_distance: int) -> void:
 	_displayed_distance = maxi(displayed_distance, 0)
 	if not is_node_ready():
 		return
 	depth_label.text = Utils.format_number_with_commas(_displayed_distance)
-
+	if DEBUG_starting_targets > 0:
+		combo_label.text = "MINING UI IS IN DEBUG"
 
 ## Stores cumulative pickaxes and restores their zero-combo baseline scenes.
 func set_pickaxe_target_unlocks(
@@ -120,7 +122,6 @@ func set_pickaxe_target_unlocks(
 	_target_unlocks = definitions.duplicate()
 	if is_node_ready():
 		_apply_pickaxe_target_unlocks()
-
 
 ## Applies the timing portion of one complete encounter-progression level.
 ## New level-owned timing rules are added to this explicit contract and passed
@@ -140,7 +141,6 @@ func set_progression_target_rules(
 	mining_window.speed = slider_speed
 	mining_window.set_starting_target_count(starting_target_count)
 	mining_window.set_target_pool(_progression_target_scenes)
-
 
 ## Rebuilds only the zero-combo target baseline after the bar is ready.
 func _apply_pickaxe_target_unlocks() -> void:
@@ -269,7 +269,6 @@ func _recovery_window_pressed(
 			#reset targets
 			recovery_window.animation_repeats = 3
 			
-			mining_window.remove_all_extra_targets()
 			#Set animation color
 			recovery_window.animation_color = combo_lost_color
 			failed_recovery = false
@@ -296,6 +295,7 @@ func _recovery_window_pressed(
 		recovery_window.stop()
 		mining_window.start()
 		failed_recovery = false
+		mining_window.reset_all_targets()
 		
 	
 	#Regardless of whether we succeeded or failed, start the mining window
@@ -346,7 +346,6 @@ func _additional_recovery_window_pressed(
 		mining_window.recovery_action()
 		mining_window.clamp_all_targets()
 		mining_window.start()
-
 
 func fail_combo():
 	var lost_combo := combo
