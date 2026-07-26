@@ -429,6 +429,27 @@ func finish_swing() -> void:
 		_prepare_latest_impact_candidates()
 
 
+## Drops the strike a cinematic interrupted, along with the hits retained behind
+## it, so the gate hands mining back in a state that can start a swing again.
+##
+## A cutscene takes the miner's AnimationPlayer and stops it where it stands, and
+## a stopped animation never reports finished, so the swing it interrupted never
+## reaches finish_swing. The pending flag then survives the whole conversation:
+## the timing bar comes back and still resolves, but every earned hit lands in
+## _queued_swings behind a swing that can no longer end, which reads in game as a
+## working UI attached to a miner who has stopped digging.
+##
+## No damage is lost by dropping it. An encounter is scheduled off a depth
+## change, which only a resolved impact produces, so the hit that opened the room
+## has already done its terrain work by the time the gate is claimed. Anything
+## still airborne is a swing the player never sees land.
+func abandon_interrupted_swing() -> void:
+	_pending_swing = null
+	_is_swing_pending = false
+	_has_resolved_pending_impact = false
+	_queued_swings.clear()
+
+
 ## Pauses retained hits during dialogue floors and resumes them afterward.
 func set_swing_queue_paused(is_paused: bool) -> void:
 	_is_swing_queue_paused = is_paused
