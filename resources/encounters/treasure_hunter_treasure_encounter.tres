@@ -18,6 +18,7 @@ appearance = ExtResource("2_appearance")
 conversation = ExtResource("3_dialogue")
 stage_scene = ExtResource("5_stage")
 sequence = ExtResource("5_uctft")
+plays_authored_timeline = true
 prestage_before_landing = true
 speaker_slot = &"treasure_hunter"
 pickaxe_reward = ExtResource("4_pickaxe")
