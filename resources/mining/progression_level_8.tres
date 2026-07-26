@@ -1,17 +1,13 @@
 [gd_resource type="Resource" script_class="EncounterProgressionLevel" format=3 uid="uid://bsvqjl3da48mn"]
 
 [ext_resource type="Script" uid="uid://ccyhfmjkfbq3d" path="res://resources/mining/encounter_progression_level.gd" id="1_level"]
-[ext_resource type="PackedScene" uid="uid://bcoaf8y2mxx7" path="res://Scenes/targets/shrinking_target.tscn" id="2_shrinking"]
-[ext_resource type="PackedScene" uid="uid://ct5832k6hpwck" path="res://Scenes/targets/multi-hit_target.tscn" id="3_chase"]
-[ext_resource type="PackedScene" uid="uid://cv457nmc4e8qy" path="res://Scenes/targets/reverse_target.tscn" id="4_reverse"]
-[ext_resource type="PackedScene" uid="uid://gx2i6oqtq8fi" path="res://Scenes/targets/moving_target.tscn" id="5_moving"]
 
 [resource]
 script = ExtResource("1_level")
-impact_size = 2
+impact_size = 1
 double_hit = true
-mine_animation_speed = 2
-combo_impact_scale = 1.3
-target_scenes = Array[PackedScene]([ExtResource("2_shrinking"), ExtResource("3_chase"), ExtResource("4_reverse"), ExtResource("5_moving")])
+mine_animation_speed = 1
+combo_impact_scale = 1.2
 starting_target_count = 2
-bonus_target_combos = PackedInt32Array(5, 10, 15, 20)
+bonus_target_combos = PackedInt32Array(10, 15, 20)
+highest_unlocked_combo_target_group_index = 4

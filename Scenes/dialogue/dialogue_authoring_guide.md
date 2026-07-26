@@ -62,10 +62,17 @@ The Treasure Hunter's two distinct pickaxe gifts never replace earlier tools.
 The newest gift controls the visible tool tint, while the complete gameplay
 rules come from `res://resources/mining/progression_level_0.tres` through
 `progression_level_9.tres`. Completing encounter index N applies level N + 1.
-Those resources author impact size, double hits, timing-target pools, slider
-speed, starting targets, mining-animation speed, bonus-target combos, and combo
-impact scale. The post-credit Lantern Man encounter has no level-ten resource,
-so it intentionally leaves level nine active.
+Those resources author impact size, double hits, slider speed, starting
+targets, mining-animation speed, bonus-target combos, and combo impact scale.
+They also unlock the highest available timing-target group. Group thresholds
+and target types come from `res://resources/mining/mining_config.tres`; combo
+selects only among the groups the current encounter level has unlocked.
+Treasure Hunter's tools remain collectible visual upgrades, Quibble still
+presents the coffee handoff without applying the former speed multiplier, and
+Rotini's persistent followers remain visual-only mining companions. These
+reward beats no longer add a separate combo-intensity or mining-power bonus.
+The post-credit Lantern Man encounter has no level-ten resource, so it
+intentionally leaves level nine active.
 
 Enable `Occurs At Run Bottom` only for the thief. That places the encounter at
 zero remaining depth for the authored 100,000-depth run. The thief uses

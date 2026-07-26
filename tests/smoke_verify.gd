@@ -574,6 +574,7 @@ func _verify_mining_scene() -> void:
 		and timing_window._audio_handler == audio_handler,
 		"SceneWiring must inject AudioHandler into TimingWindowTask."
 	)
+	_verify_combo_target_groups(terrain_manager.config, timing_window)
 	_expect(
 		run_intro_controller != null
 		and arrival_sequence != null
@@ -818,6 +819,92 @@ func _verify_mining_scene() -> void:
 	)
 	game_root.queue_free()
 	await process_frame
+
+
+## Protects the combo-owned target-type ladder and its production baseline.
+func _verify_combo_target_groups(
+	config: MiningConfig,
+	timing_window: TimingWindowTask
+) -> void:
+	var expected_minimums := PackedInt32Array([0, 4, 8, 15, 20])
+	var expected_paths: Array[Array] = [
+		["res://Scenes/targets/target_base.tscn"],
+		[
+			"res://Scenes/targets/target_base.tscn",
+			"res://Scenes/targets/reverse_target.tscn",
+		],
+		[
+			"res://Scenes/targets/target_base.tscn",
+			"res://Scenes/targets/reverse_target.tscn",
+			"res://Scenes/targets/multi-hit_target.tscn",
+		],
+		[
+			"res://Scenes/targets/reverse_target.tscn",
+			"res://Scenes/targets/multi-hit_target.tscn",
+			"res://Scenes/targets/moving_target.tscn",
+		],
+		[
+			"res://Scenes/targets/reverse_target.tscn",
+			"res://Scenes/targets/moving_target.tscn",
+			"res://Scenes/targets/fade_target.tscn",
+		],
+	]
+	_expect(
+		config != null
+			and config.has_valid_combo_target_groups()
+			and config.combo_target_groups.size()
+				== expected_minimums.size(),
+		"MiningConfig must define five valid combo target groups."
+	)
+	if (
+		config == null
+		or not config.has_valid_combo_target_groups()
+		or config.combo_target_groups.size()
+			!= expected_minimums.size()
+	):
+		return
+	for group_index in range(config.combo_target_groups.size()):
+		var group := config.combo_target_groups[group_index]
+		var actual_paths: Array[String] = []
+		for target_scene: PackedScene in group.target_scenes:
+			actual_paths.append(target_scene.resource_path)
+		_expect(
+			group.minimum_combo == expected_minimums[group_index]
+				and actual_paths == expected_paths[group_index]
+				and config.get_combo_target_group_index(
+					group.minimum_combo
+				) == group_index,
+			"Combo target group %d must match the authored ladder."
+				% group_index
+		)
+	var expected_unlocked_group_indices := PackedInt32Array([
+		0, 0, 0, 0, 1, 1, 2, 3, 4, 4,
+	])
+	_expect(
+		config.progression_levels.size()
+			== expected_unlocked_group_indices.size(),
+		"Encounter progression must author ten combo-group unlock levels."
+	)
+	if (
+		config.progression_levels.size()
+		== expected_unlocked_group_indices.size()
+	):
+		for level_index in range(config.progression_levels.size()):
+			_expect(
+				config.progression_levels[level_index]
+					.highest_unlocked_combo_target_group_index
+					== expected_unlocked_group_indices[level_index],
+				"Encounter progression level %d has the wrong target-group cap."
+					% level_index
+			)
+	_expect(
+		timing_window != null
+			and timing_window.mining_window.target_packed_scenes.size() == 1
+			and timing_window.mining_window.target_packed_scenes[0]
+				.resource_path
+				== "res://Scenes/targets/target_base.tscn",
+		"Production timing must start with the plain green target pool."
+	)
 
 
 ## Proves the finale's lines still finish themselves.

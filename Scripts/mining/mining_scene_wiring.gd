@@ -279,21 +279,12 @@ func _ready() -> void:
 		timing_window.streak_ended,
 		combo_director._on_streak_ended
 	)
-	_connect_once(
-		pickaxe_progression.upgrade_granted,
-		combo_director._on_upgrade_granted
-	)
+	# Encounter completion now unlocks target groups through
+	# EncounterProgression. Reward signals retain authored presentation only;
+	# they do not raise a permanent combo-intensity floor.
 	_connect_once(
 		pickaxe_progression.upgrade_granted,
 		pickaxe_reward_celebration.play_for_upgrade
-	)
-	_connect_once(
-		coffee_speed_boost.boost_awarded,
-		combo_director._on_coffee_boost_awarded
-	)
-	_connect_once(
-		encounter_controller.rat_colony_support_requested,
-		combo_director._on_rat_colony_support_requested
 	)
 	_connect_once(
 		_game_state.run_reset,
@@ -377,10 +368,8 @@ func _ready() -> void:
 		dialogue_director.line_presented,
 		encounter_controller._on_dialogue_line_presented
 	)
-	_connect_once(
-		encounter_controller.coffee_speed_boost_requested,
-		coffee_speed_boost.award_boost
-	)
+	# Rotini's followers remain a persistent visual reward. Their strikes play
+	# bounded feedback but never remove terrain or raise combo intensity.
 	_connect_once(
 		encounter_controller.rat_colony_support_requested,
 		rat_colony_followers.activate_followers
