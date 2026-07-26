@@ -24,7 +24,7 @@ var stored_combo : int = 0
 @export var combo_saved_color: Color = Color.CYAN
 @export var combo_lost_color: Color = Color.RED
 
-var _audio_handler: PlayerAudioHandler
+var _audio_handler: PlayerAudioHandler = AudioHandler
 var _target_unlocks: Array[PickaxeDefinition] = []
 var _progression_target_scenes: Array[PackedScene] = []
 var _progression_bonus_target_combos := PackedInt32Array()

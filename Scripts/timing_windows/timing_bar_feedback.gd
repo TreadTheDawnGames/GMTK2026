@@ -359,8 +359,9 @@ func _draw_recovery_frame(main_bar: SliderTimingWindow) -> void:
 
 ## Single struck slash across the bar for a press that hit nothing.
 func _draw_slash(mark: Mark, bar_rect: Rect2, mark_color: Color) -> void:
-	var half_height := bar_rect.size.y * 0.5 + frame_kick_px
-	var lean := half_height * 0.45
+	var reversed : float = (1.0 if randi() % 2 == 0 else -1.0) + (randf() * 0.5)
+	var half_height := bar_rect.size.y * 0.5 + frame_kick_px * reversed
+	var lean := half_height * 0.45 * reversed
 	draw_line(
 		mark.position + Vector2(-lean, -half_height),
 		mark.position + Vector2(lean, half_height),
