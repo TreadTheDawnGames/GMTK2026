@@ -1,21 +1,23 @@
 extends SceneTree
 
-## Proves a cutscene's cast is drawn in front of the rock they are standing in.
+## Proves a cutscene's cast is drawn in the rock they are standing in, on the
+## same stratum the miner occupies while he is digging.
 ##
-## During ordinary mining the cast layer sits behind the foreground stratum,
-## which is what makes the miner read as being down in his dig rather than pasted
-## on top of it. A cutscene lifts the whole cast in front of that stratum instead,
-## because a shot that holds on two characters has to let you see them.
+## Cutscenes used to lift the whole cast clear of every stratum so a held shot
+## showed whole characters. Zephan's direction reversed that: the cast belong in
+## the ground the way the player does, with their feet covered, rather than being
+## cut out in front of it. So the cutscene order and the mining order now name the
+## same stratum, and this check tests that they still do.
 ##
-## The lift is a single number, MinerRig.cutscene_draw_order, and the thing it
-## has to beat is whatever the terrain profile's frontmost stratum draws at. Those
-## two live in different files and nothing has ever tied them together: add a
-## stratum, or renumber the existing ones, and every cutscene quietly starts
-## playing behind the wall with no error anywhere. That is exactly how it looks
-## when it goes wrong - the characters are simply gone behind the dirt.
+## Both are compared against whatever the terrain profile's strata actually draw
+## at. Those numbers live in a different file and nothing else ties them together:
+## add a stratum, or renumber the existing ones, and the cast quietly ends up on
+## the wrong side of the rock with no error anywhere. Too far forward and they are
+## pasted on top of the ground; too far back and they are simply gone behind the
+## dirt.
 ##
-## The invariant is that the cutscene cast order is strictly in front of every
-## terrain stratum, and that the resting order is still behind the foreground one.
+## The invariant is that both orders sit strictly between the two frontmost
+## strata: behind the foreground layer, in front of the one it stands on.
 
 const MINER_SCENE := preload("res://Scenes/mining/miner_rig.tscn")
 const PROFILE_PATH := "res://resources/mining/default_terrain_layer_profile.tres"
