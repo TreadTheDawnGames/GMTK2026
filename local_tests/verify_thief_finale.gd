@@ -10,8 +10,8 @@ extends SceneTree
 ##   played, and reproduces the numbers Jared's script was written against.
 ## - Round-trips the lifetime record through a file to prove a total survives a
 ##   restart, which is the whole reason it is not kept in savegame.tres.
-## - Checks the encounter wiring the shot depends on: the authored timeline
-##   switch, the room being an external file, and the organ art.
+## - Checks the encounter wiring the shot depends on: the authored timeline,
+##   external room, 30%-larger figures, and typed two-axis camera animation.
 ## - Exits nonzero on any failure so this can gate a merge.
 
 const ENCRYPTED_DIALOGUE: EncryptedDialogueConversation = preload(
@@ -253,7 +253,44 @@ func _verify_encounter_wiring() -> void:
 				"The organ must draw behind the cast; z_index is %d."
 				% organ.z_index
 			)
+			_expect(
+				organ.scale.is_equal_approx(Vector2(0.195, 0.195)),
+				"The finale organ must retain its 30%% size increase; got %s."
+				% str(organ.scale)
+			)
+		var stage_controller := stage as CharacterEncounterStage
+		_expect(
+			stage_controller.camera_pan_offset_cells is Vector2,
+			"The finale camera animation property must remain two-axis."
+		)
+		var pan_animation := stage_controller.animation_player.get_animation(
+			&"pan_to_organ"
+		)
+		_expect(
+			pan_animation != null,
+			"The finale stage must retain its pan_to_organ animation."
+		)
+		if pan_animation != null:
+			var final_pan_value: Variant = pan_animation.track_get_key_value(
+				0,
+				pan_animation.track_get_key_count(0) - 1
+			)
+			_expect(
+				final_pan_value is Vector2
+				and (final_pan_value as Vector2).is_equal_approx(
+					Vector2(120.0, 0.0)
+				),
+				"The finale camera pan must end at Vector2(120, 0); got %s."
+				% str(final_pan_value)
+			)
 		stage.queue_free()
+	_expect(
+		FINALE_ENCOUNTER.appearance.sprite_scale.is_equal_approx(
+			Vector2(0.195, 0.195)
+		),
+		"The finale figure must retain its 30%% size increase; got %s."
+		% str(FINALE_ENCOUNTER.appearance.sprite_scale)
+	)
 
 	var sequence_errors := FINALE_SEQUENCE.validate(
 		PackedStringArray([str(FINALE_ENCOUNTER.actor_id)])

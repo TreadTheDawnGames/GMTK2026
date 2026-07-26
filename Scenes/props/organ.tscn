@@ -20,5 +20,5 @@ The editor stand-in does not reproduce the bug, because it is a child of the sta
 The pipes are drawn, not modelled: nothing here responds to the music. If the organ should ever move with what is playing, it is this node's scale or an added shader, not a change to the room."
 texture = ExtResource("1_organ")
 offset = Vector2(0, -824)
-scale = Vector2(0.15, 0.15)
+scale = Vector2(0.195, 0.195)
 z_index = -1

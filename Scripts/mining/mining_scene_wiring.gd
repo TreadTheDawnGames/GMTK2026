@@ -408,12 +408,12 @@ func _ready() -> void:
 		encounter_controller.character_stage_rock_break_requested,
 		_on_character_stage_rock_break_requested
 	)
-	# Straight through: a pan is already expressed in the view's own units, so
+	# Straight through: an offset is already expressed in the view's own units, so
 	# there is nothing for this boundary to translate the way the strike handlers
 	# convert a screen position into terrain.
 	_connect_once(
 		encounter_controller.character_stage_camera_pan_requested,
-		view_controller.set_encounter_view_pan_cells
+		view_controller.set_encounter_view_offset_cells
 	)
 	_connect_once(
 		encounter_controller.stampede_rumble_started,

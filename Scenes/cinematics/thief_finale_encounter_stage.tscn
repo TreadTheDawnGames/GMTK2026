@@ -27,7 +27,7 @@ tracks/0/keys = {
 "times": PackedFloat32Array(0),
 "transitions": PackedFloat32Array(1),
 "update": 0,
-"values": [0.0]
+"values": [Vector2(0, 0)]
 }
 
 [sub_resource type="Animation" id="Animation_opening"]
@@ -51,7 +51,7 @@ tracks/0/keys = {
 "times": PackedFloat32Array(0, 1, 7),
 "transitions": PackedFloat32Array(1, 1, 1),
 "update": 0,
-"values": [0.0, 0.0, 120.0]
+"values": [Vector2(0, 0), Vector2(0, 0), Vector2(120, 0)]
 }
 
 [sub_resource type="AnimationLibrary" id="AnimationLibrary_finale"]
@@ -73,7 +73,7 @@ SOME OF HIS LINES ARE NOT FINISHED UNTIL THEY ARE PLAYED. They carry {tokens} th
 
 TRACKING IS OFF, WHICH IS THE OPPOSITE OF EVERY RECENT ROOM. Conversation Tracks Miner slides the actor marks to whatever column the fall left the miner in, and that is right when a character has walked over to talk to him. It is wrong here: this one is at an instrument that is part of the room, and an organ cannot slide sideways to meet a landing column. The documented cost applies in full - the miner's 49-column band is 392px wide, so his distance from the organ varies by that much and the pan lands the instrument up to 192px off centre either way. The vault is carved wide enough that it still reads at both extremes. Narrowing the band, or measuring the pan at runtime instead of animating a fixed one, are the two real fixes and both are above this room.
 
-THE PAN IS AN ANIMATION, NOT A BEAT. camera_pan_offset_cells is animated by the pan_to_organ clip, and every change is relayed out to the view controller, which slides the framed view that many terrain cells off the miner. A STAGE_CUE beat plays that clip and blocks the timeline until it ends, so the timeline owns when the pan happens and the clip owns how it moves - which is the only way to author an eased curve rather than describe one. Nothing has to pan back: release_encounter_focus already tweens the view home when the shot ends.
+THE PAN IS AN ANIMATION, NOT A BEAT. camera_pan_offset_cells is animated by the pan_to_organ clip, and every change is relayed out to the view controller as a two-axis offset from the framing where encounter focus settled. A STAGE_CUE beat plays that clip and blocks the timeline until it ends, so the timeline owns when the pan happens and the clip owns how it moves - which is the only way to author an eased curve rather than describe one. Nothing has to pan back: release_encounter_focus already tweens the view home when the shot ends.
 
 He does not walk, and Entrance, Conversation, Rest and Exit are all one mark. That is this character's whole grammar, set at 1,400 and kept at 5,600 and after the credits: he does not travel, he is somewhere and then he is not. Here he is not even that - Hide Actor After Closing is off, so when control is handed back and the player keeps digging, the organ is still being played behind them."
 opening_move_seconds = 0.2
