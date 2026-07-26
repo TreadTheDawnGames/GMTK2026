@@ -240,20 +240,19 @@ func _spawn_follower() -> void:
 		clump_scale_multiplier if is_clump else single_scale_multiplier
 	)
 	rat.set_appearance(appearance)
-	# A drawn crowd goes behind the individuals running over it. The clump is a
-	# backdrop - it holds two dozen mice but only ever moves as one thing - and
-	# the single mice are what sells the motion, so they have to be the layer in
-	# front or the stampede reads as one sliding picture.
-	#
-	# Taken from depicted_rat_count rather than authored per slot, because "is
-	# this a crowd" is already recorded there and saying it twice is one more
-	# place to disagree.
-	rat.z_index = clump_draw_order if is_clump else single_draw_order
 	_appearance_index += 1
 	rat.prepare_for_sequence(
 		_resolve_grounded_marker(entrance_marker),
 		_appearance_index
 	)
+	# Preparation restores the actor's authored depth, so the stage-specific
+	# crowd order belongs after it. A drawn clump is a backdrop and the single
+	# runners in front are what make the whole mass look like it is moving.
+	#
+	# Taken from depicted_rat_count rather than authored per slot, because "is
+	# this a crowd" is already recorded there and saying it twice is one more
+	# place to disagree.
+	rat.z_index = clump_draw_order if is_clump else single_draw_order
 	_connect_once(rat.reached_wall, _on_follower_reached_wall)
 	_connect_once(rat.ready_to_exit, _on_follower_ready_to_exit)
 	_connect_once(rat.run_target_reached, _on_follower_run_target_reached)
