@@ -107,8 +107,8 @@ const MAX_PLAYABLE_DEPTH: int = 2_000_000_000
 @export var progression_levels: Array[EncounterProgressionLevel] = []
 
 @export_category("Combo Targets")
-## Ordered target pools selected by combo. The first group must start at zero;
-## later groups replace it at their inclusive minimum_combo.
+## Ordered target unlocks selected by combo. The first group must start at zero;
+## later groups add their scenes at their inclusive minimum_combo.
 @export var combo_target_groups: Array[ComboTargetGroup] = []
 
 @export_category("Effects")
@@ -162,3 +162,23 @@ func get_combo_target_group_index(combo: int) -> int:
 			break
 		selected_index = group_index
 	return selected_index
+
+
+## Builds the deduplicated target pool unlocked through one group.
+func get_combo_target_pool_through_group(
+	group_index: int
+) -> Array[PackedScene]:
+	var target_pool: Array[PackedScene] = []
+	if not has_valid_combo_target_groups() or group_index < 0:
+		return target_pool
+	var final_group_index := mini(
+		group_index,
+		combo_target_groups.size() - 1
+	)
+	for unlocked_group_index in range(final_group_index + 1):
+		for target_scene: PackedScene in (
+			combo_target_groups[unlocked_group_index].target_scenes
+		):
+			if target_scene not in target_pool:
+				target_pool.append(target_scene)
+	return target_pool

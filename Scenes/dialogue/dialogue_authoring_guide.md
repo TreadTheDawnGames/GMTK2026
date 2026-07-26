@@ -66,7 +66,8 @@ Those resources author impact size, double hits, slider speed, starting
 targets, mining-animation speed, bonus-target combos, and combo impact scale.
 They also unlock the highest available timing-target group. Group thresholds
 and target types come from `res://resources/mining/mining_config.tres`; combo
-selects only among the groups the current encounter level has unlocked.
+accumulates every reached group up to the current encounter level's cap, so an
+earlier target type remains possible after later types unlock.
 Treasure Hunter's tools remain collectible visual upgrades, Quibble still
 presents the coffee handoff without applying the former speed multiplier, and
 Rotini's persistent followers remain visual-only mining companions. These

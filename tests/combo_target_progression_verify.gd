@@ -6,7 +6,7 @@ extends SceneTree
 ## - Checks Zephan's entry breakpoints and reward-aligned progression caps.
 ## - Checks loss reset and deferred replacement of a partially resolved set.
 ## - Confirms reward levels change target availability, not old mining rules.
-## - The invariant is that combo never selects a group progression has locked.
+## - The invariant is that combo never adds a group progression has locked.
 
 const TIMING_WINDOW_SCENE := preload("res://Scenes/TimingWindow.tscn")
 
@@ -58,8 +58,10 @@ func _run() -> void:
 			"level %d at combo 20" % level_index
 		)
 
-	var band_combos := PackedInt32Array([3, 4, 7, 8, 14, 15, 19, 20])
-	var band_groups := PackedInt32Array([0, 1, 1, 2, 2, 3, 3, 4])
+	var band_combos := PackedInt32Array([
+		3, 4, 7, 8, 14, 15, 18, 19, 20,
+	])
+	var band_groups := PackedInt32Array([0, 1, 1, 2, 2, 3, 3, 3, 4])
 	for band_index in range(band_combos.size()):
 		timing_window.combo = band_combos[band_index]
 		progression.apply_level(8)
@@ -199,10 +201,12 @@ func _expect_active_group(
 	context: String
 ) -> void:
 	var expected_paths: Array[String] = []
-	for target_scene: PackedScene in (
-		config.combo_target_groups[expected_group_index].target_scenes
-	):
-		expected_paths.append(target_scene.resource_path)
+	for group_index in range(expected_group_index + 1):
+		for target_scene: PackedScene in (
+			config.combo_target_groups[group_index].target_scenes
+		):
+			if target_scene.resource_path not in expected_paths:
+				expected_paths.append(target_scene.resource_path)
 	var actual_paths: Array[String] = []
 	for target_scene: PackedScene in (
 		timing_window.mining_window.target_packed_scenes
@@ -210,7 +214,7 @@ func _expect_active_group(
 		actual_paths.append(target_scene.resource_path)
 	_expect(
 		actual_paths == expected_paths,
-		"Wrong target group for %s: %s." % [context, actual_paths]
+		"Wrong cumulative target pool for %s: %s." % [context, actual_paths]
 	)
 
 
