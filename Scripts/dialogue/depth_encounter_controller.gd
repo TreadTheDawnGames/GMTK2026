@@ -18,6 +18,11 @@ signal encounter_completed(encounter_index: int)
 signal coffee_speed_boost_requested
 signal rat_colony_support_requested
 signal character_stage_strike_requested(screen_position: Vector2)
+## Relays a stage's request to open real rock where a strike landed.
+signal character_stage_rock_break_requested(
+	screen_position: Vector2,
+	radius_cells: int
+)
 
 const FLOW_OWNER: StringName = &"depth_encounter"
 const MINER_SPEAKER_SLOT: StringName = &"miner"
@@ -736,6 +741,10 @@ func _prepare_authored_characters() -> bool:
 				stage.presentation_strike_requested,
 				_on_character_stage_strike_requested
 			)
+			_connect_once(
+				stage.presentation_rock_break_requested,
+				_on_character_stage_rock_break_requested
+			)
 			if encounter.starts_rat_colony_support:
 				if not stage is RatColonyEncounterStage:
 					push_error(
@@ -887,6 +896,15 @@ func _on_character_stage_strike_requested(
 	screen_position: Vector2
 ) -> void:
 	character_stage_strike_requested.emit(screen_position)
+
+
+## Relays a stage's rock-breaking request the same way, so terrain stays owned by
+## the mining wiring rather than being reached into from a cutscene stage.
+func _on_character_stage_rock_break_requested(
+	screen_position: Vector2,
+	radius_cells: int
+) -> void:
+	character_stage_rock_break_requested.emit(screen_position, radius_cells)
 
 
 ## Relays the clean stage transition through the cross-system wiring boundary.
