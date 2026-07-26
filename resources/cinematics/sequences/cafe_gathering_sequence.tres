@@ -79,7 +79,6 @@ notes = "Looking left, back down the room at all of them. He stands 244px right 
 
 [sub_resource type="Resource" id="Beat_open_silence"]
 script = ExtResource("1_beat")
-kind = 4
 duration_seconds = 0.9
 notes = "Held silence on the whole room before anybody speaks. The miner has just come through the ceiling into the one place the entire run has been walking toward, and the shot needs a moment for the player to read the sign over his head before a dialogue box covers the bottom of the frame.
 
@@ -110,7 +109,6 @@ Every reaction inside this beat is already free. DepthEncounterController bounce
 
 [sub_resource type="Resource" id="Beat_closing_hold"]
 script = ExtResource("1_beat")
-kind = 4
 start_seconds = 12.9
 duration_seconds = 1.1
 notes = "A held beat on the gathering after the Keeper's last line, before the timeline ends and play_closing takes him. Without it the shot cuts straight from the dialogue box closing to him fading, and 'Stay a while. Not every minute needs somewhere to go.' does not get the moment it is asking for.

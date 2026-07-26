@@ -27,6 +27,7 @@ signal pressed(success: bool, hit_direction: int, combo : int)
 
 @export var desired_target_heirarchy_index : int = 1
 
+
 var direction: float = 1.0
 # Growth is bounded by two starting targets plus four authored combo bonuses;
 # a lost streak prunes the collection back to its current level's baseline.
@@ -35,6 +36,8 @@ var consecutive_hits : int = 0
 var _starting_target_count: int = 1
 var _bounce_muted: bool = false
 var _audio_handler: PlayerAudioHandler
+var _backing_size : float = 700
+@export_range(-1, 1, 1) var preferred_side : int = 0
 
 var slider_position : float = 0.0:
 	set(value):
@@ -45,6 +48,7 @@ var slider_position : float = 0.0:
 ## Creates the configured target baseline and prepares one-shot recovery bars.
 func _ready() -> void:
 	set_process(false)
+	#preferred_side = 0
 	while targets.size() < _starting_target_count:
 		add_target()
 	Utils.set_control_width(slider, slider_size)
@@ -62,6 +66,8 @@ func _ready() -> void:
 		stop()
 	else:
 		set_process(true)
+	_backing_size = backing.size.x
+	
 
 ## Returns the slider edge area including input grace.
 func slider_half_width() -> float:
@@ -70,6 +76,7 @@ func slider_half_width() -> float:
 ## Shows the bar and prepares a fresh target for one-shot recovery.
 func start() -> void:
 	backing.size.x = size.x
+	_backing_size = size.x
 	reset_one_shot()
 	show()
 	set_process(true)
@@ -243,7 +250,7 @@ func _process(delta: float) -> void:
 
 	# Detect if we need to bounce
 	var left_edge := slider_half_width()
-	var right_edge := backing.size.x - slider_half_width()
+	var right_edge := _backing_size - slider_half_width()
 	var hit_left_edge := slider_position <= left_edge and direction < 0.0
 	var hit_right_edge := (
 		slider_position >= right_edge
@@ -286,49 +293,11 @@ func play_bounce_sound() -> void:
 ## Maps a successful slider position to left, center-neutral, or right.
 func _get_slider_hit_direction() -> int:
 	var hit_offset_from_center: float = (
-		slider_position - backing.size.x * 0.5
+		slider_position - _backing_size * 0.5
 	)
 	if is_zero_approx(hit_offset_from_center):
 		return 0
 	return -1 if hit_offset_from_center < 0.0 else 1
-
-
-### Moves one target to a valid position inside its backing bar.
-#func randomize_target(target: TimingTarget) -> void:
-	## Target sets reset on successful hits, so use the authored width directly
-	## instead of allocating a temporary position/width array on the hot path.
-	#var target_width: float = maxf(target.my_width, 1.0)
-	#var minimum_center_x: float = target_width * 0.5
-	#var maximum_center_x: float = maxf(
-		#backing.size.x - minimum_center_x,
-		#minimum_center_x
-	#)
-	#var requested_center_x: float = target.place(backing.size.x)
-	#if fixed_window >= 0.0:
-		#requested_center_x = fixed_window * backing.size.x
-	#target.position.x = clampf(
-		#requested_center_x,
-		#minimum_center_x,
-		#maximum_center_x
-	#)
-#
-	### Placement work stays bounded: at most five rerolls per target reset.
-	#var rerolls_remaining: int = 5
-	#while rerolls_remaining > 0:
-		#var overlaps_existing_target1: bool = false
-		#for existing_target: TimingTarget in targets:
-			#if existing_target == target:
-				#continue
-			#if target.get_rect().intersects(existing_target.get_rect()):
-				#overlaps_existing_target1 = true
-				#break
-		#if not overlaps_existing_target1:
-			#break
-		#target.position.x = randf_range(
-			#minimum_center_x,
-			#maximum_center_x
-		#)
-		#rerolls_remaining -= 1
 
 func randomize_all_targets():
 	var need_reroll : bool = true
@@ -338,7 +307,18 @@ func randomize_all_targets():
 		need_reroll = false
 		var placed_targs : Array = []
 		for target in targets:
-			var requested_position = target.place(backing.size.x) if fixed_window < 0.0 else fixed_window * backing.size.x
+			var requested_position = target.place(_backing_size) if fixed_window < 0.0 else fixed_window * _backing_size
+			print("Requested pos before: ", requested_position)
+			
+			if abs(preferred_side) > 0:
+				var left_bounds : float = 0
+				var right_bounds : float = _backing_size
+				if preferred_side < 0:
+					right_bounds = _backing_size * 0.66
+				elif preferred_side > 0:
+					left_bounds = _backing_size * 0.33
+				requested_position = remap(requested_position, 0, _backing_size, left_bounds, right_bounds)
+				print("Requested pos: ", requested_position)
 			target.set_target_position(requested_position, false  )
 			var extents = [target.get_left_extent() , target.get_right_extent() , requested_position, target]
 		#if extents overlap
@@ -356,7 +336,7 @@ func randomize_all_targets():
 			placed_targs.append(extents)
 			var minimum_center_x: float = target.my_width * 0.5
 			var maximum_center_x: float = maxf(
-				backing.size.x - minimum_center_x,
+				_backing_size - minimum_center_x,
 				minimum_center_x
 			)
 
@@ -364,7 +344,7 @@ func randomize_all_targets():
 				extents[2],
 				minimum_center_x,
 				maximum_center_x), true)
-		if total_rerolls > 24:
+		if total_rerolls > 5:
 			printerr("Not an error: Rerolls = ", total_rerolls)
 			break
 		total_rerolls += 1
@@ -391,7 +371,7 @@ func clamp_within_bounds(to_clamp : float, width : float) -> float:
 	return clampf(
 		to_clamp,
 		width * 0.5,
-		backing.size.x - width * 0.5
+		_backing_size - width * 0.5
 	)
 
 func is_all_targets_hit() -> bool:
@@ -404,7 +384,7 @@ func clamp_target_within_bounds(target : TimingTarget) -> float:
 	var return_me = clampf(
 		target.target_position,
 		target.my_width * 0.5,
-		backing.size.x - target.my_width * 0.5
+		_backing_size - target.my_width * 0.5
 	)
 	target.set_target_position(return_me, true)
 	return return_me
@@ -416,3 +396,6 @@ func clamp_all_targets():
 func recovery_action():
 	for target in targets:
 		target.recovery_action()
+
+func set_preferred_side(side : int = 0):
+	preferred_side = side

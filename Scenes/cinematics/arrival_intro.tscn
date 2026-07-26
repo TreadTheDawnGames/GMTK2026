@@ -7,13 +7,15 @@
 [ext_resource type="Texture2D" uid="uid://b3hhpddv4br3f" path="res://Assets/Props/bus_stop.png" id="6_bus_stop"]
 [ext_resource type="Script" uid="uid://bgmwqct2laiko" path="res://Scripts/cinematics/cinematic_terrain_preview.gd" id="7_preview"]
 [ext_resource type="Resource" uid="uid://dhlm43rg16rkw" path="res://resources/mining/mining_config.tres" id="8_config"]
-[ext_resource type="Resource" path="res://resources/mining/default_terrain_layer_profile.tres" id="9_profile"]
+[ext_resource type="Resource" uid="uid://rsxn5lxga40a" path="res://resources/mining/default_terrain_layer_profile.tres" id="9_profile"]
 [ext_resource type="Texture2D" uid="uid://ptqdkvxje5ac" path="res://Assets/Props/bus_side_left.png" id="10_bus_left"]
 [ext_resource type="Script" uid="uid://b38bkkdjcto5g" path="res://Scripts/mining/terrain_manager.gd" id="11_terrain_manager"]
 [ext_resource type="Script" uid="uid://d3fjog3we4ugh" path="res://Scripts/mining/terrain_layer_renderer.gd" id="12_terrain_renderer"]
-[ext_resource type="Resource" path="res://resources/encounters/depth_encounter_config.tres" id="12_vtugv"]
+[ext_resource type="Resource" uid="uid://2g3sn8h0mk7t" path="res://resources/encounters/depth_encounter_config.tres" id="12_vtugv"]
 [ext_resource type="Shader" uid="uid://basjt8wi65bkp" path="res://Shaders/sunset_prop.gdshader" id="13_sunset_prop"]
 [ext_resource type="Texture2D" uid="uid://bkgia2xwepbwk" path="res://Assets/Terrain/grass_band.png" id="14_grass_band"]
+[ext_resource type="AudioStream" uid="uid://cxrfceg3n2vh0" path="res://Assets/Audio/SFX/Bus.wav" id="15_uvbvv"]
+[ext_resource type="AudioStream" uid="uid://bnf6pj6dv2rad" path="res://Assets/Audio/SFX/BusDriveAway.wav" id="16_ky7hn"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_grass_far"]
 resource_local_to_scene = true
@@ -91,6 +93,13 @@ shader_parameter/bounce_height = 0.28
 shader_parameter/haze_color = Color(1, 0.55, 0.3, 1)
 shader_parameter/haze_strength = 0.06
 
+[sub_resource type="AudioStreamSynchronized" id="AudioStreamSynchronized_6ko1l"]
+stream_count = 2
+stream_0/stream = ExtResource("15_uvbvv")
+stream_0/volume = 0.0
+stream_1/stream = ExtResource("16_ky7hn")
+stream_1/volume = -60.0
+
 [node name="ArrivalIntro" type="Node2D" unique_id=1350024243 node_paths=PackedStringArray("bus", "bus_sprite", "station", "attendant", "bus_arrival_anchor", "bus_stop_anchor", "bus_exit_anchor", "door_step_anchor", "bus_rear_edge_anchor", "miner_drop_off_anchor", "attendant_pickup_stop_anchor")]
 process_mode = 3
 process_priority = 100
@@ -125,7 +134,6 @@ position = Vector2(332, 262)
 [node name="BusExitAnchor" type="Marker2D" parent="." unique_id=111098797]
 editor_description = "Offscreen LEFT. Only the x coordinate is used. The bus draws in FRONT of the cast, so sliding away left uncovers the miner from behind its trailing edge."
 position = Vector2(-700, 262)
-
 
 [node name="SurfaceBackdrop" type="Node2D" parent="." unique_id=1170740603]
 editor_description = "The field the stop is standing in. Two bands of the same drawn grass, both sunk far enough below the ground line that terrain layer one covers everything except the tops clearing the horizon, which is exactly what you see of a field that runs away from you. Depth comes from three things together: how much of each band clears the line, how much haze its material mixes in, and the sky ridges behind them. Negative z keeps both behind the terrain, so digging removes the ground in front of them and they scroll away with the surface."
@@ -208,7 +216,7 @@ position = Vector2(500, 256)
 [node name="EditorTerrainPreview" type="Node2D" parent="." unique_id=1669499363 node_paths=PackedStringArray("terrain_manager", "terrain_renderer", "test_impacts_root")]
 editor_description = "Editor-only. Runs the production TerrainManager and TerrainLayerRenderer so the props are placed against the real ground line, grass and crust rather than an empty canvas. Depth 0 keeps it on the surface. It frees itself in a running game and nothing reads from it."
 z_index = -100
-position = Vector2(-576, -260)
+position = Vector2(-752, -260)
 script = ExtResource("7_preview")
 terrain_manager = NodePath("TerrainManager")
 terrain_renderer = NodePath("TerrainLayerRenderer")
@@ -228,3 +236,6 @@ preview_in_editor = true
 
 [node name="TestImpacts" type="Node2D" parent="EditorTerrainPreview" unique_id=881216552]
 editor_description = "Empty on the surface: the arrival plays against intact ground. Add a Marker2D here to dig a real opening and check a prop against broken ground."
+
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=1665074781]
+stream = SubResource("AudioStreamSynchronized_6ko1l")

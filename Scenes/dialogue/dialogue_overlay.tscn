@@ -1,8 +1,17 @@
-[gd_scene load_steps=6 format=3 uid="uid://bwnqpopl5iayr"]
+[gd_scene format=3 uid="uid://bwnqpopl5iayr"]
 
 [ext_resource type="Script" uid="uid://1h124vfbvc4" path="res://Scripts/dialogue/dialogue_director.gd" id="1_director"]
-[ext_resource type="Script" path="res://Scripts/dialogue/cinematic_frame.gd" id="2_frame"]
-[ext_resource type="Shader" path="res://Shaders/cinematic_iris.gdshader" id="4_iris"]
+[ext_resource type="Script" uid="uid://bgideblrdsskw" path="res://Scripts/dialogue/cinematic_frame.gd" id="2_frame"]
+[ext_resource type="Shader" uid="uid://tac64bxvanmi" path="res://Shaders/cinematic_iris.gdshader" id="4_iris"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_iris"]
+resource_local_to_scene = true
+shader = ExtResource("4_iris")
+shader_parameter/aperture_center = Vector2(0.5, 0.5)
+shader_parameter/aperture_radius = Vector2(2, 2)
+shader_parameter/viewport_aspect = 1.0
+shader_parameter/edge_softness = 0.08
+shader_parameter/blackout_color = Color(0, 0, 0, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_dialogue"]
 bg_color = Color(0.075, 0.055, 0.047, 0.97)
@@ -18,10 +27,6 @@ corner_radius_bottom_left = 6
 shadow_color = Color(0, 0, 0, 0.48)
 shadow_size = 9
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_iris"]
-resource_local_to_scene = true
-shader = ExtResource("4_iris")
-
 [node name="DialogueDirector" type="CanvasLayer" unique_id=1373788107 node_paths=PackedStringArray("dialogue_root", "bottom_panel", "speaker_label", "body_label", "continue_label", "cinematic_frame")]
 process_mode = 3
 layer = 20
@@ -33,7 +38,7 @@ body_label = NodePath("DialogueRoot/BottomPanel/Margin/Content/BodyLabel")
 continue_label = NodePath("DialogueRoot/BottomPanel/Margin/Content/ContinueLabel")
 cinematic_frame = NodePath("CinematicFrame")
 
-[node name="CinematicFrame" type="Control" parent="." node_paths=PackedStringArray("iris_overlay", "top_bar", "bottom_bar")]
+[node name="CinematicFrame" type="Control" parent="." unique_id=58943034 node_paths=PackedStringArray("iris_overlay", "top_bar", "bottom_bar")]
 process_mode = 3
 layout_mode = 3
 anchors_preset = 15
@@ -43,13 +48,13 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("2_frame")
-starts_blacked_out = false
 iris_overlay = NodePath("IrisMask")
 top_bar = NodePath("TopBar")
 bottom_bar = NodePath("BottomBar")
 
-[node name="IrisMask" type="ColorRect" parent="CinematicFrame"]
+[node name="IrisMask" type="ColorRect" parent="CinematicFrame" unique_id=1869536319]
 visible = false
+material = SubResource("ShaderMaterial_iris")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -57,14 +62,13 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-material = SubResource("ShaderMaterial_iris")
 
-[node name="TopBar" type="ColorRect" parent="CinematicFrame"]
+[node name="TopBar" type="ColorRect" parent="CinematicFrame" unique_id=1918594206]
 layout_mode = 0
 mouse_filter = 2
 color = Color(0.008, 0.006, 0.008, 1)
 
-[node name="BottomBar" type="ColorRect" parent="CinematicFrame"]
+[node name="BottomBar" type="ColorRect" parent="CinematicFrame" unique_id=1376288236]
 layout_mode = 0
 mouse_filter = 2
 color = Color(0.008, 0.006, 0.008, 1)
