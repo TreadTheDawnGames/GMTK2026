@@ -217,6 +217,7 @@ func _play_named_encounter(encounter_id: StringName) -> void:
 		_set_status("No encounter named '%s' is scheduled." % encounter_id)
 		return
 	encounter._next_encounter_index = encounter_index
+	_release_credits_gate_if_needed(encounter, encounter_index)
 	_set_status("Beat: %s (crossing ceiling)" % encounter_id)
 	_descend_to(_get_encounter_ceiling(encounter, encounter_index))
 	await get_tree().process_frame
@@ -225,6 +226,37 @@ func _play_named_encounter(encounter_id: StringName) -> void:
 	_land_at(_get_encounter_floor_depth(encounter, encounter_index))
 	await get_tree().process_frame
 	_set_status("Beat: %s (playing) - R replays" % encounter_id)
+
+
+## Tells the controller the credits have run, but only for an encounter that says
+## it needs them.
+##
+## _can_schedule_next_encounter refuses to reserve a credits-gated encounter until
+## _credits_have_completed is true, and this harness never plays the credits. So
+## the post-credits beat crossed its ceiling, was refused, and the preview sat on
+## a tunnel with nothing in it - indistinguishable from the harness having simply
+## restarted the game, with nothing in any log. It is the same class of silent
+## refusal the descend-and-land pair above exists to avoid.
+##
+## Driven off the encounter's own flag rather than its id, so this stays a general
+## capability of the playtest button rather than a special case for encounter 10,
+## and does nothing at all for the ten encounters that do not ask for it.
+##
+## It goes through _on_credits_completed rather than setting the flag directly,
+## because that is the same entry point the real credits overlay uses and it also
+## retries a depth already reached.
+func _release_credits_gate_if_needed(
+	controller: DepthEncounterController,
+	encounter_index: int
+) -> void:
+	var encounter := controller.encounter_config.encounters[encounter_index]
+	if encounter == null or not encounter.requires_credits_complete:
+		return
+	_set_status(
+		"Releasing the credits gate, which '%s' requires."
+		% encounter.encounter_id
+	)
+	controller._on_credits_completed()
 
 
 func _get_encounter_controller() -> DepthEncounterController:
