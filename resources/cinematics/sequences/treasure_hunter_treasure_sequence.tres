@@ -4,67 +4,41 @@
 [ext_resource type="Resource" uid="uid://yigtckpqgod" path="res://resources/dialogue/treasure_hunter_treasure_conversation.tres" id="2_31prq"]
 [ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="3_fftny"]
 
-[sub_resource type="Resource" id="Resource_plink"]
+[sub_resource type="Resource" id="Resource_show"]
 script = ExtResource("1_g737l")
 kind = 9
 actor = &"treasure_hunter"
+notes = "He is already here. The stage authors Entrance on the conversation stop, so this reveals him standing at his hoard rather than walking him in along a tunnel this room does not have."
 
-[sub_resource type="Resource" id="Resource_w0fxx"]
-script = ExtResource("1_g737l")
-kind = 0
-actor = &"treasure_hunter"
-duration_seconds = 0.8
-target_marker = &"Conversation"
-starts_from_authored_point = true
-start_marker = &"Entrance"
-pose = &"walk"
-
-[sub_resource type="Resource" id="Resource_sbyeo"]
+[sub_resource type="Resource" id="Resource_face"]
 script = ExtResource("1_g737l")
 kind = 2
 actor = &"treasure_hunter"
-start_seconds = 0.8
 facing = -1
 
-[sub_resource type="Resource" id="Resource_1qi08"]
+[sub_resource type="Resource" id="Resource_pose"]
 script = ExtResource("1_g737l")
 kind = 1
 actor = &"treasure_hunter"
-start_seconds = 0.8
 pose = &"idle"
 
-[sub_resource type="Resource" id="Resource_4oqyl"]
+[sub_resource type="Resource" id="Resource_celebrate"]
 script = ExtResource("1_g737l")
 kind = 3
 actor = &"treasure_hunter"
-start_seconds = 0.8
-duration_seconds = 0.3
-bounce_count = 2
+duration_seconds = 0.9
+bounce_count = 4
+notes = "The whooping the reference puts before the room even opens - Zephan slides Yippee and wahoo! in beside the miner while he is still falling. Nothing can present a line the miner is not there for, so the celebration lands as the frame opens instead: he is still jumping about it when the ceiling comes in."
 
-[sub_resource type="Resource" id="Resource_3hmu0"]
+[sub_resource type="Resource" id="Resource_dialogue"]
 script = ExtResource("1_g737l")
 kind = 5
-start_seconds = 1.1
+start_seconds = 0.9
 duration_seconds = 6.0
 conversation = ExtResource("2_31prq")
-notes = "He has found his hoard, so he arrives faster and more pleased with himself than the first time."
-
-[sub_resource type="Resource" id="Resource_xtr4o"]
-script = ExtResource("1_g737l")
-kind = 0
-actor = &"treasure_hunter"
-start_seconds = 7.1
-duration_seconds = 1.6
-target_marker = &"Exit"
-pose = &"no_pickaxe"
-
-[sub_resource type="Resource" id="Resource_xey6q"]
-script = ExtResource("1_g737l")
-kind = 10
-actor = &"treasure_hunter"
-start_seconds = 8.7
+notes = "Blocks, so the clock holds here for as long as the player takes to read. Six seconds is the nominal length only. Nothing follows it: he gives the pickaxe away and stays with the treasure, and the stage's closing move has nowhere to take him. The generated placeholder this replaced walked him to Exit at 7.1s and hid him at 8.7s, which is why he vanished the moment the conversation ended."
 
 [resource]
 script = ExtResource("3_fftny")
 sequence_id = &"treasure_hunter_treasure_sequence"
-beats = Array[ExtResource("1_g737l")]([SubResource("Resource_plink"), SubResource("Resource_w0fxx"), SubResource("Resource_sbyeo"), SubResource("Resource_1qi08"), SubResource("Resource_4oqyl"), SubResource("Resource_3hmu0"), SubResource("Resource_xtr4o"), SubResource("Resource_xey6q")])
+beats = Array[ExtResource("1_g737l")]([SubResource("Resource_show"), SubResource("Resource_face"), SubResource("Resource_pose"), SubResource("Resource_celebrate"), SubResource("Resource_dialogue")])
