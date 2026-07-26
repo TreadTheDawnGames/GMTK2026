@@ -6,7 +6,6 @@
 [ext_resource type="Script" uid="uid://bpg6fvsw6y7ai" path="res://resources/encounters/character_appearance.gd" id="6_ytped"]
 [ext_resource type="Texture2D" uid="uid://bq8qwl3xn5qny" path="res://Assets/Characters/miner_idle-Pickaxe.png" id="7_wh1q7"]
 [ext_resource type="Script" path="res://Scripts/cinematics/cinematic_rat_appearance.gd" id="8_rat_appearance"]
-[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_clump.tres" id="9_clump"]
 [ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_brown.tres" id="10_brown"]
 [ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_grey.tres" id="11_grey"]
 [ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_white.tres" id="12_white"]
@@ -33,23 +32,22 @@ hide_actor_after_closing = true
 conversation_tracks_miner = true
 conversation_root_offset_from_miner_x = 178.0
 procession_mines = false
-max_live_followers = 12
-web_max_live_followers = 8
-spawn_interval_seconds = 0.24
-exit_seconds = 3.0
+max_live_followers = 24
+web_max_live_followers = 16
+spawn_interval_seconds = 0.15
+exit_seconds = 4.0
 floor_offset_y = 0.0
 procession_cue = &"stampede"
 stampede_warning_seconds = 3.0
 stampede_rumble_strength_px = 6.0
-stampede_minimum_run_seconds = 3.0
+stampede_minimum_run_seconds = 4.0
 stampede_audio = NodePath("StampedeAudio")
-clump_scale_multiplier = 3.0
 single_scale_multiplier = 1.35
-procession_rows = 3
-procession_row_rise_pixels = 26.0
-procession_row_scale_falloff = 0.86
-procession_hop_pixels = 20.0
-rat_appearances = Array[ExtResource("8_rat_appearance")]([ExtResource("9_clump"), ExtResource("10_brown"), ExtResource("9_clump"), ExtResource("11_grey"), ExtResource("9_clump"), ExtResource("12_white")])
+procession_rows = 4
+procession_row_rise_pixels = 18.0
+procession_row_scale_falloff = 0.96
+procession_hop_pixels = 26.0
+rat_appearances = Array[ExtResource("8_rat_appearance")]([ExtResource("10_brown"), ExtResource("11_grey"), ExtResource("12_white"), ExtResource("10_brown"), ExtResource("11_grey"), ExtResource("12_white")])
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
 editor_description = "600px right of Conversation, which puts both Rotini and every mouse past the frame edge at any landing column: the frame is 1152 wide and centred on the miner, so anything closer than 480px would have them appear from nothing in open shot. The colony spawns here too."

@@ -56,6 +56,14 @@ class ImpactStamp:
 	## presentation setup instead of repeating world-to-chunk math per layer.
 	var impact_chunk_index: int
 	var narrow_path_points: PackedVector2Array
+	## Related straight mining lanes share one persistent stamp. Overlapping
+	## mouse lanes collapse into one left and one right excavation, so retained
+	## state and raster passes are bounded at two rects rather than actor count.
+	var parallel_tunnel_rects: Array[Rect2] = []
+	## The inner continuation to the player is a native rectangular clear. It
+	## overlaps the organic outer cut, keeping the visible rock boundary ragged
+	## without resizing a viewport-wide mask. Growth is bounded at two rects.
+	var parallel_tunnel_fill_rects: Array[Rect2] = []
 	var narrow_path_radius_scale: float = 1.0
 	var narrow_path_two_layer_fraction: float = 0.5
 	var use_big_hole: bool
@@ -174,6 +182,11 @@ const LAYER_SHADER: Shader = preload(
 )
 const SOLID_MASK_COLOR := Color.WHITE
 const EMPTY_MASK_COLOR := Color.TRANSPARENT
+## Only the solid-facing outer edge needs the authored organic mask. The inner
+## span joins the player's already-organic shaft and clears natively, avoiding
+## a viewport-wide image resize when the colony closes every shelf gap.
+const PARALLEL_TUNNEL_ORGANIC_WIDTH: float = 48.0
+const PARALLEL_TUNNEL_FILL_OVERLAP: float = 16.0
 # A landing samples at most 64 rows upward and 64 rows back to the support lip
 # (512 mask pixels total at the default profile). The query runs once per
 # landing and never grows with run depth or hit count.
@@ -1111,6 +1124,15 @@ func _on_terrain_paths_damaged(
 	_apply_impact_stamps(stamps)
 
 
+## Draws one grouped foreground contact stamp for the colony's logical lanes.
+func _on_parallel_tunnels_damaged(destroyed_paths: Array) -> void:
+	if destroyed_paths.is_empty():
+		return
+	_apply_impact_stamps([
+		_create_parallel_tunnel_stamp(destroyed_paths)
+	])
+
+
 ## Stores related stamps and uploads each visible chunk only once.
 func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 	var affected_chunk_lookup: Dictionary[int, bool] = {}
@@ -1141,7 +1163,10 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 		# promote their immutable terrain patch instead.
 		for stamp_index in range(stamps.size()):
 			var stamp := stamps[stamp_index]
-			if not stamp.narrow_path_points.is_empty():
+			if (
+				not stamp.narrow_path_points.is_empty()
+				or not stamp.parallel_tunnel_rects.is_empty()
+			):
 				continue
 			var preparation_layers: Array[int] = []
 			var prepared_patches: Dictionary = (
@@ -1236,7 +1261,10 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 						)
 						continue
 					var raster_band_count := 1
-					if stamp.narrow_path_points.is_empty():
+					if (
+						stamp.narrow_path_points.is_empty()
+						and stamp.parallel_tunnel_rects.is_empty()
+					):
 						var affected_rect := (
 							_get_stamp_layer_chunk_mask_rect(
 								stamp,
@@ -4244,7 +4272,7 @@ func _create_impact_stamp(
 			_active_impact_combo
 		)
 
-	var cell_size := terrain_manager.config.terrain_cell_world_size
+	var cell_size: int = terrain_manager.config.terrain_cell_world_size
 	var stamp := ImpactStamp.new()
 	var damage_rect := Rect2(
 		Vector2(minimum_cell * cell_size),
@@ -4287,20 +4315,48 @@ func _create_impact_stamp(
 			0.75,
 			combo_strength
 		)
-		for cell_index in range(0, destroyed_cells.size(), 2):
+		var is_straight_vertical_path := true
+		for cell_index in range(1, destroyed_cells.size()):
+			if (
+				destroyed_cells[cell_index].x
+					!= destroyed_cells[0].x
+				or destroyed_cells[cell_index].y
+					!= destroyed_cells[cell_index - 1].y + 1
+			):
+				is_straight_vertical_path = false
+				break
+		if is_straight_vertical_path:
+			# A two-point segment has the exact capsule silhouette of all
+			# collinear intermediate points. Mouse lanes therefore raster in
+			# constant time with depth instead of retesting every dug row.
 			stamp.narrow_path_points.append(
 				(
-					Vector2(destroyed_cells[cell_index])
+					Vector2(destroyed_cells.front())
 					+ Vector2.ONE * 0.5
 				) * cell_size
 			)
-		if destroyed_cells.size() % 2 == 0:
-			stamp.narrow_path_points.append(
-				(
-					Vector2(destroyed_cells.back())
-					+ Vector2.ONE * 0.5
-				) * cell_size
-			)
+			if destroyed_cells.size() > 1:
+				stamp.narrow_path_points.append(
+					(
+						Vector2(destroyed_cells.back())
+						+ Vector2.ONE * 0.5
+					) * cell_size
+				)
+		else:
+			for cell_index in range(0, destroyed_cells.size(), 2):
+				stamp.narrow_path_points.append(
+					(
+						Vector2(destroyed_cells[cell_index])
+						+ Vector2.ONE * 0.5
+					) * cell_size
+				)
+			if destroyed_cells.size() % 2 == 0:
+				stamp.narrow_path_points.append(
+					(
+						Vector2(destroyed_cells.back())
+						+ Vector2.ONE * 0.5
+					) * cell_size
+				)
 	stamp.core_radius = (
 		maxf(damage_rect.size.x, damage_rect.size.y) * 0.5
 	)
@@ -4326,6 +4382,123 @@ func _create_impact_stamp(
 		+ float(posmod(variation_hash / 4, 9)) * 0.02
 	)
 	stamp.variation_hash = variation_hash
+	return stamp
+
+
+## Collapses the bounded mouse tunnels into one persistent foreground stamp.
+##
+## This helper currently has one caller, but it is kept as a renderer-domain
+## constructor because streaming replays the resulting stamp independently of
+## the terrain event that created it.
+func _create_parallel_tunnel_stamp(
+	destroyed_paths: Array
+) -> ImpactStamp:
+	var cell_size := terrain_manager.config.terrain_cell_world_size
+	var stamp := ImpactStamp.new()
+	var terrain_center_x := (
+		float(terrain_manager.config.terrain_width_cells * cell_size) * 0.5
+	)
+	var side_tunnel_rects: Array[Rect2] = [Rect2(), Rect2()]
+	var side_has_tunnel := PackedByteArray([0, 0])
+	for destroyed_path: Array[Vector2i] in destroyed_paths:
+		if destroyed_path.is_empty():
+			continue
+		var minimum_cell: Vector2i = destroyed_path.front()
+		var maximum_cell: Vector2i = destroyed_path.front()
+		for cell: Vector2i in destroyed_path:
+			minimum_cell.x = mini(minimum_cell.x, cell.x)
+			minimum_cell.y = mini(minimum_cell.y, cell.y)
+			maximum_cell.x = maxi(maximum_cell.x, cell.x)
+			maximum_cell.y = maxi(maximum_cell.y, cell.y)
+		var logical_width_cells: int = (
+			maximum_cell.x - minimum_cell.x + 1
+		)
+		var hole_size_cells: int = maxi(logical_width_cells, 3)
+		var tunnel_depth_cells: int = (
+			maximum_cell.y - minimum_cell.y + 1
+		)
+		var hole_center_x: float = (
+			float(minimum_cell.x + maximum_cell.x + 1) * 0.5
+		)
+		var tunnel_rect := Rect2(
+			Vector2(
+				(hole_center_x - float(hole_size_cells) * 0.5)
+					* float(cell_size),
+				float(minimum_cell.y) * float(cell_size)
+			),
+			Vector2(
+				float(hole_size_cells * cell_size),
+				float(tunnel_depth_cells * cell_size)
+			)
+		)
+		var side_index := (
+			0 if tunnel_rect.get_center().x < terrain_center_x else 1
+		)
+		side_tunnel_rects[side_index] = (
+			side_tunnel_rects[side_index].merge(tunnel_rect)
+			if side_has_tunnel[side_index] == 1
+			else tunnel_rect
+		)
+		side_has_tunnel[side_index] = 1
+	var has_damage_bounds := false
+	for side_index in range(side_tunnel_rects.size()):
+		if side_has_tunnel[side_index] == 0:
+			continue
+		var side_tunnel_rect := side_tunnel_rects[side_index]
+		var organic_tunnel_rect := side_tunnel_rect
+		if side_tunnel_rect.size.x > PARALLEL_TUNNEL_ORGANIC_WIDTH:
+			var organic_width := PARALLEL_TUNNEL_ORGANIC_WIDTH
+			var overlap := minf(
+				PARALLEL_TUNNEL_FILL_OVERLAP,
+				organic_width
+			)
+			if side_index == 0:
+				organic_tunnel_rect.size.x = organic_width
+				stamp.parallel_tunnel_fill_rects.append(Rect2(
+					Vector2(
+						organic_tunnel_rect.end.x - overlap,
+						side_tunnel_rect.position.y
+					),
+					Vector2(
+						side_tunnel_rect.end.x
+							- organic_tunnel_rect.end.x
+							+ overlap,
+						side_tunnel_rect.size.y
+					)
+				))
+			else:
+				organic_tunnel_rect.position.x = (
+					side_tunnel_rect.end.x - organic_width
+				)
+				organic_tunnel_rect.size.x = organic_width
+				stamp.parallel_tunnel_fill_rects.append(Rect2(
+					side_tunnel_rect.position,
+					Vector2(
+						organic_tunnel_rect.position.x
+							- side_tunnel_rect.position.x
+							+ overlap,
+						side_tunnel_rect.size.y
+					)
+				))
+		stamp.parallel_tunnel_rects.append(organic_tunnel_rect)
+		stamp.damage_bounds = (
+			stamp.damage_bounds.merge(side_tunnel_rect)
+			if has_damage_bounds
+			else side_tunnel_rect
+		)
+		has_damage_bounds = true
+	stamp.center = stamp.damage_bounds.get_center()
+	stamp.core_radius = maxf(
+		stamp.damage_bounds.size.x,
+		stamp.damage_bounds.size.y
+	) * 0.5
+	stamp.use_big_hole = false
+	stamp.include_fracture_lines = false
+	stamp.variation_hash = (
+		roundi(stamp.damage_bounds.position.x) * 73_856_093
+		^ roundi(stamp.damage_bounds.position.y) * 19_349_663
+		^ stamp.parallel_tunnel_rects.size() * 83_492_791
+	)
 	return stamp
 
 
@@ -4476,7 +4649,14 @@ func _apply_impact_stamp_layer(
 		return false
 	_make_layer_writable(chunk, layer_index)
 	var changed := false
-	if not stamp.narrow_path_points.is_empty():
+	if not stamp.parallel_tunnel_rects.is_empty():
+		changed = _punch_parallel_tunnels(
+			chunk.mask_images[layer_index],
+			chunk_index,
+			stamp,
+			layer_index
+		)
+	elif not stamp.narrow_path_points.is_empty():
 		changed = _punch_narrow_path(
 			chunk.mask_images[layer_index],
 			chunk_index,
@@ -4522,7 +4702,10 @@ func _get_stamp_dirty_tile_bits(
 	layer_index: int
 ) -> int:
 	var stamp_rect := _get_stamp_broad_rect(stamp)
-	if stamp.narrow_path_points.is_empty():
+	if (
+		stamp.narrow_path_points.is_empty()
+		and stamp.parallel_tunnel_rects.is_empty()
+	):
 		var mask_data := _get_hole_mask_data(
 			layer_index,
 			stamp.use_big_hole
@@ -4583,7 +4766,10 @@ func _get_stamp_layer_chunk_mask_rect(
 	layer_index: int,
 	chunk_index: int
 ) -> Rect2i:
-	if not stamp.narrow_path_points.is_empty():
+	if (
+		not stamp.narrow_path_points.is_empty()
+		or not stamp.parallel_tunnel_rects.is_empty()
+	):
 		return Rect2i()
 	var mask_data := _get_hole_mask_data(
 		layer_index,
@@ -4666,6 +4852,10 @@ func _can_apply_impact_stamp_layer(
 		)
 	):
 		return false
+	if not stamp.parallel_tunnel_rects.is_empty():
+		return layer_index == 0
+	if not stamp.narrow_path_points.is_empty():
+		return layer_index <= 2
 	# Orange remains the decorative tunnel backdrop below combo seven. At or
 	# above the combo gate, the size threshold still prevents a physically
 	# small secondary path from exposing the brown back wall.
@@ -4996,6 +5186,89 @@ func _draw() -> void:
 			4.0,
 			Color(1.0, 0.15, 0.85, 0.95)
 		)
+
+
+## Stretches the miner's organic mask through each mouse's complete dug interval.
+##
+## The foreground opening may soften beyond the exact logical lane by less than
+## one cell. F3 overlays those logical cells so the accepted mismatch can be
+## checked directly; deeper strata remain intact to preserve the 2.5D rim. One
+## side-wide rect keeps work and retained state bounded at two tunnels.
+func _punch_parallel_tunnels(
+	destination: Image,
+	chunk_index: int,
+	stamp: ImpactStamp,
+	layer_index: int
+) -> bool:
+	if layer_index != 0 or stamp.parallel_tunnel_rects.is_empty():
+		return false
+	var mask_data := _get_hole_mask_data(layer_index, false)
+	if mask_data == null:
+		return false
+	var changed := false
+	for fill_rect in stamp.parallel_tunnel_fill_rects:
+		changed = (
+			_fill_parallel_tunnel_rect(
+				destination,
+				chunk_index,
+				fill_rect
+			)
+			or changed
+		)
+	for hole_index in range(stamp.parallel_tunnel_rects.size()):
+		var hole_changed := _punch_hole(
+			destination,
+			chunk_index,
+			stamp.parallel_tunnel_rects[hole_index],
+			mask_data,
+			hole_index % 2 == 1,
+			hole_index % 3 == 1,
+			hole_index % 4,
+			true
+		)
+		changed = hole_changed or changed
+	return changed
+
+
+## Clears the corridor interior with Image's native rectangle operation. Its
+## outer overlap is covered by the authored organic punch above, and its inner
+## edge meets the player's organic shaft, so no straight edge faces solid rock.
+func _fill_parallel_tunnel_rect(
+	destination: Image,
+	chunk_index: int,
+	fill_world_rect: Rect2
+) -> bool:
+	if not fill_world_rect.has_area():
+		return false
+	var mask_pixels_per_world_unit := (
+		float(profile.mask_pixels_per_cell)
+		/ float(terrain_manager.config.terrain_cell_world_size)
+	)
+	var chunk_mask_top := (
+		chunk_index
+		* terrain_manager.config.chunk_height_cells
+		* profile.mask_pixels_per_cell
+	)
+	var mask_rect := Rect2i(
+		Vector2i(
+			floori(
+				fill_world_rect.position.x
+					* mask_pixels_per_world_unit
+			),
+			floori(
+				fill_world_rect.position.y
+					* mask_pixels_per_world_unit
+			) - chunk_mask_top
+		),
+		Vector2i(
+			ceili(fill_world_rect.size.x * mask_pixels_per_world_unit),
+			ceili(fill_world_rect.size.y * mask_pixels_per_world_unit)
+		)
+	).intersection(Rect2i(Vector2i.ZERO, destination.get_size()))
+	if not mask_rect.has_area():
+		return false
+	destination.fill_rect(mask_rect, EMPTY_MASK_COLOR)
+	return true
 
 
 ## Draws one sharp dark crack instead of repeating the full hole artwork.
@@ -6199,7 +6472,10 @@ func _upload_chunk_masks(
 ## Returns a conservative area containing every layer opening.
 func _get_stamp_broad_rect(stamp: ImpactStamp) -> Rect2:
 	var gameplay_layer_count := profile.get_gameplay_layer_count()
-	if not stamp.narrow_path_points.is_empty():
+	if (
+		not stamp.narrow_path_points.is_empty()
+		or not stamp.parallel_tunnel_rects.is_empty()
+	):
 		var narrow_growth := (
 			float(terrain_manager.config.terrain_cell_world_size) * 0.75
 			+ float(profile.core_hole_padding)

@@ -4,8 +4,9 @@ extends CharacterEncounterStage
 ## How it works:
 ## - The encounter presenter is the lead rat already waiting by the miner.
 ## - Opening, or a named cue, starts a bounded stream of mouse actors.
-## - Each follower runs to the work marker, mines, then exits to the right.
+## - Mining followers spread across deterministic slots on both sides.
 ## - Strike contacts reuse the shared terrain particles, smoke, and shake route.
+## - Receding rows share one depth-light and grounded-shadow presentation.
 ## - Closing or cancellation stops timers and frees every transient follower.
 ## - Owned state is capped to max_live_followers and pruned on every exit.
 ## - The stage never changes terrain layers or gameplay collision.
@@ -28,8 +29,8 @@ signal stampede_rumble_finished
 @export var rat_scene: PackedScene
 @export var rat_container: Node2D
 @export var rat_appearances: Array[RatAppearanceType] = []
-@export_range(1, 12, 1) var max_live_followers: int = 7
-@export_range(1, 12, 1) var web_max_live_followers: int = 5
+@export_range(1, 24, 1) var max_live_followers: int = 7
+@export_range(1, 24, 1) var web_max_live_followers: int = 5
 @export_range(0.05, 2.0, 0.05) var spawn_interval_seconds: float = 0.45
 @export_range(0.05, 3.0, 0.05) var run_seconds: float = 0.65
 @export_range(0.05, 2.0, 0.05) var exit_seconds: float = 0.45
@@ -114,6 +115,12 @@ signal stampede_rumble_finished
 ## The arc is per-leg, so a follower crossing the room bounces the whole way
 ## instead of taking one jump at the start.
 @export_range(0.0, 96.0, 1.0) var procession_hop_pixels: float = 0.0
+## Half-width occupied by mining slots around Work, which marks the miner.
+@export_range(64.0, 640.0, 8.0) var mining_floor_half_span_pixels: float = 520.0
+## Empty column reserved for the miner and Rotini at the middle of the crowd.
+@export_range(48.0, 256.0, 4.0) var mining_center_clearance_pixels: float = 132.0
+## Distance between successive mining roots on either side of the player.
+@export_range(32.0, 192.0, 4.0) var mining_slot_spacing_pixels: float = 96.0
 
 ## Growth is bounded by max_live_followers (or the web cap) and pruned on exit.
 var _followers: Array[CinematicRatMiner] = []
@@ -312,8 +319,9 @@ func _spawn_follower() -> void:
 		_is_spawning = false
 		return
 	rat_container.add_child(rat)
+	var follower_index := _appearance_index
 	var appearance := rat_appearances[
-		_appearance_index % rat_appearances.size()
+		follower_index % rat_appearances.size()
 	]
 	var is_clump := (
 		appearance != null and appearance.depicted_rat_count > 1
@@ -321,7 +329,7 @@ func _spawn_follower() -> void:
 	# Which row back this one runs in. Cycling by spawn index rather than choosing
 	# at random keeps every row equally fed, so the crowd stays even instead of
 	# clumping into whichever row won the die rolls.
-	var row := _appearance_index % maxi(procession_rows, 1)
+	var row := follower_index % maxi(procession_rows, 1)
 	# Size before appearance, because set_appearance is what applies the scale to
 	# the sprite. Setting it afterwards leaves the actor drawn at the old size
 	# until something else reassigns the art.
@@ -334,6 +342,9 @@ func _spawn_follower() -> void:
 	rat.prepare_for_sequence(
 		_get_row_entrance(row),
 		_appearance_index
+	)
+	rat.set_visual_depth_ratio(
+		float(row) / float(maxi(procession_rows - 1, 1))
 	)
 	# Preparation restores the actor's authored depth, so the stage-specific
 	# crowd order belongs after it. A drawn clump is a backdrop and the single
@@ -364,9 +375,10 @@ func _spawn_follower() -> void:
 			_remove_follower(rat)
 		return
 	if not rat.start_run_to_wall(
-		work_marker.global_position.x,
+		_get_mining_work_x(follower_index, row),
 		run_seconds,
-		_floor_sampler
+		_floor_sampler,
+		procession_hop_pixels
 	):
 		_remove_follower(rat)
 
@@ -376,7 +388,9 @@ func _on_follower_reached_wall(rat: CinematicRatMiner) -> void:
 		return
 	rat.start_mining_then_exit(
 		strikes_per_rat,
-		_resolve_grounded_marker(exit_marker),
+		_get_row_exit(
+			(rat.sequence_index - 1) % maxi(procession_rows, 1)
+		),
 		exit_seconds,
 		strike_interval_seconds
 	)
@@ -386,7 +400,7 @@ func _on_follower_ready_to_exit(rat: CinematicRatMiner) -> void:
 	if not is_instance_valid(rat) or not _followers.has(rat):
 		return
 	if not rat.start_run_to_target(
-		_resolve_grounded_marker(exit_marker),
+		rat.get_exit_target(),
 		exit_seconds,
 		0.0,
 		NAN,
@@ -439,6 +453,34 @@ func _get_row_exit(row: int) -> Vector2:
 		0.0,
 		procession_row_rise_pixels * float(row)
 	)
+
+
+## Returns one deterministic work root, alternating left and right from center.
+##
+## Work is the miner's column for a digging scene. Cycling a fixed band count
+## keeps a long-running stream evenly spread without allocating or retaining a
+## slot map, and the center clearance prevents any mouse root covering him.
+func _get_mining_work_x(follower_index: int, row: int) -> float:
+	var usable_span := maxf(
+		mining_floor_half_span_pixels - mining_center_clearance_pixels,
+		0.0
+	)
+	var band_count := maxi(
+		floori(usable_span / maxf(mining_slot_spacing_pixels, 1.0)) + 1,
+		1
+	)
+	var side := -1.0 if follower_index % 2 == 0 else 1.0
+	var band := (follower_index / 2) % band_count
+	var row_stagger := (
+		float(row) * mining_slot_spacing_pixels * 0.22
+	)
+	var distance := minf(
+		mining_center_clearance_pixels
+			+ float(band) * mining_slot_spacing_pixels
+			+ row_stagger,
+		mining_floor_half_span_pixels
+	)
+	return work_marker.global_position.x + side * distance
 
 
 func _resolve_grounded_marker(marker: Marker2D) -> Vector2:

@@ -30,6 +30,13 @@ class SculptPlacement:
 const MAX_LIGHTNING_CRACKS: int = 8
 const MAX_LIGHTNING_CRACK_LENGTH: int = 32
 const MAX_LIGHTNING_CRACK_DEPTH: int = 8
+## The persistent mouse formation owns exactly 32 desktop slots. A parallel
+## contact batch merges them into at most two side corridors, each bounded by
+## the 192-cell terrain width and 128 rows. Presentation consumes both temporary
+## paths synchronously; nothing from one mouse hit survives into the next.
+const MAX_PARALLEL_TUNNELS: int = 32
+const MAX_PARALLEL_TUNNEL_DEPTH_ROWS: int = 128
+const PARALLEL_TUNNEL_EDGE_PADDING_CELLS: int = 1
 
 
 ## Reports opened cells, their authoritative bounds, and the pickaxe contact.
@@ -46,6 +53,9 @@ signal terrain_paths_damaged(
 	destroyed_paths: Array,
 	horizontal_direction: int
 )
+## Reports the fixed colony's related full-depth logical lanes separately so
+## presentation can draw one continuous miner-style tunnel per mouse.
+signal parallel_tunnels_damaged(destroyed_paths: Array)
 ## Reports 2D view movement so world presentation follows the mining face.
 signal view_position_changed(view_cell_position: Vector2)
 
@@ -176,6 +186,133 @@ func dig_tunnel(
 					+ Vector2i.ONE
 			)
 		)
+	return result
+
+
+## Opens the fixed mouse formation's simultaneous contacts as two continuous
+## side corridors, so the logical ground matches the full tunnels on screen.
+##
+## This intentionally grants no depth, combo, gem, or reward event. The player
+## remains the run authority; mice only remove the cells their pickaxes touch.
+func dig_parallel_tunnels(
+	start_cells: Array[Vector2i],
+	start_cell_count: int,
+	depth_rows: int,
+	half_width_cells: int,
+	protected_center_cell_x: int = -1,
+	protected_target_cell_x: int = -1
+) -> DigResult:
+	var result := DigResult.new()
+	var safe_count := mini(
+		clampi(start_cell_count, 0, start_cells.size()),
+		MAX_PARALLEL_TUNNELS
+	)
+	var safe_depth := clampi(
+		depth_rows,
+		1,
+		MAX_PARALLEL_TUNNEL_DEPTH_ROWS
+	)
+	var safe_half_width := clampi(half_width_cells, 0, 3)
+	var corridor_bounds: Array[Vector2i] = []
+	var corridor_sides := PackedInt32Array()
+	var left_bounds := Vector2i(config.terrain_width_cells, -1)
+	var right_bounds := Vector2i(config.terrain_width_cells, -1)
+	var unclassified_bounds := Vector2i(config.terrain_width_cells, -1)
+	var first_row := config.get_bottom_surface_row()
+	var final_row := 0
+	for cell_index in range(safe_count):
+		var start_cell := start_cells[cell_index]
+		if not _is_mineable_cell(start_cell):
+			continue
+		first_row = mini(first_row, start_cell.y)
+		final_row = maxi(
+			final_row,
+			mini(
+			start_cell.y + safe_depth,
+				config.get_bottom_surface_row()
+			)
+		)
+		var padded_left := (
+			start_cell.x
+			- safe_half_width
+			- PARALLEL_TUNNEL_EDGE_PADDING_CELLS
+		)
+		var padded_right := (
+			start_cell.x
+			+ safe_half_width
+			+ PARALLEL_TUNNEL_EDGE_PADDING_CELLS
+		)
+		if protected_center_cell_x < 0:
+			unclassified_bounds.x = mini(
+				unclassified_bounds.x,
+				padded_left
+			)
+			unclassified_bounds.y = maxi(
+				unclassified_bounds.y,
+				padded_right
+			)
+		elif start_cell.x < protected_center_cell_x:
+			left_bounds.x = mini(left_bounds.x, padded_left)
+			left_bounds.y = maxi(left_bounds.y, padded_right)
+		elif start_cell.x > protected_center_cell_x:
+			right_bounds.x = mini(right_bounds.x, padded_left)
+			right_bounds.y = maxi(right_bounds.y, padded_right)
+	if left_bounds.y >= left_bounds.x:
+		corridor_bounds.append(left_bounds)
+		corridor_sides.append(-1)
+	if right_bounds.y >= right_bounds.x:
+		corridor_bounds.append(right_bounds)
+		corridor_sides.append(1)
+	if unclassified_bounds.y >= unclassified_bounds.x:
+		corridor_bounds.append(unclassified_bounds)
+		corridor_sides.append(0)
+	if corridor_bounds.is_empty() or final_row <= first_row:
+		return result
+
+	var destroyed_paths: Array = []
+	destroyed_paths.resize(corridor_bounds.size())
+	for corridor_index in range(corridor_bounds.size()):
+		var destroyed_path: Array[Vector2i] = []
+		destroyed_paths[corridor_index] = destroyed_path
+	for cell_y in range(first_row, final_row):
+		var protected_path_center_x := protected_center_cell_x
+		if protected_center_cell_x >= 0:
+			protected_path_center_x = _get_tunnel_center_x(
+				protected_center_cell_x,
+				(
+					protected_target_cell_x
+					if protected_target_cell_x >= 0
+					else protected_center_cell_x
+				),
+				cell_y - first_row,
+				final_row - first_row
+			)
+		for corridor_index in range(corridor_bounds.size()):
+			var bounds := corridor_bounds[corridor_index]
+			var corridor_side := corridor_sides[corridor_index]
+			if corridor_side < 0:
+				# Meet the player's moving tunnel edge on every row. Leaving
+				# this at the innermost mouse contact creates the solid shelves
+				# the mice visibly stand behind instead of clearing together.
+				bounds.y = protected_path_center_x - safe_half_width - 1
+			elif corridor_side > 0:
+				bounds.x = protected_path_center_x + safe_half_width + 1
+			var destroyed_path: Array[Vector2i] = (
+				destroyed_paths[corridor_index]
+			)
+			result.cells_removed += _destroy_tunnel_row(
+				cell_y,
+				bounds.x,
+				bounds.y,
+				destroyed_path
+			)
+
+	var published_paths: Array = []
+	for destroyed_path: Array[Vector2i] in destroyed_paths:
+		if not destroyed_path.is_empty():
+			published_paths.append(destroyed_path)
+	if not published_paths.is_empty():
+		parallel_tunnels_damaged.emit(published_paths)
 	return result
 
 

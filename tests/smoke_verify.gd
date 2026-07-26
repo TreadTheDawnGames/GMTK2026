@@ -44,6 +44,12 @@ const OPENING_SURFACE_CONVERSATION: DialogueConversation = preload(
 var _failures: Array[String] = []
 var _presented_line_indices: PackedInt32Array = PackedInt32Array()
 var _finished_conversation_ids: Array[StringName] = []
+var _mouse_dig_contact_count: int = 0
+var _mouse_dig_start_row: int = 0
+var _mouse_dig_depth_rows: int = 0
+var _mouse_dig_half_width_cells: int = 0
+var _mouse_dig_miner_cell_x: int = 0
+var _mouse_dig_miner_target_cell_x: int = 0
 
 
 func _initialize() -> void:
@@ -215,6 +221,9 @@ func _verify_mining_scene() -> void:
 	var miner_rig := game_root.get_node_or_null(
 		"MiningScene/MinerRig"
 	) as MinerRig
+	var rat_colony_followers := game_root.get_node_or_null(
+		"MiningScene/RatColonyFollowers"
+	) as RatColonyFollowers
 	var hud := game_root.get_node_or_null(
 		"MiningScene/HUD"
 	) as MiningHud
@@ -749,6 +758,12 @@ func _verify_mining_scene() -> void:
 		),
 		"View changes must be wired to terrain streaming."
 	)
+	await _verify_rat_colony_support(
+		rat_colony_followers,
+		scene_wiring,
+		terrain_manager,
+		timing_window
+	)
 	var music_manager := root.get_node_or_null("MusicManager")
 	_expect(music_manager != null, "MusicManager autoload must exist.")
 	if music_manager != null:
@@ -885,6 +900,404 @@ func _verify_mining_scene() -> void:
 	)
 	game_root.queue_free()
 	await process_frame
+
+
+## Verifies the bounded mouse formation, steering bridge, and real terrain dig.
+func _verify_rat_colony_support(
+	followers: RatColonyFollowers,
+	scene_wiring: MiningSceneWiring,
+	terrain_manager: TerrainManager,
+	timing_window: TimingWindowTask
+) -> void:
+	_expect(followers != null, "Rat colony followers must exist.")
+	if (
+		followers == null
+		or scene_wiring == null
+		or terrain_manager == null
+		or timing_window == null
+		or timing_window.mining_window == null
+	):
+		return
+	_expect(
+		followers.validate_followers().is_empty(),
+		"Rat colony authored references and rank arrays must be valid."
+	)
+	_expect(
+		followers.terrain_dig_requested.is_connected(
+			scene_wiring._on_rat_colony_terrain_dig_requested
+		),
+		"Mouse terrain contacts must cross MiningSceneWiring."
+	)
+	_expect(
+		terrain_manager.parallel_tunnels_damaged.is_connected(
+			scene_wiring.terrain_renderer._on_parallel_tunnels_damaged
+		),
+		"Grouped mouse holes must cross MiningSceneWiring."
+	)
+	_expect(
+		followers.preferred_mining_side_requested.is_connected(
+			scene_wiring._on_rat_colony_preferred_side_requested
+		),
+		"Mouse route bias must cross MiningSceneWiring."
+	)
+	_expect(
+		scene_wiring.mining_controller.swing_requested.is_connected(
+			followers._on_player_swing_requested
+		),
+		"Every mouse must start from the miner's successful swing signal."
+	)
+	_expect(
+		scene_wiring.mining_controller.dig_visuals_preparation_requested
+			.is_connected(followers._on_player_dig_prepared),
+		"Mouse tunnels must use the miner's authoritative prepared dig interval."
+	)
+	var minimum_slot_distance := INF
+	var maximum_slot_distance := 0.0
+	for follower_index in range(followers.followers.size()):
+		var slot := followers.get_slot_position(follower_index)
+		minimum_slot_distance = minf(minimum_slot_distance, absf(slot.x))
+		maximum_slot_distance = maxf(maximum_slot_distance, absf(slot.x))
+	_expect(
+		minimum_slot_distance >= followers.miner_clearance_pixels,
+		"Every mouse slot must preserve the player-clear center column."
+	)
+	_expect(
+		maximum_slot_distance >= 500.0,
+		"Mouse slots must cover both floor edges, not huddle at center."
+	)
+	for follower_index in range(followers.followers.size()):
+		_expect(
+			is_equal_approx(
+				followers.get_slot_position(follower_index).y,
+				followers.get_slot_position(0).y
+			),
+			"Every mining mouse must share the miner's grounded mining face."
+		)
+	followers.activate_followers()
+	_expect(
+		followers.clump_appearances.is_empty()
+		and followers.get_depicted_rat_count()
+			== followers._live_follower_count,
+		"The mining colony must use readable individual mouse art, not clumps."
+	)
+	for rank_scale in followers.rank_scales:
+		_expect(
+			rank_scale >= 1.2,
+			"Depth rows must keep the normal large mouse size."
+		)
+	var mouse_contact_counter := Callable(
+		self,
+		&"_on_mouse_dig_smoke_requested"
+	)
+	_mouse_dig_contact_count = 0
+	_mouse_dig_start_row = 0
+	_mouse_dig_depth_rows = 0
+	_mouse_dig_half_width_cells = 0
+	_mouse_dig_miner_cell_x = 0
+	_mouse_dig_miner_target_cell_x = 0
+	if not followers.terrain_dig_requested.is_connected(
+		mouse_contact_counter
+	):
+		followers.terrain_dig_requested.connect(mouse_contact_counter)
+	followers.terrain_dig_requested.disconnect(
+		scene_wiring._on_rat_colony_terrain_dig_requested
+	)
+	var prepared_mouse_start_row := (
+		terrain_manager.config.initial_surface_row + 64
+	)
+	var prepared_mouse_depth_rows := 12
+	followers._on_player_dig_prepared(
+		Vector2i(
+			terrain_manager.config.terrain_width_cells / 2,
+			prepared_mouse_start_row
+		),
+		prepared_mouse_depth_rows,
+		3,
+		terrain_manager.config.terrain_width_cells / 2,
+		1
+	)
+	followers._on_player_swing_requested(
+		1,
+		1.0,
+		1.0,
+		1
+	)
+	var all_visible_mice_are_swinging := true
+	for follower in followers.followers:
+		if (
+			follower.visible
+			and follower._action != CinematicRatMiner.Action.BREACHING
+		):
+			all_visible_mice_are_swinging = false
+	_expect(
+		all_visible_mice_are_swinging,
+		"Every visible mouse must swing on each resolved player hit."
+	)
+	for digging_follower in followers.followers:
+		if digging_follower.visible:
+			digging_follower.animation_player.advance(0.25)
+	followers.terrain_dig_requested.connect(
+		scene_wiring._on_rat_colony_terrain_dig_requested
+	)
+	await process_frame
+	scene_wiring._flush_rat_colony_terrain_digs()
+	_expect(
+		_mouse_dig_contact_count == followers.get_visible_follower_count(),
+		"Every visible mouse must dig once at its animation contact."
+	)
+	_expect(
+		_mouse_dig_start_row == prepared_mouse_start_row
+		and _mouse_dig_depth_rows == prepared_mouse_depth_rows
+		and _mouse_dig_half_width_cells == 3,
+		(
+			"Every mouse contact must retain the miner's start row, full depth, "
+			+ "and full width."
+		)
+	)
+	_expect(
+		_mouse_dig_miner_cell_x
+			== terrain_manager.config.terrain_width_cells / 2,
+		"Mouse contacts must retain the miner column that protects the center."
+	)
+	_expect(
+		_mouse_dig_miner_target_cell_x
+			== terrain_manager.config.terrain_width_cells / 2,
+		"Mouse corridors must retain the player's moving tunnel target."
+	)
+	for digging_follower in followers.followers:
+		if digging_follower.visible:
+			digging_follower.animation_player.advance(1.0)
+	followers.global_position += Vector2.UP
+	followers._process(0.0)
+	var descending_mice_are_walking := true
+	for digging_follower in followers.followers:
+		if (
+			digging_follower.visible
+			and digging_follower.animation_player.current_animation != &"run"
+		):
+			descending_mice_are_walking = false
+	_expect(
+		descending_mice_are_walking,
+		"Vertical terrain descent must put every idle mouse into its ground walk."
+	)
+	var support_ys := PackedFloat32Array()
+	support_ys.resize(followers.get_visible_follower_count())
+	support_ys.fill(300.0)
+	followers.seat_live_followers_on_ground(support_ys)
+	var mice_are_seated_on_lane_support := true
+	for digging_follower in followers.followers:
+		if (
+			digging_follower.visible
+			and not is_equal_approx(
+				digging_follower.global_position.y,
+				300.0
+			)
+		):
+			mice_are_seated_on_lane_support = false
+	_expect(
+		mice_are_seated_on_lane_support,
+		"Each live mouse must accept its own sampled terrain support."
+	)
+	followers._on_player_impact_resolved(
+		Vector2.ZERO,
+		1,
+		1.0,
+		1.0,
+		1
+	)
+	followers.terrain_dig_requested.disconnect(mouse_contact_counter)
+	followers.preferred_mining_side_requested.emit(1)
+	_expect(
+		timing_window.mining_window.preferred_side == 1,
+		"Caspian's public preferred-side API must receive mouse steering."
+	)
+	followers.deactivate_followers()
+	_expect(
+		timing_window.mining_window.preferred_side == 0,
+		"Resetting mouse support must clear timing-side preference."
+	)
+
+	var cell_size := float(
+		terrain_manager.config.terrain_cell_world_size
+	)
+	var mouse_contact_screen := Vector2(
+		terrain_manager.config.terrain_screen_center_x + 320.0,
+		terrain_manager.config.mining_face_screen_y + cell_size * 4.0
+	)
+	var mouse_contact_world := terrain_manager.screen_to_terrain_position(
+		mouse_contact_screen
+	)
+	var mouse_contact_cell := Vector2i(
+		floori(mouse_contact_world.x / cell_size),
+		floori(mouse_contact_world.y / cell_size)
+	)
+	var mouse_cell_was_solid := terrain_manager.is_solid_cell(
+		mouse_contact_cell
+	)
+	var mouse_tunnel_end_cell := Vector2i(
+		mouse_contact_cell.x,
+		mouse_contact_cell.y + 1
+	)
+	var mouse_tunnel_end_was_solid := terrain_manager.is_solid_cell(
+		mouse_tunnel_end_cell
+	)
+	scene_wiring._on_rat_colony_terrain_dig_requested(
+		mouse_contact_screen,
+		mouse_contact_cell.y,
+		2,
+		0,
+		mouse_contact_cell.x - 8,
+		mouse_contact_cell.x - 8
+	)
+	scene_wiring._flush_rat_colony_terrain_digs()
+	_expect(
+		mouse_cell_was_solid
+		and mouse_tunnel_end_was_solid
+		and not terrain_manager.is_solid_cell(mouse_contact_cell)
+		and not terrain_manager.is_solid_cell(mouse_tunnel_end_cell),
+		"A mouse contact must remove its complete production terrain tunnel."
+	)
+	var corridor_center_x := (
+		terrain_manager.config.terrain_width_cells / 2
+	)
+	var corridor_row := mouse_contact_cell.y + 20
+	var corridor_contacts: Array[Vector2i] = [
+		Vector2i(corridor_center_x - 40, corridor_row),
+		Vector2i(corridor_center_x - 25, corridor_row),
+		Vector2i(corridor_center_x + 25, corridor_row),
+		Vector2i(corridor_center_x + 40, corridor_row),
+	]
+	var corridor_target_x := corridor_center_x + 10
+	terrain_manager.dig_parallel_tunnels(
+		corridor_contacts,
+		corridor_contacts.size(),
+		2,
+		0,
+		corridor_center_x,
+		corridor_target_x
+	)
+	_expect(
+		not terrain_manager.is_solid_cell(Vector2i(
+			corridor_center_x - 1,
+			corridor_row
+		))
+		and not terrain_manager.is_solid_cell(Vector2i(
+			corridor_center_x + 1,
+			corridor_row
+		))
+		and terrain_manager.is_solid_cell(Vector2i(
+			corridor_center_x,
+			corridor_row
+		))
+		and not terrain_manager.is_solid_cell(Vector2i(
+			corridor_target_x - 1,
+			corridor_row + 1
+		))
+		and not terrain_manager.is_solid_cell(Vector2i(
+			corridor_target_x + 1,
+			corridor_row + 1
+		))
+		and terrain_manager.is_solid_cell(Vector2i(
+			corridor_target_x,
+			corridor_row + 1
+		)),
+		(
+			"Mouse corridors must continuously meet both edges of the player's "
+			+ "moving tunnel while preserving the occupied centerline."
+		)
+	)
+	var full_mouse_visual_path: Array[Vector2i] = []
+	var prepared_mouse_half_width := 3
+	for row_offset in range(prepared_mouse_depth_rows):
+		for column_offset in range(
+			-prepared_mouse_half_width,
+			prepared_mouse_half_width + 1
+		):
+			full_mouse_visual_path.append(
+				Vector2i(
+					mouse_contact_cell.x + column_offset,
+					mouse_contact_cell.y + row_offset
+				)
+			)
+	var full_mouse_tunnel_stamp := (
+		scene_wiring.terrain_renderer._create_parallel_tunnel_stamp(
+			[full_mouse_visual_path]
+		)
+	)
+	var expected_mouse_tunnel_size := Vector2(
+		float(prepared_mouse_half_width * 2 + 1) * cell_size,
+		float(prepared_mouse_depth_rows) * cell_size
+	)
+	var combined_mouse_tunnel_rect := (
+		full_mouse_tunnel_stamp.parallel_tunnel_rects[0]
+		if not full_mouse_tunnel_stamp.parallel_tunnel_rects.is_empty()
+		else Rect2()
+	)
+	for fill_rect in full_mouse_tunnel_stamp.parallel_tunnel_fill_rects:
+		combined_mouse_tunnel_rect = combined_mouse_tunnel_rect.merge(
+			fill_rect
+		)
+	_expect(
+		full_mouse_tunnel_stamp.parallel_tunnel_rects.size() == 1
+		and combined_mouse_tunnel_rect.size == expected_mouse_tunnel_size,
+		(
+			"Mouse organic edge and bounded interior clear must together span "
+			+ "the miner's full prepared width and depth."
+		)
+	)
+
+	var gameplay_view_height := float(ProjectSettings.get_setting(
+		"display/window/size/window_height_override",
+		root.get_visible_rect().size.y
+	))
+	var required_fall_rows := ceili(gameplay_view_height / cell_size)
+	var tall_mouse_encounters := 0
+	var mouse_encounter_diagnostics := PackedStringArray()
+	for encounter in terrain_manager.encounter_config.encounters:
+		if encounter == null or encounter.encounter_id not in [
+			&"rutini_first",
+			&"rutini_second",
+			]:
+			continue
+		var resolved_height := encounter.resolve_chamber_height_rows(
+			terrain_manager.encounter_config.chamber_height_rows
+		)
+		mouse_encounter_diagnostics.append(
+			"%s(height=%d,trodden=%s)"
+			% [
+				encounter.encounter_id,
+				resolved_height,
+				str(encounter.dresses_trodden_floor),
+			]
+		)
+		if (
+			encounter.dresses_trodden_floor
+			and resolved_height >= required_fall_rows
+		):
+			tall_mouse_encounters += 1
+	_expect(
+		tall_mouse_encounters == 2,
+		(
+			"Both Rotini encounters need a full-screen fall and 2.5D floor "
+			+ "dressing; required=%d observed=%s."
+		) % [required_fall_rows, ", ".join(mouse_encounter_diagnostics)]
+	)
+
+
+func _on_mouse_dig_smoke_requested(
+	_screen_position: Vector2,
+	start_row: int,
+	depth_rows: int,
+	half_width_cells: int,
+	miner_cell_x: int,
+	miner_target_cell_x: int
+) -> void:
+	_mouse_dig_contact_count += 1
+	_mouse_dig_start_row = start_row
+	_mouse_dig_depth_rows = depth_rows
+	_mouse_dig_half_width_cells = half_width_cells
+	_mouse_dig_miner_cell_x = miner_cell_x
+	_mouse_dig_miner_target_cell_x = miner_target_cell_x
 
 
 ## Proves the finale's lines still finish themselves.
