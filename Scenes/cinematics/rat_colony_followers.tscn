@@ -18,7 +18,11 @@ Zephan's drawing of the colony is now in it. Every rank except the front one wea
 
 The pool and the spacing were both set to fill the frame rather than to sit in it. Twenty-four actors at 132px could only reach three distance bands a side, so the colony bracketed the two frame edges and left the miner alone in the middle of his own crowd; tightening the spacing alone just pulled that ring in and left the outer frame empty. Thirty-two actors give four bands a side, and at 48px clearance and 116px spacing the furthest sits 570px out - the exact half-width of the frame. The crowd therefore runs from one edge to the other with the miner inside it.
 
-Web lights half the pool. The cap thins every rank evenly rather than deleting the back, so a web player sees a shallower crowd rather than a smaller one."
+Web lights half the pool. The cap thins every rank evenly rather than deleting the back, so a web player sees a shallower crowd rather than a smaller one.
+
+Draw order puts the front rank on the SECOND layer - z 1, between terrain strata 0 and 1 - which is exactly where MinerRig.buried_draw_order stands the miner while he is mining. That is the directive for every character: the colony digs beside him, so it is layered as he is, and the foreground rock closes over them together. It used to sit at z 2, level with the frontmost stratum, which drew the nearest rats in front of the rock the miner is buried in. Each rank behind the front recedes one stratum.
+
+These four numbers only mean anything against TerrainLayerProfile.layer_z_indices, currently (2, 0, -1, -2), and nothing ties the two together. Renumber the strata and the colony silently changes which rock it is in front of."
 process_mode = 3
 script = ExtResource("1_followers")
 followers = Array[NodePath]([NodePath("Formation/Rat00"), NodePath("Formation/Rat01"), NodePath("Formation/Rat02"), NodePath("Formation/Rat03"), NodePath("Formation/Rat04"), NodePath("Formation/Rat05"), NodePath("Formation/Rat06"), NodePath("Formation/Rat07"), NodePath("Formation/Rat08"), NodePath("Formation/Rat09"), NodePath("Formation/Rat10"), NodePath("Formation/Rat11"), NodePath("Formation/Rat12"), NodePath("Formation/Rat13"), NodePath("Formation/Rat14"), NodePath("Formation/Rat15"), NodePath("Formation/Rat16"), NodePath("Formation/Rat17"), NodePath("Formation/Rat18"), NodePath("Formation/Rat19"), NodePath("Formation/Rat20"), NodePath("Formation/Rat21"), NodePath("Formation/Rat22"), NodePath("Formation/Rat23"), NodePath("Formation/Rat24"), NodePath("Formation/Rat25"), NodePath("Formation/Rat26"), NodePath("Formation/Rat27"), NodePath("Formation/Rat28"), NodePath("Formation/Rat29"), NodePath("Formation/Rat30"), NodePath("Formation/Rat31")])
@@ -27,6 +31,7 @@ clump_appearances = Array[ExtResource("3_appearance")]([ExtResource("8_clump")])
 rank_scales = PackedFloat32Array(1, 0.82, 0.95, 0.85)
 rank_tints = PackedColorArray(1, 1, 1, 1, 0.82, 0.79, 0.76, 1, 0.88, 0.86, 0.84, 1, 0.76, 0.74, 0.73, 1)
 rank_vertical_offsets = PackedFloat32Array(40, 26, 22, 14)
+rank_draw_orders = PackedInt32Array(1, 0, -1, -2)
 rank_spacing_pixels = 116.0
 miner_clearance_pixels = 48.0
 clump_first_rank = 0
