@@ -240,7 +240,7 @@ func _verify_mining_scene() -> void:
 	)
 	if timing_bar_feedback != null:
 		timing_bar_feedback.combo_bar.value = 4.0
-		timing_bar_feedback._on_timing_pressed(false, 4, 0)
+		timing_bar_feedback._on_streak_ended(4)
 		timing_bar_feedback._process(
 			timing_bar_feedback.combo_loss_step_seconds * 0.5
 		)
