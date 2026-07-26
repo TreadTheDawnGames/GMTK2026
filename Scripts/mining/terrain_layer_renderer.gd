@@ -313,6 +313,11 @@ var _trodden_floor_is_enabled: bool = false
 var _trodden_floor_world_y: float = 0.0
 var _cutscene_floor_plane_is_enabled: bool = false
 var _cutscene_floor_plane_world_y: float = 0.0
+## Prevents filtered foreground alpha from exposing the rear stratum before the
+## player enters and completes the cutscene. The first real mining contact drops
+## this seal before damage is written, so the retained treatment bends and
+## cracks with the authoritative terrain mask rather than covering it.
+var _trodden_floor_seals_mask: bool = false
 
 var _active_chunks: Dictionary[int, TerrainChunkVisual] = {}
 # Nodes, sprites, and materials of chunks the view has left, waiting to be
@@ -593,6 +598,9 @@ func _process(_delta: float) -> void:
 ## Captures the combo used by synchronous damage stamps for one resolved hit.
 func _on_dig_presentation_started(combo: int) -> void:
 	_active_impact_combo = maxi(combo, 0)
+	if _trodden_floor_is_enabled and _trodden_floor_seals_mask:
+		_trodden_floor_seals_mask = false
+		_publish_cutscene_floor()
 
 
 ## Replaces unfinished candidate work. Exact success keeps completed candidate
@@ -1824,21 +1832,28 @@ func _restore_chunk_snapshot(
 ## A cutscene room's floor is hundreds of rows below the run's own surface, so
 ## the crust the surface uses cannot reach it. This pushes the same idea against
 ## whatever line the caller names, which is what makes it reusable: an encounter
-## turns it on at its own floor when the shot opens and clears it when the shot
-## releases, and no room needs its own shader or its own material.
+## turns it on before entering its own floor, and no room needs its own shader or
+## material. It stays attached after dialogue; the first mining contact releases
+## only the temporary rear-layer seal.
 ##
-## Live chunks are updated in place rather than rebuilt. The dressing is two
-## uniforms; rebuilding streamed chunks to change them would replay every mask
+## Live chunks are updated in place rather than rebuilt. Rebuilding streamed
+## chunks to change these uniforms would replay every mask
 ## upload in view, which is exactly the per-frame cost the platform budget exists
 ## to protect.
 func set_trodden_floor(enabled: bool, floor_world_y: float = 0.0) -> void:
-	if _trodden_floor_is_enabled == enabled and is_equal_approx(
-		_trodden_floor_world_y,
-		floor_world_y
+	var should_seal_mask := enabled
+	if (
+		_trodden_floor_is_enabled == enabled
+		and _trodden_floor_seals_mask == should_seal_mask
+		and is_equal_approx(
+			_trodden_floor_world_y,
+			floor_world_y
+		)
 	):
 		return
 	_trodden_floor_is_enabled = enabled
 	_trodden_floor_world_y = floor_world_y
+	_trodden_floor_seals_mask = should_seal_mask
 	_publish_cutscene_floor()
 
 
@@ -1904,6 +1919,10 @@ func _publish_cutscene_floor_to_chunk(chunk: TerrainChunkVisual) -> void:
 		material.set_shader_parameter(
 			&"cutscene_floor_world_y",
 			_cutscene_floor_plane_world_y
+		)
+		material.set_shader_parameter(
+			&"trodden_floor_seals_mask",
+			_trodden_floor_seals_mask
 		)
 
 
@@ -6093,6 +6112,10 @@ func _create_layer_material(
 	material.set_shader_parameter(
 		&"cutscene_floor_world_y",
 		_cutscene_floor_plane_world_y
+	)
+	material.set_shader_parameter(
+		&"trodden_floor_seals_mask",
+		_trodden_floor_seals_mask
 	)
 	material.set_shader_parameter(
 		&"trodden_depth_world_px",

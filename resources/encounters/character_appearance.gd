@@ -11,6 +11,10 @@ extends Resource
 ## Horizontal staging only. Runtime and editor previews measure the lowest
 ## opaque row so transparent canvas padding cannot move a character's feet.
 @export var sprite_offset: Vector2 = Vector2.ZERO
+## Optional world-pixel correction when a carried prop extends below the body.
+## Positive values lower the body into its sampled floor; zero keeps the
+## bottommost opaque pixel on the actor origin.
+@export var body_grounding_offset_y: float = 0.0
 @export var tint: Color = Color.WHITE
 @export var flip_h: bool = false
 ## Which way the source art already looks. Turning an actor to face its travel

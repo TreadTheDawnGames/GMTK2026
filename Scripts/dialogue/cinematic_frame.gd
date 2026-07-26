@@ -26,13 +26,17 @@ enum IrisState {
 	OPENING,
 }
 
+const DEFAULT_BAR_HEIGHT_RATIO: float = 0.14
+
 @export_category("References")
 @export var iris_overlay: ColorRect
 @export var top_bar: ColorRect
 @export var bottom_bar: ColorRect
 
 @export_category("Letterbox Bars")
-@export_range(0.05, 0.4, 0.01) var bar_height_ratio: float = 0.14
+@export_range(0.05, 0.4, 0.01) var bar_height_ratio: float = (
+	DEFAULT_BAR_HEIGHT_RATIO
+)
 @export_range(0.0, 1.5, 0.05) var transition_seconds: float = 0.25
 
 @export_category("Blackout Reveal")
@@ -60,11 +64,14 @@ var _frame_progress: float = 0.0:
 		_frame_progress = clampf(value, 0.0, 1.0)
 		_layout_bars()
 ## Current bar height as a share of the viewport. Ordinary framing holds this at
-## bar_height_ratio; the blackout reveal animates it down from half the screen.
-var _bar_cover_ratio: float = 0.14:
+## the active shot ratio; the blackout reveal animates it down from half screen.
+var _bar_cover_ratio: float = DEFAULT_BAR_HEIGHT_RATIO:
 	set(value):
 		_bar_cover_ratio = clampf(value, 0.0, 0.5)
 		_layout_bars()
+## A per-shot override survives repeated open requests while the frame is up.
+## Once fully closed, the next ordinary opening starts from the authored default.
+var _active_bar_height_ratio: float = DEFAULT_BAR_HEIGHT_RATIO
 var _iris_radius_pixels: Vector2:
 	set(value):
 		_iris_radius_pixels = Vector2(
@@ -95,7 +102,8 @@ func _ready() -> void:
 	if starts_blacked_out:
 		apply_blackout(true)
 	else:
-		_bar_cover_ratio = bar_height_ratio
+		_active_bar_height_ratio = bar_height_ratio
+		_bar_cover_ratio = _active_bar_height_ratio
 		_frame_progress = 0.0
 	_reset_iris(false)
 
@@ -118,8 +126,19 @@ func _notification(what: int) -> void:
 	_update_iris_material()
 
 
-## Slides both letterbox bars into the viewport.
-func open_frame(instant: bool = false) -> void:
+## Slides both bars into view, optionally selecting this shot's matte height.
+func open_frame(
+	instant: bool = false,
+	requested_bar_height_ratio: float = -1.0
+) -> void:
+	if requested_bar_height_ratio >= 0.0:
+		_active_bar_height_ratio = clampf(
+			requested_bar_height_ratio,
+			0.05,
+			0.4
+		)
+	elif is_closed():
+		_active_bar_height_ratio = bar_height_ratio
 	_start_bar_transition(1.0, instant, frame_opened)
 
 
@@ -130,6 +149,8 @@ func close_frame(instant: bool = false) -> void:
 
 ## Covers the entire viewport by growing both bars until they meet in the middle.
 func apply_blackout(instant: bool = false) -> void:
+	if is_closed():
+		_active_bar_height_ratio = bar_height_ratio
 	if _bar_transition != null and _bar_transition.is_valid():
 		_bar_transition.kill()
 	_bar_transition = null
@@ -154,7 +175,7 @@ func reveal_from_blackout(instant: bool = false) -> void:
 	_bar_transition = null
 	_frame_progress = 1.0
 	if instant or blackout_reveal_seconds <= 0.0:
-		_bar_cover_ratio = bar_height_ratio
+		_bar_cover_ratio = _active_bar_height_ratio
 		_finish_blackout_reveal()
 		return
 	_bar_transition = create_tween()
@@ -162,7 +183,7 @@ func reveal_from_blackout(instant: bool = false) -> void:
 	_bar_transition.tween_property(
 		self,
 		"_bar_cover_ratio",
-		bar_height_ratio,
+		_active_bar_height_ratio,
 		blackout_reveal_seconds
 	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 	_bar_transition.tween_callback(_finish_blackout_reveal)
@@ -170,7 +191,7 @@ func reveal_from_blackout(instant: bool = false) -> void:
 
 ## Returns whether the bars still cover more than the authored letterbox.
 func is_blacked_out() -> bool:
-	return _bar_cover_ratio > bar_height_ratio + 0.001
+	return _bar_cover_ratio > _active_bar_height_ratio + 0.001
 
 
 ## Suspends until the blackout has finished splitting open.
@@ -282,9 +303,9 @@ func _start_bar_transition(
 	if _bar_transition != null and _bar_transition.is_valid():
 		_bar_transition.kill()
 	_bar_transition = null
-	# Ordinary framing always works from the authored letterbox height, so a
-	# blackout can never leak into a later conversation.
-	_bar_cover_ratio = bar_height_ratio
+	# Ordinary framing works from this shot's selected height, so blackout state
+	# cannot leak into the conversation that follows it.
+	_bar_cover_ratio = _active_bar_height_ratio
 
 	if instant or is_equal_approx(_frame_progress, target_progress):
 		_frame_progress = target_progress

@@ -64,9 +64,8 @@ signal sequence_vfx_action_requested(
 ## it ends, so the timeline still owns when the pan happens and how long the shot
 ## waits for it, while the clip owns how it moves.
 ##
-## The Thief finale is the only encounter that animates it. Left at zero it emits
-## nothing and costs the other ten nothing, and the view controller ignores a pan
-## outside an encounter it is already framing.
+## The Thief finale is the legacy stage that animates it. New camera work belongs
+## in typed CAMERA beats, which share the same view-controller boundary.
 var camera_pan_offset_cells := Vector2.ZERO:
 	set(value):
 		if camera_pan_offset_cells.is_equal_approx(value):
@@ -131,7 +130,7 @@ var camera_pan_offset_cells := Vector2.ZERO:
 ## Dynamically keeps this actor beside the miner regardless of landing column.
 @export var conversation_tracks_miner: bool = false
 ## Presenter-root offset; actor sprite offsets remain authored by appearance.
-@export_range(-256.0, 256.0, 1.0) var conversation_root_offset_from_miner_x: float = 0.0
+@export_range(-1024.0, 1024.0, 1.0) var conversation_root_offset_from_miner_x: float = 0.0
 ## Slides this stage's props with its tracked cast instead of leaving them
 ## pinned to the room.
 ##

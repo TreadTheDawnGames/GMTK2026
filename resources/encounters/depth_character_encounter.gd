@@ -47,6 +47,13 @@ extends Resource
 ## Reveals an already-present actor and set before the miner lands. Reserve this
 ## for discoveries during the fall, not visitors who enter after landing.
 @export var prestage_before_landing: bool = false
+## Optional per-shot framing. Negative values preserve the shared presentation
+## defaults, so one room can use more height without moving every encounter.
+@export_range(-1.0, 0.82, 0.01) var cinematic_focus_viewport_y_ratio: float = -1.0
+@export_range(-1.0, 0.4, 0.01) var cinematic_bar_height_ratio: float = -1.0
+## Recedes the completed room by this share of the viewport, then holds that
+## frame until a new mining target changes the followed terrain cell.
+@export_range(0.0, 0.2, 0.01) var post_cinematic_recession_ratio: float = 0.0
 ## Used only when story text should remain encrypted in source control.
 @export var encrypted_conversation: EncryptedDialogueConversation
 @export var speaker_slot: StringName
@@ -62,12 +69,14 @@ extends Resource
 @export var requires_credits_complete: bool = false
 ## Opens the chamber through its right wall for authored choreography.
 @export var opens_right_exit: bool = false
-## Dresses this room's floor as walked-on ground while the shot is running.
+## Dresses this room's floor as walked-on ground from entry through first mining.
 ##
 ## Off by default, so every existing encounter draws exactly as before. On, and
 ## DepthEncounterController asks TerrainLayerRenderer for the shared trodden
-## floor at this encounter's own floor line for the length of the cutscene, and
-## clears it when the shot releases.
+## floor at this encounter's own floor line before the miner falls into view.
+## The renderer seals the presentation while the shot owns it, then the first
+## ordinary mining impact releases that seal so the real mask cracks the same
+## floor instead of replacing it with a separate effect.
 ##
 ## It is a shared service rather than one room's dressing - the settings live on
 ## the renderer and any encounter can opt in - so turning this on is the whole
