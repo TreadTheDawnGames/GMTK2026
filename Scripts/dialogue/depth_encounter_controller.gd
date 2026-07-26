@@ -60,15 +60,19 @@ const LANDING_FLOOR_TOLERANCE_ROWS: int = 4
 ## stage's walking sampler go through this, so the cast cannot drift apart from
 ## the man they are talking to.
 ##
-## Fourteen rather than the original seven. Seven cleared the stroked outline on
-## a flat floor and no more, so the cast read as standing level with the ground
-## rather than on top of it - and once the rooms carried the shared floor bumps,
-## a character standing on the near side of a three-cell lump had that lump drawn
-## over their soles. The intent is that everyone stands visibly on the floor,
-## which costs a few pixels of gap on perfectly flat rock and is the cheaper of
-## the two mistakes: a character floating slightly reads as a character, and a
-## character sunk slightly reads as a bug.
-const CUTSCENE_FLOOR_LIFT_PIXELS: float = 14.0
+## Zero. The cast stand ON the surface the sampler reports, with no gap at all.
+##
+## This has been seven and then fourteen, each time to clear the drawn outline
+## stroked outward from the rock boundary. Fourteen is visibly too much now that
+## the characters draw on the second stratum: the miner reads as hovering above
+## the floor rather than standing on it, which is worse than the sinking the lift
+## was added to prevent - a floating character has no weight, and this game's whole
+## read is a man putting his weight into a pickaxe.
+##
+## Zero puts everyone's soles on the top of the rock the sampler found. If a
+## character ever looks half-buried again, the fix is the sampler picking the
+## right stratum, not padding on top of whatever it returned.
+const CUTSCENE_FLOOR_LIFT_PIXELS: float = 0.0
 ## How still the sampled floor has to be, and for how many readings, before the
 ## room counts as having arrived. Half a pixel is under the sub-cell resolution
 ## the mask is written at, so it cannot be met by a room still travelling.
@@ -620,10 +624,7 @@ func _gather_cafe_characters(floor_sampler: Callable) -> void:
 		else:
 			presenter.global_position = Vector2(
 				authored_mark.global_position.x,
-				_resolve_gathering_floor_y(
-					floor_sampler,
-					authored_mark.global_position
-				)
+				_resolve_gathering_floor_y(floor_sampler, authored_mark)
 			)
 		if _stage_draws_actor_into_its_set(actor_id):
 			presenter.hide()
@@ -648,8 +649,19 @@ func _get_gathering_marker(actor_id: StringName) -> Marker2D:
 	) as Marker2D
 
 
-## Returns the height a gathered actor's soles rest at, preferring the sampled
-## surface and falling back to the mark's own authored y.
+## Returns the height a gathered actor's soles rest at: the sampled floor under
+## their mark, raised by however far off the ground that mark was authored.
+##
+## A mark's y is a HEIGHT ABOVE THE GROUND, not a position. Every actor marker in
+## every stage is authored at y = 0 and that still means "standing on whatever the
+## terrain turns out to be there", because the sampler decides the rest. A negative
+## y is how a character is put on top of something: Quibble sits on the cafe's
+## bench, thirty pixels up, and the bench itself moves with the loose rock under it
+## because the whole cluster tracks the same landing column.
+##
+## Reading it as an offset rather than as an absolute is what keeps that true. An
+## authored absolute would be correct at one landing column and wrong at every
+## other, since the rock the bench stands on is different rock each run.
 ##
 ## The fallback is not decoration. The sampler answers NAN for a column whose rock
 ## has not resolved, and a NAN position puts an actor nowhere at all - so a room
@@ -657,12 +669,19 @@ func _get_gathering_marker(actor_id: StringName) -> Marker2D:
 ## character out of the shot.
 func _resolve_gathering_floor_y(
 	floor_sampler: Callable,
-	mark_global_position: Vector2
+	authored_mark: Marker2D
 ) -> float:
+	var height_above_ground := (
+		authored_mark.global_position.y - _active_stage.global_position.y
+		if _active_stage != null
+		else 0.0
+	)
 	if not floor_sampler.is_valid():
-		return mark_global_position.y
-	var sampled_y := float(floor_sampler.call(mark_global_position.x))
-	return mark_global_position.y if is_nan(sampled_y) else sampled_y
+		return authored_mark.global_position.y
+	var sampled_y := float(floor_sampler.call(authored_mark.global_position.x))
+	if is_nan(sampled_y):
+		return authored_mark.global_position.y
+	return sampled_y + height_above_ground
 
 
 ## Reports whether the active stage's own artwork already draws this character.
