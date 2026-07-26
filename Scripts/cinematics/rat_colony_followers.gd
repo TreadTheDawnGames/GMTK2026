@@ -2,31 +2,29 @@ class_name RatColonyFollowers
 extends Node2D
 
 ## How it works:
-## - Four ranks of rats dig alongside the miner, receding into the tunnel: each
-##   rank further back is smaller, darker, and drawn behind the one in front, so
-##   the colony reads as a crowd with depth rather than a row of stickers.
-## - Rank membership is index modulo rank count, so trimming the live count for a
-##   weaker platform thins every rank evenly and keeps the depth readable instead
-##   of deleting the back of the crowd.
-## - Rats arrive by running in from both edges on a stagger, alternating sides,
-##   rather than appearing in place.
-## - The back ranks can wear clump art: one texture showing several rats, costing
-##   one actor. That is how the colony gets dense without the node count, the
-##   animation count or the per-hit work going up with it.
-## - Every real terrain impact restarts a bounded number of strikes, chosen round
-##   robin, so the animation cost of one hit does not grow with the crowd. Most
-##   rats are idle at any instant; the ones that swing rotate.
-## - Owned actors never grow: the scene authors the whole pool and this only ever
-##   shows, hides, places and animates what is already there.
-## - Run reset cancels every action and hides the complete formation.
-## The invariant is that an inactive or reset colony has no visible rat, and that
-## the work one impact causes is capped whatever the crowd size.
+## - Fixed left/right lanes blanket the floor while preserving the miner column.
+## - Four shader-lit ranks recede by draw order, haze, and ground shadow.
+## - Shipped ranks use normal-size individual mouse art, never miniature clumps.
+## - Every successful player hit makes every visible mouse swing at its own lane.
+## - Every contact requests the miner's full-width tunnel through the same depth.
+## - A deterministic side bias steers future targets through Caspian's public API.
+## - Reset cancels every action, pending hop, target bias, and visible mouse.
+## Invariant: active mice share the miner's ground face; inactive mice are hidden.
 
 const RatAppearanceType = preload(
 	"res://Scripts/cinematics/cinematic_rat_appearance.gd"
 )
 
 signal presentation_strike_requested(screen_position: Vector2)
+signal terrain_dig_requested(
+	screen_position: Vector2,
+	start_row: int,
+	depth_rows: int,
+	half_width_cells: int,
+	miner_cell_x: int,
+	miner_target_cell_x: int
+)
+signal preferred_mining_side_requested(side: int)
 
 @export_category("References")
 @export var follow_target: Node2D
@@ -47,13 +45,15 @@ signal presentation_strike_requested(screen_position: Vector2)
 ## First rank that uses clump art. Ranks in front of it stay single rats: a clump
 ## near the camera reads as a smear, while at the back it reads as more colony.
 @export_range(0, 3, 1) var clump_first_rank: int = 2
+## Keeps wide clump art out of the protected player column.
+@export_range(0.0, 576.0, 4.0) var clump_minimum_distance_pixels: float = 192.0
 
 @export_category("Depth Ranks")
 ## How many ranks the colony recedes into. The terrain draws four strata, so
 ## four ranks is one rat layer per layer of rock they are digging through.
 @export_range(1, 4, 1) var rank_count: int = 4
-## Size of a rat in each rank, front rank first. A rat further back is smaller
-## because it is further away, not because it is a smaller rat.
+## Size of a rat in each rank, front rank first. Keep every rank near the normal
+## large mouse size; lane height and lighting carry most of the depth read.
 @export var rank_scales: PackedFloat32Array = PackedFloat32Array(
 	[1.0, 0.82, 0.66, 0.54]
 )
@@ -70,8 +70,8 @@ signal presentation_strike_requested(screen_position: Vector2)
 	Color(0.64, 0.61, 0.59, 1.0),
 	Color(0.48, 0.46, 0.45, 1.0),
 ])
-## Vertical offset per rank. Further ranks sit higher, which is what reads as
-## standing further back along the tunnel floor.
+## Ground offset per rank. Gameplay gives every rank the same value so each
+## pickaxe reaches the miner's current face; other presentations may vary it.
 @export var rank_vertical_offsets: PackedFloat32Array = PackedFloat32Array(
 	[64.0, 40.0, 20.0, 4.0]
 )
@@ -89,10 +89,14 @@ signal presentation_strike_requested(screen_position: Vector2)
 ## actually authored; neither ever instantiates anything.
 @export_range(1, 32, 1) var max_visible_followers: int = 24
 @export_range(1, 32, 1) var web_max_visible_followers: int = 12
-## How many rats restart a strike on one impact. This is the cap that keeps a
-## hit costing the same whether eight rats are on screen or sixteen.
-@export_range(1, 16, 1) var strikes_per_impact: int = 4
-@export_range(1, 16, 1) var web_strikes_per_impact: int = 2
+## Each live actor performs one real contact per resolved player hit and copies
+## the miner's prepared width and depth, so every mouse removes the same area.
+## Dirt, sparks, and shake are pooled presentation, not terrain authority. Limit
+## those emitters while all visible mice still animate and remove real cells.
+@export_range(1, 16, 1) var presentation_contacts_per_impact: int = 8
+@export_range(1, 16, 1) var web_presentation_contacts_per_impact: int = 4
+## Matches MinerRig.combo_speed_bonus so their wind-up and contact frames align.
+@export_range(0.0, 1.0, 0.05) var combo_speed_bonus: float = 0.35
 
 @export_category("Arrival")
 ## How far off each side a rat starts its run in from.
@@ -101,24 +105,51 @@ signal presentation_strike_requested(screen_position: Vector2)
 ## Delay added per rat so the colony trickles in instead of marching as a block.
 @export_range(0.0, 1.0, 0.01) var arrival_stagger_seconds: float = 0.09
 
+@export_category("Idle Motion")
+## One back-rank mouse hops in place this often while mining continues.
+@export_range(1, 12, 1) var impacts_per_idle_hop: int = 2
+@export_range(0.1, 1.2, 0.05) var idle_hop_seconds: float = 0.38
+@export_range(4.0, 96.0, 1.0) var idle_hop_height_pixels: float = 30.0
+
 var _is_active: bool = false
 var _live_follower_count: int = 0
 ## Rotates through the live rats so each impact hands the strike to a different
 ## few. Without it the same front rats would swing every time.
-var _strike_cursor: int = 0
 var _reduce_motion_enabled: bool = false
+var _hop_cursor: int = 0
+var _resolved_impact_count: int = 0
+var _remaining_presentation_contacts: int = 0
+## MiningController publishes these before the shared swing starts. They remain
+## stable through every mouse contact so camera descent cannot move a tunnel's
+## logical start into a wall. One pending swing is retained; no per-hit arrays.
+var _pending_dig_start_row: int = 0
+var _pending_dig_depth_rows: int = 1
+var _pending_dig_half_width_cells: int = 0
+var _pending_dig_miner_cell_x: int = 0
+var _pending_dig_miner_target_cell_x: int = 0
+## Built exactly once from the fixed scene pool; no slot vectors allocate per hit.
+var _slot_positions := PackedVector2Array()
+## At most one already-authored mouse is queued to hop after its strike recovers.
+var _pending_hop_follower: CinematicRatMiner
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_rebuild_formation_cache()
 	for follower_index in range(followers.size()):
 		var follower := followers[follower_index]
 		if not is_instance_valid(follower):
 			continue
-		if not follower.strike_contact.is_connected(
-			_on_follower_strike_contact
+		var contact_handler := _on_follower_strike_contact.bind(follower)
+		if not follower.strike_contact.is_connected(contact_handler):
+			follower.strike_contact.connect(contact_handler)
+		var breach_finished_handler := (
+			_on_follower_entry_breach_finished.bind(follower)
+		)
+		if not follower.entry_breach_finished.is_connected(
+			breach_finished_handler
 		):
-			follower.strike_contact.connect(_on_follower_strike_contact)
+			follower.entry_breach_finished.connect(breach_finished_handler)
 		var appearance := _get_appearance_for_index(follower_index)
 		if appearance != null:
 			follower.set_appearance(appearance)
@@ -149,7 +180,12 @@ func set_reduce_motion_enabled(enabled: bool) -> void:
 ## clump art has been authored yet.
 func _get_appearance_for_index(follower_index: int) -> RatAppearanceType:
 	var rank := get_rank_for_index(follower_index)
-	if rank >= clump_first_rank and not clump_appearances.is_empty():
+	var slot_position := get_slot_position(follower_index)
+	if (
+		rank >= clump_first_rank
+		and absf(slot_position.x) >= clump_minimum_distance_pixels
+		and not clump_appearances.is_empty()
+	):
 		return clump_appearances[follower_index % clump_appearances.size()]
 	if rat_appearances.is_empty():
 		return null
@@ -174,7 +210,15 @@ func get_depicted_rat_count() -> int:
 
 func _process(_delta: float) -> void:
 	if _is_active and is_instance_valid(follow_target):
-		global_position = follow_target.global_position
+		var target_position := follow_target.global_position
+		var is_walking := (
+			target_position.distance_squared_to(global_position) > 0.0001
+		)
+		global_position = target_position
+		for follower_index in range(_live_follower_count):
+			var follower := followers[follower_index]
+			if is_instance_valid(follower) and follower.visible:
+				follower.set_ground_travel_active(is_walking)
 
 
 ## Returns which rank a pool index belongs to. Modulo rather than division, so a
@@ -190,6 +234,12 @@ func get_rank_for_index(follower_index: int) -> int:
 ## clearance is added rather than blended in, so the nearest rat on each side is
 ## clear of him however tight the spacing is set.
 func get_slot_position(follower_index: int) -> Vector2:
+	if follower_index >= 0 and follower_index < _slot_positions.size():
+		return _slot_positions[follower_index]
+	return _calculate_slot_position(follower_index)
+
+
+func _calculate_slot_position(follower_index: int) -> Vector2:
 	var resolved_rank_count := maxi(rank_count, 1)
 	var rank := get_rank_for_index(follower_index)
 	var slot_in_rank := follower_index / resolved_rank_count
@@ -206,10 +256,25 @@ func get_slot_position(follower_index: int) -> Vector2:
 	return Vector2(horizontal, _get_rank_vertical_offset(rank))
 
 
+## Precalculates the immutable formation once.
+func _rebuild_formation_cache() -> void:
+	_slot_positions.clear()
+	for follower_index in range(followers.size()):
+		_slot_positions.append(_calculate_slot_position(follower_index))
+
+
 ## Makes the bounded formation persist beside the player after Rotini's beat.
 func activate_followers() -> void:
 	_is_active = true
-	_strike_cursor = 0
+	_hop_cursor = 0
+	_resolved_impact_count = 0
+	_remaining_presentation_contacts = 0
+	_pending_dig_start_row = 0
+	_pending_dig_depth_rows = 1
+	_pending_dig_half_width_cells = 0
+	_pending_dig_miner_cell_x = 0
+	_pending_dig_miner_target_cell_x = 0
+	_pending_hop_follower = null
 	_live_follower_count = mini(
 		followers.size(),
 		_get_visible_follower_cap()
@@ -226,27 +291,39 @@ func activate_followers() -> void:
 			continue
 		_apply_rank_look(follower, get_rank_for_index(follower_index))
 		_begin_arrival(follower, follower_index)
+	preferred_mining_side_requested.emit(-1)
 
 
 ## Clears all persistent presentation when a run restarts.
 func deactivate_followers() -> void:
 	_is_active = false
 	_live_follower_count = 0
-	_strike_cursor = 0
+	_hop_cursor = 0
+	_resolved_impact_count = 0
+	_remaining_presentation_contacts = 0
+	_pending_dig_start_row = 0
+	_pending_dig_depth_rows = 1
+	_pending_dig_half_width_cells = 0
+	_pending_dig_miner_cell_x = 0
+	_pending_dig_miner_target_cell_x = 0
+	_pending_hop_follower = null
 	for follower in followers:
 		if not is_instance_valid(follower):
 			continue
 		follower.cancel_action()
 		follower.hide()
+	preferred_mining_side_requested.emit(0)
 
 
-## Dresses one rat for the rank it belongs to. Scale, tint and draw order move
-## together; changing one alone makes a rat read as the wrong size rather than
-## as further away.
+## Dresses one rat for the rank it belongs to. The scale variation stays subtle;
+## tint, lane height, shadow, and draw order carry the distance read.
 func _apply_rank_look(follower: CinematicRatMiner, rank: int) -> void:
 	follower.scale = Vector2.ONE * _get_rank_scale(rank)
 	follower.modulate = _get_rank_tint(rank)
 	follower.set_plane_draw_order(_get_rank_draw_order(rank))
+	follower.set_visual_depth_ratio(
+		float(rank) / float(maxi(rank_count - 1, 1))
+	)
 
 
 ## Runs one rat in from whichever side its slot sits on, after its share of the
@@ -301,17 +378,63 @@ func _on_arrival_delay_elapsed(
 	)
 
 
+## Captures the same immutable terrain interval that the miner will dig.
+func _on_player_dig_prepared(
+	start_cell: Vector2i,
+	depth_rows: int,
+	player_half_width_cells: int,
+	_player_target_cell_x: int,
+	_combo: int
+) -> void:
+	if not _is_active:
+		return
+	_pending_dig_start_row = start_cell.y
+	_pending_dig_depth_rows = maxi(depth_rows, 1)
+	_pending_dig_half_width_cells = maxi(player_half_width_cells, 0)
+	_pending_dig_miner_cell_x = start_cell.x
+	_pending_dig_miner_target_cell_x = _player_target_cell_x
+
+
+## Starts every mouse from the same successful swing request as MinerRig.
+func _on_player_swing_requested(
+	_combo: int,
+	combo_strength: float,
+	swing_speed_multiplier: float,
+	path_direction: int
+) -> void:
+	if not _is_active or _live_follower_count <= 0:
+		return
+	var facing := signi(path_direction) if path_direction != 0 else 1
+	var playback_speed := (
+		lerpf(1.0, 1.0 + combo_speed_bonus, combo_strength)
+		* maxf(swing_speed_multiplier, 0.1)
+	)
+	_remaining_presentation_contacts = (
+		mini(
+			presentation_contacts_per_impact,
+			web_presentation_contacts_per_impact
+		)
+		if OS.has_feature("web")
+		else presentation_contacts_per_impact
+	)
+	for follower_index in range(_live_follower_count):
+		_start_follower_strike(
+			follower_index,
+			facing,
+			playback_speed
+		)
+
+
 ## Lets production wiring route resolved player impacts without terrain coupling.
 ##
-## Only a bounded slice of the colony swings per hit, taken round robin from the
-## live rats. The crowd can grow without the cost of a hit growing with it, and a
-## rotating few swinging reads better than every rat striking in unison.
+## Terrain contacts already came from the shared swing-start timeline. Resolution
+## only advances deterministic steering and schedules between-hit idle motion.
 func _on_player_impact_resolved(
 	_screen_position: Vector2,
 	cells_removed: int,
 	_combo_strength: float,
 	_debris_multiplier: float,
-	swing_side: int
+	_swing_side: int
 ) -> void:
 	if (
 		_reduce_motion_enabled
@@ -320,26 +443,70 @@ func _on_player_impact_resolved(
 		or _live_follower_count <= 0
 	):
 		return
-	var facing := signi(swing_side) if swing_side != 0 else 1
-	var budget := mini(_get_strike_budget(), _live_follower_count)
-	var started := 0
-	var examined := 0
-	while started < budget and examined < _live_follower_count:
+	_resolved_impact_count += 1
+	preferred_mining_side_requested.emit(
+		-1 if _resolved_impact_count % 2 == 0 else 1
+	)
+	if _resolved_impact_count % maxi(impacts_per_idle_hop, 1) == 0:
+		_schedule_next_idle_hop()
+
+
+func _start_follower_strike(
+	follower_index: int,
+	facing: int,
+	playback_speed: float
+) -> bool:
+	if follower_index < 0 or follower_index >= _live_follower_count:
+		return false
+	var follower := followers[follower_index]
+	if not is_instance_valid(follower) or not follower.visible:
+		return false
+	follower.cancel_action()
+	follower.set_facing_direction(facing)
+	if not follower.start_entry_breach(
+		follower.strike_anchor.global_position,
+		playback_speed
+	):
+		return false
+	return true
+
+
+## Selects one mouse to hop after its current miner-mirrored strike finishes.
+func _schedule_next_idle_hop() -> void:
+	for offset in range(_live_follower_count):
 		var follower_index := (
-			(_strike_cursor + examined) % _live_follower_count
+			(_hop_cursor + offset) % _live_follower_count
 		)
-		examined += 1
-		var follower := followers[follower_index]
-		if not is_instance_valid(follower) or not follower.visible:
+		if get_rank_for_index(follower_index) == 0:
 			continue
-		follower.cancel_action()
-		follower.set_facing_direction(facing)
-		if follower.start_entry_breach(
-			follower.strike_anchor.global_position
+		var follower := followers[follower_index]
+		if (
+			not is_instance_valid(follower)
+			or not follower.visible
 		):
-			started += 1
-	_strike_cursor = (_strike_cursor + examined) % maxi(
-		_live_follower_count, 1
+			continue
+		_pending_hop_follower = follower
+		_hop_cursor = (
+			(follower_index + 1) % maxi(_live_follower_count, 1)
+		)
+		return
+
+
+func _on_follower_entry_breach_finished(
+	_rat: CinematicRatMiner,
+	follower: CinematicRatMiner
+) -> void:
+	if (
+		not _is_active
+		or follower != _pending_hop_follower
+		or not is_instance_valid(follower)
+	):
+		return
+	_pending_hop_follower = null
+	follower.jump_to(
+		follower.global_position,
+		idle_hop_seconds,
+		idle_hop_height_pixels
 	)
 
 
@@ -376,9 +543,63 @@ func validate_followers() -> String:
 	return ""
 
 
-func _on_follower_strike_contact(screen_position: Vector2) -> void:
-	if _is_active:
+func _on_follower_strike_contact(
+	screen_position: Vector2,
+	follower: CinematicRatMiner
+) -> void:
+	if not _is_active:
+		return
+	if not is_instance_valid(follower) or not follower.visible:
+		return
+	if _remaining_presentation_contacts > 0:
+		_remaining_presentation_contacts -= 1
 		presentation_strike_requested.emit(screen_position)
+	terrain_dig_requested.emit(
+		screen_position,
+		_pending_dig_start_row,
+		_pending_dig_depth_rows,
+		_pending_dig_half_width_cells,
+		_pending_dig_miner_cell_x,
+		_pending_dig_miner_target_cell_x
+	)
+
+
+## Returns the live sole positions sampled by the composition root after a
+## shared landing. The packed result is bounded by the fixed 32-actor pool and
+## is discarded once that landing has been seated.
+func get_live_ground_sample_screen_xs() -> PackedFloat32Array:
+	var sample_xs := PackedFloat32Array()
+	sample_xs.resize(_live_follower_count)
+	for follower_index in range(_live_follower_count):
+		var follower := followers[follower_index]
+		sample_xs[follower_index] = (
+			follower.global_position.x
+			if is_instance_valid(follower)
+			else NAN
+		)
+	return sample_xs
+
+
+## Seats each mouse's sole on its own organic tunnel floor. An invalid renderer
+## sample preserves the last supported position instead of snapping into rock.
+func seat_live_followers_on_ground(
+	support_screen_ys: PackedFloat32Array
+) -> void:
+	var supported_count := mini(
+		_live_follower_count,
+		support_screen_ys.size()
+	)
+	for follower_index in range(supported_count):
+		var follower := followers[follower_index]
+		var support_screen_y := support_screen_ys[follower_index]
+		if (
+			not is_instance_valid(follower)
+			or not follower.visible
+			or is_nan(support_screen_y)
+			or is_inf(support_screen_y)
+		):
+			continue
+		follower.global_position.y = support_screen_y
 
 
 func _get_visible_follower_cap() -> int:
@@ -386,14 +607,6 @@ func _get_visible_follower_cap() -> int:
 		mini(max_visible_followers, web_max_visible_followers)
 		if OS.has_feature("web")
 		else max_visible_followers
-	)
-
-
-func _get_strike_budget() -> int:
-	return (
-		mini(strikes_per_impact, web_strikes_per_impact)
-		if OS.has_feature("web")
-		else strikes_per_impact
 	)
 
 
