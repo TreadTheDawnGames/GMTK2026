@@ -13,6 +13,7 @@ const ENCOUNTER_PATH: String = (
 const DIALOGUE_PATH: String = (
 	"res://resources/dialogue/moody_teen_first_conversation.tres"
 )
+const PRESTAGE_ENTRANCE_FALLBACK_Y: float = 2.25
 const EXPECTED_SPEAKERS := [
 	&"miner",
 	&"moody_teen",
@@ -177,15 +178,28 @@ func _verify_stage(stage_scene: PackedScene) -> void:
 	var expected_position := stage.conversation_marker.position
 	_expect(
 		is_zero_approx(expected_position.y),
-		"Ayden's authored sole marker must stay on the terrain floor line."
+		"Ayden's settled sole markers must stay on the terrain floor line."
 	)
 	for marker in [
-		stage.entrance_marker,
 		stage.work_marker,
 		stage.rest_marker,
 		stage.exit_marker,
 	]:
-		_expect(marker.position == expected_position, "Every actor marker must match.")
+		_expect(
+			marker.position == expected_position,
+			"Every post-settle actor marker must match."
+		)
+	_expect(
+		is_equal_approx(
+			stage.entrance_marker.position.x,
+			expected_position.x
+		)
+		and is_equal_approx(
+			stage.entrance_marker.position.y,
+			PRESTAGE_ENTRANCE_FALLBACK_Y
+		),
+		"Entrance must retain the exact prestage sole fallback."
+	)
 	stage.free()
 
 

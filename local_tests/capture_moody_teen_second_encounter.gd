@@ -106,7 +106,7 @@ func _run() -> void:
 		camera,
 		Vector2(MINER_STAGE_X, 0.0),
 		Vector2.ONE,
-		"05_f3_logical_parity.png"
+		"05_logical_parity.png"
 	) else 0
 	preview.terrain_renderer.set("_show_logical_overlay", false)
 	preview.terrain_renderer.queue_redraw()
@@ -155,10 +155,27 @@ func _make_capture_schedule() -> DepthEncounterConfig:
 	var encounters: Array[DepthCharacterEncounter] = []
 	for encounter in schedule.encounters:
 		encounters.append(encounter)
-	encounters.insert(4, FIRST_ENCOUNTER)
-	encounters.insert(8, SECOND_ENCOUNTER)
+	if not _has_encounter(encounters, FIRST_ENCOUNTER.encounter_id):
+		encounters.insert(4, FIRST_ENCOUNTER)
+	if not _has_encounter(encounters, SECOND_ENCOUNTER.encounter_id):
+		var quibble_index := -1
+		for index in range(encounters.size()):
+			if encounters[index].encounter_id == &"coffee_cat_first":
+				quibble_index = index
+				break
+		encounters.insert(quibble_index + 1, SECOND_ENCOUNTER)
 	schedule.encounters = encounters
 	return schedule
+
+
+func _has_encounter(
+	encounters: Array[DepthCharacterEncounter],
+	encounter_id: StringName
+) -> bool:
+	for encounter in encounters:
+		if encounter.encounter_id == encounter_id:
+			return true
+	return false
 
 
 func _capture(

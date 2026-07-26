@@ -27,8 +27,8 @@ conversation_tracks_miner = true
 conversation_root_offset_from_miner_x = 132.8
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
-editor_description = "Same grounded mark as every phase. Ayden is visible below the entry throat before the miner settles."
-position = Vector2(-43.2, 0)
+editor_description = "Ayden is visible below the entry throat before the miner settles. The 2.25px authored fallback seats his opted-in sole overlap while the floor is still outside the renderer's support window; stage preparation replaces this y with the live terrain sample."
+position = Vector2(-43.2, 2.25)
 
 [node name="Conversation" parent="ActorMarkers" index="1"]
 editor_description = "132.8px right of the miner: the approved one-miner-width stare spacing."
