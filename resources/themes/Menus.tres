@@ -1,130 +1,122 @@
 [gd_resource type="Theme" format=3 uid="uid://cy302o2vx18ng"]
 
-[ext_resource type="Texture2D" uid="uid://cto2hqnwgym0w" path="res://Assets/UI/Kenney/button_grey.png" id="1_sf6q4"]
-[ext_resource type="Texture2D" uid="uid://byhuld6l80gl5" path="res://Assets/UI/Kenney/checkbox_grey_checked.png" id="2_xxdkt"]
-[ext_resource type="Texture2D" uid="uid://6nxw3brm5b26" path="res://Assets/UI/Kenney/checkbox_grey_empty.png" id="3_er5k3"]
-[ext_resource type="Texture2D" uid="uid://ccvcl3807g3bu" path="res://Assets/UI/Kenney/checkbox_grey_cross.png" id="4_ftnpt"]
-[ext_resource type="Texture2D" uid="uid://cpt1d4aqnhqd5" path="res://Assets/UI/Kenney/minimap_icon_jewel_white.png" id="4_unykb"]
-[ext_resource type="Texture2D" uid="uid://moxmdijpnp07" path="res://Assets/UI/Kenney/minimap_icon_jewel_red.png" id="5_ftnpt"]
-[ext_resource type="Texture2D" uid="uid://ct5qum1x83kda" path="res://Assets/UI/Kenney/minimap_icon_star_white.png" id="6_r7wsn"]
-[ext_resource type="Texture2D" uid="uid://ni24owabpyc" path="res://Assets/UI/Kenney/progress_blue.png" id="7_er5k3"]
-[ext_resource type="Texture2D" uid="uid://cyrawoek2opco" path="res://Assets/UI/Kenney/panel_brown.png" id="7_okgy0"]
-[ext_resource type="Texture2D" uid="uid://c58c74om01fyj" path="res://Assets/UI/Kenney/Sprite-scrollbar_horizontal.png" id="8_gpvyk"]
-[ext_resource type="Texture2D" uid="uid://c30ydfesje06b" path="res://Assets/UI/Kenney/progress_white.png" id="8_okgy0"]
+[ext_resource type="Texture2D" uid="uid://dl4cpb0wailvq" path="res://Assets/UI/TimeBar/Button.png" id="1_unykb"]
+[ext_resource type="Texture2D" uid="uid://c5xir47yhsdxr" path="res://Assets/UI/TimeBar/Ticked_Off.png" id="2_ftnpt"]
+[ext_resource type="Texture2D" uid="uid://bmy7j3oxh7oei" path="res://Assets/UI/TimeBar/Ticked_On.png" id="3_r7wsn"]
+[ext_resource type="Texture2D" uid="uid://m50265l55hm4" path="res://Assets/UI/TimeBar/Grabber.png" id="4_okgy0"]
+[ext_resource type="Texture2D" uid="uid://bor2ht8lqsblr" path="res://Assets/UI/TimeBar/GrabberDark.png" id="6_ftnpt"]
+[ext_resource type="Texture2D" uid="uid://b0wjcvv5tf2jy" path="res://Assets/UI/TimeBar/Panel.png" id="7_gpvyk"]
+[ext_resource type="Texture2D" uid="uid://c55owqv55vrw8" path="res://Assets/UI/TimeBar/Arrow.png" id="8_er5k3"]
+[ext_resource type="Texture2D" uid="uid://dtiicmmpxelh7" path="res://Assets/UI/TimeBar/PillTexture.png" id="10_ftnpt"]
+[ext_resource type="Texture2D" uid="uid://g5rmyhdedqkx" path="res://Assets/UI/TimeBar/Ticked_Off2.png" id="10_unykb"]
 [ext_resource type="FontFile" uid="uid://yn3pahibw5ow" path="res://Assets/UI/ComicRelief-Bold.ttf" id="11_unykb"]
 [ext_resource type="Texture2D" uid="uid://w8g7tuvgppd4" path="res://Assets/UI/TimeBar/ComboBack.png" id="12_r7wsn"]
 
-[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_31y5o"]
-load_path = "res://.godot/imported/button_grey.png-8d90c526dbb1180c05e5deff31db6635.ctex"
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_h6xhj"]
+texture = ExtResource("7_gpvyk")
+texture_margin_left = 40.0
+texture_margin_top = 40.0
+texture_margin_right = 40.0
+texture_margin_bottom = 40.0
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_cbhj7"]
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_gw8ll"]
-texture = SubResource("CompressedTexture2D_31y5o")
-texture_margin_left = 4.0
-texture_margin_top = 4.0
-texture_margin_right = 4.0
-texture_margin_bottom = 4.0
+texture = ExtResource("1_unykb")
+texture_margin_left = 12.0
+texture_margin_top = 12.0
+texture_margin_right = 12.0
+texture_margin_bottom = 12.0
 modulate_color = Color(0.83033526, 0.83033514, 0.83033514, 1)
 
-[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_jgekk"]
-load_path = "res://.godot/imported/button_grey.png-8d90c526dbb1180c05e5deff31db6635.ctex"
-
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_ipynv"]
-texture = SubResource("CompressedTexture2D_jgekk")
-texture_margin_left = 4.0
-texture_margin_top = 4.0
-texture_margin_right = 4.0
-texture_margin_bottom = 4.0
+texture = ExtResource("1_unykb")
+texture_margin_left = 12.0
+texture_margin_top = 12.0
+texture_margin_right = 12.0
+texture_margin_bottom = 12.0
 modulate_color = Color(0.5649617, 0.5649616, 0.5649616, 1)
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_6ko1l"]
-texture = ExtResource("1_sf6q4")
-texture_margin_left = 4.0
-texture_margin_top = 4.0
-texture_margin_right = 4.0
-texture_margin_bottom = 4.0
+texture = ExtResource("1_unykb")
+texture_margin_left = 12.0
+texture_margin_top = 12.0
+texture_margin_right = 12.0
+texture_margin_bottom = 12.0
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_ftnpt"]
-texture = ExtResource("7_er5k3")
+texture = ExtResource("12_r7wsn")
 texture_margin_left = 7.0
 texture_margin_top = 8.0
 texture_margin_right = 7.0
 texture_margin_bottom = 8.0
+modulate_color = Color(0.44828027, 0.27111143, 0.1874117, 1)
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_r7wsn"]
-texture = ExtResource("8_okgy0")
+texture = ExtResource("12_r7wsn")
 texture_margin_left = 7.0
 texture_margin_top = 8.0
 texture_margin_right = 7.0
 texture_margin_bottom = 8.0
 
-[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_h6xhj"]
-texture = ExtResource("7_okgy0")
-texture_margin_left = 8.0
-texture_margin_top = 8.0
-texture_margin_right = 8.0
-texture_margin_bottom = 8.0
-expand_margin_left = 8.0
-expand_margin_top = 8.0
-expand_margin_right = 8.0
-expand_margin_bottom = 8.0
-
-[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_yo206"]
-load_path = "res://.godot/imported/panel_brown.png-cf89b26925526136e2d496d63cd8d598.ctex"
-
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_u5dxp"]
-texture = SubResource("CompressedTexture2D_yo206")
+texture = ExtResource("4_okgy0")
 texture_margin_left = 8.0
 texture_margin_top = 8.0
 texture_margin_right = 8.0
-texture_margin_bottom = 8.0
-
-[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_ude0y"]
-texture = ExtResource("8_gpvyk")
-texture_margin_left = 6.0
-texture_margin_top = 8.0
-texture_margin_right = 6.0
 texture_margin_bottom = 8.0
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_okgy0"]
-texture = ExtResource("12_r7wsn")
+texture = ExtResource("10_ftnpt")
 axis_stretch_horizontal = 1
+modulate_color = Color(0, 0, 0, 0.57254905)
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_gpvyk"]
-texture = ExtResource("12_r7wsn")
+texture = ExtResource("10_ftnpt")
 axis_stretch_horizontal = 1
-modulate_color = Color(0.33333334, 0.34509805, 0.6, 1)
+modulate_color = Color(1, 0.8039216, 0, 0.7607843)
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_ftnpt"]
 
 [resource]
 default_font = ExtResource("11_unykb")
+AcceptDialog/styles/panel = SubResource("StyleBoxTexture_h6xhj")
+Button/colors/font_color = Color(0, 0, 0, 1)
+Button/colors/font_focus_color = Color(0, 0, 0, 1)
+Button/colors/font_hover_color = Color(0.26657492, 0.26657525, 0.2665758, 1)
+Button/styles/focus = SubResource("StyleBoxEmpty_cbhj7")
 Button/styles/hover = SubResource("StyleBoxTexture_gw8ll")
 Button/styles/hover_pressed = SubResource("StyleBoxTexture_ipynv")
 Button/styles/normal = SubResource("StyleBoxTexture_6ko1l")
 Button/styles/pressed = SubResource("StyleBoxTexture_ipynv")
-CheckBox/icons/checked = ExtResource("4_ftnpt")
-CheckBox/icons/unchecked = ExtResource("3_er5k3")
-CheckButton/icons/checked = ExtResource("4_ftnpt")
-CheckButton/icons/checked_disabled = ExtResource("4_ftnpt")
-CheckButton/icons/checked_disabled_mirrored = ExtResource("4_ftnpt")
-CheckButton/icons/checked_mirrored = ExtResource("4_ftnpt")
-CheckButton/icons/unchecked = ExtResource("3_er5k3")
-CheckButton/icons/unchecked_disabled = ExtResource("3_er5k3")
-CheckButton/icons/unchecked_disabled_mirrored = ExtResource("3_er5k3")
-CheckButton/icons/unchecked_mirrored = ExtResource("3_er5k3")
-HSlider/icons/grabber = ExtResource("4_unykb")
-HSlider/icons/grabber_disabled = ExtResource("5_ftnpt")
-HSlider/icons/grabber_highlight = ExtResource("6_r7wsn")
+CheckBox/colors/font_color = Color(0, 0, 0, 1)
+CheckBox/font_sizes/font_size = 25
+CheckBox/icons/checked = ExtResource("2_ftnpt")
+CheckBox/icons/unchecked = ExtResource("3_r7wsn")
+CheckButton/colors/font_color = Color(0, 0, 0, 1)
+CheckButton/icons/checked = ExtResource("2_ftnpt")
+CheckButton/icons/checked_disabled = ExtResource("2_ftnpt")
+CheckButton/icons/checked_disabled_mirrored = ExtResource("2_ftnpt")
+CheckButton/icons/checked_mirrored = ExtResource("2_ftnpt")
+CheckButton/icons/unchecked = ExtResource("3_r7wsn")
+CheckButton/icons/unchecked_disabled = ExtResource("3_r7wsn")
+CheckButton/icons/unchecked_disabled_mirrored = ExtResource("3_r7wsn")
+CheckButton/icons/unchecked_mirrored = ExtResource("3_r7wsn")
+HSlider/icons/grabber = ExtResource("4_okgy0")
+HSlider/icons/grabber_highlight = ExtResource("6_ftnpt")
 HSlider/styles/grabber_area = SubResource("StyleBoxTexture_ftnpt")
 HSlider/styles/grabber_area_highlight = SubResource("StyleBoxTexture_ftnpt")
 HSlider/styles/slider = SubResource("StyleBoxTexture_r7wsn")
 Label/constants/outline_size = 4
+OptionButton/icons/arrow = ExtResource("8_er5k3")
 Panel/styles/panel = SubResource("StyleBoxTexture_h6xhj")
 PanelContainer/styles/panel = SubResource("StyleBoxTexture_h6xhj")
 PopupMenu/colors/font_color = Color(0, 0, 0, 1)
-PopupMenu/icons/checked = ExtResource("2_xxdkt")
-PopupMenu/icons/radio_checked = ExtResource("2_xxdkt")
-PopupMenu/icons/radio_unchecked = ExtResource("3_er5k3")
-PopupMenu/icons/unchecked = ExtResource("3_er5k3")
+PopupMenu/icons/checked = ExtResource("3_r7wsn")
+PopupMenu/icons/radio_checked = ExtResource("3_r7wsn")
+PopupMenu/icons/radio_unchecked = ExtResource("10_unykb")
+PopupMenu/icons/unchecked = ExtResource("10_unykb")
 PopupMenu/styles/panel = SubResource("StyleBoxTexture_u5dxp")
-PopupMenu/styles/separator = SubResource("StyleBoxTexture_ude0y")
 ProgressBar/styles/background = SubResource("StyleBoxTexture_okgy0")
 ProgressBar/styles/fill = SubResource("StyleBoxTexture_gpvyk")
+TabContainer/styles/panel = SubResource("StyleBoxEmpty_ftnpt")

@@ -35,6 +35,10 @@ window/vsync/vsync_mode=0
 
 enabled=PackedStringArray("res://Addons/cutscene_editor/plugin.cfg")
 
+[gui]
+
+theme/custom="uid://cy302o2vx18ng"
+
 [input]
 
 ui_accept={

@@ -117,10 +117,10 @@ var _reduce_motion_enabled: bool = false
 func _ready() -> void:
 	combo_bar.value = 0.0
 	combo_bar.set_maximum(_combo_ceiling())
-	combo_bar.add_tick(_recovery_threshold())
+	#combo_bar.add_tick(_recovery_threshold())
 	timing_window.recovery_window.pressed.connect(_on_timing_pressed)
 	timing_window.recovery_window2.pressed.connect(_on_timing_pressed)
-	#combo_bar.add_ticks(_tier_thresholds())
+	combo_bar.add_ticks(_tier_thresholds())
 	#print("tiers: ", _tier_thresholds())
 	
 	
@@ -197,6 +197,9 @@ func _process(delta: float) -> void:
 		or combo >= _combo_ceiling()
 	):
 		queue_redraw()
+	
+	#if combo_bar.value == combo_bar.max_value:
+		#combo_bar.
 
 
 ## Draws the standing gauge first, then every live mark over it.

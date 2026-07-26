@@ -48,14 +48,13 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -382.96014
-offset_top = -65.5
+offset_top = -55.5
 offset_right = 382.96014
-offset_bottom = 65.5
+offset_bottom = 85.5
 grow_horizontal = 2
 grow_vertical = 2
 texture = ExtResource("4_1aeyh")
 expand_mode = 5
-stretch_mode = 5
 
 [node name="DepthLabel" type="Label" parent="MiningWindow/Control" unique_id=2110919583]
 unique_name_in_owner = true

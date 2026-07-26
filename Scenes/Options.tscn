@@ -3,7 +3,8 @@
 [ext_resource type="Theme" uid="uid://cy302o2vx18ng" path="res://resources/themes/Menus.tres" id="1_sc1bs"]
 [ext_resource type="Script" uid="uid://t7rbu3tvtnwg" path="res://Scripts/ui/Options.gd" id="1_settings"]
 [ext_resource type="PackedScene" uid="uid://blig0domcdoj" path="res://Scenes/volume_control.tscn" id="2_y60rh"]
-[ext_resource type="Texture2D" uid="uid://byhuld6l80gl5" path="res://Assets/UI/Kenney/checkbox_grey_checked.png" id="4_q4at1"]
+[ext_resource type="Texture2D" uid="uid://c5xir47yhsdxr" path="res://Assets/UI/TimeBar/Ticked_Off.png" id="4_cbhj7"]
+[ext_resource type="Texture2D" uid="uid://bmy7j3oxh7oei" path="res://Assets/UI/TimeBar/Ticked_On.png" id="4_q4at1"]
 
 [node name="Options" type="Control" unique_id=560086525]
 process_mode = 3
@@ -17,144 +18,86 @@ rotation = 0.00055791246
 theme = ExtResource("1_sc1bs")
 script = ExtResource("1_settings")
 
-[node name="TabContainer" type="TabContainer" parent="." unique_id=55938104]
+[node name="Panel" type="PanelContainer" parent="." unique_id=1180579019]
+custom_minimum_size = Vector2(306, 227)
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -153.0
-offset_top = -129.5
-offset_right = 153.0
-offset_bottom = 129.5
+offset_left = -279.5
+offset_top = -202.5
+offset_right = 279.5
+offset_bottom = 202.5
 grow_horizontal = 2
 grow_vertical = 2
-current_tab = 0
-tab_0/hidden = true
-tab_1/hidden = true
 
-[node name="Panel" type="PanelContainer" parent="TabContainer" unique_id=1180579019]
-custom_minimum_size = Vector2(306, 259)
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel" unique_id=1116907942]
 layout_mode = 2
-metadata/_tab_index = 0
 
-[node name="SettingsTitle" type="Label" parent="TabContainer/Panel" unique_id=386252351]
+[node name="HBoxContainer3" type="HBoxContainer" parent="Panel/VBoxContainer" unique_id=1315484457]
 layout_mode = 2
-size_flags_horizontal = 0
+
+[node name="SettingsTitle" type="Label" parent="Panel/VBoxContainer/HBoxContainer3" unique_id=386252351]
+layout_mode = 2
+size_flags_horizontal = 2
 size_flags_vertical = 0
 theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 35
 text = " SETTINGS"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="VBoxContainer" type="VBoxContainer" parent="TabContainer/Panel" unique_id=1116907942]
+[node name="BackButton" type="Button" parent="Panel/VBoxContainer/HBoxContainer3" unique_id=1496746948 groups=["Button"]]
+unique_name_in_owner = true
+modulate = Color(1, 0.6, 0.6, 1)
 layout_mode = 2
+text = "CLOSE"
 
-[node name="Spacer1" type="Control" parent="TabContainer/Panel/VBoxContainer" unique_id=1064477402]
-custom_minimum_size = Vector2(0, 32)
-layout_mode = 2
-
-[node name="MasterVolume" parent="TabContainer/Panel/VBoxContainer" unique_id=1247329782 instance=ExtResource("2_y60rh")]
+[node name="MasterVolume" parent="Panel/VBoxContainer" unique_id=1247329782 instance=ExtResource("2_y60rh")]
 unique_name_in_owner = true
 layout_mode = 2
 bus_name = &"Master"
 
-[node name="Music" parent="TabContainer/Panel/VBoxContainer" unique_id=1181797806 instance=ExtResource("2_y60rh")]
+[node name="Music" parent="Panel/VBoxContainer" unique_id=1181797806 instance=ExtResource("2_y60rh")]
 unique_name_in_owner = true
 layout_mode = 2
 bus_name = &"Music"
 
-[node name="SFX" parent="TabContainer/Panel/VBoxContainer" unique_id=684634811 instance=ExtResource("2_y60rh")]
+[node name="SFX" parent="Panel/VBoxContainer" unique_id=684634811 instance=ExtResource("2_y60rh")]
 unique_name_in_owner = true
 layout_mode = 2
 bus_name = &"SFX"
 
-[node name="HBoxContainer2" type="HBoxContainer" parent="TabContainer/Panel/VBoxContainer" unique_id=870888829]
+[node name="HBoxContainer2" type="HBoxContainer" parent="Panel/VBoxContainer" unique_id=870888829]
 layout_mode = 2
 
-[node name="Control" type="Control" parent="TabContainer/Panel/VBoxContainer/HBoxContainer2" unique_id=1295790535]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="Label" type="Label" parent="TabContainer/Panel/VBoxContainer/HBoxContainer2/Control" unique_id=181984732]
-layout_mode = 0
-offset_left = 1.0
-offset_top = 4.0
-offset_right = 63.0
-offset_bottom = 27.0
-text = "VSync: "
-
-[node name="VSyncOptions" type="OptionButton" parent="TabContainer/Panel/VBoxContainer/HBoxContainer2/Control" unique_id=1885478359]
-layout_mode = 0
-offset_left = 67.0
-offset_right = 142.0
-offset_bottom = 32.0
-theme_override_font_sizes/font_size = 12
-selected = 0
-item_count = 3
-popup/item_0/text = "Disabled"
-popup/item_0/id = 1
-popup/item_1/text = "Adaptive"
-popup/item_1/id = 2
-popup/item_2/text = "Enabled"
-popup/item_2/id = 0
-
-[node name="MuteBounce" type="CheckBox" parent="TabContainer/Panel/VBoxContainer/HBoxContainer2" unique_id=1518626433]
+[node name="VSyncOptions" type="OptionButton" parent="Panel/VBoxContainer/HBoxContainer2" unique_id=1885478359]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 11
+size_flags_horizontal = 3
+selected = 0
+item_count = 3
+popup/item_0/text = "VSync: Disabled"
+popup/item_0/id = 1
+popup/item_1/text = "VSync: Adaptive"
+popup/item_1/id = 2
+popup/item_2/text = "VSync: Enabled"
+popup/item_2/id = 0
+
+[node name="MuteBounce" type="CheckBox" parent="Panel/VBoxContainer/HBoxContainer2" unique_id=1518626433]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(189.375, 0)
+layout_mode = 2
 theme_override_icons/checked = ExtResource("4_q4at1")
+theme_override_icons/unchecked = ExtResource("4_cbhj7")
 button_pressed = true
 text = "Mute Edge Bounce"
 
-[node name="ReduceMotion" type="CheckBox" parent="TabContainer/Panel/VBoxContainer"]
+[node name="ReduceMotion" type="CheckBox" parent="Panel/VBoxContainer"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 11
 theme_override_icons/checked = ExtResource("4_q4at1")
+theme_override_icons/unchecked = ExtResource("4_cbhj7")
 text = "Reduce Motion"
-
-[node name="HBoxContainer" type="HBoxContainer" parent="TabContainer/Panel/VBoxContainer" unique_id=1635268855]
-layout_mode = 2
-
-[node name="CreditsButton" type="Button" parent="TabContainer/Panel/VBoxContainer/HBoxContainer" unique_id=367716964]
-modulate = Color(0.74, 0.74, 0.74, 1)
-layout_mode = 2
-size_flags_horizontal = 3
-text = "CREDITS"
-
-[node name="BackButton" type="Button" parent="TabContainer/Panel/VBoxContainer/HBoxContainer" unique_id=1496746948 groups=["Button"]]
-modulate = Color(1, 0.6, 0.6, 1)
-layout_mode = 2
-size_flags_horizontal = 3
-text = "CLOSE"
-
-[node name="PanelContainer" type="PanelContainer" parent="TabContainer" unique_id=451072940]
-visible = false
-custom_minimum_size = Vector2(306, 227)
-layout_mode = 2
-metadata/_tab_index = 1
-
-[node name="VBoxContainer" type="VBoxContainer" parent="TabContainer/PanelContainer" unique_id=74243991]
-layout_mode = 2
-
-[node name="RichTextLabel" type="RichTextLabel" parent="TabContainer/PanelContainer/VBoxContainer" unique_id=860294980]
-clip_contents = false
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/outline_size = 4
-bbcode_enabled = true
-text = "[font_size=24]Credits:[/font_size][font_size=1]
-
-[font_size=12]Game Design: ZManJim, _Sumarbrander
-Programming: CoolNether123, _Sumarbrander
-Story: ZManJim
-Audio: ZManJim, [font_size=6]kasparsj[/font_size]
-Art: Chez, [font_size=6]Kenney.nl[/font_size]
-Font: [font_size=6]Google[/font_size]
-Addons: [font_size=6]GAMESTERVIRUS[/font_size]"
-
-[node name="ReturnToSettings" type="Button" parent="TabContainer/PanelContainer/VBoxContainer" unique_id=843285135]
-layout_mode = 2
-text = "Back"
