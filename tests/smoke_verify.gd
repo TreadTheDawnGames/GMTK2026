@@ -83,6 +83,12 @@ func _verify_mining_scene() -> void:
 	var terrain_renderer := game_root.get_node_or_null(
 		"MiningScene/TerrainLayerRenderer"
 	) as TerrainLayerRenderer
+	var impact_camera := game_root.get_node_or_null(
+		"MiningScene/ImpactCamera"
+	) as Camera2D
+	var dialogue_director := game_root.get_node_or_null(
+		"DialogueDirector"
+	) as DialogueDirector
 	var scene_wiring := game_root.get_node_or_null(
 		"MiningScene/Systems/SceneWiring"
 	) as MiningSceneWiring
@@ -126,6 +132,34 @@ func _verify_mining_scene() -> void:
 		game_root.queue_free()
 		await process_frame
 		return
+	# The title camera is wider than gameplay. Cover its real world-space bottom
+	# and keep the cinematic bars out until Start, or the menu exposes grey.
+	if impact_camera != null and not is_zero_approx(impact_camera.zoom.y):
+		var visible_world_bottom := (
+			impact_camera.get_screen_center_position().y
+			+ root.get_visible_rect().size.y
+				* 0.5 / absf(impact_camera.zoom.y)
+		)
+		var loaded_world_bottom := (
+			terrain_manager.config.mining_face_screen_y
+			+ (
+				float(
+					(terrain_renderer._loaded_last_chunk + 1)
+					* terrain_manager.config.chunk_height_cells
+				)
+				- terrain_renderer._current_view_y
+			) * terrain_manager.config.terrain_cell_world_size
+		)
+		_expect(
+			loaded_world_bottom >= visible_world_bottom,
+			"Title camera must not see below the streamed terrain."
+		)
+	_expect(
+		dialogue_director != null
+		and dialogue_director.cinematic_frame != null
+		and dialogue_director.cinematic_frame.is_closed(),
+		"Title menu must keep the cinematic bars off the live terrain."
+	)
 	# Sculpt streaming now expands eight authored cells per packed byte. Compare
 	# complete representative rows to the authoritative resource so the faster
 	# bulk path cannot reverse bit order or change protected-floor collision.

@@ -443,8 +443,14 @@ func finish_swing() -> void:
 ## change, which only a resolved impact produces, so the hit that opened the room
 ## has already done its terrain work by the time the gate is claimed. Anything
 ## still airborne is a swing the player never sees land.
+##
+## _pending_swing is deliberately left alone. This is called from inside the
+## impact it is interrupting: resolve_impact reaches record_success, the depth
+## that produces captures the encounter, the gate claims mining, and control
+## comes back here while resolve_impact still has its own emissions to make from
+## that same request. Clearing the reference under it crashes the hit that
+## earned the cutscene. The next _start_swing replaces it.
 func abandon_interrupted_swing() -> void:
-	_pending_swing = null
 	_is_swing_pending = false
 	_has_resolved_pending_impact = false
 	_queued_swings.clear()

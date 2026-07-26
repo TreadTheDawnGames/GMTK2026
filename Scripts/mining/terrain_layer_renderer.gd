@@ -391,6 +391,19 @@ func _ready() -> void:
 ## Prediction only fills CPU caches; gameplay cells and visible textures remain
 ## unchanged until the real impact signal arrives.
 func _process(_delta: float) -> void:
+	# Camera zoom can change while the logical mining view stays still (the
+	# title shot does exactly that). Recheck the cheap chunk bounds each frame
+	# so zooming out cannot expose the clear color below the streamed terrain.
+	var previous_first_chunk := _loaded_first_chunk
+	var previous_last_chunk := _loaded_last_chunk
+	_refresh_active_chunks()
+	# A zoom-only refresh can add chunks without a view-position signal. Place
+	# those new/recycled roots immediately, but leave settled roots untouched.
+	if (
+		previous_first_chunk != _loaded_first_chunk
+		or previous_last_chunk != _loaded_last_chunk
+	):
+		_position_active_chunks()
 	var has_preparation := (
 		_pending_stamp_preparation_head
 		< _pending_stamp_preparation.size()
@@ -1236,8 +1249,18 @@ func _process_next_pending_impact_work() -> void:
 		work.raster_complete = true
 	# A final descriptor resumes at the same head until every dirty tile has
 	# uploaded. Queue size stays bounded while the 7 ms guard sees each slice.
+	# A preparation-only item owns no chunk, so it has no texture to publish.
+	#
+	# It is queued as (chunk = null, chunk_index = -1), and the grouping pass above
+	# skips exactly those items, which leaves publish_layer at its default true.
+	# The chunk comparison then reads null == _active_chunks.get(-1), which is also
+	# null, so the guard let a null chunk through to be dereferenced. On the
+	# surface this never showed, because a run only queues authoritative
+	# preparation once a speculative candidate misses - which is what a big view
+	# jump into a cutscene chamber causes.
 	if (
 		work.publish_layer
+		and work.chunk != null
 		and _active_chunks.get(work.chunk_index) == work.chunk
 		and work.chunk.dirty_mask_tiles[work.layer_index] != 0
 	):
@@ -1562,13 +1585,29 @@ func _refresh_active_chunks() -> void:
 	var config := terrain_manager.config
 	var viewport_height := get_viewport_rect().size.y
 	var cell_size := float(config.terrain_cell_world_size)
+	var visible_world_top := 0.0
+	var visible_world_bottom := viewport_height
+	var active_camera := get_viewport().get_camera_2d()
+	if active_camera != null and not is_zero_approx(active_camera.zoom.y):
+		# Terrain positions are world coordinates that happen to equal screen
+		# coordinates at gameplay zoom 1. The wide menu camera sees much more
+		# world vertically, so convert its actual world-space viewport bounds
+		# before selecting chunks.
+		var half_visible_world_height := (
+			viewport_height * 0.5 / absf(active_camera.zoom.y)
+		)
+		var camera_center_y := (
+			active_camera.get_screen_center_position().y
+		)
+		visible_world_top = camera_center_y - half_visible_world_height
+		visible_world_bottom = camera_center_y + half_visible_world_height
 	var top_world_y := (
 		_current_view_y
-		- config.mining_face_screen_y / cell_size
+		+ (visible_world_top - config.mining_face_screen_y) / cell_size
 	)
 	var bottom_world_y := (
 		_current_view_y
-		+ (viewport_height - config.mining_face_screen_y) / cell_size
+		+ (visible_world_bottom - config.mining_face_screen_y) / cell_size
 	)
 	var first_chunk := maxi(
 		floori(top_world_y / float(config.chunk_height_cells)),
