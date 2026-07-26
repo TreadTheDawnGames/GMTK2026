@@ -27,6 +27,8 @@ signal character_stage_rock_break_requested(
 	screen_position: Vector2,
 	radius_cells: int
 )
+## Relays a stage's requested two-axis displacement from encounter focus.
+signal character_stage_camera_pan_requested(offset_cells: Vector2)
 
 const FLOW_OWNER: StringName = &"depth_encounter"
 const MINER_SPEAKER_SLOT: StringName = &"miner"
@@ -304,6 +306,7 @@ func _activate_pending_encounter() -> void:
 	# He has hit the room's floor. Sprawl, then get up, while the frame opens
 	# around him.
 	miner_rig.show_cutscene_landing()
+	_apply_trodden_floor(encounter)
 	cinematic_flow.focus(FLOW_OWNER)
 	_begin_active_encounter.call_deferred()
 
@@ -478,7 +481,7 @@ func _on_dialogue_line_presented(
 		presenter.react_to_presented_line()
 
 
-## Opens dialogue or stops at the unwritten thief endpoint.
+## Opens the authored dialogue or releases a malformed encounter safely.
 func _begin_active_encounter() -> void:
 	var encounter := encounter_config.encounters[_active_encounter_index]
 	var presenter := _presenters[_active_encounter_index]
@@ -582,8 +585,11 @@ func _begin_active_encounter() -> void:
 			encounter.encrypted_conversation.decrypt_conversation()
 		)
 	if encounter.occurs_at_run_bottom and _active_conversation == null:
-		dialogue_director.open_cinematic_frame()
-		final_encounter_reached.emit(encounter.encounter_id)
+		push_error(
+			"Final encounter '%s' has no authored dialogue."
+			% encounter.encounter_id
+		)
+		_fail_active_encounter()
 		return
 	if (
 		_active_conversation != null
@@ -599,10 +605,27 @@ func _begin_active_encounter() -> void:
 		"Encounter '%s' could not start dialogue." % encounter.encounter_id
 	)
 	if encounter.occurs_at_run_bottom:
-		dialogue_director.open_cinematic_frame()
-		final_encounter_reached.emit(encounter.encounter_id)
+		_fail_active_encounter()
 		return
 	_fail_active_encounter()
+
+
+## Dresses this room's floor as walked-on ground, if the encounter asked for it.
+##
+## The floor line is derived from the encounter's own depth rather than passed in,
+## so a room can never dress a line it does not stand on. It is cleared in
+## _finish_cinematic_flow, which is the one place every ending goes through - a
+## completed shot, a cancelled one and a failed one all release there, and a
+## dressing left behind would follow the player down the rest of the run.
+func _apply_trodden_floor(encounter: DepthCharacterEncounter) -> void:
+	if not encounter.dresses_trodden_floor:
+		terrain_renderer.set_trodden_floor(false)
+		return
+	var floor_world_y := float(
+		mining_config.initial_surface_row
+		+ encounter.resolve_depth(mining_config.total_run_depth)
+	) * float(mining_config.terrain_cell_world_size)
+	terrain_renderer.set_trodden_floor(true, floor_world_y)
 
 
 ## Reports whether this conversation is the cast's shared cafe stop.
@@ -802,10 +825,12 @@ func _complete_encounter_after_dialogue(
 		return
 	if encounter.occurs_at_run_bottom:
 		final_encounter_reached.emit(encounter.encounter_id)
-		return
-	if _active_stage != null:
+		_is_final_breakthrough_armed = false
+	var had_active_stage := _active_stage != null
+	if had_active_stage:
 		await _active_stage.play_closing()
 		_active_stage = null
+	if encounter.occurs_at_run_bottom or had_active_stage:
 		dialogue_director.close_cinematic_frame()
 		await dialogue_director.wait_until_frame_closed()
 
@@ -979,6 +1004,10 @@ func _prepare_authored_characters() -> bool:
 				stage.presentation_rock_break_requested,
 				_on_character_stage_rock_break_requested
 			)
+			_connect_once(
+				stage.presentation_camera_pan_requested,
+				_on_character_stage_camera_pan_requested
+			)
 			# A stampede floors the miner for as long as it runs. The stage owns
 			# the horde and knows when the last of them is gone; it does not own
 			# the miner, so it says what happened and this decides what that
@@ -1039,6 +1068,7 @@ func has_pending_or_active_interaction() -> bool:
 ## Releases only this encounter's named ownership of mining and camera state.
 func _finish_cinematic_flow() -> void:
 	_reset_speech_reactions()
+	terrain_renderer.set_trodden_floor(false)
 	# Nobody is left face down when the shot releases him, whatever ended it. A
 	# stampede that was cancelled mid-run never reaches its own finished signal,
 	# and the miner would go back to mining lying on his face.
@@ -1105,6 +1135,8 @@ func _on_final_breakthrough_mined(
 func _complete_final_breakthrough() -> void:
 	_reset_speech_reactions()
 	dialogue_director.close_cinematic_frame()
+	var encounter := encounter_config.encounters[_active_encounter_index]
+	final_encounter_reached.emit(encounter.encounter_id)
 	_next_encounter_index = _active_encounter_index + 1
 	_active_encounter_index = -1
 	_active_stage = null
@@ -1131,14 +1163,15 @@ func _resolve_cast_member(actor_id: StringName) -> Node2D:
 ## read.
 func _on_sequence_dialogue_requested(
 	conversation: DialogueConversation,
-	_line_range: Vector2i
+	line_range: Vector2i
 ) -> void:
 	if conversation == null:
 		return
 	_active_conversation = conversation
 	_sequence_is_awaiting_dialogue = dialogue_director.start_conversation(
 		conversation,
-		true
+		true,
+		line_range
 	)
 	if not _sequence_is_awaiting_dialogue:
 		push_error(
@@ -1185,6 +1218,12 @@ func _on_character_stage_rock_break_requested(
 	character_stage_rock_break_requested.emit(screen_position, radius_cells)
 
 
+## Relays a stage's camera pan the same way, because the framed view belongs to
+## the mining wiring and a cutscene stage owns actors, props and local effects.
+func _on_character_stage_camera_pan_requested(offset_cells: Vector2) -> void:
+	character_stage_camera_pan_requested.emit(offset_cells)
+
+
 ## Relays the clean stage transition through the cross-system wiring boundary.
 func _on_persistent_colony_requested() -> void:
 	rat_colony_support_requested.emit()
@@ -1205,6 +1244,8 @@ func _fail_active_encounter() -> void:
 	await dialogue_director.wait_until_frame_closed()
 	_reset_speech_reactions()
 	_active_conversation = null
+	_is_final_breakthrough_armed = false
+	_is_final_breakthrough_resolving = false
 	if _active_encounter_index >= 0:
 		_next_encounter_index = _active_encounter_index + 1
 	_active_encounter_index = -1

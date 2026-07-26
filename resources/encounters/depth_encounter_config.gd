@@ -2,7 +2,7 @@
 class_name DepthEncounterConfig
 extends Resource
 
-## Stores the named character schedule and shared chamber settings.
+## Stores the named character schedule and default chamber settings.
 ## Vertical values use gameplay depth measured from the miner's feet.
 ## @tool because the cutscene terrain preview calls the chamber methods while
 ## editing; without it Godot loads this resource as a placeholder instance.
@@ -40,10 +40,16 @@ func is_chamber_row(depth: int, total_run_depth: int) -> bool:
 	for encounter in encounters:
 		if encounter == null:
 			continue
+		var encounter_chamber_height := (
+			encounter.resolve_chamber_height_rows(chamber_height_rows)
+		)
 		var rows_until_floor := (
 			encounter.resolve_depth(total_run_depth) - depth
 		)
-		if rows_until_floor > 0 and rows_until_floor <= chamber_height_rows:
+		if (
+			rows_until_floor > 0
+			and rows_until_floor <= encounter_chamber_height
+		):
 			return true
 	return false
 
@@ -57,8 +63,11 @@ func get_encounter_ceiling_depth(
 ) -> int:
 	if encounter == null:
 		return -1
+	var encounter_chamber_height := (
+		encounter.resolve_chamber_height_rows(chamber_height_rows)
+	)
 	return maxi(
-		encounter.resolve_depth(total_run_depth) - chamber_height_rows,
+		encounter.resolve_depth(total_run_depth) - encounter_chamber_height,
 		0
 	)
 
@@ -130,12 +139,15 @@ func get_chamber_horizontal_bounds_at_depth(
 	for encounter in encounters:
 		if encounter == null:
 			continue
+		var encounter_chamber_height := (
+			encounter.resolve_chamber_height_rows(chamber_height_rows)
+		)
 		var rows_until_floor: float = (
 			float(encounter.resolve_depth(total_run_depth)) - depth
 		)
 		if (
 			rows_until_floor > 0.0
-			and rows_until_floor <= float(chamber_height_rows)
+			and rows_until_floor <= float(encounter_chamber_height)
 		):
 			var maximum_inset: float = minf(
 				float(chamber_ceiling_inset_cells),
@@ -143,10 +155,10 @@ func get_chamber_horizontal_bounds_at_depth(
 			)
 			var taper_progress: float = (
 				0.0
-				if chamber_height_rows <= 1
+				if encounter_chamber_height <= 1
 				else clampf(
 					(rows_until_floor - 1.0)
-						/ float(chamber_height_rows - 1),
+						/ float(encounter_chamber_height - 1),
 					0.0,
 					1.0
 				)

@@ -91,6 +91,8 @@ actor = &"rutini"
 start_seconds = 0.55
 duration_seconds = 0.35
 bounce_count = 2
+bounce_offset = Vector2(-2, -8)
+bounce_style = 0
 notes = "Two bounces just before his first line, so 'Easy, lads. We're here.' reads as him calling the colony to a stop rather than as a reaction to his own dialogue box. He is the only one in the shot who is arriving - everybody else has been waiting - and this is the beat that says so.
 
 Two rather than one because one bounce reads as a nod and two reads as somebody shouting over a crowd."
@@ -105,7 +107,7 @@ notes = "The whole conversation, all eight lines, held for exactly as long as th
 
 THE READING ORDER IS THE CAMERA MOVE. Zephan's IMG_1647 plans this beat as a pan across the gathering that ends on the Lantern Keeper. The encounter camera cannot pan - it centres on the miner's landing column and holds - so the cast are laid out left to right in the order they speak and the conversation walks the eye across the room instead: Rotini beside the miner, Cheese Girl at the shop window on the far left, the Treasure Hunter, the miner's silence, the Treasure Hunter again, Quibble on the right, and the Keeper at the far right end. Reorder these lines and the shot stops being a pan.
 
-Every reaction inside this beat is already free. DepthEncounterController bounces whichever gathered actor owns the presented line and applies that line's Speaker Pose, so Quibble raises his cup on his own line without a beat here asking him to. Do not try to split this into per-line beats to land a cue between two of them: line_range is authored and validated, and then the schedule ignores it, so any DIALOGUE beat plays the whole conversation."
+Every reaction inside this beat is already free. DepthEncounterController bounces whichever gathered actor owns the presented line and applies that line's Speaker Pose, so Quibble raises his cup on his own line without a beat here asking him to. This remains one beat for a continuous group exchange; the editor can split it into inclusive line ranges if a later animation has to land between two lines."
 
 [sub_resource type="Resource" id="Beat_closing_hold"]
 script = ExtResource("1_beat")

@@ -51,6 +51,8 @@ actor = &"rutini"
 start_seconds = 1.5
 duration_seconds = 0.3
 bounce_count = 2
+bounce_offset = Vector2(2, -8)
+bounce_style = 1
 notes = "Two bounces on arrival. This is the \"You again?\" - he recognises the man before the line appears, rather than reacting to his own dialogue. Two rather than one because it reads as a double take."
 
 [sub_resource type="Resource" id="Resource_dialogue"]
@@ -59,7 +61,7 @@ kind = 5
 start_seconds = 1.8
 duration_seconds = 6.0
 conversation = ExtResource("2_conversation")
-notes = "The whole conversation, held for as long as the player takes to read it; the six seconds are nominal. The colony arrives inside this beat rather than after it: line four, \"Come on boys! Dig!\", carries the begin_colony_mining stage cue, and the stage's Procession Cue is what turns that name into a flood of mice. A timeline cannot address one line - the schedule ignores a beat's line_range - so the cue has to live on the line, which is also where a writer moving that call would move it.
+notes = "The whole conversation, held for as long as the player takes to read it; the six seconds are nominal. The colony arrives inside this beat rather than after it: line four, \"Come on boys! Dig!\", carries the begin_colony_mining stage cue, and the stage's Procession Cue is what turns that name into a flood of mice. The cue stays on the line so moving that call in the inline dialogue editor moves its animation with it; inclusive line ranges remain available if a later edit needs a separate beat around the call.
 
 This is the last beat on purpose. The walk out belongs to the stage's own closing move, because play_closing() runs either way and a timeline that also walked him to Exit would move him twice. Closing is also what asks for the persistent colony, so the boys he just called arrive as he leaves."
 

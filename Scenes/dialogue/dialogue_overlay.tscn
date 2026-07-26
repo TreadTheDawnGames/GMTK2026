@@ -1,17 +1,15 @@
-[gd_scene format=3 uid="uid://bwnqpopl5iayr"]
+[gd_scene load_steps=13 format=3 uid="uid://bwnqpopl5iayr"]
 
 [ext_resource type="Script" uid="uid://1h124vfbvc4" path="res://Scripts/dialogue/dialogue_director.gd" id="1_director"]
-[ext_resource type="Script" uid="uid://bgideblrdsskw" path="res://Scripts/dialogue/cinematic_frame.gd" id="2_frame"]
-[ext_resource type="Shader" uid="uid://tac64bxvanmi" path="res://Shaders/cinematic_iris.gdshader" id="4_iris"]
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_iris"]
-resource_local_to_scene = true
-shader = ExtResource("4_iris")
-shader_parameter/aperture_center = Vector2(0.5, 0.5)
-shader_parameter/aperture_radius = Vector2(2, 2)
-shader_parameter/viewport_aspect = 1.0
-shader_parameter/edge_softness = 0.08
-shader_parameter/blackout_color = Color(0, 0, 0, 1)
+[ext_resource type="Script" path="res://Scripts/dialogue/cinematic_frame.gd" id="2_frame"]
+[ext_resource type="Shader" path="res://Shaders/cinematic_iris.gdshader" id="4_iris"]
+[ext_resource type="Texture2D" path="res://Assets/UI/dialogue_textboxes/mr_sitts_textbox.png" id="5_mr_sitts"]
+[ext_resource type="Texture2D" path="res://Assets/UI/dialogue_textboxes/quibble_textbox.png" id="6_quibble"]
+[ext_resource type="Texture2D" path="res://Assets/UI/dialogue_textboxes/rotini_textbox.png" id="7_rotini"]
+[ext_resource type="Texture2D" path="res://Assets/UI/dialogue_textboxes/sparky_textbox.png" id="8_sparky"]
+[ext_resource type="Texture2D" path="res://Assets/UI/dialogue_textboxes/zeb_textbox.png" id="9_zeb"]
+[ext_resource type="Texture2D" path="res://Assets/UI/dialogue_textboxes/ayden_textbox.png" id="10_ayden"]
+[ext_resource type="Texture2D" path="res://Assets/UI/dialogue_textboxes/coco_textbox.png" id="11_coco"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_dialogue"]
 bg_color = Color(0.075, 0.055, 0.047, 0.97)
@@ -27,18 +25,32 @@ corner_radius_bottom_left = 6
 shadow_color = Color(0, 0, 0, 0.48)
 shadow_size = 9
 
-[node name="DialogueDirector" type="CanvasLayer" unique_id=1373788107 node_paths=PackedStringArray("dialogue_root", "bottom_panel", "speaker_label", "body_label", "continue_label", "cinematic_frame")]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_iris"]
+resource_local_to_scene = true
+shader = ExtResource("4_iris")
+
+[node name="DialogueDirector" type="CanvasLayer" unique_id=1373788107 node_paths=PackedStringArray("dialogue_root", "bottom_panel", "textbox_art", "fallback_panel", "dialogue_margin", "speaker_label", "body_label", "continue_label", "cinematic_frame")]
 process_mode = 3
 layer = 20
 script = ExtResource("1_director")
 dialogue_root = NodePath("DialogueRoot")
 bottom_panel = NodePath("DialogueRoot/BottomPanel")
+textbox_art = NodePath("DialogueRoot/BottomPanel/TextboxArt")
+fallback_panel = NodePath("DialogueRoot/BottomPanel/FallbackPanel")
+dialogue_margin = NodePath("DialogueRoot/BottomPanel/Margin")
 speaker_label = NodePath("DialogueRoot/BottomPanel/Margin/Content/SpeakerLabel")
 body_label = NodePath("DialogueRoot/BottomPanel/Margin/Content/BodyLabel")
 continue_label = NodePath("DialogueRoot/BottomPanel/Margin/Content/ContinueLabel")
 cinematic_frame = NodePath("CinematicFrame")
+mr_sitts_textbox_texture = ExtResource("5_mr_sitts")
+quibble_textbox_texture = ExtResource("6_quibble")
+rotini_textbox_texture = ExtResource("7_rotini")
+sparky_textbox_texture = ExtResource("8_sparky")
+zeb_textbox_texture = ExtResource("9_zeb")
+ayden_textbox_texture = ExtResource("10_ayden")
+coco_textbox_texture = ExtResource("11_coco")
 
-[node name="CinematicFrame" type="Control" parent="." unique_id=58943034 node_paths=PackedStringArray("iris_overlay", "top_bar", "bottom_bar")]
+[node name="CinematicFrame" type="Control" parent="." node_paths=PackedStringArray("iris_overlay", "top_bar", "bottom_bar")]
 process_mode = 3
 layout_mode = 3
 anchors_preset = 15
@@ -48,13 +60,13 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("2_frame")
+starts_blacked_out = false
 iris_overlay = NodePath("IrisMask")
 top_bar = NodePath("TopBar")
 bottom_bar = NodePath("BottomBar")
 
-[node name="IrisMask" type="ColorRect" parent="CinematicFrame" unique_id=1869536319]
+[node name="IrisMask" type="ColorRect" parent="CinematicFrame"]
 visible = false
-material = SubResource("ShaderMaterial_iris")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -62,13 +74,14 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+material = SubResource("ShaderMaterial_iris")
 
-[node name="TopBar" type="ColorRect" parent="CinematicFrame" unique_id=1918594206]
+[node name="TopBar" type="ColorRect" parent="CinematicFrame"]
 layout_mode = 0
 mouse_filter = 2
 color = Color(0.008, 0.006, 0.008, 1)
 
-[node name="BottomBar" type="ColorRect" parent="CinematicFrame" unique_id=1376288236]
+[node name="BottomBar" type="ColorRect" parent="CinematicFrame"]
 layout_mode = 0
 mouse_filter = 2
 color = Color(0.008, 0.006, 0.008, 1)
@@ -83,7 +96,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 1
 
-[node name="BottomPanel" type="PanelContainer" parent="DialogueRoot" unique_id=1586836139]
+[node name="BottomPanel" type="Control" parent="DialogueRoot" unique_id=1586836139]
 layout_mode = 1
 anchors_preset = 12
 anchor_top = 1.0
@@ -95,10 +108,37 @@ offset_right = -90.0
 offset_bottom = -32.0
 grow_horizontal = 2
 grow_vertical = 0
+mouse_filter = 2
+
+[node name="FallbackPanel" type="Panel" parent="DialogueRoot/BottomPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBox_dialogue")
 
+[node name="TextboxArt" type="TextureRect" parent="DialogueRoot/BottomPanel"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
 [node name="Margin" type="MarginContainer" parent="DialogueRoot/BottomPanel" unique_id=1636964935]
-layout_mode = 2
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_constants/margin_left = 22
 theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 22

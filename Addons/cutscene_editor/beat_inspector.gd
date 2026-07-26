@@ -25,6 +25,8 @@ const FIELD_POSE: StringName = &"pose"
 const FIELD_STEP_HEIGHT: StringName = &"step_height"
 const FIELD_FACING: StringName = &"facing"
 const FIELD_BOUNCE_COUNT: StringName = &"bounce_count"
+const FIELD_BOUNCE_OFFSET: StringName = &"bounce_offset"
+const FIELD_BOUNCE_STYLE: StringName = &"bounce_style"
 const FIELD_CONVERSATION: StringName = &"conversation"
 const FIELD_LINE_RANGE: StringName = &"line_range"
 const FIELD_CUE: StringName = &"cue"
@@ -98,6 +100,8 @@ func get_visible_fields_for_kind(kind: int) -> PackedStringArray:
 			fields.append(str(FIELD_FACING))
 		CutsceneBeat.Kind.BOUNCE:
 			fields.append(str(FIELD_BOUNCE_COUNT))
+			fields.append(str(FIELD_BOUNCE_OFFSET))
+			fields.append(str(FIELD_BOUNCE_STYLE))
 		CutsceneBeat.Kind.DIALOGUE:
 			fields.append(str(FIELD_CONVERSATION))
 			fields.append(str(FIELD_LINE_RANGE))
@@ -124,7 +128,7 @@ func _rebuild() -> void:
 	# bottom dock is short, so a form taller than it needs somewhere to scroll
 	# rather than being clipped with no way to reach the rest.
 	custom_minimum_size.x = maxf(custom_minimum_size.x, _MINIMUM_WIDTH)
-	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_flags_horizontal = Control.SIZE_SHRINK_END
 	var scroll := ScrollContainer.new()
 	scroll.name = "BeatFieldsScroll"
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -150,6 +154,16 @@ func _rebuild() -> void:
 	title.text = "%s beat" % CutsceneBeat.Kind.keys()[_selected_beat.kind]
 	title.add_theme_font_size_override(&"font_size", 15)
 	_form.add_child(title)
+	var guidance := Label.new()
+	guidance.text = "Timing is changed here or by dragging the beat in the timeline."
+	guidance.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	guidance.add_theme_color_override(&"font_color", Color("#9aa4b4"))
+	guidance.tooltip_text = (
+		"Drag a beat to change when it starts, drag its right edge to change "
+		+ "duration, and drag between lanes to change its actor. Every field "
+		+ "supports Godot undo and redo."
+	)
+	_form.add_child(guidance)
 	_add_number_field(
 		"Start",
 		FIELD_START_SECONDS,
@@ -205,10 +219,19 @@ func _rebuild() -> void:
 				"Bounce count",
 				FIELD_BOUNCE_COUNT,
 				_selected_beat.bounce_count,
-				0.0,
+				1.0,
 				99.0,
-				1.0
+				1.0,
+				"How many complete out-and-back motions fit inside this beat."
 			)
+			_add_vector_field(
+				"Peak offset",
+				FIELD_BOUNCE_OFFSET,
+				_selected_beat.bounce_offset,
+				"Visual-only displacement at the peak. Negative Y bobs up; "
+				+ "positive Y dips down; X adds a sideways hop."
+			)
+			_add_bounce_style_field()
 		CutsceneBeat.Kind.DIALOGUE:
 			_add_conversation_field()
 			_add_line_range_field()
@@ -228,7 +251,8 @@ func _add_number_field(
 	current_value: float,
 	minimum: float,
 	maximum: float,
-	step: float
+	step: float,
+	help_text: String = ""
 ) -> void:
 	var row := _make_row(caption)
 	var spin := SpinBox.new()
@@ -239,6 +263,8 @@ func _add_number_field(
 	spin.value = current_value
 	spin.allow_greater = true
 	spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	spin.tooltip_text = help_text
+	row.tooltip_text = help_text
 	row.add_child(spin)
 	if not spin.value_changed.is_connected(_on_number_changed):
 		spin.value_changed.connect(_on_number_changed.bind(property_name))
@@ -388,7 +414,8 @@ func _get_actor_pose_set(actor_id: StringName) -> ActorPoseSet:
 func _add_vector_field(
 	caption: String,
 	property_name: StringName,
-	current_value: Vector2
+	current_value: Vector2,
+	help_text: String = ""
 ) -> void:
 	var row := _make_row(caption)
 	var x_spin := SpinBox.new()
@@ -398,6 +425,7 @@ func _add_vector_field(
 	x_spin.step = 1.0
 	x_spin.value = current_value.x
 	x_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	x_spin.tooltip_text = help_text
 	row.add_child(x_spin)
 	var y_spin := SpinBox.new()
 	y_spin.name = String(property_name) + "Y"
@@ -406,6 +434,8 @@ func _add_vector_field(
 	y_spin.step = 1.0
 	y_spin.value = current_value.y
 	y_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	y_spin.tooltip_text = help_text
+	row.tooltip_text = help_text
 	row.add_child(y_spin)
 	if not x_spin.value_changed.is_connected(_on_vector_x_changed):
 		x_spin.value_changed.connect(_on_vector_x_changed.bind(y_spin, property_name))
@@ -434,25 +464,95 @@ func _add_facing_field() -> void:
 		option.item_selected.connect(_on_facing_changed)
 
 
+func _add_bounce_style_field() -> void:
+	var row := _make_row("Motion")
+	var option := OptionButton.new()
+	option.name = String(FIELD_BOUNCE_STYLE)
+	option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	option.add_item("Gentle")
+	option.set_item_metadata(0, CutsceneBeat.BounceStyle.GENTLE)
+	option.add_item("Snappy")
+	option.set_item_metadata(1, CutsceneBeat.BounceStyle.SNAPPY)
+	option.add_item("Linear")
+	option.set_item_metadata(2, CutsceneBeat.BounceStyle.LINEAR)
+	for index in range(option.item_count):
+		if int(option.get_item_metadata(index)) == _selected_beat.bounce_style:
+			option.select(index)
+			break
+	option.tooltip_text = (
+		"Gentle eases into the peak, Snappy reaches it quickly, and Linear "
+		+ "moves at an even rate. Duration and bounce count stay unchanged."
+	)
+	row.tooltip_text = option.tooltip_text
+	row.add_child(option)
+	option.item_selected.connect(_on_bounce_style_changed.bind(option))
+
+
 func _add_conversation_field() -> void:
 	var row := _make_row("Conversation")
-	var value := LineEdit.new()
-	value.name = String(FIELD_CONVERSATION)
-	value.editable = false
-	value.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	if _selected_beat.conversation == null:
-		value.text = "(none assigned)"
-	else:
-		value.text = str(_selected_beat.conversation.conversation_id)
-	row.add_child(value)
+	var option := OptionButton.new()
+	option.name = String(FIELD_CONVERSATION)
+	option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	option.tooltip_text = (
+		"Choose which authored conversation this beat presents. The line range "
+		+ "below decides which part runs at this point in the timeline."
+	)
+	option.add_item("(none assigned)")
+	option.set_item_metadata(0, null)
+	var conversations: Array[DialogueConversation] = []
+	if (
+		_context.encounter != null
+		and _context.encounter.conversation != null
+	):
+		conversations.append(_context.encounter.conversation)
+	if _context.sequence != null:
+		for beat in _context.sequence.beats:
+			if (
+				beat != null
+				and beat.conversation != null
+				and not conversations.has(beat.conversation)
+			):
+				conversations.append(beat.conversation)
+	var selected_index := 0
+	for conversation in conversations:
+		option.add_item(str(conversation.conversation_id))
+		option.set_item_metadata(option.item_count - 1, conversation)
+		if conversation == _selected_beat.conversation:
+			selected_index = option.item_count - 1
+	option.select(selected_index)
+	row.add_child(option)
+	option.item_selected.connect(_on_conversation_changed.bind(option))
 
 
 func _add_line_range_field() -> void:
-	var row := _make_row("Line range")
+	var label := Label.new()
+	label.text = "Line range"
+	label.tooltip_text = (
+		"Choose the inclusive first and last lines presented at this point in "
+		+ "the timeline."
+	)
+	_form.add_child(label)
+	var row := HBoxContainer.new()
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_form.add_child(row)
 	var start_option := _make_line_option(true)
 	var end_option := _make_line_option(false)
-	row.add_child(start_option)
-	row.add_child(end_option)
+	var start_group := VBoxContainer.new()
+	start_group.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var start_label := Label.new()
+	start_label.text = "From"
+	start_label.add_theme_color_override(&"font_color", Color("#9aa4b4"))
+	start_group.add_child(start_label)
+	start_group.add_child(start_option)
+	row.add_child(start_group)
+	var end_group := VBoxContainer.new()
+	end_group.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var end_label := Label.new()
+	end_label.text = "Through"
+	end_label.add_theme_color_override(&"font_color", Color("#9aa4b4"))
+	end_group.add_child(end_label)
+	end_group.add_child(end_option)
+	row.add_child(end_group)
 	if not start_option.item_selected.is_connected(_on_line_start_changed):
 		start_option.item_selected.connect(_on_line_start_changed.bind(end_option))
 	if not end_option.item_selected.is_connected(_on_line_end_changed):
@@ -564,6 +664,52 @@ func _add_dialogue_line_row(line_index: int, line: DialogueLine) -> void:
 	caption.add_theme_color_override(&"font_color", Color("#9aa4b4"))
 	_form.add_child(caption)
 
+	var delivery_row := GridContainer.new()
+	delivery_row.columns = 4
+	delivery_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var speaker_label := Label.new()
+	speaker_label.text = "Speaker"
+	delivery_row.add_child(speaker_label)
+	var speaker_option := OptionButton.new()
+	speaker_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for participant in _selected_beat.conversation.participants:
+		if participant == null:
+			continue
+		speaker_option.add_item(participant.display_name)
+		speaker_option.set_item_metadata(
+			speaker_option.item_count - 1,
+			participant.slot
+		)
+		if participant.slot == line.speaker_slot:
+			speaker_option.select(speaker_option.item_count - 1)
+	speaker_option.tooltip_text = (
+		"Who delivers this line. The runtime uses the stable speaker slot to "
+		+ "pick the actor and display name."
+	)
+	speaker_option.item_selected.connect(
+		_on_dialogue_speaker_changed.bind(line, speaker_option)
+	)
+	delivery_row.add_child(speaker_option)
+
+	var auto_label := Label.new()
+	auto_label.text = "Auto"
+	delivery_row.add_child(auto_label)
+	var auto_spin := SpinBox.new()
+	auto_spin.min_value = 0.0
+	auto_spin.max_value = 30.0
+	auto_spin.step = 0.1
+	auto_spin.suffix = " s"
+	auto_spin.value = line.auto_advance_delay_seconds
+	auto_spin.tooltip_text = (
+		"Zero waits for player input. A positive value advances this line "
+		+ "automatically after that many seconds."
+	)
+	auto_spin.value_changed.connect(
+		_on_dialogue_auto_advance_changed.bind(line)
+	)
+	delivery_row.add_child(auto_spin)
+	_form.add_child(delivery_row)
+
 	var text_edit := TextEdit.new()
 	text_edit.text = line.text
 	text_edit.custom_minimum_size = Vector2(0.0, 54.0)
@@ -594,6 +740,49 @@ func _add_dialogue_line_row(line_index: int, line: DialogueLine) -> void:
 	)
 	speed_row.add_child(speed_spin)
 	_form.add_child(speed_row)
+
+	var cue_row := GridContainer.new()
+	cue_row.columns = 4
+	cue_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var pose_label := Label.new()
+	pose_label.text = "Pose"
+	cue_row.add_child(pose_label)
+	var pose_edit := LineEdit.new()
+	pose_edit.text = str(line.speaker_pose)
+	pose_edit.placeholder_text = "optional speaker pose"
+	pose_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pose_edit.tooltip_text = (
+		"Optional pose applied to this line's speaker while the line is shown."
+	)
+	pose_edit.focus_exited.connect(
+		_on_dialogue_name_committed.bind(
+			line,
+			pose_edit,
+			&"speaker_pose",
+			"Edit dialogue speaker pose"
+		)
+	)
+	cue_row.add_child(pose_edit)
+	var cue_label := Label.new()
+	cue_label.text = "Cue"
+	cue_row.add_child(cue_label)
+	var cue_edit := LineEdit.new()
+	cue_edit.text = str(line.stage_cue)
+	cue_edit.placeholder_text = "optional stage animation"
+	cue_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cue_edit.tooltip_text = (
+		"Optional AnimationPlayer clip started when this exact line appears."
+	)
+	cue_edit.focus_exited.connect(
+		_on_dialogue_name_committed.bind(
+			line,
+			cue_edit,
+			&"stage_cue",
+			"Edit dialogue stage cue"
+		)
+	)
+	cue_row.add_child(cue_edit)
+	_form.add_child(cue_row)
 
 
 func _on_fit_beat_to_dialogue_pressed(total_seconds: float) -> void:
@@ -637,11 +826,90 @@ func _on_dialogue_speed_changed(value: float, line: DialogueLine) -> void:
 	_rebuild()
 
 
+func _on_dialogue_speaker_changed(
+	index: int,
+	line: DialogueLine,
+	option: OptionButton
+) -> void:
+	if line == null or option == null or index < 0:
+		return
+	var speaker_slot := StringName(option.get_item_metadata(index))
+	if line.speaker_slot == speaker_slot:
+		return
+	_commit_resource_changes(
+		line,
+		{
+			"speaker_slot": {
+				"before": line.speaker_slot,
+				"after": speaker_slot,
+			}
+		},
+		"Edit dialogue speaker"
+	)
+	_rebuild()
+
+
+func _on_dialogue_auto_advance_changed(
+	value: float,
+	line: DialogueLine
+) -> void:
+	if (
+		line == null
+		or is_equal_approx(line.auto_advance_delay_seconds, value)
+	):
+		return
+	_commit_resource_changes(
+		line,
+		{
+			"auto_advance_delay_seconds": {
+				"before": line.auto_advance_delay_seconds,
+				"after": maxf(value, 0.0),
+			}
+		},
+		"Edit dialogue auto advance"
+	)
+	_rebuild()
+
+
+func _on_dialogue_name_committed(
+	line: DialogueLine,
+	editor: LineEdit,
+	property_name: StringName,
+	action_name: String
+) -> void:
+	if line == null or editor == null:
+		return
+	var before := StringName(line.get(property_name))
+	var after := StringName(editor.text.strip_edges())
+	if before == after:
+		return
+	_commit_resource_changes(
+		line,
+		{
+			String(property_name): {
+				"before": before,
+				"after": after,
+			}
+		},
+		action_name
+	)
+	_rebuild()
+
+
 func _make_line_option(is_start: bool) -> OptionButton:
 	var option := OptionButton.new()
 	option.name = "LineStart" if is_start else "LineEnd"
 	option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	option.add_item("Whole conversation")
+	# The menu intentionally includes the full dialogue text, but that text must
+	# not become the control's minimum width. Otherwise selecting a dialogue
+	# beat makes two long dropdowns expand the inspector and crush the timeline.
+	option.fit_to_longest_item = false
+	option.tooltip_text = (
+		"First dialogue line played by this beat."
+		if is_start
+		else "Last dialogue line played by this beat."
+	)
+	option.add_item("First line" if is_start else "Last line")
 	option.set_item_metadata(0, -1)
 	var selected_value := (
 		_selected_beat.line_range.x
@@ -792,6 +1060,26 @@ func _on_facing_changed(index: int) -> void:
 	var option := _find_control(String(FIELD_FACING)) as OptionButton
 	if option != null:
 		_commit_property(FIELD_FACING, int(option.get_item_metadata(index)), "Edit facing")
+
+
+func _on_bounce_style_changed(index: int, option: OptionButton) -> void:
+	if _selected_beat == null or option == null or index < 0:
+		return
+	_commit_property(
+		FIELD_BOUNCE_STYLE,
+		int(option.get_item_metadata(index)),
+		"Edit bounce motion"
+	)
+
+
+func _on_conversation_changed(index: int, option: OptionButton) -> void:
+	if _selected_beat == null or option == null or index < 0:
+		return
+	_commit_property(
+		FIELD_CONVERSATION,
+		option.get_item_metadata(index),
+		"Edit dialogue conversation"
+	)
 
 
 func _on_line_start_changed(index: int, end_option: OptionButton) -> void:

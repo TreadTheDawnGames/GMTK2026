@@ -22,10 +22,32 @@ signal presentation_rock_break_requested(
 	screen_position: Vector2,
 	radius_cells: int
 )
+## Asks the owner to slide the framed view off the framing this encounter settled
+## on, in terrain cells, for a shot whose subject is not where the miner landed.
+signal presentation_camera_pan_requested(offset_cells: Vector2)
 signal sequence_dialogue_requested(
 	conversation: DialogueConversation,
 	line_range: Vector2i
 )
+
+## Terrain cells the framed view is displaced from the encounter focus.
+##
+## This exists to be animated. Every other way a cutscene moves is authored as a
+## beat, but a pan is a continuous motion with its own easing, and an
+## AnimationPlayer track is the one place in this project where a curve can be
+## drawn rather than described. A STAGE_CUE beat plays that clip and blocks until
+## it ends, so the timeline still owns when the pan happens and how long the shot
+## waits for it, while the clip owns how it moves.
+##
+## The Thief finale is the only encounter that animates it. Left at zero it emits
+## nothing and costs the other ten nothing, and the view controller ignores a pan
+## outside an encounter it is already framing.
+var camera_pan_offset_cells := Vector2.ZERO:
+	set(value):
+		if camera_pan_offset_cells.is_equal_approx(value):
+			return
+		camera_pan_offset_cells = value
+		presentation_camera_pan_requested.emit(value)
 
 @export_category("Named Marker Roots")
 @export var actor_markers_root: Node2D

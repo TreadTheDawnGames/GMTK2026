@@ -4,7 +4,7 @@
 [ext_resource type="Resource" uid="uid://cpqjkl4c3ygg2" path="res://resources/encounters/cheese_girl_character_appearance.tres" id="2_appearance"]
 [ext_resource type="Resource" uid="uid://dcyt4ietamaxn" path="res://resources/dialogue/cheese_girl_first_conversation.tres" id="3_dialogue"]
 [ext_resource type="Resource" uid="uid://dpx2ny0co5sah" path="res://resources/cinematics/sequences/cheese_girl_first_sequence.tres" id="4_26vmj"]
-[ext_resource type="Resource" uid="uid://bqpuu15onyr1q" path="res://resources/cinematics/sculpts/cheese_girl_first_room.tres" id="5_nacqn"]
+[ext_resource type="Resource" uid="uid://doiwlvb172mrb" path="res://resources/cinematics/sculpts/cheese_girl_first_room.tres" id="5_nacqn"]
 [ext_resource type="PackedScene" uid="uid://w8fc1ceqwfjp" path="res://Scenes/cinematics/cheese_girl_encounter_stage.tscn" id="5_stage"]
 
 [resource]
@@ -12,6 +12,7 @@ script = ExtResource("1_encounter")
 encounter_id = &"cheese_girl_first"
 actor_id = &"cheese_girl"
 depth_from_surface = 300
+chamber_height_rows_override = 72
 appearance = ExtResource("2_appearance")
 conversation = ExtResource("3_dialogue")
 stage_scene = ExtResource("5_stage")

@@ -7,6 +7,7 @@ extends SceneTree
 ## - Resolves one real terrain dig through the production TerrainManager.
 ## - Confirms damaged terrain restores byte-exactly without replaying history.
 ## - Checks fractional review travel, encounter stops, and upward preloading.
+## - Guards the sample-neutral shader path that smooths buried cut contours.
 ## - Exits nonzero on any failed contract so agents get a fast merge gate.
 ## - This intentionally stays small; detailed behavior remains in local_tests.
 ## - The invariant is that a parseable game can complete one mining mutation.
@@ -17,6 +18,9 @@ const MINING_SCENE: PackedScene = preload(
 const TREASURE_HUNTER_APPEARANCE: CharacterAppearance = preload(
 	"res://resources/encounters/treasure_hunter_character_appearance.tres"
 )
+const MOODY_TEEN_APPEARANCE: CharacterAppearance = preload(
+	"res://resources/encounters/moody_teen_character_appearance.tres"
+)
 const TREASURE_HUNTER_FIRST_SEQUENCE: CutsceneSequence = preload(
 	"res://resources/cinematics/sequences/treasure_hunter_first_sequence.tres"
 )
@@ -26,8 +30,16 @@ const TREASURE_HUNTER_TREASURE_SEQUENCE: CutsceneSequence = preload(
 const TREASURE_HUNTER_TREASURE_CONVERSATION: DialogueConversation = preload(
 	"res://resources/dialogue/treasure_hunter_treasure_conversation.tres"
 )
+const THIEF_ENCRYPTED_DIALOGUE: EncryptedDialogueConversation = preload(
+	"res://resources/dialogue/thief_encrypted_dialogue.tres"
+)
+const OPENING_SURFACE_CONVERSATION: DialogueConversation = preload(
+	"res://resources/dialogue/opening_surface_conversation.tres"
+)
 
 var _failures: Array[String] = []
+var _presented_line_indices: PackedInt32Array = PackedInt32Array()
+var _finished_conversation_ids: Array[StringName] = []
 
 
 func _initialize() -> void:
@@ -36,8 +48,27 @@ func _initialize() -> void:
 
 func _run() -> void:
 	await process_frame
+	_verify_headless_history_isolation()
 	_verify_entry_scene()
+	# Headless smoke cannot judge antialiased pixels. Protect the implementation
+	# choice instead: buried contours use the existing raw mask taps for a
+	# continuous direction and depth-scaled derivative AA, so smoothing cannot
+	# silently regress into extra Web texture samples or a denser terrain mask.
+	var terrain_shader_source := FileAccess.get_file_as_string(
+		"res://Shaders/terrain_layer.gdshader"
+	)
+	_expect(
+		terrain_shader_source.contains("cut_aa_half_width")
+		and terrain_shader_source.contains(
+			"neighbor_alpha.z - neighbor_alpha.w"
+		)
+		and terrain_shader_source.contains(
+			"neighbor_alpha.x - neighbor_alpha.y"
+		),
+		"Buried terrain contours must retain sample-neutral derivative smoothing."
+	)
 	await _verify_mining_scene()
+	_verify_finale_text_resolves()
 	if _failures.is_empty():
 		print("SMOKE_VERIFY_PASS")
 		quit(0)
@@ -45,6 +76,28 @@ func _run() -> void:
 	for failure: String in _failures:
 		push_error("SMOKE_VERIFY_FAIL: %s" % failure)
 	quit(1)
+
+
+## Prevents local/CI verification from counting as somebody playing the game.
+func _verify_headless_history_isolation() -> void:
+	if DisplayServer.get_name() != "headless":
+		return
+	var player_history := root.get_node_or_null(
+		"/root/PlayerHistory"
+	) as PlayerHistoryRecord
+	_expect(
+		player_history != null,
+		"PlayerHistory autoload must exist for the Thief finale."
+	)
+	if player_history == null:
+		return
+	# This specifically guards the benchmark isolation fix: a headless process
+	# must not dirty or flush the real user://player_history.cfg on shutdown.
+	_expect(
+		not player_history.is_processing()
+		and not player_history._is_dirty,
+		"Headless verification must leave PlayerHistory persistence idle."
+	)
 
 
 func _verify_entry_scene() -> void:
@@ -61,6 +114,33 @@ func _verify_entry_scene() -> void:
 	_expect(
 		ResourceLoader.exists(entry_scene_path, "PackedScene"),
 		"Configured entry scene must resolve: %s" % entry_scene_path
+	)
+	_expect(
+		MOODY_TEEN_APPEARANCE.texture != null
+		and MOODY_TEEN_APPEARANCE.texture.resource_path
+			== "res://Assets/Characters/moody_teen/moody_teen.png"
+		and MOODY_TEEN_APPEARANCE.horizontal_frames == 1
+		and MOODY_TEEN_APPEARANCE.frame == 0
+		and MOODY_TEEN_APPEARANCE.art_faces_left,
+		"Moody Teen must use Ayden's supplied single-frame character art."
+	)
+	var opening_uses_mr_sitts := (
+		OPENING_SURFACE_CONVERSATION.validate().is_empty()
+		and OPENING_SURFACE_CONVERSATION.participants.size() == 1
+		and OPENING_SURFACE_CONVERSATION.participants[0].slot
+			== &"newspaper_reader"
+		and OPENING_SURFACE_CONVERSATION.participants[0].display_name
+			== "Mr. Sitts"
+	)
+	for line in OPENING_SURFACE_CONVERSATION.lines:
+		opening_uses_mr_sitts = (
+			opening_uses_mr_sitts
+			and line != null
+			and line.speaker_slot == &"newspaper_reader"
+		)
+	_expect(
+		opening_uses_mr_sitts,
+		"The surface conversation must present every line as Mr. Sitts."
 	)
 	var entry_scene := ResourceLoader.load(
 		entry_scene_path,
@@ -94,6 +174,9 @@ func _verify_mining_scene() -> void:
 	var scene_wiring := game_root.get_node_or_null(
 		"MiningScene/Systems/SceneWiring"
 	) as MiningSceneWiring
+	var run_intro_controller := game_root.get_node_or_null(
+		"MiningScene/Systems/RunIntroController"
+	) as RunIntroController
 	var mining_controller := game_root.get_node_or_null(
 		"MiningScene/Systems/MiningController"
 	) as MiningController
@@ -167,6 +250,116 @@ func _verify_mining_scene() -> void:
 		and dialogue_director.cinematic_frame.is_closed(),
 		"Title menu must keep the cinematic bars off the live terrain."
 	)
+	if dialogue_director != null:
+		var art_conversation := DialogueConversation.new()
+		art_conversation.conversation_id = &"smoke_textbox_art"
+		var expected_textures: Dictionary[StringName, Texture2D] = {
+			&"miner": dialogue_director.sparky_textbox_texture,
+			&"treasure_hunter": dialogue_director.zeb_textbox_texture,
+			&"rutini": dialogue_director.rotini_textbox_texture,
+			&"coffee_cat": dialogue_director.quibble_textbox_texture,
+			&"cheese_girl": dialogue_director.coco_textbox_texture,
+			&"moody_teen": dialogue_director.ayden_textbox_texture,
+			&"newspaper_reader": dialogue_director.mr_sitts_textbox_texture,
+		}
+		for speaker_slot: StringName in expected_textures:
+			var participant := DialogueParticipant.new()
+			participant.slot = speaker_slot
+			participant.display_name = str(speaker_slot)
+			art_conversation.participants.append(participant)
+		var opening_participant := DialogueParticipant.new()
+		opening_participant.slot = &"opening_voice"
+		opening_participant.display_name = "..."
+		art_conversation.participants.append(opening_participant)
+		var art_line := DialogueLine.new()
+		art_line.speaker_slot = &"miner"
+		art_line.text = "Textbox art smoke check."
+		art_conversation.lines.append(art_line)
+		var previous_pause_gameplay := dialogue_director.pause_gameplay
+		var previous_auto_frame := dialogue_director.auto_frame_conversations
+		dialogue_director.pause_gameplay = false
+		dialogue_director.auto_frame_conversations = false
+		for speaker_slot: StringName in expected_textures:
+			art_line.speaker_slot = speaker_slot
+			var art_started := dialogue_director.start_conversation(
+				art_conversation
+			)
+			_expect(
+				art_started
+				and dialogue_director.textbox_art.visible
+				and not dialogue_director.fallback_panel.visible
+				and not dialogue_director.speaker_label.visible
+				and is_equal_approx(
+					dialogue_director.bottom_panel.size.y,
+					173.0
+				)
+				and dialogue_director.textbox_art.stretch_mode
+					== TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				and absf(
+					(
+						dialogue_director.bottom_panel.size.x
+						/ dialogue_director.bottom_panel.size.y
+					)
+					-
+					(
+						float(
+							expected_textures[speaker_slot].get_width()
+						)
+						/ float(
+							expected_textures[speaker_slot].get_height()
+						)
+					)
+				) < 0.01
+				and is_equal_approx(
+					dialogue_director.body_label.custom_minimum_size.y,
+					dialogue_director.art_body_minimum_height
+				)
+				and (
+					dialogue_director.body_label.get_theme_font_size(
+						"normal_font_size"
+					)
+					== dialogue_director.art_body_font_size
+				)
+				and (
+					dialogue_director.textbox_art.texture
+					== expected_textures[speaker_slot]
+				),
+				"Dialogue slot '%s' must use its authored textbox art."
+				% speaker_slot
+			)
+			if art_started:
+				dialogue_director.finish_conversation()
+		art_line.speaker_slot = &"opening_voice"
+		var fallback_started := dialogue_director.start_conversation(
+			art_conversation
+		)
+		_expect(
+			fallback_started
+			and not dialogue_director.textbox_art.visible
+			and dialogue_director.fallback_panel.visible
+			and dialogue_director.speaker_label.visible
+			and is_equal_approx(
+				dialogue_director.body_label.custom_minimum_size.y,
+				dialogue_director.fallback_body_minimum_height
+			)
+			and (
+				dialogue_director.body_label.get_theme_font_size(
+					"normal_font_size"
+				)
+				== dialogue_director.fallback_body_font_size
+			)
+			and is_equal_approx(
+				dialogue_director.bottom_panel.size.x,
+				dialogue_director.dialogue_root.size.x
+					- dialogue_director.fallback_panel_horizontal_margin * 2.0
+			),
+			"Speakers without supplied art must retain the readable fallback."
+		)
+		if fallback_started:
+			dialogue_director.finish_conversation()
+		dialogue_director.pause_gameplay = previous_pause_gameplay
+		dialogue_director.auto_frame_conversations = previous_auto_frame
+		_verify_dialogue_line_ranges(dialogue_director)
 	# Sculpt streaming now expands eight authored cells per packed byte. Compare
 	# complete representative rows to the authoritative resource so the faster
 	# bulk path cannot reverse bit order or change protected-floor collision.
@@ -176,7 +369,78 @@ func _verify_mining_scene() -> void:
 		"Terrain smoke verification requires one authored sculpt."
 	)
 	if not sculpt_placements.is_empty():
+		var cheese_encounter := (
+			terrain_manager.encounter_config.encounters[0]
+		)
+		var shared_chamber_height := (
+			terrain_manager.encounter_config.chamber_height_rows
+		)
+		var cheese_chamber_height := (
+			cheese_encounter.resolve_chamber_height_rows(
+				shared_chamber_height
+			)
+		)
+		_expect(
+			cheese_chamber_height == shared_chamber_height * 3,
+			"Cheese Girl's arrival fall must remain three times the shared height."
+		)
 		var sculpt: CutsceneTerrainSculpt = sculpt_placements[0].sculpt
+		var ceiling_local_row := (
+			sculpt.get_floor_local_row() - cheese_chamber_height
+		)
+		var pre_cutscene_layers_are_intact := ceiling_local_row >= 0
+		for local_y in range(maxi(ceiling_local_row, 0)):
+			for local_x in range(sculpt.grid_size.x):
+				var local_cell := Vector2i(local_x, local_y)
+				if not sculpt.is_solid_local(local_cell):
+					pre_cutscene_layers_are_intact = false
+					break
+				for layer_index in range(
+					sculpt.layer_solid_bits.size()
+				):
+					if not sculpt.is_layer_solid_local(
+						layer_index,
+						local_cell
+					):
+						pre_cutscene_layers_are_intact = false
+						break
+				if not pre_cutscene_layers_are_intact:
+					break
+			if not pre_cutscene_layers_are_intact:
+				break
+		_expect(
+			pre_cutscene_layers_are_intact,
+			"Cheese Girl's sculpt must not overwrite intact layered terrain "
+				+ "before its cutscene ceiling."
+		)
+		var reachable_fall_is_clear := true
+		var first_entry_x := sculpt.get_landing_first_local_x(
+			terrain_manager.config.snake_half_span_cells
+		)
+		var last_entry_x := mini(
+			first_entry_x
+				+ terrain_manager.config.snake_half_span_cells * 2,
+			sculpt.grid_size.x - 1
+		)
+		var clear_fall_last_row := (
+			sculpt.get_floor_local_row()
+			- DepthEncounterController.LANDING_FLOOR_TOLERANCE_ROWS
+		)
+		for local_y in range(
+			ceiling_local_row,
+			clear_fall_last_row + 1
+		):
+			for local_x in range(first_entry_x, last_entry_x + 1):
+				if sculpt.is_solid_local(Vector2i(local_x, local_y)):
+					reachable_fall_is_clear = false
+					break
+			if not reachable_fall_is_clear:
+				break
+		_expect(
+			reachable_fall_is_clear,
+			"Cheese Girl's enlarged cavern must keep every reachable fall "
+				+ "column clear until the landing tolerance."
+		)
 		var logical_mask := (
 			terrain_renderer._get_sculpt_logical_mask_image(sculpt, -1)
 		)
@@ -243,6 +507,13 @@ func _verify_mining_scene() -> void:
 		"SceneWiring must inject AudioHandler into TimingWindowTask."
 	)
 	_expect(
+		run_intro_controller != null
+		and run_intro_controller.arrival_sequence != null
+		and run_intro_controller.arrival_sequence._audio_handler
+			== audio_handler,
+		"SceneWiring must inject AudioHandler into ArrivalIntroSequence."
+	)
+	_expect(
 		TREASURE_HUNTER_APPEARANCE.pose_set != null
 		and TREASURE_HUNTER_APPEARANCE.pose_set.has_pose(&"idle")
 		and TREASURE_HUNTER_APPEARANCE.pose_set.has_pose(&"walk")
@@ -278,6 +549,8 @@ func _verify_mining_scene() -> void:
 		exits_without_pickaxe,
 		"Treasure Hunter must leave and reach the cafe without his pickaxe."
 	)
+	if encounter_controller != null:
+		_verify_authored_bounces(encounter_controller)
 	_expect(
 		run_state != null
 		and run_state.depth_changed.is_connected(
@@ -397,6 +670,32 @@ func _verify_mining_scene() -> void:
 	)
 	game_root.queue_free()
 	await process_frame
+
+
+## Proves the finale's lines still finish themselves.
+##
+## The Thief's conversation is the only text in the game that is incomplete on
+## disk: it carries {tokens} resolved against the player's lifetime record when
+## each line is presented. Break that and nothing errors - the game's last scene
+## simply shows literal braces to somebody eight hours in. This is the cheap
+## check that it still resolves; local_tests/verify_thief_finale.gd is the
+## thorough one.
+func _verify_finale_text_resolves() -> void:
+	var conversation := THIEF_ENCRYPTED_DIALOGUE.decrypt_conversation()
+	_expect(
+		conversation != null,
+		"The Thief finale conversation must decrypt."
+	)
+	if conversation == null:
+		return
+	var empty_history := PlayerHistoryRecord.new()
+	for line_index in range(conversation.lines.size()):
+		var line: DialogueLine = conversation.lines[line_index]
+		_expect(
+			DialogueTokens.resolve(line.text, empty_history).find("{") < 0,
+			"Finale line %d leaves an unresolved token." % line_index
+		)
+	empty_history.free()
 
 
 ## Exercises the review contracts through the production config and renderer.
@@ -520,6 +819,104 @@ func _verify_review_camera(
 
 	view_controller.follow_mining_position(original_target)
 	view_controller.snap_follow_to_target()
+
+
+## Confirms a timeline can present an inclusive subset without renumbering lines.
+func _verify_dialogue_line_ranges(dialogue_director: DialogueDirector) -> void:
+	_presented_line_indices.clear()
+	_finished_conversation_ids.clear()
+	if not dialogue_director.line_presented.is_connected(
+		_on_smoke_line_presented
+	):
+		dialogue_director.line_presented.connect(_on_smoke_line_presented)
+	if not dialogue_director.conversation_finished.is_connected(
+		_on_smoke_conversation_finished
+	):
+		dialogue_director.conversation_finished.connect(
+			_on_smoke_conversation_finished
+		)
+	var started := dialogue_director.start_conversation(
+		TREASURE_HUNTER_TREASURE_CONVERSATION,
+		true,
+		Vector2i(1, 2)
+	)
+	_expect(started, "DialogueDirector must accept a valid timeline line range.")
+	if not started:
+		return
+	dialogue_director.advance()
+	dialogue_director.advance()
+	_expect(
+		_presented_line_indices == PackedInt32Array([1, 2]),
+		"Dialogue line ranges must present only their inclusive global indices."
+	)
+	_expect(
+		_finished_conversation_ids == [
+			TREASURE_HUNTER_TREASURE_CONVERSATION.conversation_id
+		],
+		"A ranged dialogue beat must finish through the normal conversation contract."
+	)
+	dialogue_director.close_cinematic_frame(true)
+
+
+## Confirms every shipped BOUNCE now has editable, playable motion data.
+func _verify_authored_bounces(
+	encounter_controller: DepthEncounterController
+) -> void:
+	var bounce_count := 0
+	for encounter in encounter_controller.encounter_config.encounters:
+		if encounter == null or encounter.sequence == null:
+			continue
+		for beat: CutsceneBeat in encounter.sequence.beats:
+			if beat == null or beat.kind != CutsceneBeat.Kind.BOUNCE:
+				continue
+			bounce_count += 1
+			_expect(
+				beat.duration_seconds > 0.0
+				and beat.bounce_count > 0
+				and not beat.bounce_offset.is_zero_approx(),
+				"Every authored BOUNCE must define duration, cycles, and peak offset."
+			)
+			var player := CutsceneSequencePlayer.new()
+			var actor := Node2D.new()
+			player.bind(
+				func(actor_id: StringName) -> Node2D:
+					return actor if actor_id == beat.actor else null,
+				Callable(),
+				Callable(),
+				null
+			)
+			var midpoint := (
+				beat.start_seconds
+				+ beat.duration_seconds / float(beat.bounce_count * 4)
+			)
+			var state: Dictionary = player.evaluate_at(
+				encounter.sequence,
+				midpoint
+			).get(&"actors", {}).get(beat.actor, {})
+			var visual_offset: Vector2 = state.get(
+				&"visual_offset",
+				Vector2.ZERO
+			)
+			_expect(
+				not visual_offset.is_zero_approx(),
+				"Timeline scrub preview must evaluate authored BOUNCE motion."
+			)
+			player.free()
+			actor.free()
+	_expect(bounce_count >= 7, "Every current cutscene bounce must stay authored.")
+
+
+func _on_smoke_line_presented(
+	_conversation_id: StringName,
+	line_index: int,
+	_speaker_slot: StringName,
+	_speaker_pose: StringName
+) -> void:
+	_presented_line_indices.append(line_index)
+
+
+func _on_smoke_conversation_finished(conversation_id: StringName) -> void:
+	_finished_conversation_ids.append(conversation_id)
 
 
 func _expect(condition: bool, failure_message: String) -> void:

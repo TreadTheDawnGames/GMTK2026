@@ -107,6 +107,11 @@ var _has_resolved_pending_impact: bool = false
 var _is_swing_queue_paused: bool = false
 var _latest_candidate_combo: int = 1
 var _latest_candidate_directions := PackedInt32Array()
+# Widened, straightened descent authored by the credits band. Zero and a
+# negative span mean ordinary mining, so every depth outside that band resolves
+# its swing exactly as it did before the inscriptions existed.
+var _inscription_minimum_half_width_cells: int = 0
+var _inscription_maximum_snake_half_span_cells: int = -1
 # Each success adds at most its primary request and one authored double hit.
 # Swing completion pops requests; a miss or run reset clears the remainder.
 var _queued_swings: Array[SwingRequest] = []
@@ -115,6 +120,24 @@ var _queued_swings: Array[SwingRequest] = []
 ## Supplies the authoritative run model at the composition boundary.
 func set_run_state(run_state: RunState) -> void:
 	_game_state = run_state
+
+
+## Widens and straightens the shaft while authored inscriptions are passing.
+## A swing still costs the player exactly what it always did: this raises the
+## floor under the resolved radius and narrows the snake's turn span, so the
+## opening is wide enough to read a name through and stays centered on it.
+## Zero half-width with a negative span restores ordinary mining.
+func set_inscription_dig_band(
+	minimum_half_width_cells: int,
+	maximum_snake_half_span_cells: int
+) -> void:
+	_inscription_minimum_half_width_cells = maxi(
+		minimum_half_width_cells,
+		0
+	)
+	_inscription_maximum_snake_half_span_cells = (
+		maximum_snake_half_span_cells
+	)
 
 
 ## Starts a swing for a successful timing result or records a miss.
@@ -517,16 +540,41 @@ func _on_impact_candidates_changed(
 	next_combo: int,
 	hit_directions: PackedInt32Array
 ) -> void:
+	var keeps_completed_candidates := _candidate_keys_match(
+		next_combo,
+		hit_directions
+	)
 	_latest_candidate_combo = maxi(next_combo, 1)
 	_latest_candidate_directions = hit_directions.duplicate()
 	if _is_swing_pending or _is_swing_queue_paused:
 		return
-	_prepare_latest_impact_candidates()
+	_prepare_latest_impact_candidates(keeps_completed_candidates)
+
+
+## Separates a priority-only reorder from regenerated candidate identities.
+func _candidate_keys_match(
+	next_combo: int,
+	hit_directions: PackedInt32Array
+) -> bool:
+	var keys_match := (
+		maxi(next_combo, 1) == _latest_candidate_combo
+		and hit_directions.size() == _latest_candidate_directions.size()
+	)
+	if keys_match:
+		for previous_direction in _latest_candidate_directions:
+			if previous_direction not in hit_directions:
+				keys_match = false
+				break
+	return keys_match
 
 
 ## Expands the current target set into bounded terrain-transform candidates.
-func _prepare_latest_impact_candidates() -> void:
-	dig_visuals_preparation_started.emit(false)
+func _prepare_latest_impact_candidates(
+	keep_completed: bool = false
+) -> void:
+	# Time-to-hit reordering changes urgency, not candidate identity. Preserve
+	# finished images across that reorder while replacing unfinished queue work.
+	dig_visuals_preparation_started.emit(keep_completed)
 	if _latest_candidate_directions.is_empty():
 		return
 	var start_cell := Vector2i(
@@ -570,8 +618,14 @@ func _get_swing_path_plan(
 				- requested_half_width_cells
 				- 1
 		)
+	var authored_half_span := config.snake_half_span_cells
+	if _inscription_maximum_snake_half_span_cells >= 0:
+		authored_half_span = mini(
+			authored_half_span,
+			_inscription_maximum_snake_half_span_cells
+		)
 	var safe_half_span := maxi(
-		mini(config.snake_half_span_cells, available_half_span),
+		mini(authored_half_span, available_half_span),
 		0
 	)
 	var left_turn_cell_x := center_cell_x - safe_half_span
@@ -614,7 +668,7 @@ func _get_requested_half_width_cells(swing: SwingRequest) -> int:
 			config.base_tunnel_half_width_cells
 				+ combo_added_half_width
 		)
-	return maxi(
+	var resolved_half_width_cells := maxi(
 		roundi(
 			float(requested_half_width_cells)
 			* (
@@ -629,6 +683,12 @@ func _get_requested_half_width_cells(swing: SwingRequest) -> int:
 			* swing.width_scale
 		),
 		0
+	)
+	# The inscription floor only ever widens. A combo or a stacked pickaxe that
+	# already cuts wider than the authored band keeps its own larger opening.
+	return maxi(
+		resolved_half_width_cells,
+		_inscription_minimum_half_width_cells
 	)
 
 

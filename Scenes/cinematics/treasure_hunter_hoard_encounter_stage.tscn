@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
 [ext_resource type="Texture2D" path="res://Assets/Props/gem_crystals.png" id="2_gems"]
@@ -23,9 +23,182 @@ region = Rect2(218, 0, 72, 124)
 atlas = ExtResource("2_gems")
 region = Rect2(290, 0, 73, 124)
 
+[sub_resource type="Animation" id="Animation_reset"]
+resource_name = "RESET"
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("PropMarkers/GemGlow:color")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Color(0.88, 0.42, 0.16, 0.04)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("PropMarkers/GemMoundCore:color")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Color(0.13, 0.075, 0.105, 0.92)]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("PropMarkers/GemPile:modulate")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Color(0.36, 0.34, 0.4, 0.72)]
+}
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("PropMarkers/Sparkles:modulate:a")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [0.0]
+}
+
+[sub_resource type="Animation" id="Animation_opening"]
+resource_name = "opening"
+length = 1.35
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("PropMarkers/GemGlow:color")
+tracks/0/interp = 2
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.55, 0.9, 1.35),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"update": 0,
+"values": [Color(0.88, 0.42, 0.16, 0.04), Color(1, 0.62, 0.2, 0.12), Color(1, 0.72, 0.28, 0.2), Color(1, 0.62, 0.2, 0.09)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("PropMarkers/GemMoundCore:color")
+tracks/1/interp = 2
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.9, 1.35),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Color(0.13, 0.075, 0.105, 0.92), Color(0.34, 0.18, 0.22, 0.98), Color(0.26, 0.13, 0.18, 0.96)]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("PropMarkers/GemPile:modulate")
+tracks/2/interp = 2
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.32, 0.92, 1.35),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"update": 0,
+"values": [Color(0.36, 0.34, 0.4, 0.72), Color(0.46, 0.43, 0.5, 0.78), Color(1.12, 1.07, 1, 1), Color(1, 1, 1, 1)]
+}
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("PropMarkers/Sparkles:modulate:a")
+tracks/3/interp = 2
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0, 0.52, 0.86),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [0.0, 0.0, 1.0]
+}
+
+[sub_resource type="Animation" id="Animation_closing"]
+resource_name = "closing"
+length = 0.01
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_hoard"]
+_data = {
+&"RESET": SubResource("Animation_reset"),
+&"closing": SubResource("Animation_closing"),
+&"opening": SubResource("Animation_opening")
+}
+
+[sub_resource type="Animation" id="Animation_sparkle_loop"]
+resource_name = "sparkle_loop"
+length = 3.2
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("PropMarkers/Sparkles/SparkleA:scale")
+tracks/0/interp = 2
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.55, 1.1, 3.2),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"update": 0,
+"values": [Vector2(0.15, 0.15), Vector2(1, 1), Vector2(0.15, 0.15), Vector2(0.15, 0.15)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("PropMarkers/Sparkles/SparkleB:scale")
+tracks/1/interp = 2
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.75, 1.3, 1.85, 3.2),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector2(0.15, 0.15), Vector2(0.15, 0.15), Vector2(1, 1), Vector2(0.15, 0.15), Vector2(0.15, 0.15)]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("PropMarkers/Sparkles/SparkleC:scale")
+tracks/2/interp = 2
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 1.45, 2, 2.55, 3.2),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector2(0.15, 0.15), Vector2(0.15, 0.15), Vector2(1, 1), Vector2(0.15, 0.15), Vector2(0.15, 0.15)]
+}
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("PropMarkers/Sparkles/SparkleD:scale")
+tracks/3/interp = 2
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0, 2.15, 2.65, 3.15, 3.2),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector2(0.15, 0.15), Vector2(0.15, 0.15), Vector2(1, 1), Vector2(0.15, 0.15), Vector2(0.15, 0.15)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_ambient"]
+_data = {
+&"sparkle_loop": SubResource("Animation_sparkle_loop")
+}
+
 [node name="TreasureHunterHoardEncounterStage" instance=ExtResource("1_stage")]
 editor_description = "Encounter 6, The Treasure. The Treasure Hunter is already standing at the hoard he spent years looking for when the miner breaks through, so he does not walk in: he is found here, gives away his pickaxe, then leaves for the later cafe gathering. Reading left to right the shot is miner, then him, then the treasure heaped up behind him and running on past the frame edge - he is between the two, turned back to the miner, gloating over riches that are at his shoulder rather than across the room. His art is drawn facing left, which is why he holds the whole conversation on the miner's right. Every marker and the hoard itself are authored relative to Conversation and slide to the miner's landing column together, so this composition is identical whichever of the 49 columns the descent arrived down."
-opening_move_seconds = 0.6
+opening_move_seconds = 1.35
 closing_move_seconds = 0.6
 closing_pose = &"no_pickaxe"
 rest_pose = &"no_pickaxe"
@@ -52,8 +225,29 @@ position = Vector2(150, 0)
 editor_description = "Past the frame edge. The authored sequence sends him here in his no-pickaxe pose before hiding him."
 position = Vector2(840, 0)
 
-[node name="GemPile" type="Node2D" parent="PropMarkers" index="0"]
+[node name="GemGlow" type="Polygon2D" parent="PropMarkers" index="0"]
+z_index = -4
+editor_description = "A bounded warm wash behind the mound. It is a flat authored polygon instead of engine lighting, so the black linework on the gems and Zeb is never washed out and the GL Compatibility web path pays no light pass."
+color = Color(0.88, 0.42, 0.16, 0.04)
+polygon = PackedVector2Array(184, 2, 198, -36, 236, -72, 278, -120, 340, -162, 412, -176, 486, -154, 554, -116, 620, -74, 684, -32, 718, 2)
+
+[node name="GemMoundOutline" type="Polygon2D" parent="PropMarkers" index="1"]
+z_index = -3
+editor_description = "The hoard's black outer mass. It closes the transparent gaps between individual crystal sprites, turning the repeated prop sheet into one mound with an outlined silhouette."
+color = Color(0.035, 0.022, 0.028, 1)
+polygon = PackedVector2Array(194, 1, 205, -25, 240, -42, 263, -80, 306, -108, 342, -143, 391, -160, 438, -146, 478, -120, 526, -94, 568, -66, 618, -42, 672, -18, 704, 1)
+
+[node name="GemMoundCore" type="Polygon2D" parent="PropMarkers" index="2"]
+z_index = -2
+editor_description = "A dark jewel-toned body inset from the black outline. Only the small gaps between overlapping crystal sprites expose it, which gives the pile weight without inventing a new asset."
+color = Color(0.13, 0.075, 0.105, 0.92)
+polygon = PackedVector2Array(202, -1, 216, -24, 249, -39, 272, -75, 313, -101, 348, -134, 391, -150, 431, -137, 472, -113, 520, -87, 563, -59, 612, -36, 664, -14, 691, -1)
+
+[node name="GemPile" type="Node2D" parent="PropMarkers" index="3"]
 z_index = -1
+position = Vector2(-23, 0)
+scale = Vector2(1.07, 0.92)
+modulate = Color(0.36, 0.34, 0.4, 0.72)
 editor_description = "A fixed 65-crystal hoard: 62 stacked in six overlapping courses from 242 to 607, and three spilled at the toe beside the Treasure Hunter. It is deliberately lopsided - a short steep face on his side and a long tail running past the right edge of a 1152px frame - so what the player sees is the near end of something bigger, not a pile that happens to stop. The count is authored and bounded, and nothing adds to it at runtime. Two things about the order matter. Courses are authored back to front, so the near face of the heap draws over the one behind it - authored the other way round, as it was, the apex overlaps the base and the pile reads as a lattice of separate floating crystals rather than as a mound. And the horizontal step is 24px against a 29px crystal, so neighbours overlap; any step wider than the crystal leaves daylight between them and the same lattice comes back. The pile runs off the right of frame on purpose: what is in shot is its near end, not the whole of it."
 
 [node name="Gem01" type="Sprite2D" parent="PropMarkers/GemPile"]
@@ -445,9 +639,47 @@ position = Vector2(262.0, -12.0)
 rotation = 0.960
 scale = Vector2(0.420, 0.420)
 texture = SubResource("AtlasTexture_pink")
-[node name="EditorTerrainPreview" parent="." index="4"]
+
+[node name="Sparkles" type="Node2D" parent="PropMarkers" index="4"]
+z_index = 2
+modulate = Color(1, 1, 1, 0)
+editor_description = "Four bounded glints loop over the hoard. Their count cannot grow; the reveal animation only unmasks them after the miner lands."
+
+[node name="SparkleA" type="Polygon2D" parent="PropMarkers/Sparkles"]
+position = Vector2(337, -139)
+scale = Vector2(0.15, 0.15)
+color = Color(1, 0.94, 0.64, 0.95)
+polygon = PackedVector2Array(0, -10, 2.2, -2.2, 10, 0, 2.2, 2.2, 0, 10, -2.2, 2.2, -10, 0, -2.2, -2.2)
+
+[node name="SparkleB" type="Polygon2D" parent="PropMarkers/Sparkles"]
+position = Vector2(430, -105)
+scale = Vector2(0.15, 0.15)
+color = Color(0.84, 0.96, 1, 0.92)
+polygon = PackedVector2Array(0, -8, 1.8, -1.8, 8, 0, 1.8, 1.8, 0, 8, -1.8, 1.8, -8, 0, -1.8, -1.8)
+
+[node name="SparkleC" type="Polygon2D" parent="PropMarkers/Sparkles"]
+position = Vector2(527, -64)
+scale = Vector2(0.15, 0.15)
+color = Color(1, 0.82, 0.9, 0.92)
+polygon = PackedVector2Array(0, -7, 1.6, -1.6, 7, 0, 1.6, 1.6, 0, 7, -1.6, 1.6, -7, 0, -1.6, -1.6)
+
+[node name="SparkleD" type="Polygon2D" parent="PropMarkers/Sparkles"]
+position = Vector2(603, -31)
+scale = Vector2(0.15, 0.15)
+color = Color(0.82, 1, 0.9, 0.88)
+polygon = PackedVector2Array(0, -6, 1.4, -1.4, 6, 0, 1.4, 1.4, 0, 6, -1.4, 1.4, -6, 0, -1.4, -1.4)
+
+[node name="AnimationPlayer" parent="." index="3"]
+libraries/ = SubResource("AnimationLibrary_hoard")
+
+[node name="AmbientAnimationPlayer" type="AnimationPlayer" parent="." index="4"]
+libraries/ = SubResource("AnimationLibrary_ambient")
+autoplay = &"sparkle_loop"
+
+[node name="EditorTerrainPreview" parent="." index="5"]
 editor_description = "Previews treasure_hunter_treasure at depth 7400 with its complete hoard."
 encounter_id = &"treasure_hunter_treasure"
 preview_depth_rows = 7400
 
 [editable path="ActorMarkers"]
+[editable path="PropMarkers"]

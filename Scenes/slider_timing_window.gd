@@ -316,7 +316,6 @@ func randomize_all_targets():
 		var placed_targs : Array = []
 		for target in targets:
 			var requested_position = target.place(_backing_size) if fixed_window < 0.0 else fixed_window * _backing_size
-			print("Requested pos before: ", requested_position)
 			
 			if abs(preferred_side) > 0:
 				var left_bounds : float = 0
@@ -326,7 +325,6 @@ func randomize_all_targets():
 				elif preferred_side > 0:
 					left_bounds = _backing_size * 0.33
 				requested_position = remap(requested_position, 0, _backing_size, left_bounds, right_bounds)
-				print("Requested pos: ", requested_position)
 			target.set_target_position(requested_position, false  )
 			var extents = [target.get_left_extent() , target.get_right_extent() , requested_position, target]
 		#if extents overlap

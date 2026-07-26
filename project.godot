@@ -21,6 +21,7 @@ GameState="*res://Scenes/globals/game_state.tscn"
 AudioHandler="*res://Scenes/globals/audio_handler.tscn"
 MusicManager="*uid://qi6w5ueftd0u"
 Conductor="*uid://cetf3kqgdyqbm"
+PlayerHistory="*res://Scripts/Global/player_history.gd"
 
 [display]
 
@@ -32,7 +33,7 @@ window/vsync/vsync_mode=0
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/cutscene_editor/plugin.cfg")
+enabled=PackedStringArray("res://Addons/cutscene_editor/plugin.cfg")
 
 [gui]
 

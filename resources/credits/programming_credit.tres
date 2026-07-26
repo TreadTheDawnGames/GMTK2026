@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1_entry")
-depth_offset = 88
+depth_offset = 116
 heading = "PROGRAMMING"
 body = "TREAD THE DAWN GAMES
 COOLNETHER123"

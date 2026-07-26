@@ -1,0 +1,24 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Texture2D" path="res://Assets/Props/organ.png" id="1_organ"]
+
+[node name="Organ" type="Sprite2D"]
+editor_description = "A pipe organ, 100,000 rows down, in a vault nobody dug. The figure at its keys is the last thing the game shows the player, and the camera does not find it until it pans.
+
+SCALE IS 0.15 AND THE FIGURE'S IS THE SAME NUMBER ON PURPOSE. Zephan drew the organ and the figure on one 1668x2224 canvas, so their relative size is already authored and there was nothing to decide: the organ's opaque content is 928x1648 at (390,418), the figure's is 486x689 at (616,1125), and one scale reproduces the drawing. Their opaque centres sit five canvas pixels apart, which is why the figure's mark and this prop share an x. Picking two scales would have quietly rewritten a composition that was already correct.
+
+At 0.15 the instrument stands 247px, a shade over two miners, and fits inside the 42 rows of vault carved over it with air at its widest point. The number is bounded from above by the letterbox rather than by the rock: the encounter framing puts the ground line at half the viewport, 324px, and the cinematic frame's top bar covers the first 91px, so anything over 233px tall runs behind it. 0.15 deliberately spends 14px of that - the very tip of the central spire is under the bar, so the pipes read as continuing past the frame instead of stopping neatly inside it. Going to 0.14 would fit it whole and would also drop the figure to 96px, well under the 113px the same character has stood at since 1,400.
+
+The offset only undoes Sprite2D centring: the source is trimmed to its own opaque content, so half its height puts the base of the plinth on the node's origin. Unlike the bench at 5,600 this authors at y = 0 rather than a negative lift, because the vault sweep clears the level tunnel's loose floor rock across the whole span the organ and the figure stand on. The ground under them is dead flat and the cast floor-sample onto exactly the row this prop rests on, so for once a prop and the cast beside it cannot disagree.
+
+Z_INDEX IS -1 AND WITHOUT IT THERE IS NOBODY AT THE ORGAN. This is the first encounter where a prop and a cast member share a column, and it cost a playtest to find. At runtime the stage and the cast presenters are siblings under CharacterLayer and everything sits at the same effective z, so draw order falls through to tree order - and the stage is added long after the presenters were built, at index 16 against the figure's 15. A 139x247 instrument centred exactly on a 73x103 figure then covers him completely, with nothing wrong in any log and the encounter reporting that it played. -1 puts the instrument one step back, which is also what it should read as: he is in front of it.
+
+The bench at 5,600 never hit this and its own note says why - the Lantern Keeper stands beside it, so nothing in that shot depends on draw order between them. Any future prop a character stands AT rather than beside needs this same treatment.
+
+The editor stand-in does not reproduce the bug, because it is a child of the stage and carries its own z_index, so a capture of this scene showed a figure that the running game did not. Check overlap in the game, not in a render.
+
+The pipes are drawn, not modelled: nothing here responds to the music. If the organ should ever move with what is playing, it is this node's scale or an added shader, not a change to the room."
+texture = ExtResource("1_organ")
+offset = Vector2(0, -824)
+scale = Vector2(0.195, 0.195)
+z_index = -1
