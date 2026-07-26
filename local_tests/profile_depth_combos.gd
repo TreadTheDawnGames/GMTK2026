@@ -454,11 +454,13 @@ func _measure_combo(
 	):
 		var work_started_at := Time.get_ticks_usec()
 		renderer._process_next_pending_impact_work()
-		if renderer._impact_overlay_presented_this_frame:
+		# Production applies every completed group once per rendered frame, and
+		# that step is what queues the fold-in work the rest of this loop
+		# measures. The benchmark drains directly, so it mirrors the step here
+		# and charges its cost to the same per-item ceiling.
+		renderer._apply_ready_impact_presentations()
+		if renderer._active_impact_crush_count > 0:
 			overlay_presented = true
-			# Production's frame scheduler clears this flag when it yields. The
-			# benchmark drains directly, so it mirrors that reset explicitly.
-			renderer._impact_overlay_presented_this_frame = false
 		var work_ms := (
 			float(Time.get_ticks_usec() - work_started_at) / 1000.0
 		)
