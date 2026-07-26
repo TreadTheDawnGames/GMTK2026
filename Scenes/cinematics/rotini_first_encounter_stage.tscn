@@ -24,7 +24,7 @@ The shot is a STAMPEDE, and the order is the point. The tunnel is EMPTY when the
 
 Conversation Facing is -1 so he turns to the miner on his left after the walk, rather than inheriting whatever direction the approach happened to end on. It is declared here because the walk's direction is a side effect: move the entrance to the other side and an undeclared facing silently turns his back on the man he is talking to.
 
-His appearance also had to be corrected for this to render. mouse_red.png is drawn facing LEFT, and the resource used to say art_faces_left was false and mirror it with flip_h instead. That inverts CharacterPresenter's facing entirely - asking for -1 produced flip_h true, which mirrors left-drawn art into facing RIGHT - so he could never look at the miner at all. It is art_faces_left = true now, with no flip_h. Declare the art's true orientation; do not compensate with flip_h."
+His appearance also had to be corrected for this to render. mouse_grey.png is drawn facing LEFT, and the resource used to say art_faces_left was false and mirror it with flip_h instead. That inverts CharacterPresenter's facing entirely - asking for -1 produced flip_h true, which mirrors left-drawn art into facing RIGHT - so he could never look at the miner at all. It is art_faces_left = true now, with no flip_h. Declare the art's true orientation; do not compensate with flip_h."
 opening_move_seconds = 1.5
 closing_move_seconds = 2.0
 opening_step_height = 3.0

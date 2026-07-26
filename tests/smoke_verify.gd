@@ -18,6 +18,9 @@ const MINING_SCENE: PackedScene = preload(
 const TREASURE_HUNTER_APPEARANCE: CharacterAppearance = preload(
 	"res://resources/encounters/treasure_hunter_character_appearance.tres"
 )
+const ROTINI_APPEARANCE: CharacterAppearance = preload(
+	"res://resources/encounters/rutini_character_appearance.tres"
+)
 const MOODY_TEEN_APPEARANCE: CharacterAppearance = preload(
 	"res://resources/encounters/moody_teen_character_appearance.tres"
 )
@@ -123,6 +126,12 @@ func _verify_entry_scene() -> void:
 		and MOODY_TEEN_APPEARANCE.frame == 0
 		and MOODY_TEEN_APPEARANCE.art_faces_left,
 		"Moody Teen must use Ayden's supplied single-frame character art."
+	)
+	_expect(
+		ROTINI_APPEARANCE.texture != null
+		and ROTINI_APPEARANCE.texture.resource_path
+			== "res://Assets/Characters/mice/mouse_grey.png",
+		"Rotini must use Jared's approved gray rat asset."
 	)
 	var opening_uses_mr_sitts := (
 		OPENING_SURFACE_CONVERSATION.validate().is_empty()
