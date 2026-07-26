@@ -24,7 +24,17 @@ The shot is a STAMPEDE, and the order is the point. The tunnel is EMPTY when the
 
 Conversation Facing is -1 so he turns to the miner on his left after the walk, rather than inheriting whatever direction the approach happened to end on. It is declared here because the walk's direction is a side effect: move the entrance to the other side and an undeclared facing silently turns his back on the man he is talking to.
 
-His appearance also had to be corrected for this to render. mouse_grey.png is drawn facing LEFT, and the resource used to say art_faces_left was false and mirror it with flip_h instead. That inverts CharacterPresenter's facing entirely - asking for -1 produced flip_h true, which mirrors left-drawn art into facing RIGHT - so he could never look at the miner at all. It is art_faces_left = true now, with no flip_h. Declare the art's true orientation; do not compensate with flip_h."
+His appearance also had to be corrected for this to render. mouse_grey.png is drawn facing LEFT, and the resource used to say art_faces_left was false and mirror it with flip_h instead. That inverts CharacterPresenter's facing entirely - asking for -1 produced flip_h true, which mirrors left-drawn art into facing RIGHT - so he could never look at the miner at all. It is art_faces_left = true now, with no flip_h. Declare the art's true orientation; do not compensate with flip_h.
+
+DENSITY, 2026-07-26. Jared asked for the horde to pour rather than file past, and to keep pouring until the player clears the line. Both were tuned without raising the population, because the live count is what costs: _spawn_next_follower spawns ONE follower per interval and only under _get_live_follower_cap(), so Max Live Followers and its web counterpart are the real budget and they are already at the top of their declared 1-12 range. Anything above that is out of contract and lands on the web export first.
+
+So the flood comes from the two levers that are free. Spawn Interval 0.24 -> 0.15 refills the same cap faster, which closes the gaps that made it read as a queue; the cap still bounds cost exactly as before. Procession Rows 3 -> 4 adds a rank without adding a body, because rows only distribute the capped population across receding depth - a fourth rank is genuinely free.
+
+Four ranks need the recession flattened or the back row climbs off the floor: Row Rise 26 -> 18 and Row Scale Falloff 0.86 -> 0.96 keep all four reading as one flood along the ground instead of mice stacked up the screen. Hop 20 -> 26 is the climbing-over-him Jared asked for.
+
+The clumps STAY, and this is the one place to resist tidying. A clump is a drawn crowd and at Clump Scale Multiplier 3 it is what supplies the mass; twelve individual mice cannot be a stampede on their own. Replacing the clump entries with single mice thins the wall to a line at exactly the cap where the wall is the whole effect. Individuals become the right call only if the cap itself is ever raised.
+
+Nothing here bounds how long it runs. Spawning continues while _is_spawning, and only play_closing -> _await_stampede_drained stops it - which is the player clearing the last line. Stampede Minimum Run stays 3.0 as a floor, not a ceiling: it stops a mashed dialogue advance from cutting the horde to one mouse."
 opening_move_seconds = 1.5
 closing_move_seconds = 2.0
 opening_step_height = 3.0
@@ -35,7 +45,7 @@ conversation_root_offset_from_miner_x = 178.0
 procession_mines = false
 max_live_followers = 12
 web_max_live_followers = 8
-spawn_interval_seconds = 0.24
+spawn_interval_seconds = 0.15
 exit_seconds = 3.0
 floor_offset_y = 0.0
 procession_cue = &"stampede"
@@ -45,10 +55,10 @@ stampede_minimum_run_seconds = 3.0
 stampede_audio = NodePath("StampedeAudio")
 clump_scale_multiplier = 3.0
 single_scale_multiplier = 1.35
-procession_rows = 3
-procession_row_rise_pixels = 26.0
-procession_row_scale_falloff = 0.86
-procession_hop_pixels = 20.0
+procession_rows = 4
+procession_row_rise_pixels = 18.0
+procession_row_scale_falloff = 0.96
+procession_hop_pixels = 26.0
 rat_appearances = Array[ExtResource("8_rat_appearance")]([ExtResource("9_clump"), ExtResource("10_brown"), ExtResource("9_clump"), ExtResource("11_grey"), ExtResource("9_clump"), ExtResource("12_white")])
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
