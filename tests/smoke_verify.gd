@@ -980,7 +980,8 @@ func _verify_mining_scene() -> void:
 				== arrival_sequence.bus_side_right_click_texture
 			and arrival_sequence.bus_sprite.position
 				== arrival_sequence.side_right_click_sprite_offset
-			and arrival_sequence.bus_sprite.scale == Vector2(0.44, 0.44)
+			and arrival_sequence.bus_sprite.scale
+				== Vector2(0.955625, 0.955625)
 			and arrival_sequence._active_wheel_uvs
 				== arrival_sequence.side_right_click_wheel_uvs
 		)

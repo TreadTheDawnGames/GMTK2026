@@ -163,11 +163,11 @@ z_index = 5
 position = Vector2(1500, 262)
 
 [node name="BusSprite" type="Sprite2D" parent="Bus" unique_id=1886361131]
-editor_description = "rim_strength is 0 on purpose: a lit contour around the bus read as an outline pasted on the shot rather than as sunlight, so the bus takes only the twilight shade and the ground bounce. The stop still uses its rim. Full drawn bus body. During the miner exit this sits in front of him for its whole length, so the trailing edge is what uncovers him. Placement is measured from the art: wheels bottom out at texture y=1002. Each travel frame carries its own sprite offset and wheel-shine UVs, applied together in _apply_bus_art. The texture keeps its original 2224 x 1668 logical size when the import data is capped, so the authored 0.44 scale preserves the 566 px opaque bus footprint described by the edge anchors."
+editor_description = "rim_strength is 0 on purpose: a lit contour around the bus read as an outline pasted on the shot rather than as sunlight, so the bus takes only the twilight shade and the ground bounce. The stop still uses its rim. Full drawn bus body. During the miner exit this sits in front of him for its whole length, so the trailing edge is what uncovers him. Placement is measured from the art: wheels bottom out at texture y=1002. Each travel frame carries its own sprite offset and wheel-shine UVs, applied together in _apply_bus_art. The source is 2224 px wide but its import is capped at 1024 px; scale 0.955625 compensates for that 1024 / 2224 reduction and preserves the approved 566 px opaque bus footprint on a fresh checkout."
 texture_filter = 4
 material = SubResource("ShaderMaterial_bus_wheels")
 position = Vector2(-14, -74)
-scale = Vector2(0.44, 0.44)
+scale = Vector2(0.955625, 0.955625)
 texture = ExtResource("3_bus")
 
 [node name="FrontEdgeAnchor" type="Marker2D" parent="Bus" unique_id=613728874]
