@@ -167,6 +167,10 @@ func _verify_stage(stage_scene: PackedScene) -> void:
 	_expect(stage.opening_pose == &"idle", "Opening pose must remain idle.")
 	_expect(stage.closing_pose == &"idle", "Closing pose must remain idle.")
 	var expected_position := stage.conversation_marker.position
+	_expect(
+		is_zero_approx(expected_position.y),
+		"Ayden's authored sole marker must stay on the terrain floor line."
+	)
 	for marker in [
 		stage.entrance_marker,
 		stage.work_marker,
