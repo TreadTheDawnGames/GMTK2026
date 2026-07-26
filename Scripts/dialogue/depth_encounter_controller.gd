@@ -1386,6 +1386,11 @@ func _on_character_stage_camera_action_requested(
 	shake_strength: float,
 	duration_seconds: float
 ) -> void:
+	# A fast advance can otherwise leave the previous speaker's short bounce
+	# running into the next blocking pan. Settling presentation before FRAME or
+	# RESET keeps Sparky and the cast planted while the shared camera moves.
+	if action != CutsceneBeat.CameraAction.SHAKE:
+		_reset_speech_reactions()
 	character_stage_camera_action_requested.emit(
 		action,
 		offset,

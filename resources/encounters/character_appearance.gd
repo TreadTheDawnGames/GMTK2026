@@ -8,6 +8,9 @@ extends Resource
 @export_range(1, 64, 1) var vertical_frames: int = 1
 @export_range(0, 4_095, 1) var frame: int = 0
 @export var sprite_scale: Vector2 = Vector2.ONE
+## Optional additive aura drawn behind, never on, this appearance's authored
+## artwork. Runtime and editor preview both apply it for presentation parity.
+@export var aura_material: Material
 ## Horizontal staging only. Runtime and editor previews measure the lowest
 ## opaque row so transparent canvas padding cannot move a character's feet.
 @export var sprite_offset: Vector2 = Vector2.ZERO

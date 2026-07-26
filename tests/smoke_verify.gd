@@ -527,6 +527,29 @@ func _verify_mining_scene() -> void:
 		# intentionally retains combo 1 from the synthetic contact above.
 		terrain_renderer._on_dig_presentation_started(0)
 	if encounter_controller != null:
+		if miner_rig != null and miner_rig.speech_reaction != null:
+			miner_rig.speech_reaction.play_bounce(
+				Vector2.UP * 7.0,
+				1.0,
+				1,
+				Tween.TRANS_QUAD
+			)
+			_expect(
+				miner_rig.speech_reaction._is_reacting,
+				"The Miner speech reaction must start before camera settling."
+			)
+			encounter_controller._on_character_stage_camera_action_requested(
+				CutsceneBeat.CameraAction.FRAME,
+				Vector2.ZERO,
+				Vector2.ONE,
+				0.0,
+				0.0
+			)
+			_expect(
+				not miner_rig.speech_reaction._is_reacting,
+				"A speaker bounce must settle before the next camera frame "
+					+ "moves."
+			)
 		var expected_encounter_ids: Array[StringName] = [
 			&"cheese_girl_first",
 			&"cloak_lantern_first",
@@ -1100,6 +1123,7 @@ func _verify_mining_scene() -> void:
 	) as Marker2D
 	var cafe_prop := cafe_props.get_node("DasQuesoCafe") as Node2D
 	var dining_table := cafe_props.get_node("DiningTable") as Node2D
+	var dining_cup := cafe_props.get_node("DiningCup") as Sprite2D
 	var left_window_stool := cafe_props.get_node(
 		"CafeStoolWindowLeft"
 	) as Node2D
@@ -1145,6 +1169,9 @@ func _verify_mining_scene() -> void:
 		and moody_teen.position.x < cafe_prop.position.x
 		and rutini_mark.position.x < cafe_prop.position.x
 		and dining_table.position.x < cafe_prop.position.x
+		and is_equal_approx(dining_cup.position.x, dining_table.position.x)
+		and dining_cup.position.y < dining_table.position.y
+		and dining_cup.texture != null
 		and cafe_prop.position.x < cat_mark.position.x
 		and left_window_stool.position.x < right_window_stool.position.x
 		and is_equal_approx(
@@ -1158,6 +1185,7 @@ func _verify_mining_scene() -> void:
 		and cafe_prop.position.y < left_window_stool.position.y
 		and moody_teen.position.y < left_window_stool.position.y
 		and left_window_stool.position.y < left_dining_chair.position.y
+		and rutini_mark.position.y < left_dining_chair.position.y
 		and left_dining_chair.position.y < treasure_mark.position.y
 		and treasure_mark.position.y < keeper_mark.position.y
 		and window_stool_count == 2

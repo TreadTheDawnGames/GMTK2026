@@ -42,17 +42,23 @@ _data = {
 &"idle": SubResource("Animation_idle")
 }
 
-[node name="CharacterPresenter" type="Node2D" node_paths=PackedStringArray("character_sprite", "actor_sprite_view", "speech_reaction")]
+[node name="CharacterPresenter" type="Node2D" node_paths=PackedStringArray("character_sprite", "character_aura", "actor_sprite_view", "speech_reaction")]
 editor_description = "Shared character presentation. Edit the idle clip in AnimationPlayer; dialogue bounce stays on CharacterSprite so both motions can play together."
 process_mode = 3
 script = ExtResource("1_presenter")
 character_sprite = NodePath("IdleRoot/SpeechRoot/CharacterSprite")
+character_aura = NodePath("IdleRoot/SpeechRoot/AppearanceAura")
 actor_sprite_view = NodePath("ActorSpriteView")
 speech_reaction = NodePath("SpeechReaction")
 
 [node name="IdleRoot" type="Node2D" parent="."]
 
 [node name="SpeechRoot" type="Node2D" parent="IdleRoot"]
+
+[node name="AppearanceAura" type="Sprite2D" parent="IdleRoot/SpeechRoot"]
+visible = false
+texture_filter = 4
+z_index = -1
 
 [node name="CharacterSprite" type="Sprite2D" parent="IdleRoot/SpeechRoot"]
 texture_filter = 4
