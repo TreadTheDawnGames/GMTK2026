@@ -84,6 +84,28 @@ signal stampede_finished
 ## place a mouse's size is decided, and a stage only says how much bigger.
 @export_range(0.25, 4.0, 0.05) var clump_scale_multiplier: float = 1.0
 @export_range(0.25, 4.0, 0.05) var single_scale_multiplier: float = 1.0
+## How many receding rows the procession runs in.
+##
+## One, the default, is the single-file stream every colony ran as before.
+##
+## More than one is how a crossing crowd gets bulk without oversized art. The
+## persistent colony fills its frame with four ranks of ordinary-sized rats, not
+## with big ones, and a stream trying to reach the same density by scaling its
+## drawings up instead ends with a handful of enormous mice and the floor showing
+## between them. Rows put the extra bodies behind, where a crowd keeps them.
+@export_range(1, 5, 1) var procession_rows: int = 1
+## How far each row back sits above the one in front, and how much smaller.
+##
+## Positive rise moves a row up the screen, which with the shrink is what reads as
+## standing further down the tunnel rather than floating.
+@export_range(0.0, 64.0, 1.0) var procession_row_rise_pixels: float = 18.0
+@export_range(0.5, 1.0, 0.01) var procession_row_scale_falloff: float = 0.88
+## How high a running mouse hops, in pixels. Zero runs them flat along the floor.
+##
+## Zephan asked for little mice jumping up and around rather than sliding past.
+## The arc is per-leg, so a follower crossing the room bounces the whole way
+## instead of taking one jump at the start.
+@export_range(0.0, 96.0, 1.0) var procession_hop_pixels: float = 0.0
 
 ## Growth is bounded by max_live_followers (or the web cap) and pruned on exit.
 var _followers: Array[CinematicRatMiner] = []
@@ -233,16 +255,21 @@ func _spawn_follower() -> void:
 	var is_clump := (
 		appearance != null and appearance.depicted_rat_count > 1
 	)
+	# Which row back this one runs in. Cycling by spawn index rather than choosing
+	# at random keeps every row equally fed, so the crowd stays even instead of
+	# clumping into whichever row won the die rolls.
+	var row := _appearance_index % maxi(procession_rows, 1)
 	# Size before appearance, because set_appearance is what applies the scale to
 	# the sprite. Setting it afterwards leaves the actor drawn at the old size
 	# until something else reassigns the art.
 	rat.appearance_scale *= (
-		clump_scale_multiplier if is_clump else single_scale_multiplier
+		(clump_scale_multiplier if is_clump else single_scale_multiplier)
+		* pow(procession_row_scale_falloff, float(row))
 	)
 	rat.set_appearance(appearance)
 	_appearance_index += 1
 	rat.prepare_for_sequence(
-		_resolve_grounded_marker(entrance_marker),
+		_get_row_entrance(row),
 		_appearance_index
 	)
 	# Preparation restores the actor's authored depth, so the stage-specific
@@ -252,7 +279,11 @@ func _spawn_follower() -> void:
 	# Taken from depicted_rat_count rather than authored per slot, because "is
 	# this a crowd" is already recorded there and saying it twice is one more
 	# place to disagree.
-	rat.z_index = clump_draw_order if is_clump else single_draw_order
+	# Rows behind the front one recede a layer each, so a crowd reads as depth
+	# rather than as one row drawn on top of another.
+	rat.z_index = (
+		(clump_draw_order if is_clump else single_draw_order) - row
+	)
 	_connect_once(rat.reached_wall, _on_follower_reached_wall)
 	_connect_once(rat.ready_to_exit, _on_follower_ready_to_exit)
 	_connect_once(rat.run_target_reached, _on_follower_run_target_reached)
@@ -261,9 +292,9 @@ func _spawn_follower() -> void:
 	if not procession_mines:
 		# Straight across, one leg, no stop at the wall.
 		if not rat.start_run_to_target(
-			_resolve_grounded_marker(exit_marker),
+			_get_row_exit(row),
 			exit_seconds,
-			0.0,
+			procession_hop_pixels,
 			NAN,
 			_floor_sampler
 		):
@@ -327,6 +358,24 @@ func _has_reached_exit(rat: CinematicRatMiner) -> bool:
 
 func _on_follower_strike_contact(screen_position: Vector2) -> void:
 	presentation_strike_requested.emit(screen_position)
+
+
+## Where one row enters, and where it leaves. Rows behind the front sit further
+## up the screen by the authored rise, which with their smaller scale is what
+## reads as standing further down the tunnel rather than hovering over the floor
+## in front of it.
+func _get_row_entrance(row: int) -> Vector2:
+	return _resolve_grounded_marker(entrance_marker) - Vector2(
+		0.0,
+		procession_row_rise_pixels * float(row)
+	)
+
+
+func _get_row_exit(row: int) -> Vector2:
+	return _resolve_grounded_marker(exit_marker) - Vector2(
+		0.0,
+		procession_row_rise_pixels * float(row)
+	)
 
 
 func _resolve_grounded_marker(marker: Marker2D) -> Vector2:

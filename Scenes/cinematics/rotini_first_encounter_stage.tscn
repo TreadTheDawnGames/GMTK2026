@@ -35,12 +35,16 @@ conversation_root_offset_from_miner_x = 110.0
 procession_mines = false
 max_live_followers = 12
 web_max_live_followers = 8
-spawn_interval_seconds = 0.1
-exit_seconds = 2.2
+spawn_interval_seconds = 0.24
+exit_seconds = 3.0
 floor_offset_y = 10.0
 procession_cue = &"stampede"
 clump_scale_multiplier = 3.0
 single_scale_multiplier = 1.35
+procession_rows = 3
+procession_row_rise_pixels = 26.0
+procession_row_scale_falloff = 0.86
+procession_hop_pixels = 20.0
 rat_appearances = Array[ExtResource("8_rat_appearance")]([ExtResource("9_clump"), ExtResource("10_brown"), ExtResource("9_clump"), ExtResource("11_grey"), ExtResource("9_clump"), ExtResource("12_white")])
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
@@ -60,6 +64,12 @@ position = Vector2(-96, 0)
 [node name="Exit" parent="ActorMarkers" index="4"]
 editor_description = "LEFT, 700px clear of Conversation. Both the mice and Rotini leave this way - on toward the Cafe - rather than back where they came from. The colony reads the travel direction off Entrance and Exit, so putting the exit on this side is all that reverses the procession."
 position = Vector2(-796, 0)
+
+[node name="RatContainer" parent="." index="3"]
+editor_description = "Zero rather than the base scene's 7, so the colony lands on the SECOND layer with the rest of the cast instead of on top of every stratum.
+
+The number is relative and the chain matters: DepthEncounterController puts CharacterLayer on cutscene_draw_order (1) for the shot, this container adds its own, and each mouse adds a row offset on top. At 7 the whole colony came out around 8 - in front of all four strata and of the miner - which is the first layer, not the second. At 0 the front row sits exactly where MinerRig.buried_draw_order stands him while he digs, and the rows behind recede from there."
+z_index = 0
 
 [node name="EditorTerrainPreview" parent="." index="5"]
 editor_description = "Previews rutini_first at its authored depth."
