@@ -255,6 +255,28 @@ func play_opening() -> void:
 	opening_finished.emit()
 
 
+## Tells a stage that a dialogue line has just gone up, and who is saying it.
+##
+## Does nothing here on purpose. Most stages hold still while people talk and
+## need no notice of it; this exists for the ones running a continuous routine of
+## their own, which otherwise have no way to know the shot is mid-sentence.
+## Quibble's caffeine loop is the case that asked for it - he cannot be seen
+## drinking his coffee while his own line is being typed out.
+##
+## The slot is passed rather than a bare "somebody is speaking", because whose
+## line it is decides the answer: a character is free to carry on with whatever
+## he is doing while the person opposite him talks.
+##
+## This is a notification, never permission. A stage may not present, advance, or
+## delay a line from here; DialogueDirector remains the only thing that runs a
+## conversation.
+func on_dialogue_line_presented(
+	_speaker_slot: StringName,
+	_line_index: int
+) -> void:
+	pass
+
+
 ## Plays one editor-authored animation named by the active dialogue line.
 func play_cue(cue_id: StringName, line_index: int) -> bool:
 	if (
