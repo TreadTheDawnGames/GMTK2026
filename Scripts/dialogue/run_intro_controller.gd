@@ -12,6 +12,7 @@ extends Node
 ##   the bus allows rather than on a timer of its own.
 ## - The authored arrival sequence places the miner at the dig spot, then pulls
 ##   the bus away to reveal him already in the mining stance.
+## - The unattributed opening conversation plays before control is returned.
 ## - Only the letterbox and HUD change when control returns; the stop, its
 ##   attendant, and the dressed ground all stay standing behind the miner.
 ## - Every failure path still opens the frame and settles the camera, so a
@@ -19,10 +20,10 @@ extends Node
 ## The invariant is that mining stays unavailable for the entire intro.
 
 const FLOW_OWNER: StringName = &"run_intro"
-const MINER_SPEAKER_SLOT: StringName = &"miner"
 
 @export_category("Content")
 @export var attendant_appearance: CharacterAppearance
+@export var opening_conversation: DialogueConversation
 
 @export_category("Animation")
 ## Held after the menu leaves, before the bus enters, so the player reads the
@@ -68,7 +69,7 @@ func _ready() -> void:
 	_apply_title_shot.call_deferred()
 
 
-## Plays the canonical bus-only arrival once the menu hands the shot over.
+## Plays the canonical arrival once the menu hands the shot over.
 func begin_run() -> void:
 	if _is_intro_active:
 		return
@@ -105,6 +106,30 @@ func _play_intro() -> void:
 		return
 	opening_camera.start_zoom_in()
 	await arrival_sequence.play_arrival()
+	if not _is_intro_active:
+		return
+	if dialogue_director.start_conversation(
+		opening_conversation,
+		true
+	):
+		return
+	push_error("Run intro could not start its opening conversation.")
+	_finish_after_opening_dialogue()
+
+
+## Continues the held opening shot after its authored conversation finishes.
+func _on_conversation_finished(conversation_id: StringName) -> void:
+	if (
+		not _is_intro_active
+		or opening_conversation == null
+		or conversation_id != opening_conversation.conversation_id
+	):
+		return
+	_finish_after_opening_dialogue()
+
+
+## Plants the miner, clears the cinematic frame, and returns gameplay control.
+func _finish_after_opening_dialogue() -> void:
 	if not _is_intro_active:
 		return
 	# End the shot with the miner planting into his dig stance while the
@@ -155,6 +180,7 @@ func _reset_speech_reactions() -> void:
 func _has_complete_references() -> bool:
 	return (
 		attendant_appearance != null
+		and opening_conversation != null
 		and dialogue_director != null
 		and arrival_sequence != null
 		and attendant_presenter != null

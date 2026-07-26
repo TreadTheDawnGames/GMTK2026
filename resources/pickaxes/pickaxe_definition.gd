@@ -2,8 +2,9 @@ class_name PickaxeDefinition
 extends Resource
 
 ## Describes one collectible pickaxe and the modifiers it adds to the run.
-## Pickaxes never replace earlier rewards: progression combines every owned
-## definition while the newest definition controls the visible tool color.
+## EncounterProgression owns production difficulty; these modifiers preserve
+## isolated legacy previews while the newest owned definition controls color.
+## Authoring source of truth: res://resources/pickaxes/pickaxe_authoring.md
 
 enum SpecialEffect {
 	NONE,
@@ -13,23 +14,29 @@ enum SpecialEffect {
 }
 
 @export_category("Identity")
+## Unique ownership key. Use snake_case and normally match the .tres filename.
 @export var id: StringName = &"basic_pickaxe"
+## Player-facing name; this does not identify the resource in code.
 @export var display_name: String = "Basic Pickaxe"
+## Player-facing explanation; keep mechanical claims consistent with the
+## matching EncounterProgressionLevel rather than these legacy modifiers.
 @export_multiline var description: String = "A dependable starting tool."
 
 @export_category("Mining")
-## Multiplies the downward rows removed by each hit.
+## Legacy-preview-only while EncounterProgression is active. Leave at 1.0 for
+## production rewards; progression_level_N.tres owns shipped impact behavior.
 @export_range(0.1, 5.0, 0.05) var power_multiplier: float = 1.0
-## Multiplies the horizontal tunnel width removed by each hit.
+## Legacy-preview-only horizontal multiplier. Neutral is 1.0.
 @export_range(0.1, 5.0, 0.05) var width_multiplier: float = 1.0
-## Multiplies the successful swing animation speed.
+## Legacy-preview-only animation multiplier. Neutral is 1.0.
 @export_range(0.1, 5.0, 0.05) var swing_speed_multiplier: float = 1.0
-## Multiplies the dirt pieces emitted at impact.
+## Legacy-preview-only debris multiplier. Neutral is 1.0.
 @export_range(0.0, 5.0, 0.05) var debris_multiplier: float = 1.0
 ## Toggles whether to use the secondary recovery bar
 @export var secondary_recovery : bool = false
 
 @export_category("Special Effect")
+## Legacy-preview-only while production EncounterProgression is active.
 @export var special_effect: SpecialEffect = SpecialEffect.NONE
 ## Adds these downward rows after the primary hit for AFTERSHOCK.
 @export_range(0, 32, 1) var aftershock_depth_rows: int = 0
@@ -49,10 +56,12 @@ enum SpecialEffect {
 @export_range(0, 8, 1) var lightning_max_crack_depth_cells: int = 4
 
 @export_category("Appearance")
+## The newest granted definition applies this color to the visible tool.
 @export var hammer_head_color: Color = Color(0.94, 0.94, 0.94, 1.0)
 
 @export_category("Timing Targets")
-## Adds one extra target from this collection at the authored combo.
-## Zero reserves these scenes for the starting baseline.
+## Legacy-preview-only while production EncounterProgression is active. Zero
+## reserves these scenes for that preview's starting baseline.
 @export_range(0, 100, 1) var target_unlock_combo: int = 0
+## Production target pools belong to progression_level_N.tres.
 @export var target_scenes: Array[PackedScene] = []

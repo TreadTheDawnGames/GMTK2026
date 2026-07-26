@@ -6,4 +6,4 @@
 editor_description = "Cafe table. Shares the stool's scale so the two keep the proportions they were drawn at; the offset stands it on the node's origin."
 texture = ExtResource("1_table")
 offset = Vector2(0, -293.5)
-scale = Vector2(0.14, 0.14)
+scale = Vector2(0.085, 0.085)

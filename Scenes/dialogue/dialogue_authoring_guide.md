@@ -59,11 +59,13 @@ Each `DepthCharacterEncounter` assigns:
   colony support, the cafe cast gathering, and the post-credit gate.
 
 The Treasure Hunter's two distinct pickaxe gifts never replace earlier tools.
-Every owned definition continues
-to contribute mining modifiers and special effects. The newest gift controls
-only the visible tool tint. Each definition also authors a combo threshold
-and target-scene collection; reaching that combo adds one extra target from
-that pickaxe until the streak ends.
+The newest gift controls the visible tool tint, while the complete gameplay
+rules come from `res://resources/mining/progression_level_0.tres` through
+`progression_level_9.tres`. Completing encounter index N applies level N + 1.
+Those resources author impact size, double hits, timing-target pools, slider
+speed, starting targets, mining-animation speed, bonus-target combos, and combo
+impact scale. The post-credit Lantern Man encounter has no level-ten resource,
+so it intentionally leaves level nine active.
 
 Enable `Occurs At Run Bottom` only for the thief. That places the encounter at
 zero remaining depth for the authored 100,000-depth run. The thief uses
@@ -83,7 +85,7 @@ it so Godot reloads the ciphertext.
 The current canonical story order is:
 
 - the bus opening at depth 0;
-- Cheese Girl at 600, inviting the Miner to her shop near 14,000;
+- Cheese Girl at 300, inviting the Miner to her cafe;
 - the lantern-staff man's cryptic first warning at 1,400;
 - Rotini's introduction at 2,500;
 - the Treasure Hunter mining in from the side and gifting the first improved

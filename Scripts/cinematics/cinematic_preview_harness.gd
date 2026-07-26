@@ -18,13 +18,16 @@ const MINING_SCENE := preload("res://Scenes/mining/mining_proof.tscn")
 const PLAYTEST_TARGET_PATH := "res://.cutscene_playtest_target"
 
 var _game_root: Node
-var _status: Label
 var _active_beat: StringName = &"intro"
 var _requested_encounter_id: StringName
+var _run_state: RunState
 
 
 func _ready() -> void:
-	_build_status_label()
+	_run_state = get_node_or_null("/root/GameState") as RunState
+	if _run_state == null:
+		push_error("CinematicPreviewHarness requires the GameState autoload.")
+		return
 	_requested_encounter_id = _read_requested_encounter_id()
 	if _requested_encounter_id.is_empty():
 		_restart_with_beat(&"intro")
@@ -73,9 +76,7 @@ func _restart_with_beat(beat: StringName) -> void:
 		_game_root = null
 	await get_tree().process_frame
 
-	var run_state := RunState.get_global(self)
-	if run_state != null:
-		run_state.reset_run()
+	_run_state.reset_run()
 
 	_game_root = MINING_SCENE.instantiate()
 	add_child(_game_root)
@@ -114,6 +115,19 @@ func _skip_run_intro() -> void:
 	if arrival == null or flow == null or director == null:
 		_set_status("Could not find the intro systems to skip.")
 		return
+	# Press Start, because the title screen is the game.
+	#
+	# The menu is drawn over the live world rather than being a scene of its own,
+	# so it does not go away on its own and nothing behind it begins until it is
+	# dismissed. Left up, the whole cutscene played out underneath a title card,
+	# a bus stop and three buttons. Asking the menu the way a player does is what
+	# starts the run.
+	var menu := _game_root.get_node_or_null(
+		"MainMenuLayer/MainMenu"
+	) as GameMainMenu
+	if menu != null and menu.has_method("_on_start_button_pressed"):
+		menu._on_start_button_pressed()
+		await get_tree().process_frame
 	_set_status("Skipping the surface intro...")
 	arrival.attendant_pickup_enabled = false
 	arrival.bus_arrival_seconds = 0.2
@@ -135,6 +149,23 @@ func _skip_run_intro() -> void:
 			return not flow.is_busy(),
 		20.0
 	)
+	# Take the gate back if the intro still has not let go.
+	#
+	# MiningCinematicFlow admits one owner at a time, and DepthEncounterController
+	# cannot reserve a cutscene while somebody else holds it. The arrival waits on
+	# player input this harness never sends, so the wait above expires, the gate
+	# stays held, and the requested cutscene silently never activates - which
+	# looks exactly like the harness having just restarted the game on the
+	# surface. Ending whatever holds it is the difference between the beat
+	# playing and nothing happening at all.
+	if flow.is_busy():
+		flow.finish(flow._owner)
+		await get_tree().process_frame
+	if flow.is_busy():
+		_set_status(
+			"The surface intro will not release the cinematic gate, so this "
+			+ "beat cannot start."
+		)
 
 
 ## Selects Rotini's colony resource, then crosses its real ceiling threshold.
@@ -150,6 +181,10 @@ func _play_rat_colony_encounter() -> void:
 	encounter._next_encounter_index = encounter_index
 	_set_status("Beat: rat colony tunnel (crossing ceiling)")
 	_descend_to(_get_encounter_ceiling(encounter, encounter_index))
+	await get_tree().process_frame
+	# Then the fall arrives. Two steps, in the order the game does them, so the
+	# controller reserves the encounter and then activates it.
+	_land_at(_get_encounter_floor_depth(encounter, encounter_index))
 	await get_tree().process_frame
 	_set_status(
 		"Beat: rat colony tunnel (playing) - R replays, 1 intro, 3 encounter"
@@ -184,6 +219,10 @@ func _play_named_encounter(encounter_id: StringName) -> void:
 	encounter._next_encounter_index = encounter_index
 	_set_status("Beat: %s (crossing ceiling)" % encounter_id)
 	_descend_to(_get_encounter_ceiling(encounter, encounter_index))
+	await get_tree().process_frame
+	# Then the fall arrives. Two steps, in the order the game does them, so the
+	# controller reserves the encounter and then activates it.
+	_land_at(_get_encounter_floor_depth(encounter, encounter_index))
 	await get_tree().process_frame
 	_set_status("Beat: %s (playing) - R replays" % encounter_id)
 
@@ -220,11 +259,85 @@ func _get_encounter_ceiling(
 
 ## Moves the run's authoritative depth so terrain streams in as it normally
 ## would, rather than teleporting presentation on its own.
+## Drops the run to a depth and tells the game it happened.
+##
+## Setting RunState.depth is not enough and never was: it is a plain variable, so
+## assigning it notifies nobody, DepthEncounterController never hears the ceiling
+## being crossed, and the harness sits on the surface looking like it restarted
+## the game rather than opening the cutscene it was asked for.
+##
+## The controller wants two things before it will activate an encounter - the
+## depth crossing its ceiling, and a landing at or below its floor - so both are
+## announced here. The landing goes through the same handler ViewController's
+## own signal reaches, which is why this drives the real sequence rather than a
+## shortcut around it.
 func _descend_to(depth_rows: int) -> void:
-	var game_state := RunState.get_global(self)
-	if game_state == null:
+	_run_state.depth = depth_rows
+	_run_state.depth_changed.emit(depth_rows)
+
+
+## Reports the fall finishing at a depth, which is the second half of what the
+## controller waits for.
+##
+## Crossing a ceiling only reserves an encounter; it activates when a landing
+## arrives at or below its floor. Descending alone therefore reserves a cutscene
+## and then waits forever for a fall that never lands, which is what left the
+## harness sitting on the surface.
+func _land_at(depth_rows: int) -> void:
+	var encounter := _get_encounter_controller()
+	if encounter == null:
 		return
-	game_state.depth = depth_rows
+	var mining_config: MiningConfig = encounter.mining_config
+	if mining_config == null:
+		return
+	_run_state.mining_y = mining_config.initial_surface_row + depth_rows
+	# The view is a separate authority from the run's depth. Setting depth alone
+	# left the camera and the terrain parked on the surface while the encounter
+	# ran underneath it, so the cutscene played out over a sunset and a bus stop.
+	# Mining moves the view by handing ViewController the miner's cell, and so
+	# does this, for the same reason everything else here goes through production
+	# systems.
+	var view := _get_view_controller()
+	if view != null:
+		view.follow_mining_position(
+			Vector2i(_run_state.mining_x, _run_state.mining_y)
+		)
+		# Let the fall finish before saying it landed.
+		#
+		# The view travels to its target over time and drags the cast's layer
+		# with it, while the encounter stage is positioned once and stays put.
+		# Announcing the landing immediately started the opening walk against a
+		# frame still moving underneath it: the actor walked to a floor sampled
+		# mid-fall, the room then settled several hundred pixels away, and the
+		# actor stayed behind - standing well below the room, off the bottom of
+		# the screen. A real run only activates an encounter once the fall is
+		# over, so waiting for it is what matches the game rather than racing it.
+		await _wait_until(
+			func() -> bool:
+				return view.target_view_position.is_equal_approx(
+					view.get_current_view_position()
+				),
+			8.0
+		)
+	encounter._on_landing_reached(_run_state.mining_y)
+
+
+func _get_view_controller() -> ViewController:
+	if not is_instance_valid(_game_root):
+		return null
+	return _game_root.get_node_or_null(
+		"MiningScene/Systems/ViewController"
+	) as ViewController
+
+
+## Returns the depth an encounter's floor sits at, which is where its landing
+## has to be reported.
+func _get_encounter_floor_depth(
+	controller: DepthEncounterController,
+	encounter_index: int
+) -> int:
+	var encounter := controller.encounter_config.encounters[encounter_index]
+	return encounter.resolve_depth(controller.mining_config.total_run_depth)
 
 
 func _wait_until(condition: Callable, timeout_seconds: float) -> void:
@@ -237,17 +350,11 @@ func _wait_until(condition: Callable, timeout_seconds: float) -> void:
 		await get_tree().process_frame
 
 
-func _build_status_label() -> void:
-	var layer := CanvasLayer.new()
-	layer.layer = 128
-	add_child(layer)
-	_status = Label.new()
-	_status.position = Vector2(16.0, 16.0)
-	_status.add_theme_color_override("font_color", Color(1, 0.95, 0.7))
-	_status.add_theme_font_size_override("font_size", 15)
-	layer.add_child(_status)
-
-
+## Reports what the harness is doing, to the console rather than over the game.
+##
+## This used to print two lines across the bottom of the screen. Playtesting a
+## cutscene means looking at the cutscene, and a debug caption sitting in the
+## frame is the one thing guaranteed to be in shot. The keys still work; they
+## are simply not advertised on top of the thing being reviewed.
 func _set_status(message: String) -> void:
-	if _status != null:
-		_status.text = "%s\n[1] intro  [2] rat colony  [3] encounter  [R] replay  [Esc] quit" % message
+	print("[cutscene playtest] ", message)

@@ -1,7 +1,7 @@
 shader_type canvas_item;
 
 // How it works:
-// - TEXTURE supplies one streamed chunk's opaque/cleared terrain mask.
+// - mask_tile_0..2 supply one continuous three-tile terrain mask.
 // - Optional authored fill art and the layer tint establish the base color.
 // - World-space value noise adds continuous broad and fine dirt variation.
 // - Shared world-space bedding fades in as strata become deeper.
@@ -25,6 +25,12 @@ uniform vec4 layer_tint : source_color = vec4(1.0);
 // world position prevents patterns from restarting at every streamed chunk.
 uniform vec2 world_origin = vec2(0.0);
 uniform vec2 chunk_world_size = vec2(1024.0, 512.0);
+// The renderer splits the authoritative CPU mask into three 128-cell columns.
+// Sixteen pixels/cell remains below WebGL's 4096 texture dimension and leaves a
+// sampler spare. One-pixel neighbor gutters keep all boundary probes seamless.
+uniform sampler2D mask_tile_0 : filter_linear;
+uniform sampler2D mask_tile_1 : filter_linear;
+uniform sampler2D mask_tile_2 : filter_linear;
 
 // World-space period of optional fill art, independent of the mask resolution.
 uniform vec2 fill_texture_world_size = vec2(256.0);
@@ -108,6 +114,10 @@ uniform bool use_layer_edge_shading = true;
 uniform float edge_shade_world_pixels = 6.0;
 uniform float edge_shade_strength = 0.45;
 uniform float edge_light_strength = 0.3;
+// A continuous ink band derived from the actual solid/open boundary. It uses
+// the bevel's existing mask taps, so browser masks keep one solid authored
+// outline without another texture sample or dependence on downscaled crack ink.
+uniform float cut_outline_strength = 1.0;
 
 // Authored crack strokes. The renderer prints them into the mask's luminance,
 // but the mask is stored well below world resolution, so a stroke the artist
@@ -183,6 +193,25 @@ uniform float ground_face_shade_strength = 0.24;
 // printed on the dirt instead of growing out of it.
 uniform float ground_contact_depth_world_px = 6.0;
 uniform float ground_contact_strength = 0.42;
+
+vec4 sample_terrain_mask(vec2 chunk_uv) {
+	vec2 safe_uv = clamp(chunk_uv, vec2(0.0), vec2(1.0));
+	vec2 tile_size = vec2(textureSize(mask_tile_0, 0));
+	float tile_content_width = max(tile_size.x - 2.0, 1.0);
+	float full_mask_width = tile_content_width * 3.0;
+	float tile_index = min(floor(safe_uv.x * 3.0), 2.0);
+	float tile_sample_x = safe_uv.x * full_mask_width
+		- tile_index * tile_content_width
+		+ 1.0;
+	vec2 tile_uv = vec2(tile_sample_x / tile_size.x, safe_uv.y);
+	if (tile_index < 1.0) {
+		return texture(mask_tile_0, tile_uv);
+	}
+	if (tile_index < 2.0) {
+		return texture(mask_tile_1, tile_uv);
+	}
+	return texture(mask_tile_2, tile_uv);
+}
 
 // Darkens a solid pixel that sits near its own layer's cut edge and lights the
 // upward-facing lip, using four mask taps to find which way the edge faces.
@@ -759,7 +788,7 @@ vec3 apply_strata_texture(vec3 surface_color, vec2 world_position) {
 void fragment() {
 	// Sprite TEXTURE packs fracture darkness in luminance and terrain solidity
 	// in alpha, so both values share one streamed texture and one upload.
-	vec4 packed_mask = texture(TEXTURE, UV);
+	vec4 packed_mask = sample_terrain_mask(UV);
 	float mask_alpha = packed_mask.a;
 	float fracture_value = packed_mask.r;
 	vec4 artwork = vec4(1.0);
@@ -773,8 +802,8 @@ void fragment() {
 	if (sharpen_mask_edges) {
 		float alpha_softness = max(fwidth(mask_alpha), 0.0001);
 		mask_alpha = smoothstep(
-			0.5 - alpha_softness,
-			0.5 + alpha_softness,
+			0.5 - alpha_softness * 0.5,
+			0.5 + alpha_softness * 0.5,
 			mask_alpha
 		);
 	}
@@ -815,20 +844,50 @@ void fragment() {
 			foreground_gem_coverage
 		);
 	}
-	// Bevel this stratum against its own opening before the cracks go on, so
-	// the rim shading reads as form and the strokes still sit on top of it.
-	if (use_layer_edge_shading && mask_alpha > 0.0) {
+	// Bevel and ink this stratum from one shared set of boundary samples. The
+	// continuous outline is independent of the optional authored crack spurs,
+	// which can remain irregular without leaving gaps around the actual hole.
+	if (
+		(use_layer_edge_shading || cut_outline_strength > 0.0)
+		&& mask_alpha > 0.0
+	) {
 		vec2 edge_step = vec2(max(edge_shade_world_pixels, 0.5))
 			/ max(chunk_world_size, vec2(1.0));
 		vec4 neighbor_alpha = vec4(
-			texture(TEXTURE, UV - vec2(0.0, edge_step.y)).a,
-			texture(TEXTURE, UV + vec2(0.0, edge_step.y)).a,
-			texture(TEXTURE, UV - vec2(edge_step.x, 0.0)).a,
-			texture(TEXTURE, UV + vec2(edge_step.x, 0.0)).a
+			sample_terrain_mask(UV - vec2(0.0, edge_step.y)).a,
+			sample_terrain_mask(UV + vec2(0.0, edge_step.y)).a,
+			sample_terrain_mask(UV - vec2(edge_step.x, 0.0)).a,
+			sample_terrain_mask(UV + vec2(edge_step.x, 0.0)).a
 		);
-		surface_color = apply_edge_shading(
-			surface_color,
+		if (use_layer_edge_shading) {
+			surface_color = apply_edge_shading(
+				surface_color,
+				neighbor_alpha
+			);
+		}
+		// Keep the black contour at the same 0.5 mask boundary, but antialias
+		// that threshold over one screen pixel. A binary step here was the
+		// remaining source of stair-stepped ink even with a dense terrain mask.
+		vec4 neighbor_softness = max(
+			fwidth(neighbor_alpha),
+			vec4(0.0001)
+		);
+		vec4 solid_neighbor = smoothstep(
+			vec4(0.5) - neighbor_softness * 0.5,
+			vec4(0.5) + neighbor_softness * 0.5,
 			neighbor_alpha
+		);
+		float nearest_solid_neighbor = min(
+			min(solid_neighbor.x, solid_neighbor.y),
+			min(solid_neighbor.z, solid_neighbor.w)
+		);
+		float cut_outline = (
+			1.0 - nearest_solid_neighbor
+		) * mask_alpha;
+		surface_color = mix(
+			surface_color,
+			rock_outline_color.rgb,
+			clamp(cut_outline * cut_outline_strength, 0.0, 1.0)
 		);
 	}
 
@@ -841,10 +900,18 @@ void fragment() {
 		if (fracture_line_weight_world_px > 0.0) {
 			vec2 ink_step = vec2(fracture_line_weight_world_px)
 				/ max(chunk_world_size, vec2(1.0));
-			vec4 ink_left = texture(TEXTURE, UV - vec2(ink_step.x, 0.0));
-			vec4 ink_right = texture(TEXTURE, UV + vec2(ink_step.x, 0.0));
-			vec4 ink_up = texture(TEXTURE, UV - vec2(0.0, ink_step.y));
-			vec4 ink_down = texture(TEXTURE, UV + vec2(0.0, ink_step.y));
+			vec4 ink_left = sample_terrain_mask(
+				UV - vec2(ink_step.x, 0.0)
+			);
+			vec4 ink_right = sample_terrain_mask(
+				UV + vec2(ink_step.x, 0.0)
+			);
+			vec4 ink_up = sample_terrain_mask(
+				UV - vec2(0.0, ink_step.y)
+			);
+			vec4 ink_down = sample_terrain_mask(
+				UV + vec2(0.0, ink_step.y)
+			);
 			ink = max(ink, (1.0 - ink_left.r) * step(0.5, ink_left.a));
 			ink = max(ink, (1.0 - ink_right.r) * step(0.5, ink_right.a));
 			ink = max(ink, (1.0 - ink_up.r) * step(0.5, ink_up.a));
@@ -852,10 +919,11 @@ void fragment() {
 		}
 		ink = clamp(ink / fracture_line_ink, 0.0, 1.0);
 		float ink_softness = max(fwidth(ink), 0.0001);
+		float ink_threshold = 0.5 / max(fracture_line_gain, 0.0001);
 		ink = smoothstep(
-			0.5 - ink_softness,
-			0.5 + ink_softness,
-			ink * fracture_line_gain
+			ink_threshold - ink_softness * 0.5,
+			ink_threshold + ink_softness * 0.5,
+			ink
 		);
 		fracture_value = 1.0 - ink * fracture_line_ink;
 	}
@@ -900,8 +968,7 @@ void fragment() {
 			if (grass_band > 0.0) {
 				// Grass only survives where the ground just under the line is
 				// still intact, so a mined opening takes it with the dirt.
-				float support_alpha = texture(
-					TEXTURE,
+				float support_alpha = sample_terrain_mask(
 					UV + vec2(
 						0.0,
 						(surface_world_y + grass_support_probe_px

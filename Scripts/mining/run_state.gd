@@ -44,15 +44,6 @@ var displayed_distance: int:
 		)
 
 
-## Returns the project autoload without coupling consumers to a bare global.
-static func get_global(context: Node) -> RunState:
-	var game_state: RunState = (
-		context.get_node_or_null("/root/GameState") as RunState
-	)
-	if game_state == null:
-		push_error("GameState autoload is unavailable.")
-	return game_state
-
 ## Starts a new run when the node loads.
 func _ready() -> void:
 	save_game = SaveGame.load_savegame()

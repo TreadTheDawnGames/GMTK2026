@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="CutsceneSequence" format=3]
+[gd_resource type="Resource" script_class="CutsceneSequence" format=3 uid="uid://64nlrieobjnb"]
 
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_beat.gd" id="1_g737l"]
-[ext_resource type="Resource" path="res://resources/dialogue/treasure_hunter_treasure_conversation.tres" id="2_31prq"]
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_sequence.gd" id="3_fftny"]
+[ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="1_g737l"]
+[ext_resource type="Resource" uid="uid://yigtckpqgod" path="res://resources/dialogue/treasure_hunter_treasure_conversation.tres" id="2_31prq"]
+[ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="3_fftny"]
 
 [sub_resource type="Resource" id="Resource_plink"]
 script = ExtResource("1_g737l")
@@ -13,47 +13,58 @@ actor = &"treasure_hunter"
 script = ExtResource("1_g737l")
 kind = 0
 actor = &"treasure_hunter"
-duration_seconds = 0.6
+duration_seconds = 0.8
 target_marker = &"Conversation"
+starts_from_authored_point = true
+start_marker = &"Entrance"
 pose = &"walk"
 
 [sub_resource type="Resource" id="Resource_sbyeo"]
 script = ExtResource("1_g737l")
 kind = 2
 actor = &"treasure_hunter"
-start_seconds = 0.6
+start_seconds = 0.8
 facing = -1
 
 [sub_resource type="Resource" id="Resource_1qi08"]
 script = ExtResource("1_g737l")
 kind = 1
 actor = &"treasure_hunter"
-start_seconds = 0.6
+start_seconds = 0.8
 pose = &"idle"
 
 [sub_resource type="Resource" id="Resource_4oqyl"]
 script = ExtResource("1_g737l")
-kind = 5
+kind = 3
+actor = &"treasure_hunter"
 start_seconds = 0.8
-duration_seconds = 6.0
-conversation = ExtResource("2_31prq")
+duration_seconds = 0.3
+bounce_count = 2
 
 [sub_resource type="Resource" id="Resource_3hmu0"]
 script = ExtResource("1_g737l")
-kind = 0
-actor = &"treasure_hunter"
-start_seconds = 6.8
-duration_seconds = 0.6
-target_marker = &"Exit"
-pose = &"walk"
+kind = 5
+start_seconds = 1.1
+duration_seconds = 6.0
+conversation = ExtResource("2_31prq")
+notes = "He has found his hoard, so he arrives faster and more pleased with himself than the first time."
 
 [sub_resource type="Resource" id="Resource_xtr4o"]
 script = ExtResource("1_g737l")
+kind = 0
+actor = &"treasure_hunter"
+start_seconds = 7.1
+duration_seconds = 1.6
+target_marker = &"Exit"
+pose = &"walk"
+
+[sub_resource type="Resource" id="Resource_xey6q"]
+script = ExtResource("1_g737l")
 kind = 10
 actor = &"treasure_hunter"
-start_seconds = 7.3999999999999995
+start_seconds = 8.7
 
 [resource]
 script = ExtResource("3_fftny")
 sequence_id = &"treasure_hunter_treasure_sequence"
-beats = Array[ExtResource("1_g737l")]([SubResource("Resource_plink"), SubResource("Resource_w0fxx"), SubResource("Resource_sbyeo"), SubResource("Resource_1qi08"), SubResource("Resource_4oqyl"), SubResource("Resource_3hmu0"), SubResource("Resource_xtr4o")])
+beats = Array[ExtResource("1_g737l")]([SubResource("Resource_plink"), SubResource("Resource_w0fxx"), SubResource("Resource_sbyeo"), SubResource("Resource_1qi08"), SubResource("Resource_4oqyl"), SubResource("Resource_3hmu0"), SubResource("Resource_xtr4o"), SubResource("Resource_xey6q")])

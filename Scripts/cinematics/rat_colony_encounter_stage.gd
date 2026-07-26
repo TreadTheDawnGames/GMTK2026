@@ -30,6 +30,13 @@ signal persistent_colony_requested
 @export_range(0.0, 0.5, 0.01) var strike_interval_seconds: float = 0.08
 @export_range(1, 6, 1) var strikes_per_rat: int = 2
 @export_range(-96.0, 32.0, 1.0) var floor_offset_y: float = -29.0
+## Whether a follower stops at the work marker to mine before leaving.
+##
+## On, the colony is digging its way down and the pauses are the point. Off, the
+## tunnel is a road and they simply cross it: Rotini's introduction is traffic
+## passing through, and a rat that stops to swing at a wall on the way reads as
+## a different scene. Everything else about the procession is shared.
+@export var procession_mines: bool = true
 
 ## Growth is bounded by max_live_followers (or the web cap) and pruned on exit.
 var _followers: Array[CinematicRatMiner] = []
@@ -133,6 +140,17 @@ func _spawn_follower() -> void:
 	_connect_once(rat.run_target_reached, _on_follower_run_target_reached)
 	_connect_once(rat.strike_contact, _on_follower_strike_contact)
 	_followers.append(rat)
+	if not procession_mines:
+		# Straight across, one leg, no stop at the wall.
+		if not rat.start_run_to_target(
+			_resolve_grounded_marker(exit_marker),
+			exit_seconds,
+			0.0,
+			NAN,
+			_floor_sampler
+		):
+			_remove_follower(rat)
+		return
 	if not rat.start_run_to_wall(
 		work_marker.global_position.x,
 		run_seconds,
@@ -166,13 +184,27 @@ func _on_follower_ready_to_exit(rat: CinematicRatMiner) -> void:
 
 
 func _on_follower_run_target_reached(rat: CinematicRatMiner) -> void:
-	if (
-		not is_instance_valid(rat)
-		or not _followers.has(rat)
-		or rat.global_position.x < exit_marker.global_position.x - 1.0
-	):
+	if not is_instance_valid(rat) or not _followers.has(rat):
+		return
+	if not _has_reached_exit(rat):
 		return
 	_remove_follower(rat)
+
+
+## Reports whether a follower has actually made it to the exit, whichever way the
+## procession runs.
+##
+## This used to ask only whether the rat had got far enough to the RIGHT, which
+## silently assumed every colony leaves the way the first one did. Run them the
+## other way and no follower is ever retired: they arrive, the test says they are
+## still short of the exit, and they pile up at the mouth until the cap stops the
+## stream. The direction is taken from the markers themselves so a stage that
+## moves its exit cannot disagree with the code that retires actors at it.
+func _has_reached_exit(rat: CinematicRatMiner) -> bool:
+	var exit_x := exit_marker.global_position.x
+	if exit_x < entrance_marker.global_position.x:
+		return rat.global_position.x <= exit_x + 1.0
+	return rat.global_position.x >= exit_x - 1.0
 
 
 func _on_follower_strike_contact(screen_position: Vector2) -> void:

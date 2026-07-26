@@ -91,10 +91,33 @@ render every beat to PNG and check the framing by eye.
 
 ### Layering rule: the cast stands behind the ground they stand in
 
-Once the miner has dug in he is on layer two and **terrain layer one draws in
-front of him** (`layer_z_indices` starts at `2`; `MinerRig.buried_draw_order` is
-`1`). That is what makes his legs read as being down in the dig rather than
-pasted on top of it.
+The miner stands on a different stratum depending on what the game is doing.
+**Mining puts him on the second layer; a cutscene lifts him to the first.**
+
+With `layer_z_indices` at `(2, 0, -1, -2)`:
+
+| State | Order | Reads as |
+| --- | ---: | --- |
+| Mining (`buried_draw_order`) | `1` | between the two frontmost strata, down in his dig |
+| Cutscene (`cutscene_draw_order`) | `3` | clear of every stratum, so a held shot shows a whole man |
+| Surface (`surface_draw_order`) | `3` | standing on the ground rather than in it |
+
+`local_tests/verify_cutscene_cast_draw_order.gd` asserts both ends of that.
+These numbers live in `miner_rig.gd` while the strata live in the terrain
+profile, and nothing else ties them together: add a stratum or renumber the
+existing ones and every cutscene silently starts playing behind the wall, with
+no error anywhere. Run that check after touching either file.
+
+The cost of the mining order is real and accepted: the camera does not follow
+the miner down, so he sits at the top of his own shaft in every frame and the
+foreground stratum crops him at the shins for the whole descent, not only while
+he is genuinely inside the ground. Being occluded by the ground he stands in is
+the read.
+
+The cast layer follows him. `CharacterLayer` rests at `z_index 1` and
+`DepthEncounterController` lifts the whole layer to `cutscene_draw_order` for the
+duration of an encounter, because a visitor left behind the rock while the miner
+is in front of it is worse than either of them being consistent.
 
 The surface is the one exception, because there he is standing *on* the ground
 rather than in it:
@@ -259,6 +282,97 @@ line.
 this encounter's actual ceiling. It never opens the cutscene directly, so a room
 the miner cannot fall into fails here exactly as it would fail in a run. That is
 the point: the harness can only give a true answer.
+
+## House rules for authoring one encounter
+
+Read this before changing a room or a stage. Every rule below cost a bug to
+learn, and each of the eleven encounters is expected to follow it.
+
+### Own only your own files
+
+An encounter is authored through exactly two files: its room in
+`resources/cinematics/sculpts/<id>_room.tres` and its stage in
+`Scenes/cinematics/<name>_encounter_stage.tscn`. Its `.tres` in
+`resources/encounters/` is wiring and should already be correct.
+
+`sculpt_baker.gd`, `character_encounter_stage.gd`, `rat_colony_encounter_stage.gd`
+and `depth_encounter_controller.gd` are shared by all eleven. Changing them to
+suit one shot changes the other ten. If a shot needs something they do not do,
+add it as an opt-in export whose default preserves current behaviour — the way
+`closing_fade_seconds`, the facing trio and `procession_mines` were added — and
+say so in the handoff. Scene merges are unrecoverable, so two people must never
+edit one `.tscn` in the same session.
+
+### The room must be reachable
+
+The miner arrives by breaking the ceiling and falling. His snaking descent can
+land on **any column in a 49-cell band** (terrain columns 168–216), and the
+encounter camera centres on whatever column he stopped at.
+
+- The floor under that whole band stays solid. `protected_floor_rows` guards it;
+  set it to zero only for a room deliberately authored with a hole, and then hold
+  the band solid by hand.
+- A room's ground is **not** its floor row — the level tunnel lays up to three
+  cells of loose rock on top, and that is what he lands on. The schedule tolerates
+  four rows of that (`LANDING_FLOOR_TOLERANCE_ROWS`). Exceed it and the encounter
+  never starts: it sits pending forever with the cinematic gate already claimed,
+  which in game looks like mining that simply stopped working, with no error.
+- `local_tests/verify_encounter_landing_reachable.gd` proves this for every room.
+  Run it after any carve.
+
+### Measure spacing, never guess it
+
+One character-width is the **widest single row of opaque pixels**, times the
+scale that ships. It is not the sprite's bounding box: the miner's box unions his
+pickaxe head at one height with his torso at another and comes out roughly twice
+the man. Measured bodies: miner **52.8px**, Cheese Girl **34.3px**, Rotini
+**62.7px** — the rat is wider than the man, because the art is long.
+
+House spacing is one miner-width of daylight between two bodies, so root to root
+is `(a + b) / 2 + 52.8`. Cheese Girl sits at 96px, Rotini at 110px.
+
+### Entrances and exits must clear the frame
+
+The frame is 1152px wide and centred on the miner, so anything within 576px of
+him is on screen. A marker authored at a fixed room offset fails this whenever he
+lands toward that side — which is how a visitor ends up popping into existence
+mid-shot, or stopping while still visible.
+
+With `conversation_tracks_miner` on, the whole `ActorMarkers` set slides to the
+landing column together, so author entrances and exits **relative to
+Conversation** and keep them at least 480px away. 600px and 700px are the values
+in use.
+
+Turn tracking **off** when a character must stand on a specific piece of rock —
+a ledge cannot slide to meet a landing column. The cost is that their distance
+from the miner then varies with where he landed, and there is no way around that
+short of narrowing the landing band or reframing the camera.
+
+### Characters are hidden until their cutscene claims them
+
+Every presenter is built at `_ready` and parked at its own depth, so one actor
+can be reused across repeat visits and gathered for the cafe. They are hidden
+there; `prepare()` reveals whoever the stage takes. Do not show one early — a
+player mining past would find them standing in the rock waiting.
+
+### Rooms live in files, not inside encounters
+
+Every encounter references its room through an `ExtResource`. If one ever goes
+back to a `SubResource`, carving the file in `sculpts/` does nothing at all and
+the failure is silent — the editor and the game simply keep drawing the embedded
+copy. The landing check reports this.
+
+### Timelines do not run yet
+
+`CutsceneSequence` resources exist for all eleven encounters and the Timeline tab
+authors them, but **nothing plays them at runtime**: `stage.sequence` is never
+assigned, the actor resolver answers only to `&"miner"`, and a blocking DIALOGUE
+beat has nobody to complete it. Assigning `sequence` would switch a stage onto
+that path and override the authored stage settings with a generated placeholder.
+
+Until someone closes those three gaps deliberately, author choreography through
+the stage's own exports — move durations, poses, the facing trio,
+`closing_fade_seconds`, `procession_mines` — and treat the timelines as notes.
 
 ## Authoring tools
 

@@ -6,9 +6,6 @@ extends CanvasLayer
 const CinematicFrameType = preload(
 	"res://Scripts/dialogue/cinematic_frame.gd"
 )
-const SILENT_MINER_SLOT: StringName = &"miner"
-const SILENT_MINER_TEXT := "..."
-
 signal conversation_started(conversation_id: StringName)
 signal line_presented(
 	conversation_id: StringName,
@@ -200,16 +197,36 @@ func wait_until_blackout_revealed() -> void:
 
 ## Suspends until framing has finished, or returns immediately if already open.
 func wait_until_frame_open() -> void:
-	if cinematic_frame == null or cinematic_frame.is_open():
-		return
-	await cinematic_frame_opened
+	await _wait_until_frame_state(true)
 
 
 ## Suspends until framing has cleared, or returns immediately if already closed.
 func wait_until_frame_closed() -> void:
-	if cinematic_frame == null or cinematic_frame.is_closed():
+	await _wait_until_frame_state(false)
+
+
+## Suspends until the letterbox has reached the requested state.
+##
+## This watches the frame's own state instead of awaiting its finished signal,
+## because that signal is an edge and the caller is waiting on a condition.
+##
+## The bars announce arrival from a tween callback, and anything that kills that
+## tween takes the announcement with it: a second open_frame, a close_frame, or
+## apply_blackout, which sets the bars fully covered and emits nothing at all.
+## Miss the edge and the awaiting coroutine is stranded for the rest of the run
+## while the bars sit there looking perfectly open. That stranded an encounter
+## before it could take its actor, so the letterbox opened over a cutscene that
+## then never started, with the HUD already gated off behind it.
+##
+## Polling per frame is cheap next to that: this runs once per cutscene
+## transition, not per frame of one.
+func _wait_until_frame_state(wants_open: bool) -> void:
+	if cinematic_frame == null:
 		return
-	await cinematic_frame_closed
+	while is_instance_valid(cinematic_frame) and (
+		cinematic_frame.is_open() if wants_open else cinematic_frame.is_closed()
+	) == false:
+		await get_tree().process_frame
 
 
 ## Reveals one more character if this line is still current.
@@ -270,13 +287,8 @@ func _present_current_line() -> void:
 		if line.auto_advance_delay_seconds > 0.0
 		else "Space / Enter / Left Click"
 	)
-	var presented_text := (
-		SILENT_MINER_TEXT
-		if line.speaker_slot == SILENT_MINER_SLOT
-		else line.text
-	)
 	speaker_label.text = display_name
-	body_label.text = presented_text
+	body_label.text = line.text
 	continue_label.text = continue_text
 	_set_visible_character_count(0)
 	_show_next_character(_presentation_token)

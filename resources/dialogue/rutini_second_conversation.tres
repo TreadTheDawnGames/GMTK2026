@@ -7,7 +7,7 @@
 [sub_resource type="Resource" id="Line_again"]
 script = ExtResource("3_line")
 speaker_slot = &"rutini"
-text = "You again! Did you find the cheese cafe?"
+text = "You again? Did you find the cheese cafe? We seem to have gotten lost in our own tunnels.k"
 
 [sub_resource type="Resource" id="Line_miner_one"]
 script = ExtResource("3_line")
@@ -17,13 +17,13 @@ text = "..."
 [sub_resource type="Resource" id="Line_cafe"]
 script = ExtResource("3_line")
 speaker_slot = &"rutini"
-text = "Straight down?"
+text = "IT’S STRAIGHT DOWN!? Why didn’t you say so earlier?"
 
 [sub_resource type="Resource" id="Line_later"]
 script = ExtResource("3_line")
 speaker_slot = &"rutini"
 stage_cue = &"begin_colony_mining"
-text = "Come on lads! Dig!"
+text = "Come on boys! Dig!"
 
 [sub_resource type="Resource" id="Participant_miner"]
 script = ExtResource("2_participant")

@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="CreditEntry" format=3 uid="uid://c6k0e5pn4mo45"]
+[gd_resource type="Resource" script_class="CreditEntry" format=3 uid="uid://bxcpfjn64txqj"]
 
 [ext_resource type="Script" uid="uid://c66qkeqn8p820" path="res://resources/credits/credit_entry.gd" id="1_entry"]
 

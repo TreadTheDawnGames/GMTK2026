@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="CutsceneSequence" format=3]
+[gd_resource type="Resource" script_class="CutsceneSequence" format=3 uid="uid://0p25yxfx0eo1"]
 
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_beat.gd" id="1_kovd1"]
-[ext_resource type="Resource" path="res://resources/dialogue/cloak_lantern_first_conversation.tres" id="2_u8juo"]
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_sequence.gd" id="3_apnup"]
+[ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="1_kovd1"]
+[ext_resource type="Resource" uid="uid://dao8yvcqfuv7f" path="res://resources/dialogue/cloak_lantern_first_conversation.tres" id="2_u8juo"]
+[ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="3_apnup"]
 
 [sub_resource type="Resource" id="Resource_0cydt"]
 script = ExtResource("1_kovd1")
@@ -13,47 +13,48 @@ actor = &"cloak_lantern"
 script = ExtResource("1_kovd1")
 kind = 0
 actor = &"cloak_lantern"
-duration_seconds = 1.6
+duration_seconds = 2.0
 target_marker = &"Conversation"
+starts_from_authored_point = true
+start_marker = &"Entrance"
 pose = &"walk"
-step_height = 6.0
 
 [sub_resource type="Resource" id="Resource_2vg6u"]
 script = ExtResource("1_kovd1")
 kind = 2
 actor = &"cloak_lantern"
-start_seconds = 1.6
+start_seconds = 2.0
 facing = -1
 
 [sub_resource type="Resource" id="Resource_g1ih4"]
 script = ExtResource("1_kovd1")
 kind = 1
 actor = &"cloak_lantern"
-start_seconds = 1.6
+start_seconds = 2.0
 pose = &"idle"
 
 [sub_resource type="Resource" id="Resource_y7psy"]
 script = ExtResource("1_kovd1")
 kind = 5
-start_seconds = 1.8
+start_seconds = 3.1
 duration_seconds = 6.0
 conversation = ExtResource("2_u8juo")
+notes = "Slow in, long silence before he speaks. The pause is the performance: he is deciding how much to tell."
 
 [sub_resource type="Resource" id="Resource_aodpc"]
 script = ExtResource("1_kovd1")
 kind = 0
 actor = &"cloak_lantern"
-start_seconds = 7.8
-duration_seconds = 2.4
+start_seconds = 9.1
+duration_seconds = 2.6
 target_marker = &"Exit"
 pose = &"walk"
-step_height = 6.0
 
 [sub_resource type="Resource" id="Resource_bid4w"]
 script = ExtResource("1_kovd1")
 kind = 10
 actor = &"cloak_lantern"
-start_seconds = 10.2
+start_seconds = 11.7
 
 [resource]
 script = ExtResource("3_apnup")

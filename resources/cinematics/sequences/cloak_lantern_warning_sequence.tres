@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="CutsceneSequence" format=3]
+[gd_resource type="Resource" script_class="CutsceneSequence" format=3 uid="uid://06ho6eb366wd"]
 
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_beat.gd" id="1_duuv6"]
-[ext_resource type="Resource" path="res://resources/dialogue/cloak_lantern_warning_conversation.tres" id="2_qpjyh"]
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_sequence.gd" id="3_k6b3r"]
+[ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="1_duuv6"]
+[ext_resource type="Resource" uid="uid://dgdmgvl3mietr" path="res://resources/dialogue/cloak_lantern_warning_conversation.tres" id="2_qpjyh"]
+[ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="3_k6b3r"]
 
 [sub_resource type="Resource" id="Resource_eb3br"]
 script = ExtResource("1_duuv6")
@@ -13,47 +13,48 @@ actor = &"cloak_lantern"
 script = ExtResource("1_duuv6")
 kind = 0
 actor = &"cloak_lantern"
-duration_seconds = 1.4
+duration_seconds = 1.7
 target_marker = &"Conversation"
+starts_from_authored_point = true
+start_marker = &"Entrance"
 pose = &"walk"
-step_height = 6.0
 
 [sub_resource type="Resource" id="Resource_g2tww"]
 script = ExtResource("1_duuv6")
 kind = 2
 actor = &"cloak_lantern"
-start_seconds = 1.4
+start_seconds = 1.7
 facing = -1
 
 [sub_resource type="Resource" id="Resource_ev6e8"]
 script = ExtResource("1_duuv6")
 kind = 1
 actor = &"cloak_lantern"
-start_seconds = 1.4
+start_seconds = 1.7
 pose = &"idle"
 
 [sub_resource type="Resource" id="Resource_60yun"]
 script = ExtResource("1_duuv6")
 kind = 5
-start_seconds = 1.5999999999999999
+start_seconds = 3.0999999999999996
 duration_seconds = 6.0
 conversation = ExtResource("2_qpjyh")
+notes = "Slower than his first visit and holds longer. The return should read as the same man pressing a point."
 
 [sub_resource type="Resource" id="Resource_nsp2h"]
 script = ExtResource("1_duuv6")
 kind = 0
 actor = &"cloak_lantern"
-start_seconds = 7.6
-duration_seconds = 2.8
+start_seconds = 9.1
+duration_seconds = 3.0
 target_marker = &"Exit"
 pose = &"walk"
-step_height = 6.0
 
 [sub_resource type="Resource" id="Resource_bjt2e"]
 script = ExtResource("1_duuv6")
 kind = 10
 actor = &"cloak_lantern"
-start_seconds = 10.399999999999999
+start_seconds = 12.1
 
 [resource]
 script = ExtResource("3_k6b3r")

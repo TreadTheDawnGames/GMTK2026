@@ -19,21 +19,54 @@ signal swing_finished
 
 @export_category("Placement")
 ## Seats the miner on the pale top stratum at the surface and character floors.
-@export_range(0.0, 64.0, 1.0) var intact_floor_grounding_offset_y: float = 16.0
+##
+## Measured rather than guessed: on an authored encounter floor his sole landed
+## ten pixels under the floor line the cast are placed on, so he read as standing
+## in the ground while whoever he was talking to stood on it. Six puts the sole
+## on that line. This is one value for the surface and for cutscene floors, so
+## check the bus-stop opening if it is changed again.
+@export_range(0.0, 64.0, 1.0) var intact_floor_grounding_offset_y: float = 6.0
+## The same seating, for the run's own starting surface.
+##
+## It is separate because the two floors are not the same thing. A cutscene
+## floor is a cut room he shares with a standing cast, so his sole goes on their
+## line. The surface is the top of the terrain, where the shelf falls away
+## toward the camera and the value that seats him on a room floor leaves him
+## standing high on the lip. Six put him right in a room and too high at the bus
+## stop; this is the one the opening is measured against.
+@export_range(0.0, 64.0, 1.0) var surface_grounding_offset_y: float = 16.0
 ## Slightly overlaps the sampled dirt edge so texture filtering cannot show a gap.
 @export_range(0.0, 4.0, 0.25) var grounding_overlap_y: float = 1.0
 ## Lifts the sole baseline slightly on each cinematic walking step.
 @export_range(0.0, 12.0, 0.5) var cinematic_walk_step_height: float = 4.0
 ## Controls how many visible walking steps fit along a traversal segment.
 @export_range(8.0, 96.0, 1.0) var cinematic_walk_stride_pixels: float = 24.0
+## Whether digging steps him along on the same stride and lift as the cinematic
+## walk. Clearing it puts him back to sliding flat with the view.
+@export var gameplay_walk_step_enabled: bool = true
+## How fast a step he has already started finishes once he stops travelling.
+@export_range(4.0, 512.0, 1.0) var walk_settle_pixels_per_second: float = 90.0
 
 @export_category("Draw Order")
 ## Standing on the run's untouched surface, in front of terrain layer one
 ## (z_index 2). He is on top of the ground there, not in it, so the foreground
 ## stratum must not cut his legs off during the arrival shot.
 @export_range(0, 16, 1) var surface_draw_order: int = 3
-## Once he has dug in he is below the original surface, so layer one closes over
-## his legs again and every shot from there down looks as it always did.
+## Where he stands while mining: behind the foreground stratum and in front of
+## the one behind it, which is what puts him down in the dig rather than pasted
+## on top of it.
+##
+## This was briefly raised to 3 so he drew in front of everything. The camera
+## does not follow him down — the terrain scrolls past it — so he sits at the top
+## of his own shaft in every frame, and the foreground stratum cut him off at the
+## shins for the whole descent rather than only while he was genuinely inside the
+## ground. That is the cost of this value, and it is accepted on purpose: being
+## occluded by the ground he is standing in is the read, and a cutscene lifts him
+## clear of it anyway through cutscene_draw_order.
+##
+## Kept strictly between the two frontmost strata z indices, currently 2 and 0.
+## verify_cutscene_cast_draw_order.gd asserts that relationship, because this
+## number and the terrain profile live in different files.
 @export_range(0, 16, 1) var buried_draw_order: int = 1
 ## Standing in an authored cutscene room, in front of terrain layer one
 ## (z_index 2) again. A cutscene frames the whole cast standing on the room's
@@ -50,6 +83,15 @@ signal swing_finished
 @export var idle_miner_texture: Texture2D
 @export var wind_up_miner_texture: Texture2D
 @export var impact_miner_texture: Texture2D
+## Drawn while a cutscene drops him into its room. Null keeps the idle frame,
+## which is how this behaved before the pose existed.
+##
+## The fall is the one moment the run shows him off his feet, and holding the
+## idle stance through it reads as the whole man being slid downward rather than
+## falling. The swap back is deliberately hung off the cinematic restore rather
+## than off the tween finishing: a fall that is cancelled halfway must not leave
+## him falling forever on solid ground.
+@export var falling_miner_texture: Texture2D
 @export var impact_point: Marker2D
 @export var stand_in_hammer_head: Line2D
 @export var final_hammer_head_sprite: Sprite2D
@@ -68,9 +110,17 @@ var _cinematic_rest_z_as_relative: bool
 var _is_on_surface: bool = true
 var _is_in_cutscene: bool = false
 var _cinematic_tween: Tween
-@onready var _audio_handler: PlayerAudioHandler = (
-	PlayerAudioHandler.get_global(self)
-)
+## The view's last published offset, and the walking step being spent against it.
+var _screen_offset: Vector2 = Vector2.ZERO
+var _walked_screen_x: float = 0.0
+var _walk_stride_progress: float = 0.0
+var _walk_step_lift: float = 0.0
+var _audio_handler: PlayerAudioHandler
+
+
+## Supplies the cross-scene audio service at the composition boundary.
+func set_audio_handler(audio_handler: PlayerAudioHandler) -> void:
+	_audio_handler = audio_handler
 
 
 ## Connects animation events and starts the idle animation.
@@ -82,6 +132,7 @@ func _ready() -> void:
 	z_index = get_rest_draw_order()
 	_set_miner_texture(idle_miner_texture)
 	show_intact_floor_grounding()
+	_ensure_ground_shadow()
 	if not animation_player.animation_finished.is_connected(
 		_on_animation_finished
 	):
@@ -89,6 +140,21 @@ func _ready() -> void:
 			_on_animation_finished
 		)
 	_play_idle()
+
+
+## Puts a contact shadow under the miner, the same one the cast and the cutscene
+## editor's stand-ins carry.
+##
+## He is the one character on screen for the whole run, so a floor he does not
+## touch is the most visible version of the problem. The rig's own origin is his
+## standing point, so the shadow needs no offset of its own.
+func _ensure_ground_shadow() -> void:
+	if get_node_or_null(NodePath("GroundShadow")) != null:
+		return
+	var shadow := ActorGroundShadow.new()
+	shadow.name = &"GroundShadow"
+	shadow.measured_sprite = drawn_miner_sprite
+	add_child(shadow)
 
 
 ## Plays the successful strike at its combo and equipped-pickaxe speed.
@@ -123,7 +189,8 @@ func _show_success_wind_up() -> void:
 ## Reports the hammer-tip position when the animation reaches the ground.
 func _emit_success_impact() -> void:
 	_set_miner_texture(impact_miner_texture)
-	_audio_handler.play_sound(AudioLibrary.IMPACT)
+	if _audio_handler != null:
+		_audio_handler.play_sound(AudioLibrary.IMPACT)
 	impact_contact.emit(impact_point.global_position)
 
 
@@ -206,8 +273,67 @@ func get_facing_direction() -> int:
 
 
 ## Places the miner at its true screen offset during falls and view movement.
+## It is applied on the spot, because a chunk flip publishes the offset it needs
+## honoured that same frame; _process only keeps carrying the walking step on
+## the frames where the view publishes nothing.
 func set_screen_offset(screen_offset: Vector2) -> void:
-	position = _rest_position + screen_offset
+	_screen_offset = screen_offset
+	_apply_screen_position()
+
+
+## Carries the walking step and writes the position it lands on.
+func _process(delta: float) -> void:
+	_advance_walk_step(delta)
+	_apply_screen_position()
+
+
+func _apply_screen_position() -> void:
+	position = _rest_position + _screen_offset + Vector2.UP * _walk_step_lift
+
+
+## Turns the sideways travel control gives him into the same footstep arc the
+## cinematic walk plays.
+##
+## Digging moves him by publishing a screen offset every frame, so under the
+## player he slid across the floor with his feet flat while the same rig walks
+## properly in a cutscene. This spends his own travel against the authored
+## stride and lifts him on the same half-sine, which makes one dig step read as
+## one footstep: the horizontal step is three cells against a stride of 24 px,
+## so he is back down flat exactly when the swing lands. Standing still finishes
+## the step he was in rather than dropping the raised foot on the spot.
+func _advance_walk_step(delta: float) -> void:
+	var stride := maxf(cinematic_walk_stride_pixels, 1.0)
+	var travel := absf(_screen_offset.x - _walked_screen_x)
+	_walked_screen_x = _screen_offset.x
+	if not gameplay_walk_step_enabled or _cinematic_override_active:
+		_walk_stride_progress = 0.0
+		_walk_step_lift = 0.0
+		return
+	if is_zero_approx(travel):
+		# Nothing new to spend, so carry the raised foot to the end of its own
+		# step instead of freezing it mid-air where the offset stopped coming.
+		if is_zero_approx(_walk_stride_progress):
+			_walk_step_lift = 0.0
+			return
+		travel = walk_settle_pixels_per_second * delta
+	_walk_stride_progress = _walk_stride_progress + travel / stride
+	if _walk_stride_progress >= 1.0:
+		_walk_stride_progress = fmod(_walk_stride_progress, 1.0)
+		# Land the step exactly flat rather than starting the next one on the
+		# tail of this one's rounding.
+		if is_zero_approx(travel - walk_settle_pixels_per_second * delta):
+			_walk_stride_progress = 0.0
+	_walk_step_lift = (
+		sin(_walk_stride_progress * PI)
+		* maxf(cinematic_walk_step_height, 0.0)
+	)
+
+
+## Returns how far the walking step currently holds him off his own baseline,
+## so the callers that seat him on sampled dirt measure the foot he is walking
+## on instead of the one he has in the air.
+func _get_walk_step_lift() -> float:
+	return _walk_step_lift
 
 
 ## Restores the visual-only speech motion before another presenter takes over.
@@ -252,6 +378,12 @@ func exit_cutscene_draw_order() -> void:
 		z_index = get_rest_draw_order()
 
 
+## Reports whether he is still standing on the surface the run started from.
+## The surface staging reads it to know when the road above him is clear.
+func is_on_surface() -> bool:
+	return _is_on_surface
+
+
 ## Moves him off the starting surface and into the ground. The caller owns the
 ## depth test; the rig owns what that means for its draw order.
 func leave_surface_draw_order() -> void:
@@ -263,19 +395,27 @@ func leave_surface_draw_order() -> void:
 		z_index = get_rest_draw_order()
 
 
-## Places the artwork above the first layer on an authored intact floor.
+## Places the artwork above the first layer on an authored intact floor, or on
+## the run's starting surface, whichever he is standing on.
 func show_intact_floor_grounding() -> void:
-	_set_grounding_offset(intact_floor_grounding_offset_y)
+	_set_grounding_offset(
+		surface_grounding_offset_y
+		if _is_on_surface
+		else intact_floor_grounding_offset_y
+	)
 
 
 ## Seats the authored sole baseline on the renderer's sampled dirt support.
 func seat_landing_foot_at_screen_y(support_screen_y: float) -> void:
 	if is_nan(support_screen_y) or not is_instance_valid(landing_foot_anchor):
 		return
+	# Measure against his settled sole. Mid-step the rig root is riding the walk
+	# lift, and seating that would push the artwork down by however high his
+	# foot happened to be and keep it there.
 	var grounding_delta: float = (
 		support_screen_y
 		+ grounding_overlap_y
-		- landing_foot_anchor.global_position.y
+		- (landing_foot_anchor.global_position.y + _get_walk_step_lift())
 	)
 	var current_grounding_offset: float = (
 		visual_root.position.y - _visual_root_rest_y
@@ -291,11 +431,15 @@ func get_landing_foot_screen_x() -> float:
 
 
 ## Returns the authored sole position, so landing feedback spawns at his feet
-## rather than at the rig origin somewhere up his body.
+## rather than at the rig origin somewhere up his body. It reports the floor he
+## is walking on, not the height of a foot caught mid-step.
 func get_landing_foot_screen_position() -> Vector2:
 	if not is_instance_valid(landing_foot_anchor):
 		return global_position
-	return landing_foot_anchor.global_position
+	return landing_foot_anchor.global_position + Vector2(
+		0.0,
+		_get_walk_step_lift()
+	)
 
 
 ## Reserves the visual root for a cutscene without moving gameplay position.
@@ -394,6 +538,9 @@ func fall_cinematic_foot_to(
 	reset_speech_motion()
 	if _cinematic_tween != null and _cinematic_tween.is_valid():
 		_cinematic_tween.kill()
+	if falling_miner_texture != null:
+		animation_player.stop()
+		_set_miner_texture(falling_miner_texture)
 	var foot_delta: Vector2 = (
 		screen_position - get_cinematic_foot_screen_position()
 	)

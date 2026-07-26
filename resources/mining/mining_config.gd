@@ -28,7 +28,10 @@ const MAX_PLAYABLE_DEPTH: int = 2_000_000_000
 ## lowering it back toward 192 is the first thing to try if the web export runs
 ## short of per-hit budget.
 @export_range(16, 512, 1) var terrain_width_cells: int = 384
-@export_range(16, 256, 1) var chunk_height_cells: int = 64
+# Twenty-two rows keep active sculpt expansion and high-density uploads below
+# the atomic web limit. Publication is queued by immutable layer group, so the
+# smaller streaming unit does not lower the 16-pixel world-space fidelity.
+@export_range(16, 256, 1) var chunk_height_cells: int = 22
 ## Sets the world-space size of one gameplay terrain cell.
 @export_range(1, 32, 1) var terrain_cell_world_size: int = 8
 @export_range(1, 512, 1) var initial_surface_row: int = 38
@@ -92,6 +95,12 @@ const MAX_PLAYABLE_DEPTH: int = 2_000_000_000
 @export_range(0.1, 5.0, 0.05) var combo_speed_multiplier: float = 1.5
 ## Multiplies recovery speed after each successfully saved streak.
 @export_range(0.1, 5.0, 0.05) var recovery_speed_multiplier: float = 1.2
+
+@export_category("Encounter Progression")
+## Complete production rules in order: level zero starts the run, and encounter
+## index N applies level N + 1. Keep levels zero through nine populated. See
+## res://resources/pickaxes/pickaxe_authoring.md before adding a pickaxe reward.
+@export var progression_levels: Array[EncounterProgressionLevel] = []
 
 @export_category("Effects")
 ## Treats this combo as full strength for animation and hit feedback.

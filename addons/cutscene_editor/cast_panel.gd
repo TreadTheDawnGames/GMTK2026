@@ -15,6 +15,30 @@ const _MARKER_ROOT_NAMES: Array[StringName] = [
 	&"PropMarkers",
 	&"ActionMarkers",
 ]
+## What each marker root is for, in the same order as _MARKER_ROOT_NAMES. The
+## node names mean nothing to someone dressing a scene; what the markers are used
+## for does.
+const _MARKER_ROOT_LABELS: Array[String] = [
+	"Where people stand",
+	"Where scenery sits",
+	"Where things happen",
+]
+## The spots a stage almost always wants. Offering them by name is what stops a
+## beat targeting "Converstaion" and walking nowhere with no error.
+const _MARKER_NAME_SUGGESTIONS: Array[String] = [
+	"Entrance",
+	"Conversation",
+	"Work",
+	"Rest",
+	"Exit",
+]
+const _CUSTOM_MARKER_LABEL := "Something else..."
+## Where prop scenes live. Scanned rather than listed, so art added to the folder
+## shows up without this file being touched.
+const _PROP_SCENE_DIR := "res://Scenes/props"
+## How far along the floor each new prop is placed from the last.
+const _PROP_PLACEMENT_STEP_PIXELS: float = 96.0
+
 const _MINER_RIG_SCENE := preload("res://Scenes/mining/miner_rig.tscn")
 
 var _context: CutsceneEditorContext
@@ -23,8 +47,10 @@ var _actor_choice: OptionButton
 ## Parallel to _actor_choice's items: {"actor_id": StringName, "appearance":
 ## CharacterAppearance} per entry, so a pick resolves without reparsing labels.
 var _actor_choice_entries: Array[Dictionary] = []
-var _prop_picker: EditorResourcePicker
-var _prop_name_edit: LineEdit
+var _prop_choice: OptionButton
+## Prop scene paths the dropdown currently offers, parallel to its items.
+var _prop_choice_paths: PackedStringArray = PackedStringArray()
+var _marker_choice: OptionButton
 var _marker_root_selector: OptionButton
 var _marker_name_edit: LineEdit
 var _selected_preview: CutsceneActorPreview
@@ -84,8 +110,9 @@ func _clear_contents() -> void:
 	_status_label = null
 	_actor_choice = null
 	_actor_choice_entries.clear()
-	_prop_picker = null
-	_prop_name_edit = null
+	_prop_choice = null
+	_prop_choice_paths = PackedStringArray()
+	_marker_choice = null
 	_marker_root_selector = null
 	_marker_name_edit = null
 
@@ -153,33 +180,101 @@ func _build_controls() -> void:
 	add_child(add_actor_button)
 
 	add_child(HSeparator.new())
-	add_child(_make_section_label("Add Prop"))
-	_prop_name_edit = LineEdit.new()
-	_prop_name_edit.placeholder_text = "Name in the PropMarkers root"
-	_add_labeled_control("Prop name", _prop_name_edit)
-	_prop_picker = EditorResourcePicker.new()
-	_prop_picker.base_type = "PackedScene"
-	_prop_picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_add_labeled_control("Prop scene", _prop_picker)
+	add_child(_make_section_label("Add scenery"))
+	# A list of the props that exist, not a path to hunt for. Dressing a set
+	# means reaching for a table, and a designer should not have to know that
+	# the table is a PackedScene two folders down.
+	_prop_choice = OptionButton.new()
+	_prop_choice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_prop_choice.tooltip_text = (
+		"Everything in %s. Added standing on the stage floor, ready to drag."
+		% _PROP_SCENE_DIR
+	)
+	_rebuild_prop_choices()
+	_add_labeled_control("Prop", _prop_choice)
 	var add_prop_button := Button.new()
-	add_prop_button.text = "Add Prop"
+	add_prop_button.text = "Add to cutscene"
 	add_prop_button.pressed.connect(_on_add_prop_pressed)
 	add_child(add_prop_button)
 
 	add_child(HSeparator.new())
-	add_child(_make_section_label("Add Marker"))
+	add_child(_make_section_label("Add a spot to walk to"))
+	# The roots are named after what they hold rather than after the node, and
+	# the common marker names are offered outright: a beat targets a marker by
+	# name, so a typo here is a walk that silently goes nowhere.
 	_marker_root_selector = OptionButton.new()
-	for root_name: StringName in _MARKER_ROOT_NAMES:
-		_marker_root_selector.add_item(String(root_name))
+	for root_index in range(_MARKER_ROOT_NAMES.size()):
+		_marker_root_selector.add_item(_MARKER_ROOT_LABELS[root_index])
 	_marker_root_selector.select(0)
-	_add_labeled_control("Marker root", _marker_root_selector)
+	_add_labeled_control("Used for", _marker_root_selector)
+	_marker_choice = OptionButton.new()
+	_marker_choice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for suggestion in _MARKER_NAME_SUGGESTIONS:
+		_marker_choice.add_item(suggestion)
+	_marker_choice.add_item(_CUSTOM_MARKER_LABEL)
+	_marker_choice.item_selected.connect(_on_marker_choice_selected)
+	_add_labeled_control("Spot", _marker_choice)
 	_marker_name_edit = LineEdit.new()
-	_marker_name_edit.placeholder_text = "Name targeted by a beat"
-	_add_labeled_control("Marker name", _marker_name_edit)
+	_marker_name_edit.placeholder_text = "Name a beat will target"
+	_marker_name_edit.visible = false
+	_add_labeled_control("Custom name", _marker_name_edit)
 	var add_marker_button := Button.new()
-	add_marker_button.text = "Add Marker"
+	add_marker_button.text = "Add to cutscene"
 	add_marker_button.pressed.connect(_on_add_marker_pressed)
 	add_child(add_marker_button)
+
+
+## Lists every prop scene on disk, so art dropped into the folder appears here
+## without anyone editing this panel.
+func _rebuild_prop_choices() -> void:
+	_prop_choice.clear()
+	_prop_choice_paths = PackedStringArray()
+	var directory := DirAccess.open(_PROP_SCENE_DIR)
+	if directory == null:
+		_prop_choice.add_item("No %s folder" % _PROP_SCENE_DIR.get_file())
+		_prop_choice.disabled = true
+		return
+	directory.list_dir_begin()
+	var entry := directory.get_next()
+	var names := PackedStringArray()
+	while entry != "":
+		if not directory.current_is_dir() and entry.ends_with(".tscn"):
+			names.append(entry)
+		entry = directory.get_next()
+	directory.list_dir_end()
+	names.sort()
+	for scene_name in names:
+		_prop_choice.add_item(
+			scene_name.get_basename().replace("_", " ").capitalize()
+		)
+		_prop_choice_paths.append("%s/%s" % [_PROP_SCENE_DIR, scene_name])
+	if _prop_choice_paths.is_empty():
+		_prop_choice.add_item("No props authored yet")
+		_prop_choice.disabled = true
+		return
+	_prop_choice.disabled = false
+	_prop_choice.select(0)
+
+
+## Shows the free-text box only when the designer wants a name that is not one
+## of the usual spots, so the common path stays a single choice.
+func _on_marker_choice_selected(index: int) -> void:
+	if not is_instance_valid(_marker_name_edit):
+		return
+	_marker_name_edit.visible = index >= _MARKER_NAME_SUGGESTIONS.size()
+
+
+## Returns the marker name to create: a chosen suggestion, or whatever was typed
+## when "Something else" is selected.
+func _get_chosen_marker_name() -> String:
+	if not is_instance_valid(_marker_choice):
+		return ""
+	var index := _marker_choice.selected
+	if index >= 0 and index < _MARKER_NAME_SUGGESTIONS.size():
+		return _MARKER_NAME_SUGGESTIONS[index]
+	if not is_instance_valid(_marker_name_edit):
+		return ""
+	return _marker_name_edit.text.strip_edges()
 
 
 ## Fills the character dropdown from the run's schedule, leaving out anyone
@@ -361,6 +456,12 @@ func populate_from_encounter() -> Vector2i:
 	if drawn_value is Array:
 		drawn_into_set = drawn_value
 
+	# The whole cast shares the miner's cutscene draw order. Only he was being
+	# given one, so everyone else defaulted to zero and stood behind both the
+	# walkway and the foreground rock - Cheese Girl's legs disappeared into the
+	# floor while the miner's did not, standing on the same line.
+	var cast_draw_order: int = _read_miner_rig().get("draw_order", 0)
+
 	var additions: Array[CutsceneActorPreview] = []
 	var already_placed := 0
 	for actor_id in actor_ids:
@@ -374,6 +475,7 @@ func populate_from_encounter() -> Vector2i:
 		actor.actor_id = actor_id
 		actor.appearance = appearance_by_actor_id.get(actor_id) as CharacterAppearance
 		actor.position = actor_positions.get(actor_id, Vector2.ZERO)
+		actor.z_index = cast_draw_order
 		additions.append(actor)
 
 	if not additions.is_empty():
@@ -630,6 +732,9 @@ func _on_add_actor_pressed() -> void:
 	actor.name = _make_unique_child_name(_context.stage, String(actor_id))
 	actor.actor_id = actor_id
 	actor.appearance = appearance
+	# Same order the populated cast gets, so a hand-added character stands in
+	# front of the floor rather than behind it.
+	actor.z_index = _read_miner_rig().get("draw_order", 0)
 	var conversation_marker := _get_conversation_marker()
 	if conversation_marker != null:
 		actor.position = _context.stage.to_local(
@@ -697,14 +802,19 @@ func _get_selected_actor_preview() -> CutsceneActorPreview:
 func _on_add_prop_pressed() -> void:
 	if not _has_valid_context():
 		return
-	var prop_name := _prop_name_edit.text.strip_edges()
-	if prop_name.is_empty():
-		_set_status("Prop name is required.")
+	var choice_index := _prop_choice.selected
+	if choice_index < 0 or choice_index >= _prop_choice_paths.size():
+		_set_status("Pick a prop to add.")
 		return
-	var prop_scene := _prop_picker.edited_resource as PackedScene
+	var prop_path: String = _prop_choice_paths[choice_index]
+	var prop_scene: PackedScene = load(prop_path)
 	if prop_scene == null:
-		_set_status("Choose a PackedScene before adding the prop.")
+		_set_status("'%s' could not be loaded." % prop_path.get_file())
 		return
+	# Named after the scene rather than typed. The name only has to be unique
+	# and recognisable in the Scene dock, and _make_unique_child_name already
+	# guarantees the first of those.
+	var prop_name := prop_path.get_file().get_basename().to_pascal_case()
 	var prop_root := _get_stage_root(&"PropMarkers")
 	if prop_root == null:
 		_set_status("This stage has no PropMarkers root.")
@@ -714,6 +824,15 @@ func _on_add_prop_pressed() -> void:
 		_set_status("The selected prop scene could not be instantiated.")
 		return
 	prop.name = _make_unique_child_name(prop_root, prop_name)
+	# Stepped along the floor by however much scenery is already there. Every
+	# prop dropped at the origin lands on the miner and on each other, so a
+	# second one looks like the first simply failed to appear.
+	var prop_2d := prop as Node2D
+	if prop_2d != null:
+		prop_2d.position = Vector2(
+			_PROP_PLACEMENT_STEP_PIXELS * float(prop_root.get_child_count()),
+			0.0
+		)
 	var undo_redo: Variant = _get_undo_redo()
 	undo_redo.create_action("Add cutscene prop")
 	undo_redo.add_do_method(prop_root, &"add_child", prop)
@@ -734,9 +853,12 @@ func _on_add_prop_pressed() -> void:
 func _on_add_marker_pressed() -> void:
 	if not _has_valid_context():
 		return
-	var marker_name := _marker_name_edit.text.strip_edges()
+	var marker_name := _get_chosen_marker_name()
 	if marker_name.is_empty():
-		_set_status("Marker name is required.")
+		_set_status("Name the spot before adding it.")
+		return
+	if _context.get_marker_names().has(marker_name):
+		_set_status("'%s' already exists on this stage." % marker_name)
 		return
 	var root_index := _marker_root_selector.selected
 	var marker_root := _get_stage_root(_MARKER_ROOT_NAMES[root_index])

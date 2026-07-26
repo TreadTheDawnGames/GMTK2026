@@ -15,3 +15,4 @@ visible = true
 [node name="BounceSound" type="AudioStreamPlayer2D" parent="." index="1" unique_id=1750839069]
 unique_name_in_owner = true
 stream = ExtResource("3_o2bqu")
+bus = &"SFX"

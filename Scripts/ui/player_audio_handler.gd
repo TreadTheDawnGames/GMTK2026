@@ -3,15 +3,6 @@ class_name PlayerAudioHandler
 @onready var music_player: AudioStreamPlayer = %MusicPlayer
 @export var interactive_stream : AudioStream
 
-## Returns the project autoload without coupling consumers to a bare global.
-static func get_global(context: Node) -> PlayerAudioHandler:
-	var audio_handler: PlayerAudioHandler = (
-		context.get_node_or_null("/root/AudioHandler") as PlayerAudioHandler
-	)
-	if audio_handler == null:
-		push_error("AudioHandler autoload is unavailable.")
-	return audio_handler
-
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	pass # Replace with function body.

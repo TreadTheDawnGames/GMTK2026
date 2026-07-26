@@ -4,13 +4,14 @@ extends Control
 ## How it works:
 ## - The menu is an overlay inside the live mining scene, not a scene of its
 ##   own, so the world behind it is the game already staged at the surface.
-## - Start therefore never loads or changes a scene. It clears the run, fades
-##   the interface off the shot, and emits start_requested for the opening
-##   sequence to act on. The world underneath is never interrupted.
+## - Start therefore never loads or changes a scene. It asks the composition
+##   root to clear the run, fades off, and starts the opening sequence.
 ## - Owned state: the staged reveal's completion and the one-shot start guard.
 ## The invariant is that this node only ever writes to its own interface.
 
 signal start_requested
+
+const OptionsMenuType := preload("res://Scripts/ui/Options.gd")
 
 @export_category("References")
 @export var title_group: CanvasItem
@@ -36,6 +37,12 @@ var _intro_tween: Tween
 var _start_tween: Tween
 var _intro_complete: bool = false
 var _is_starting: bool = false
+var _save_game: SaveGame
+
+
+## Supplies the save resource passed to settings screens opened by this menu.
+func set_save_game(save_game: SaveGame) -> void:
+	_save_game = save_game
 
 
 ## Connects menu actions and starts the staged interface reveal.
@@ -122,11 +129,6 @@ func _on_start_button_pressed() -> void:
 	options_button.disabled = true
 	exit_button.disabled = true
 	status_label.text = ""
-	# Clear the persistent run before the fade, so the reset never depends on
-	# how long the transition takes.
-	var run_state := RunState.get_global(self)
-	if run_state != null:
-		run_state.reset_run()
 	# The shot is asked for first and the interface leaves over the top of it,
 	# so the bus is already driving in while the buttons dissolve. Fading out
 	# first and asking afterwards leaves a beat of empty world in between,
@@ -159,10 +161,13 @@ func _fade_interface_out() -> void:
 
 ## Opens the authored settings screen over the menu.
 func _on_options_pressed() -> void:
-	var options := options_scene.instantiate() as Control
+	var options := options_scene.instantiate() as OptionsMenuType
 	if options == null:
-		push_error("The configured options scene must instantiate a Control.")
+		push_error(
+			"The configured options scene must instantiate an OptionsMenu."
+		)
 		return
+	options.set_save_game(_save_game)
 	options.tree_exited.connect(
 		options_button.grab_focus,
 		CONNECT_ONE_SHOT

@@ -12,13 +12,13 @@ class DirtPiece:
 	var color: Color
 	var rotation: float
 	var angular_velocity: float
-	var shape_seed: float
 	var settled: bool = false
 
 
 @export_category("References")
 @export var terrain_manager: TerrainManager
 @export var terrain_profile: TerrainLayerProfile
+@export var particle_multimesh: MultiMeshInstance2D
 
 @export_category("Burst")
 @export_range(0.1, 2.0, 0.05) var pieces_per_removed_cell: float = 0.6
@@ -41,16 +41,60 @@ class DirtPiece:
 @export_category("Performance")
 ## Limits simultaneous fragments so repeated hits stay inexpensive.
 @export_range(1, 512, 1) var maximum_active_pieces: int = 192
-## Applies a lower simultaneous-fragment limit in browser exports.
-@export_range(1, 256, 1) var web_maximum_active_pieces: int = 64
+## Forty-eight retains a dense burst while leaving browser CPU/GPU headroom for
+## terrain publication and RichText feedback in the same post-impact frames.
+@export_range(1, 256, 1) var web_maximum_active_pieces: int = 48
 
 var _pieces: Array[DirtPiece] = []
+# Retired records are reused. The pool can never exceed the platform's active
+# cap, so repeated hits allocate no new presentation records in steady state.
+var _piece_pool: Array[DirtPiece] = []
 var _random := RandomNumberGenerator.new()
 
 
-## Prepares random values and sleeps processing until the first burst.
+## Prepares one shared hex mesh and sleeps processing until the first burst.
 func _ready() -> void:
 	_random.randomize()
+	if particle_multimesh == null:
+		push_error("MiningHitParticles requires a particle MultiMesh.")
+		return
+	var mesh_arrays: Array = []
+	mesh_arrays.resize(Mesh.ARRAY_MAX)
+	mesh_arrays[Mesh.ARRAY_VERTEX] = PackedVector2Array([
+		Vector2.ZERO,
+		Vector2(1.0, 0.0),
+		Vector2(0.5, 0.866),
+		Vector2(-0.5, 0.866),
+		Vector2(-1.0, 0.0),
+		Vector2(-0.5, -0.866),
+		Vector2(0.5, -0.866),
+	])
+	mesh_arrays[Mesh.ARRAY_INDEX] = PackedInt32Array([
+		0, 1, 2,
+		0, 2, 3,
+		0, 3, 4,
+		0, 4, 5,
+		0, 5, 6,
+		0, 6, 1,
+	])
+	var debris_mesh := ArrayMesh.new()
+	debris_mesh.add_surface_from_arrays(
+		Mesh.PRIMITIVE_TRIANGLES,
+		mesh_arrays
+	)
+	var active_piece_budget := maximum_active_pieces
+	if OS.has_feature("web"):
+		active_piece_budget = mini(
+			active_piece_budget,
+			web_maximum_active_pieces
+		)
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_2D
+	multimesh.use_colors = true
+	multimesh.mesh = debris_mesh
+	multimesh.instance_count = maxi(active_piece_budget, 1)
+	multimesh.visible_instance_count = 0
+	particle_multimesh.multimesh = multimesh
 	set_process(false)
 
 
@@ -86,7 +130,9 @@ func play_at_impact(
 	)
 	# Keep the newest impact readable by discarding oldest pieces first.
 	for _piece_index in range(oldest_pieces_to_remove):
-		_pieces.remove_at(0)
+		var retired_piece: DirtPiece = _pieces.pop_front()
+		if _piece_pool.size() < active_piece_budget:
+			_piece_pool.append(retired_piece)
 
 	var spawn_position := terrain_manager.screen_to_terrain_position(
 		impact_screen_position + Vector2.UP * 2.0
@@ -102,7 +148,11 @@ func play_at_impact(
 	)
 
 	for _piece_index in range(piece_amount):
-		var piece := DirtPiece.new()
+		var piece: DirtPiece = (
+			_piece_pool.pop_back()
+			if not _piece_pool.is_empty()
+			else DirtPiece.new()
+		)
 		piece.terrain_position = spawn_position
 		piece.velocity = Vector2.UP.rotated(
 			_random.randf_range(-half_spread, half_spread)
@@ -125,10 +175,10 @@ func play_at_impact(
 		)
 		piece.rotation = _random.randf_range(0.0, TAU)
 		piece.angular_velocity = _random.randf_range(-8.0, 8.0)
-		piece.shape_seed = _random.randf_range(0.0, TAU)
+		piece.settled = false
 		_pieces.append(piece)
 	set_process(true)
-	queue_redraw()
+	_update_particle_instances()
 
 
 ## Moves active dirt pieces and removes expired pieces.
@@ -137,20 +187,31 @@ func _process(delta: float) -> void:
 		var piece := _pieces[piece_index]
 		piece.remaining_lifetime -= delta
 		if piece.remaining_lifetime <= 0.0:
+			var retired_piece := _pieces[piece_index]
 			_pieces.remove_at(piece_index)
+			if _piece_pool.size() < maximum_active_pieces:
+				_piece_pool.append(retired_piece)
 			continue
 		if not piece.settled:
 			piece.velocity.y += gravity * delta
 			piece.rotation += piece.angular_velocity * delta
 			_move_piece(piece, delta)
-	queue_redraw()
+	_update_particle_instances()
 	if _pieces.is_empty():
 		set_process(false)
 
 
-## Draws each fading dirt fragment at its current terrain position.
-func _draw() -> void:
-	for piece in _pieces:
+## Uploads active debris transforms and colors to one instanced canvas draw.
+func _update_particle_instances() -> void:
+	if particle_multimesh == null or particle_multimesh.multimesh == null:
+		return
+	var multimesh := particle_multimesh.multimesh
+	var visible_count := mini(
+		_pieces.size(),
+		multimesh.instance_count
+	)
+	for piece_index in range(visible_count):
+		var piece := _pieces[piece_index]
 		var screen_position := terrain_manager.terrain_to_screen_position(
 			piece.terrain_position
 		)
@@ -162,26 +223,17 @@ func _draw() -> void:
 		)
 		var draw_color := piece.color
 		draw_color.a *= fade_alpha
-		var vertices := PackedVector2Array()
-		for vertex_index in range(6):
-			var angle := (
-				piece.rotation
-				+ TAU * float(vertex_index) / 6.0
-			)
-			var edge_variation := lerpf(
-				0.72,
-				1.0,
-				0.5 + 0.5 * sin(
-					piece.shape_seed + float(vertex_index) * 2.17
-				)
-			)
-			vertices.append(
+		multimesh.set_instance_transform_2d(
+			piece_index,
+			Transform2D(
+				piece.rotation,
+				Vector2.ONE * piece.radius,
+				0.0,
 				screen_position
-				+ Vector2.RIGHT.rotated(angle)
-				* piece.radius
-				* edge_variation
 			)
-		draw_colored_polygon(vertices, draw_color)
+		)
+		multimesh.set_instance_color(piece_index, draw_color)
+	multimesh.visible_instance_count = visible_count
 
 
 ## Moves one dirt piece and bounces it away from solid terrain.

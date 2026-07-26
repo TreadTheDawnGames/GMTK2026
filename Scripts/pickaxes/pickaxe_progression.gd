@@ -3,9 +3,11 @@ extends Node
 
 ## How it works:
 ## - NPC rewards are appended to one cumulative run stack.
-## - Every owned definition contributes mining modifiers and timing targets.
+## - EncounterProgression owns production mining and timing difficulty.
+## - Definition modifiers remain available to isolated legacy previews.
 ## - The newest reward controls only the visible tool appearance.
 ## - The invariant is that granting an upgrade never disables an older one.
+## Authoring source of truth: res://resources/pickaxes/pickaxe_authoring.md
 
 signal upgrade_granted(definition: PickaxeDefinition)
 signal target_unlocks_changed(definitions: Array[PickaxeDefinition])
@@ -40,7 +42,8 @@ func _ready() -> void:
 	_apply_stack()
 
 
-## Adds a character's gift to the active stack and makes it the visible tool.
+## Adds the encounter-authored gift once and makes it the visible tool.
+## Callers supply the definition explicitly; UI must not query this loadout.
 func grant_upgrade(definition: PickaxeDefinition) -> bool:
 	if definition == null or definition.id.is_empty():
 		return false

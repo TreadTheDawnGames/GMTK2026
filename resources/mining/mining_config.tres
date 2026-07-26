@@ -1,8 +1,20 @@
 [gd_resource type="Resource" script_class="MiningConfig" format=3 uid="uid://dhlm43rg16rkw"]
 
 [ext_resource type="Script" uid="uid://xqwjlj3si8td" path="res://resources/mining/mining_config.gd" id="1_config"]
+[ext_resource type="Script" uid="uid://ccyhfmjkfbq3d" path="res://resources/mining/encounter_progression_level.gd" id="1_csmot"]
+[ext_resource type="Resource" uid="uid://dpdbrvvmrb7s5" path="res://resources/mining/progression_level_0.tres" id="2_level_0"]
+[ext_resource type="Resource" uid="uid://bkweoms5a7xnb" path="res://resources/mining/progression_level_1.tres" id="3_level_1"]
+[ext_resource type="Resource" uid="uid://cs0p63ssmvbds" path="res://resources/mining/progression_level_2.tres" id="4_level_2"]
+[ext_resource type="Resource" uid="uid://beq1cj0uet31n" path="res://resources/mining/progression_level_3.tres" id="5_level_3"]
+[ext_resource type="Resource" uid="uid://cxw2y8u87dxfb" path="res://resources/mining/progression_level_4.tres" id="6_level_4"]
+[ext_resource type="Resource" uid="uid://b6bc4uabq7glm" path="res://resources/mining/progression_level_5.tres" id="7_level_5"]
+[ext_resource type="Resource" uid="uid://dax465lhfu80a" path="res://resources/mining/progression_level_6.tres" id="8_level_6"]
+[ext_resource type="Resource" uid="uid://cyix7qxtpjhes" path="res://resources/mining/progression_level_7.tres" id="9_level_7"]
+[ext_resource type="Resource" uid="uid://bsvqjl3da48mn" path="res://resources/mining/progression_level_8.tres" id="10_level_8"]
+[ext_resource type="Resource" uid="uid://po156e267vbx" path="res://resources/mining/progression_level_9.tres" id="11_level_9"]
 
 [resource]
 script = ExtResource("1_config")
 base_mine_depth_rows = 12
 combo_mine_depth_rows_per_step = 2
+progression_levels = Array[ExtResource("1_csmot")]([ExtResource("2_level_0"), ExtResource("3_level_1"), ExtResource("4_level_2"), ExtResource("5_level_3"), ExtResource("6_level_4"), ExtResource("7_level_5"), ExtResource("8_level_6"), ExtResource("9_level_7"), ExtResource("10_level_8"), ExtResource("11_level_9")])

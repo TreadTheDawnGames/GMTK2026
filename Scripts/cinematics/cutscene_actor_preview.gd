@@ -31,6 +31,7 @@ var _sprite: Sprite2D
 var _missing_warning: Polygon2D
 var _missing_warning_cross_a: Line2D
 var _missing_warning_cross_b: Line2D
+var _ground_shadow: ActorGroundShadow
 var _watched_appearance: CharacterAppearance
 var _watched_pose_set: ActorPoseSet
 
@@ -89,15 +90,38 @@ func get_preview_error() -> String:
 func _ensure_sprite() -> Sprite2D:
 	if is_instance_valid(_sprite):
 		return _sprite
-	_sprite = Sprite2D.new()
-	_sprite.name = &"PreviewSprite"
-	add_child(_sprite)
+	# Adopt one saved by an older version of this script rather than adding a
+	# second beside it. Without this the scene loads its stored PreviewSprite,
+	# builds another, and Godot renames the newcomer PreviewSprite2.
+	_sprite = get_node_or_null(NodePath("PreviewSprite")) as Sprite2D
+	if _sprite == null:
+		_sprite = Sprite2D.new()
+		_sprite.name = &"PreviewSprite"
+		add_child(_sprite)
 	_sync_sprite_owner()
 	return _sprite
 
 
 func _ensure_missing_warning() -> void:
 	if is_instance_valid(_missing_warning):
+		return
+	# Same adoption as the sprite: reuse what a previously saved scene left here
+	# instead of building a duplicate set of warning marks beside it.
+	_missing_warning = get_node_or_null(
+		NodePath("MissingAppearanceWarning")
+	) as Polygon2D
+	_missing_warning_cross_a = get_node_or_null(
+		NodePath("MissingAppearanceCrossA")
+	) as Line2D
+	_missing_warning_cross_b = get_node_or_null(
+		NodePath("MissingAppearanceCrossB")
+	) as Line2D
+	if (
+		_missing_warning != null
+		and _missing_warning_cross_a != null
+		and _missing_warning_cross_b != null
+	):
+		_sync_sprite_owner()
 		return
 	_missing_warning = Polygon2D.new()
 	_missing_warning.name = &"MissingAppearanceWarning"
@@ -124,7 +148,25 @@ func _ensure_missing_warning() -> void:
 		Vector2(15.0, -15.0),
 	])
 	add_child(_missing_warning_cross_b)
-	_sync_generated_child_owners()
+	_sync_sprite_owner()
+
+
+## Puts a contact shadow under this actor if it has not got one.
+##
+## The node's origin is the character's feet, so a shadow parented here needs no
+## offset: it is already on the spot the actor is standing. Runtime-only like
+## the sprite, so it is never written into the saved scene.
+func _ensure_ground_shadow() -> void:
+	if is_instance_valid(_ground_shadow):
+		_ground_shadow.visible = _is_drawable_appearance()
+		return
+	_ground_shadow = get_node_or_null(NodePath("GroundShadow")) as ActorGroundShadow
+	if _ground_shadow == null:
+		_ground_shadow = ActorGroundShadow.new()
+		_ground_shadow.name = &"GroundShadow"
+		add_child(_ground_shadow)
+	_ground_shadow.visible = _is_drawable_appearance()
+	_sync_sprite_owner()
 
 
 func _make_warning_cross(cross_name: StringName) -> Line2D:
@@ -135,16 +177,24 @@ func _make_warning_cross(cross_name: StringName) -> Line2D:
 	return cross
 
 
+## Keeps the generated visuals out of the saved scene.
+##
+## They used to be given the scene as their owner, which meant they were written
+## into the .tscn. The next load then read a stored PreviewSprite, built a second
+## one because the script rebuilds its visuals on entering the tree, and Godot
+## renamed the newcomer PreviewSprite2 with a clash warning per node - four
+## warnings per actor, every time the scene opened.
+##
+## The node a designer places is the actor; everything under it is drawn from the
+## appearance and belongs to the running editor, not to the file. A null owner is
+## what says so.
+##
+## Named for what it is called from rather than what it now does: the cast panel
+## stages this through UndoRedo when it adds an actor.
 func _sync_sprite_owner() -> void:
-	if is_instance_valid(_sprite) and owner != null:
-		_sprite.owner = owner
-	_sync_generated_child_owners()
-
-
-func _sync_generated_child_owners() -> void:
 	for generated_child: Node in get_children():
-		if generated_child != self and owner != null:
-			generated_child.owner = owner
+		if generated_child != self:
+			generated_child.owner = null
 
 
 func _connect_appearance_resources() -> void:
@@ -209,6 +259,7 @@ func _rebuild_sprite() -> void:
 	var target := _ensure_sprite()
 	_sync_sprite_owner()
 	_ensure_missing_warning()
+	_ensure_ground_shadow()
 	var is_drawable := _is_drawable_appearance()
 	_missing_warning.visible = not is_drawable
 	_missing_warning_cross_a.visible = not is_drawable

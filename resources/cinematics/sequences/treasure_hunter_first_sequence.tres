@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="CutsceneSequence" format=3]
+[gd_resource type="Resource" script_class="CutsceneSequence" format=3 uid="uid://b3eyke21tie0t"]
 
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_beat.gd" id="1_al5fl"]
-[ext_resource type="Resource" path="res://resources/dialogue/treasure_hunter_first_conversation.tres" id="2_252o6"]
-[ext_resource type="Script" path="res://resources/cinematics/cutscene_sequence.gd" id="3_l63c8"]
+[ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="1_al5fl"]
+[ext_resource type="Resource" uid="uid://er6s47x6pn6j" path="res://resources/dialogue/treasure_hunter_first_conversation.tres" id="2_252o6"]
+[ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="3_l63c8"]
 
 [sub_resource type="Resource" id="Resource_2k5s6"]
 script = ExtResource("1_al5fl")
@@ -13,33 +13,42 @@ actor = &"treasure_hunter"
 script = ExtResource("1_al5fl")
 kind = 0
 actor = &"treasure_hunter"
-duration_seconds = 1.0
+duration_seconds = 0.9
 target_marker = &"Conversation"
+starts_from_authored_point = true
+start_marker = &"Entrance"
 pose = &"walk"
-step_height = 9.0
 
 [sub_resource type="Resource" id="Resource_al13m"]
 script = ExtResource("1_al5fl")
 kind = 2
 actor = &"treasure_hunter"
-start_seconds = 1.0
+start_seconds = 0.9
 facing = -1
 
 [sub_resource type="Resource" id="Resource_1nh83"]
 script = ExtResource("1_al5fl")
 kind = 1
 actor = &"treasure_hunter"
-start_seconds = 1.0
+start_seconds = 0.9
 pose = &"idle"
 
 [sub_resource type="Resource" id="Resource_7j7gd"]
+script = ExtResource("1_al5fl")
+kind = 3
+actor = &"treasure_hunter"
+start_seconds = 0.9
+duration_seconds = 0.3
+
+[sub_resource type="Resource" id="Resource_l8ac4"]
 script = ExtResource("1_al5fl")
 kind = 5
 start_seconds = 1.2
 duration_seconds = 6.0
 conversation = ExtResource("2_252o6")
+notes = "Brisk, barely stops. He has a pickaxe to hand over and the single bounce is him presenting it."
 
-[sub_resource type="Resource" id="Resource_l8ac4"]
+[sub_resource type="Resource" id="Resource_yq1co"]
 script = ExtResource("1_al5fl")
 kind = 0
 actor = &"treasure_hunter"
@@ -47,9 +56,8 @@ start_seconds = 7.2
 duration_seconds = 1.8
 target_marker = &"Exit"
 pose = &"walk"
-step_height = 9.0
 
-[sub_resource type="Resource" id="Resource_yq1co"]
+[sub_resource type="Resource" id="Resource_djxbr"]
 script = ExtResource("1_al5fl")
 kind = 10
 actor = &"treasure_hunter"
@@ -58,4 +66,4 @@ start_seconds = 9.0
 [resource]
 script = ExtResource("3_l63c8")
 sequence_id = &"treasure_hunter_first_sequence"
-beats = Array[ExtResource("1_al5fl")]([SubResource("Resource_2k5s6"), SubResource("Resource_hwkqq"), SubResource("Resource_al13m"), SubResource("Resource_1nh83"), SubResource("Resource_7j7gd"), SubResource("Resource_l8ac4"), SubResource("Resource_yq1co")])
+beats = Array[ExtResource("1_al5fl")]([SubResource("Resource_2k5s6"), SubResource("Resource_hwkqq"), SubResource("Resource_al13m"), SubResource("Resource_1nh83"), SubResource("Resource_7j7gd"), SubResource("Resource_l8ac4"), SubResource("Resource_yq1co"), SubResource("Resource_djxbr")])
