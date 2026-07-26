@@ -42,6 +42,9 @@ const ROOM_PATH: String = (
 	"res://resources/cinematics/sculpts/treasure_hunter_first_room.tres"
 )
 const MINING_CONFIG_PATH: String = "res://resources/mining/mining_config.tres"
+const ENCOUNTER_PATH: String = (
+	"res://resources/encounters/treasure_hunter_first_encounter.tres"
+)
 
 ## With this room's anchor offset a grid column equals its terrain column
 ## outright, so every number below is also a terrain column.
@@ -540,6 +543,7 @@ func _verify_room(
 			)
 
 	_verify_cast_headroom(sculpt)
+	_verify_arrival_trigger_matches_the_roof(sculpt, floor_row)
 	_verify_sealed_bore(sculpt, floor_row)
 	_verify_strikes_open_the_plug(sculpt, floor_row)
 
@@ -582,6 +586,51 @@ func _verify_cast_headroom(sculpt: CutsceneTerrainSculpt) -> void:
 				) % [local_x, headroom, required]
 			)
 			return
+
+
+## Proves the encounter is captured where this room's roof actually is.
+##
+## The schedule captures the run when it comes within Chamber Height Rows of the
+## floor, and that row has to be the room's own opening. Leave it at the shared
+## default of 24 over a room carved 31 rows up and the miner breaks through the
+## roof and falls seven rows through open air with nothing happening - which is
+## the fault encounter 3 shipped a fix for in 37d69a2. Set it higher than the
+## carve and the cutscene starts while he is still inside solid rock.
+##
+## Nothing else in the project ties these two numbers together: the override
+## lives on the encounter resource and the opening lives in this file, and a
+## later carve that opens the roof further would silently put the trigger back
+## inside the room. This check is that tie, and it is why the encounter resource
+## is loaded by a script that otherwise only touches the sculpt.
+func _verify_arrival_trigger_matches_the_roof(
+	sculpt: CutsceneTerrainSculpt,
+	floor_row: int
+) -> void:
+	var encounter := load(ENCOUNTER_PATH) as DepthCharacterEncounter
+	if encounter == null:
+		_failures.append("The encounter resource could not be loaded.")
+		return
+	var highest_open_row := floor_row
+	for local_x in range(sculpt.grid_size.x):
+		for local_y in range(floor_row):
+			if not sculpt.is_solid_local(Vector2i(local_x, local_y)):
+				highest_open_row = mini(highest_open_row, local_y)
+				break
+	var carved_height := floor_row - highest_open_row
+	if encounter.chamber_height_rows_override != carved_height:
+		_failures.append(
+			(
+				"The room is carved %d rows above its floor but the encounter's "
+				+ "Chamber Height Rows Override is %d. Set the override to %d, "
+				+ "or the shot starts in the wrong place: too low and he falls "
+				+ "through open air before anything begins, too high and it "
+				+ "starts while he is still in the rock."
+			) % [
+				carved_height,
+				encounter.chamber_height_rows_override,
+				carved_height,
+			]
+		)
 
 
 ## Proves the wall he mines through is still authored closed.
