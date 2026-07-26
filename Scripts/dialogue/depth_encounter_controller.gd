@@ -40,6 +40,19 @@ const CAST_FLOOR_LAYER_INDEX: int = 0
 ## contract asks this comparison to tolerate overshoot rather than demand an
 ## exact impact row, and this is the same allowance in the other direction.
 const LANDING_FLOOR_TOLERANCE_ROWS: int = 4
+## Pixels every cutscene actor is raised off the sampled floor support.
+##
+## The sampler answers with the first solid cell of the rock. What the player
+## sees is that rock's drawn outline, which is stroked outward from the boundary
+## and so sits above it, and a character seated on the raw support stands with
+## their soles inside that band looking half sunk into the ground.
+##
+## One value here rather than a nudge per character, because it is not a property
+## of anyone's art: Cheese Girl's sprite offset already stands her exactly on her
+## own origin, and she reads as low anyway. Both the miner's seating and the
+## stage's walking sampler go through this, so the cast cannot drift apart from
+## the man they are talking to.
+const CUTSCENE_FLOOR_LIFT_PIXELS: float = 7.0
 
 @export_category("Schedule")
 @export var encounter_config: DepthEncounterConfig
@@ -212,6 +225,24 @@ func _activate_pending_encounter() -> void:
 	_begin_active_encounter.call_deferred()
 
 
+## Returns the screen height a cutscene actor's soles rest at for one column.
+##
+## Everyone standing in a cutscene room resolves their footing through here - the
+## miner when he is seated on arrival, and every visitor as they walk - so the
+## cast can never end up on a different reading of the same floor.
+func _sample_cutscene_floor(screen_x: float, landing_world_row: int) -> float:
+	var support: float = (
+		terrain_renderer.get_layer_opening_floor_support_screen_y(
+			screen_x,
+			landing_world_row,
+			CAST_FLOOR_LAYER_INDEX
+		)
+	)
+	if is_nan(support):
+		return support
+	return support - CUTSCENE_FLOOR_LIFT_PIXELS
+
+
 ## Slides the whole actor marker set so the conversation stop lands the authored
 ## distance from wherever the miner's descent actually left him.
 ##
@@ -345,10 +376,8 @@ func _begin_active_encounter() -> void:
 		# and sampling the one behind it found a support hundreds of pixels lower
 		# - which is where the cast were being walked to, well below the room and
 		# off the bottom of the frame.
-		var floor_sampler := (
-			terrain_renderer
-			.get_layer_opening_floor_support_screen_y
-			.bind(_game_state.mining_y, CAST_FLOOR_LAYER_INDEX)
+		var floor_sampler := _sample_cutscene_floor.bind(
+			_game_state.mining_y
 		)
 		# Stand the miner on the rock rather than on the row underneath it.
 		#
@@ -492,10 +521,14 @@ func _on_conversation_finished(conversation_id: StringName) -> void:
 		final_encounter_reached.emit(encounter.encounter_id)
 		return
 	if _active_stage != null:
+		print("[END] closing stage")
 		await _active_stage.play_closing()
+		print("[END] stage closed")
 		_active_stage = null
 		dialogue_director.close_cinematic_frame()
+		print("[END] waiting for frame to close")
 		await dialogue_director.wait_until_frame_closed()
+		print("[END] frame closed")
 
 	_next_encounter_index = _active_encounter_index + 1
 	_active_encounter_index = -1
@@ -684,6 +717,7 @@ func has_pending_or_active_interaction() -> bool:
 
 ## Releases only this encounter's named ownership of mining and camera state.
 func _finish_cinematic_flow() -> void:
+	print("[END] releasing mining gate")
 	_reset_speech_reactions()
 	miner_rig.exit_cutscene_draw_order()
 	# Back to the mining grounding, so the shot's seating never follows him into
