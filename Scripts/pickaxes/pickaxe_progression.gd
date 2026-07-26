@@ -68,7 +68,6 @@ func _apply_stack() -> void:
 func _apply_visible_pickaxe(definition: PickaxeDefinition) -> void:
 	if definition == null:
 		return
-	print("applying: ", definition.display_name)
 	miner_rig.set_pickaxe_visual_tier(definition.visual_tier)
 	miner_rig.set_hammer_head_color(definition.hammer_head_color)
 	mining_controller.config.use_secondary_recovery = definition.secondary_recovery

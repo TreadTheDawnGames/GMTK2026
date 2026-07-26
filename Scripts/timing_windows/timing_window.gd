@@ -354,6 +354,13 @@ func fail_combo():
 	_play_sound(AudioLibrary.STREAK_LOST)
 	_apply_combo_target_group.call_deferred(0, false)
 
+func missing_target_after_updated_target_tresholds(reached_combo : int) -> bool:
+	for i in _progression_bonus_target_combos:
+		print("Reached combo: ", reached_combo, ". Greater than threshold? ", reached_combo > i, " and are we missing a target? ", mining_window.targets.size() < _progression_bonus_target_combos.size())
+		#if we are above a the combo threshold  and  we are lacking a target (plus one because we ALWAYS have at least one target)
+		if reached_combo > i and mining_window.targets.size() < _progression_bonus_target_combos.size() + 1:
+			return true
+	return false
 
 ## Applies a reached combo pool after a completed set, then adds hit bonuses.
 func _apply_success_target_rules(
@@ -364,9 +371,7 @@ func _apply_success_target_rules(
 		var group_index := _resolve_combo_target_group_index(reached_combo)
 		if target_set_completed:
 			_apply_combo_target_group(reached_combo, true)
-		#for i in _progression_bonus_target_combos:
-			#if reached_combo > i and mining_window.targets.size()
-		if reached_combo in _progression_bonus_target_combos:
+		if reached_combo in _progression_bonus_target_combos or missing_target_after_updated_target_tresholds(reached_combo):
 			if (
 				target_set_completed
 				or group_index == _active_combo_target_group_index
