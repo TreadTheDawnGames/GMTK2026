@@ -96,6 +96,14 @@ signal swing_finished
 @export var idle_miner_texture: Texture2D
 @export var wind_up_miner_texture: Texture2D
 @export var impact_miner_texture: Texture2D
+@export_category("Pickaxe Upgrade Poses")
+@export var silver_idle_miner_texture: Texture2D
+@export var silver_wind_up_miner_texture: Texture2D
+@export var silver_impact_miner_texture: Texture2D
+@export var gold_idle_miner_texture: Texture2D
+@export var gold_wind_up_miner_texture: Texture2D
+@export var gold_impact_miner_texture: Texture2D
+@export_category("References")
 ## Drawn while a cutscene drops him into its room. Null keeps the idle frame,
 ## which is how this behaved before the pose existed.
 ##
@@ -144,6 +152,9 @@ var _walked_screen_x: float = 0.0
 var _walk_stride_progress: float = 0.0
 var _walk_step_lift: float = 0.0
 var _audio_handler: PlayerAudioHandler
+var _active_idle_miner_texture: Texture2D
+var _active_wind_up_miner_texture: Texture2D
+var _active_impact_miner_texture: Texture2D
 
 
 ## Supplies the cross-scene audio service at the composition boundary.
@@ -159,10 +170,13 @@ func _ready() -> void:
 	# measured against and which the cutscene poses are aligned back to.
 	_base_drawn_sprite_position = drawn_miner_sprite.position
 	_base_drawn_sprite_scale = drawn_miner_sprite.scale
+	_active_idle_miner_texture = idle_miner_texture
+	_active_wind_up_miner_texture = wind_up_miner_texture
+	_active_impact_miner_texture = impact_miner_texture
 	# The rig owns its own draw order from here on, so the two authored values
 	# above are the only place it is decided.
 	z_index = get_rest_draw_order()
-	_set_miner_texture(idle_miner_texture)
+	_set_miner_texture(_active_idle_miner_texture)
 	show_intact_floor_grounding()
 	_ensure_ground_shadow()
 	if not animation_player.animation_finished.is_connected(
@@ -197,7 +211,7 @@ func play_success(
 	path_direction: int
 ) -> void:
 	set_facing_direction(path_direction)
-	_set_miner_texture(idle_miner_texture)
+	_set_miner_texture(_active_idle_miner_texture)
 	var combo_multiplier := lerpf(
 		1.0,
 		1.0 + combo_speed_bonus,
@@ -215,12 +229,12 @@ func play_success(
 
 ## Swaps to the readable anticipation pose before hammer contact.
 func _show_success_wind_up() -> void:
-	_set_miner_texture(wind_up_miner_texture)
+	_set_miner_texture(_active_wind_up_miner_texture)
 
 
 ## Reports the hammer-tip position when the animation reaches the ground.
 func _emit_success_impact() -> void:
-	_set_miner_texture(impact_miner_texture)
+	_set_miner_texture(_active_impact_miner_texture)
 	if _audio_handler != null:
 		_audio_handler.play_sound(AudioLibrary.IMPACT)
 	impact_contact.emit(impact_point.global_position)
@@ -228,7 +242,7 @@ func _emit_success_impact() -> void:
 
 ## Plays the missed-swing animation.
 func play_miss(_combo: int) -> void:
-	_set_miner_texture(idle_miner_texture)
+	_set_miner_texture(_active_idle_miner_texture)
 	_playing_full_swing = false
 	animation_player.stop()
 	animation_player.speed_scale = animation_speed_multiplier
@@ -237,7 +251,7 @@ func play_miss(_combo: int) -> void:
 
 ## Holds the miner in the raised pickaxe pose.
 func play_wind_up() -> void:
-	_set_miner_texture(wind_up_miner_texture)
+	_set_miner_texture(_active_wind_up_miner_texture)
 	_playing_full_swing = false
 	animation_player.stop()
 	animation_player.speed_scale = animation_speed_multiplier
@@ -246,7 +260,7 @@ func play_wind_up() -> void:
 
 ## Holds the miner in the downward impact pose.
 func play_wind_down() -> void:
-	_set_miner_texture(impact_miner_texture)
+	_set_miner_texture(_active_impact_miner_texture)
 	_playing_full_swing = false
 	animation_player.stop()
 	animation_player.speed_scale = animation_speed_multiplier
@@ -256,7 +270,7 @@ func play_wind_down() -> void:
 ## Previews the raised and impact poses in sequence.
 func play_full_swing() -> void:
 	# Authoring preview for the anticipation and contact poses.
-	_set_miner_texture(wind_up_miner_texture)
+	_set_miner_texture(_active_wind_up_miner_texture)
 	_playing_full_swing = true
 	animation_player.stop()
 	animation_player.speed_scale = animation_speed_multiplier
@@ -285,6 +299,24 @@ func set_hammer_head_color(color: Color) -> void:
 			drawn_miner_sprite.material as ShaderMaterial
 		)
 		drawn_material.set_shader_parameter(&"tool_tint", color)
+
+
+## Selects one complete, consistently registered pose set for the newest tool.
+func set_pickaxe_visual_tier(tier: int) -> void:
+	match tier:
+		PickaxeDefinition.VisualTier.SILVER:
+			_active_idle_miner_texture = silver_idle_miner_texture
+			_active_wind_up_miner_texture = silver_wind_up_miner_texture
+			_active_impact_miner_texture = silver_impact_miner_texture
+		PickaxeDefinition.VisualTier.GOLD:
+			_active_idle_miner_texture = gold_idle_miner_texture
+			_active_wind_up_miner_texture = gold_wind_up_miner_texture
+			_active_impact_miner_texture = gold_impact_miner_texture
+		_:
+			_active_idle_miner_texture = idle_miner_texture
+			_active_wind_up_miner_texture = wind_up_miner_texture
+			_active_impact_miner_texture = impact_miner_texture
+	_set_miner_texture(_active_idle_miner_texture)
 
 
 ## Faces the visible miner toward the selected mining side.
@@ -809,7 +841,7 @@ func _get_pose_metrics(texture: Texture2D) -> Dictionary:
 ## Returns finished actions to idle after any queued strike plays.
 func _on_animation_finished(animation_name: StringName) -> void:
 	if animation_name == &"wind_up" and _playing_full_swing:
-		_set_miner_texture(impact_miner_texture)
+		_set_miner_texture(_active_impact_miner_texture)
 		return
 	if animation_name == &"three_frame_success":
 		_playing_full_swing = false
@@ -823,6 +855,6 @@ func _on_animation_finished(animation_name: StringName) -> void:
 
 ## Plays idle at the current speed setting.
 func _play_idle() -> void:
-	_set_miner_texture(idle_miner_texture)
+	_set_miner_texture(_active_idle_miner_texture)
 	animation_player.speed_scale = animation_speed_multiplier
 	animation_player.play(&"idle")

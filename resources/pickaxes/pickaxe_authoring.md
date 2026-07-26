@@ -5,7 +5,7 @@ the production run. The collectible pickaxe and the gameplay progression level
 are deliberately separate:
 
 - `PickaxeDefinition` identifies the reward, prevents duplicate ownership, and
-  controls the newest visible hammer-head colour.
+  selects the newest visible wood, silver, or gold pose set.
 - `EncounterProgressionLevel` controls production mining and timing behavior.
 - `DepthCharacterEncounter.pickaxe_reward` decides which encounter grants the
   collectible.
@@ -21,7 +21,8 @@ are deliberately separate:
      when practical. Duplicate IDs are treated as the same owned pickaxe.
    - `display_name`: the player-facing name.
    - `description`: the player-facing explanation.
-3. Set `hammer_head_color`. The newest granted pickaxe immediately uses it.
+3. Set `visual_tier` to the authored wood, silver, or gold pose set. Keep
+   `hammer_head_color` as the layered-preview/future-art fallback.
 4. Keep the legacy mining multipliers at `1.0`, `special_effect` at `NONE`,
    and `target_scenes` empty unless an isolated legacy preview explicitly
    needs those values. Production gameplay overrides those fields with an
@@ -83,5 +84,6 @@ godot --headless --path . --script res://local_tests/integration_verify.gd
 ```
 
 Then play through the granting encounter and verify the reward is granted once,
-the hammer colour changes, the intended progression level activates, a new run
-restores level zero, and the timing/mining behavior matches the authored level.
+the full pose set changes tier, the intended progression level activates, a new
+run restores level zero, and the timing/mining behavior matches the authored
+level.

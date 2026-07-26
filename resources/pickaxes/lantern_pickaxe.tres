@@ -11,6 +11,7 @@ display_name = "Lantern Pickaxe"
 description = "A lit tool that introduces targets which fade into the dark."
 power_multiplier = 1.03
 swing_speed_multiplier = 1.05
+visual_tier = 2
 hammer_head_color = Color(1, 0.82, 0.34, 1)
 target_unlock_combo = 50
 target_scenes = Array[PackedScene]([ExtResource("3_fade"), ExtResource("3_qv6sw")])

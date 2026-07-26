@@ -14,6 +14,7 @@ special_effect = 2
 follow_up_power_scale = 0.55
 follow_up_speed_scale = 1.35
 follow_up_debris_scale = 0.6
+visual_tier = 1
 hammer_head_color = Color(0.45, 1, 0.65, 1)
 target_unlock_combo = 20
 target_scenes = Array[PackedScene]([ExtResource("2_b8qbh"), ExtResource("3_target")])

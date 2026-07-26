@@ -881,8 +881,33 @@ void fragment() {
 			min(solid_neighbor.x, solid_neighbor.y),
 			min(solid_neighbor.z, solid_neighbor.w)
 		);
+		// Four cardinal taps find the open side cheaply, but using their
+		// minimum directly measures Manhattan distance and stair-steps
+		// diagonal ink. Project one final tap along the recovered edge
+		// direction so curves keep a constant world-space line weight without
+		// raising the streamed mask density or adding four diagonal reads.
+		vec2 open_direction = vec2(
+			solid_neighbor.z - solid_neighbor.w,
+			solid_neighbor.x - solid_neighbor.y
+		);
+		float open_direction_length = length(open_direction);
+		float projected_solid_neighbor = nearest_solid_neighbor;
+		if (open_direction_length > 0.0001) {
+			float projected_alpha = sample_terrain_mask(
+				UV + open_direction / open_direction_length * edge_step
+			).a;
+			float projected_softness = max(
+				fwidth(projected_alpha),
+				0.0001
+			);
+			projected_solid_neighbor = smoothstep(
+				0.5 - projected_softness * 0.5,
+				0.5 + projected_softness * 0.5,
+				projected_alpha
+			);
+		}
 		float cut_outline = (
-			1.0 - nearest_solid_neighbor
+			1.0 - projected_solid_neighbor
 		) * mask_alpha;
 		surface_color = mix(
 			surface_color,
