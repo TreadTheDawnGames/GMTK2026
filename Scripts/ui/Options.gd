@@ -49,12 +49,9 @@ func _on_back_button_pressed() -> void:
 	if _save_game == null:
 		push_error("Options cannot save without an active SaveGame.")
 		return
-	_copy_controls_to_save(_save_game)
-	_save_game.apply_runtime_settings()
-	_save_game.write_savegame()
+	save_settings()
 	queue_free()
 	get_tree().paused = false
-
 
 ## Shows credits within the same modal menu.
 func _on_credits_button_pressed() -> void:
@@ -117,3 +114,11 @@ func _copy_controls_to_save(save_game: SaveGame) -> void:
 	save_game.music_mute = music.check_box.button_pressed
 	save_game.sfx_volume = sfx.slider.value
 	save_game.sfx_mute = sfx.check_box.button_pressed
+
+func _exit_tree() -> void:
+	save_settings()
+
+func save_settings():
+	_copy_controls_to_save(_save_game)
+	_save_game.apply_runtime_settings()
+	_save_game.write_savegame()
