@@ -25,6 +25,8 @@ signal character_stage_rock_break_requested(
 	screen_position: Vector2,
 	radius_cells: int
 )
+## Relays a stage's request to slide the framed view sideways off the miner.
+signal character_stage_camera_pan_requested(offset_cells: float)
 
 const FLOW_OWNER: StringName = &"depth_encounter"
 const MINER_SPEAKER_SLOT: StringName = &"miner"
@@ -924,6 +926,10 @@ func _prepare_authored_characters() -> bool:
 				stage.presentation_rock_break_requested,
 				_on_character_stage_rock_break_requested
 			)
+			_connect_once(
+				stage.presentation_camera_pan_requested,
+				_on_character_stage_camera_pan_requested
+			)
 			# A stampede floors the miner for as long as it runs. The stage owns
 			# the horde and knows when the last of them is gone; it does not own
 			# the miner, so it says what happened and this decides what that
@@ -1112,6 +1118,12 @@ func _on_character_stage_rock_break_requested(
 	radius_cells: int
 ) -> void:
 	character_stage_rock_break_requested.emit(screen_position, radius_cells)
+
+
+## Relays a stage's camera pan the same way, because the framed view belongs to
+## the mining wiring and a cutscene stage owns actors, props and local effects.
+func _on_character_stage_camera_pan_requested(offset_cells: float) -> void:
+	character_stage_camera_pan_requested.emit(offset_cells)
 
 
 ## Relays the clean stage transition through the cross-system wiring boundary.

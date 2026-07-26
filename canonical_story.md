@@ -47,7 +47,7 @@ these beats without Jared or Zephan approving the narrative change.
 | Scene 9 / Encounter 9 — The Cheese Cafe | 14,000 | 14:00 | The Miner reaches the Cafe gathering with Cheese Girl, the Treasure Hunter, Rotini and his rats, Quibble, and the Lantern Keeper. |
 | Credits transition — not a scene | 15,000 | 15:00 | Credits begin while the player remains able to dig. Continuing through the credits is intentional. |
 | Scene 10 — Post-credits Lantern Keeper | 15,200 | Post-credits | The Lantern Keeper remarks on how long the player has been digging and says only a zillion more swings remain before the Thief. |
-| Scene 11 — The Thief | 100,000 | Long-term objective | The player finally reaches the Thief. The exact reveal and dialogue remain intentionally unspecified here. |
+| Scene 11 — The Thief | 100,000 | Long-term objective | The player reaches the bottom and finds the Lantern Keeper playing an organ. He reads their real play time and input count back to them and tells them the Thief is themselves. Approved by Jared 2026-07-26; the text is deliberately not reproduced here (see below). |
 
 ## Approved Dialogue and Action
 
@@ -210,3 +210,16 @@ The approved dialogue above is authoritative. Do not paraphrase its unusual
 spelling, capitalization, punctuation, or intentionally unattributed opening
 voice without narrative approval. Placeholder language for the Thief must not
 be invented into canon without narrative approval.
+
+The Thief's own lines are the one exception to "the approved dialogue is written
+down here", and the exception is deliberate. Jared approved them on 2026-07-26
+and they live encrypted in `resources/dialogue/thief_encrypted_dialogue.tres`,
+because the whole scene depends on a player not having read it first and this
+repository is public. Writing them into this file would undo that. To change
+them, edit a payload outside `Source\` and re-run
+`tools/encrypt_dialogue.gd --payload`; never commit the plaintext.
+
+Some of those lines are not finished until they are played: they carry `{tokens}`
+that resolve against the player's own lifetime record at the moment each line is
+presented. They therefore say something different for every player, and the
+finale is the only place in the game where that is true.

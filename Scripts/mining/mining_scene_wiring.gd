@@ -66,6 +66,10 @@ const MINER_FLOOR_LAYER_INDEX: int = 0
 	get_node_or_null("/root/AudioHandler") as PlayerAudioHandler
 )
 @onready var _music_manager: Node = get_node("/root/MusicManager")
+@onready var _conductor: Node = get_node("/root/Conductor")
+
+## Owns the two depth thresholds where the run's music dies and the organ starts.
+var _finale_music: FinaleApproachMusic
 
 
 ## Establishes every signal that crosses a mining subsystem boundary.
@@ -82,6 +86,23 @@ func _ready() -> void:
 	hud.set_save_game(_game_state.save_game)
 	miner_rig.set_audio_handler(_audio_handler)
 	timing_window.set_audio_handler(_audio_handler)
+	# Built here rather than placed in the scene, because it owns one decision
+	# and no picture: two depths on the way to the Thief where the run's music
+	# dies and where the organ starts. Nothing else in the mining scene needs to
+	# see it, and building it in code keeps the finale out of a .tscn that every
+	# other encounter branch is also editing.
+	_finale_music = FinaleApproachMusic.new()
+	_finale_music.name = "FinaleApproachMusic"
+	add_child(_finale_music)
+	_finale_music.configure(_conductor as AudioStreamPlayer)
+	_connect_once(
+		_game_state.run_reset,
+		_finale_music._on_run_reset
+	)
+	_connect_once(
+		encounter_controller.final_encounter_reached,
+		_on_final_encounter_music
+	)
 	_connect_once(
 		main_menu.start_requested,
 		_on_start_requested
@@ -376,6 +397,13 @@ func _ready() -> void:
 		encounter_controller.character_stage_rock_break_requested,
 		_on_character_stage_rock_break_requested
 	)
+	# Straight through: a pan is already expressed in the view's own units, so
+	# there is nothing for this boundary to translate the way the strike handlers
+	# convert a screen position into terrain.
+	_connect_once(
+		encounter_controller.character_stage_camera_pan_requested,
+		view_controller.set_encounter_view_pan_cells
+	)
 	timing_window.set_bounce_muted(_game_state.save_game.mute_bounce)
 	_on_run_depth_changed(_game_state.depth)
 
@@ -397,6 +425,15 @@ func _on_run_depth_changed(depth: int) -> void:
 		_game_state.has_reached_thief
 	)
 	timing_window.show_displayed_distance(_game_state.displayed_distance)
+	# Remaining depth rather than depth, so the two music cues stay measured from
+	# the Thief and follow the configured run length instead of hard-coding where
+	# the bottom happens to be today.
+	_finale_music.notice_remaining_depth(_game_state.remaining_depth)
+
+
+## Lets the finale's music decide whether the run's own score comes back.
+func _on_final_encounter_music(_encounter_id: StringName) -> void:
+	_finale_music.notice_finale_finished()
 
 
 ## Frames the authored sole instead of the abstract mining-row coordinate.

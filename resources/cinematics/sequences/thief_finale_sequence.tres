@@ -1,61 +1,66 @@
 [gd_resource type="Resource" script_class="CutsceneSequence" format=3 uid="uid://56sdbabxhel0"]
 
-[ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="1_5p4la"]
-[ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="2_cj0l1"]
+[ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="1_beat"]
+[ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="2_sequence"]
 
-[sub_resource type="Resource" id="Resource_1si7t"]
-script = ExtResource("1_5p4la")
+[sub_resource type="Resource" id="Beat_show"]
+script = ExtResource("1_beat")
 kind = 9
 actor = &"thief"
+notes = "prepare() has already stood him on the Entrance mark and shown him, and Entrance, Conversation, Rest and Exit are all the same point at the organ, so that mark is simply where he is.
 
-[sub_resource type="Resource" id="Resource_nftvh"]
-script = ExtResource("1_5p4la")
-kind = 0
-actor = &"thief"
+This beat states it anyway so the timeline is the whole account of the shot rather than depending on the stage having done half of it first. Encounters 5 and 10 open the same way and for the same reason.
+
+He is off screen when this runs. Nothing about showing him is visible for another nine seconds - that is the shot."
+
+[sub_resource type="Resource" id="Beat_landing_hold"]
+script = ExtResource("1_beat")
+kind = 4
+duration_seconds = 2.2
+notes = "The frame opens on an ordinary tunnel and holds there.
+
+THIS IS THE MOST IMPORTANT BEAT IN THE SEQUENCE AND IT CONTAINS NOTHING. The player has dug 100,000 rows to meet the Thief. What they are shown first is the same corridor they have landed in eleven times before, with nobody in it. Toccata and Fugue has been playing for two minutes by now, so the room reads as wrong while looking completely normal, and the only thing that can carry that is time on a shot with no subject.
+
+2.2s is nearly twice the post-credits opening pause, which was itself twice encounter 5's. Those three make a progression on purpose, and this one ends it.
+
+Shorter and the arrival reads as a beat being got through. Longer and the player starts hunting the frame for the thing they are waiting for, which spends the surprise before the camera moves."
+
+[sub_resource type="Resource" id="Beat_pan"]
+script = ExtResource("1_beat")
+kind = 6
+start_seconds = 2.2
+duration_seconds = 7.0
+cue = &"pan_to_organ"
+notes = "The pan. It plays the stage's pan_to_organ clip, which animates camera_pan_offset_cells from 0 to 120 and is relayed out to the view controller as a sideways displacement of the framed view, in terrain cells off the miner's own column.
+
+WHY THIS IS A CUE AND NOT A BEAT KIND. There is no PAN beat and one shot does not justify adding it. A camera move is a continuous motion that wants an eased curve, and an AnimationPlayer track is the one place in this project where a curve can be drawn rather than described. So the timeline owns WHEN the pan happens and how long everything after it waits, and the clip owns HOW it moves - it holds still for a second, then eases out over six.
+
+This beat blocks, so the 7.0s here is not an estimate the way a dialogue duration is: it is the clip's real length, and the shot genuinely stops here until the camera has arrived.
+
+The held second at the head of the clip is inside the animation rather than added as another WAIT, because it belongs to the camera move - the pause a person makes before turning their head, not a pause in the scene.
+
+THE MINER LEAVES THE FRAME AND IS MEANT TO. 120 cells is 960px against a 1152px frame, so by the end he is off the left edge with the organ standing where he was. Nobody is looking at him any more, which is the whole of what he is about to be told.
+
+WHERE IT ENDS UP IS NOT EXACT. Tracking is off in this room, so 120 is measured against a dead-centre landing; the snaking fall can arrive anywhere in a 49-column band and the organ lands up to 192px either side of centre. The vault is carved wide enough to hold it at both extremes. See the stage's own note."
+
+[sub_resource type="Resource" id="Beat_reveal_hold"]
+script = ExtResource("1_beat")
+kind = 4
+start_seconds = 9.2
 duration_seconds = 2.6
-target_marker = &"Conversation"
-starts_from_authored_point = true
-start_marker = &"Entrance"
-pose = &"walk"
+notes = "The organ, playing, and nothing said.
 
-[sub_resource type="Resource" id="Resource_t0b1r"]
-script = ExtResource("1_5p4la")
-kind = 2
-actor = &"thief"
-start_seconds = 2.6
-facing = -1
+The longest silence in the game, and the last one. The player has just been shown what is at the bottom and has not been told what it means yet, and this is the only stretch of the scene where they get to work it out unaided - from the moment the box opens, the rest is him talking for forty-six lines.
 
-[sub_resource type="Resource" id="Resource_378ld"]
-script = ExtResource("1_5p4la")
-kind = 1
-actor = &"thief"
-start_seconds = 2.6
-pose = &"idle"
+It also gives the figure's three-frame hands time to loop several times, which is what says he is playing rather than posed at a keyboard.
 
-[sub_resource type="Resource" id="Resource_fymss"]
-script = ExtResource("1_5p4la")
-start_seconds = 4.6
-duration_seconds = 6.0
-notes = "The arrival the whole run points at. Long approach, long silence, no bounce. Dialogue is deliberately unauthored.
+THIS IS THE LAST BEAT ON PURPOSE, AND THERE IS NO DIALOGUE BEAT IN THIS TIMELINE. The conversation is encrypted on the encounter, and a DIALOGUE beat carries a plain DialogueConversation that a designer picks in the Inspector - there is nothing to pick here, because the text is ciphertext until it is played. So the timeline deliberately ends before the talking, and the controller falls through to the encrypted path it already had, decrypts, and runs the whole conversation itself.
 
-No conversation is authored yet; replace this hold with a DIALOGUE beat once there is one."
+Nothing is lost by that. depth_encounter_controller ignores line_range and plays whole conversations anyway, so no beat could have been landed between two lines even if the text were in the clear.
 
-[sub_resource type="Resource" id="Resource_qbstf"]
-script = ExtResource("1_5p4la")
-kind = 0
-actor = &"thief"
-start_seconds = 10.6
-duration_seconds = 2.6
-target_marker = &"Exit"
-pose = &"walk"
-
-[sub_resource type="Resource" id="Resource_g34jx"]
-script = ExtResource("1_5p4la")
-kind = 10
-actor = &"thief"
-start_seconds = 13.2
+Do not end this timeline by moving or hiding him either. play_closing owns the departure, and in this room the departure is that there is not one: Exit is the mark he is already standing on and Hide Actor After Closing is off, so control comes back and the player keeps digging past a man at an organ."
 
 [resource]
-script = ExtResource("2_cj0l1")
+script = ExtResource("2_sequence")
 sequence_id = &"thief_finale_sequence"
-beats = Array[ExtResource("1_5p4la")]([SubResource("Resource_1si7t"), SubResource("Resource_nftvh"), SubResource("Resource_t0b1r"), SubResource("Resource_378ld"), SubResource("Resource_fymss"), SubResource("Resource_qbstf"), SubResource("Resource_g34jx")])
+beats = Array[ExtResource("1_beat")]([SubResource("Beat_show"), SubResource("Beat_landing_hold"), SubResource("Beat_pan"), SubResource("Beat_reveal_hold")])

@@ -1,14 +1,14 @@
-[gd_resource type="Resource" script_class="CharacterAppearance" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="CharacterAppearance" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://resources/encounters/character_appearance.gd" id="1_appearance"]
-[ext_resource type="Texture2D" path="res://Assets/Characters/MrNotOffensiveName-Sheet.png" id="2_texture"]
+[ext_resource type="Texture2D" path="res://Assets/Characters/thief/thief_playing_sheet.png" id="2_texture"]
+[ext_resource type="Resource" path="res://resources/actors/thief_pose_set.tres" id="3_pose_set"]
 
 [resource]
 script = ExtResource("1_appearance")
 texture = ExtResource("2_texture")
-horizontal_frames = 7
-frame = 1
-sprite_scale = Vector2(0.66, 0.66)
-sprite_offset = Vector2(0, -78)
-tint = Color(0.34, 0.31, 0.42, 1)
-flip_h = true
+horizontal_frames = 3
+frame = 0
+sprite_scale = Vector2(0.15, 0.15)
+sprite_offset = Vector2(0, -89.5)
+pose_set = ExtResource("3_pose_set")

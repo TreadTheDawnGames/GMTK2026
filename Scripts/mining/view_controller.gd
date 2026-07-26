@@ -124,6 +124,26 @@ func focus_miner_for_encounter(subject_rest_screen_y: float = NAN) -> void:
 	)
 
 
+## Slides the framed view sideways from the miner's own column, in terrain cells.
+##
+## Every other camera move here is a tween this file owns, because every other
+## camera move is a transition between two framings. A pan is not: it is the
+## shot, it wants an authored curve, and the caller is already animating one. So
+## this takes a position rather than a destination and is expected to be called
+## every frame while the pan runs.
+##
+## It refuses outside an encounter focus on purpose. The pan is a displacement
+## from `target_view_position`, which only means the miner's landing column while
+## a cutscene holds the view still; during ordinary mining that value is chasing
+## him and the same offset would read as the camera drifting for no reason.
+## Nothing has to undo a pan either - `release_encounter_focus` already tweens
+## back to `target_view_position`, so the view walks home when the shot ends.
+func set_encounter_view_pan_cells(offset_cells: float) -> void:
+	if not _is_encounter_focus_active:
+		return
+	current_view_x = target_view_position.x + offset_cells
+
+
 ## Exposes the last published view displacement for presentation composition.
 func get_miner_screen_offset() -> Vector2:
 	return _last_miner_screen_offset

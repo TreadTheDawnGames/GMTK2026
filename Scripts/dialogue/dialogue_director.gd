@@ -34,6 +34,19 @@ signal cinematic_frame_closed
 @export var characters_for_slowest_time: Array[String] = ["."]
 @export var characters_for_slower: Array[String] = [","]
 
+# The lifetime record, resolved once, so a line can name the player's own totals.
+#
+# It is looked up by node path rather than by the PlayerHistory identifier
+# because that identifier does not exist at compile time: the autoload's script
+# carries a class_name, and GDScript does not also publish a global variable for
+# an autoload whose script is already a global class.
+#
+# Null is a supported state. The cutscene preview and the headless checks run
+# without the autoload, and a line with no tokens in it - which is every line in
+# the game except the finale's - does not care either way.
+const _PLAYER_HISTORY_PATH: NodePath = ^"/root/PlayerHistory"
+
+var _player_history: PlayerHistoryRecord
 var _active_conversation: DialogueConversation
 var _current_line_index: int = -1
 var _presentation_token: int = 0
@@ -46,6 +59,9 @@ var _advance_input_enabled: bool = true
 ## Starts hidden and owns the internal presentation signal connections.
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_player_history = get_node_or_null(
+		_PLAYER_HISTORY_PATH
+	) as PlayerHistoryRecord
 	_references_valid = _validate_references()
 	if not _references_valid:
 		push_error("DialogueDirector references are incomplete.")
@@ -288,7 +304,12 @@ func _present_current_line() -> void:
 		else "Space / Enter / Left Click"
 	)
 	speaker_label.text = display_name
-	body_label.text = line.text
+	# Resolved here, at the last possible moment, because a line that names the
+	# player's own hours has to be read when it is shown rather than when the
+	# conversation was built. Every reader downstream - the typewriter, its
+	# punctuation delays, the length check - already works from the label, so
+	# they all see the resolved text without knowing this happened.
+	body_label.text = DialogueTokens.resolve(line.text, _player_history)
 	continue_label.text = continue_text
 	_set_visible_character_count(0)
 	_show_next_character(_presentation_token)
