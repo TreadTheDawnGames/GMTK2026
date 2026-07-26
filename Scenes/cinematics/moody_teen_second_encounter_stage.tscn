@@ -1,0 +1,72 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
+[ext_resource type="Script" uid="uid://7qy8qeox17tk" path="res://Scripts/cinematics/cutscene_actor_preview.gd" id="2_preview"]
+[ext_resource type="Resource" path="res://resources/encounters/moody_teen_character_appearance.tres" id="3_teen"]
+[ext_resource type="Script" uid="uid://bpg6fvsw6y7ai" path="res://resources/encounters/character_appearance.gd" id="4_appearance"]
+[ext_resource type="Texture2D" uid="uid://bq8qwl3xn5qny" path="res://Assets/Characters/miner_idle-Pickaxe.png" id="5_miner"]
+
+[sub_resource type="Resource" id="Resource_miner_preview"]
+script = ExtResource("4_appearance")
+texture = ExtResource("5_miner")
+sprite_scale = Vector2(0.203, 0.203)
+sprite_offset = Vector2(0, -88)
+
+[node name="MoodyTeenSecondEncounterStage" instance=ExtResource("1_stage")]
+editor_description = "Encounter 7.5, depth 10,500: the miner drops through a narrow throat into an asymmetric bell cavern and discovers Ayden already standing one measured miner-width to the right. The still seven-line exchange deliberately repeats Encounter 4.5, but the chamber reads vertically rather than as a broad horizontal arch. Every actor marker remains one grounded point, and closing leaves Ayden in place when mining control returns."
+opening_move_seconds = 0.01
+closing_move_seconds = 0.01
+opening_step_height = 0.0
+opening_pose = &"idle"
+closing_pose = &"idle"
+hide_actor_after_closing = false
+entrance_facing = -1
+conversation_facing = -1
+closing_facing = -1
+conversation_tracks_miner = true
+conversation_root_offset_from_miner_x = 132.8
+
+[node name="Entrance" parent="ActorMarkers" index="0"]
+editor_description = "Same grounded mark as every phase. Ayden is visible below the entry throat before the miner settles."
+position = Vector2(-43.2, 0)
+
+[node name="Conversation" parent="ActorMarkers" index="1"]
+editor_description = "132.8px right of the miner: the approved one-miner-width stare spacing."
+position = Vector2(-43.2, 0)
+
+[node name="Work" parent="ActorMarkers" index="2"]
+position = Vector2(-43.2, 0)
+
+[node name="Rest" parent="ActorMarkers" index="3"]
+editor_description = "Ayden remains in the bell chamber after the repeated exchange."
+position = Vector2(-43.2, 0)
+
+[node name="Exit" parent="ActorMarkers" index="4"]
+editor_description = "There is no exit choreography; closing resolves at the same grounded mark."
+position = Vector2(-43.2, 0)
+
+[node name="EditorTerrainPreview" parent="." index="4"]
+editor_description = "Previews moody_teen_second at 10,500 after the integration steward registers Encounter 7.5."
+encounter_id = &"moody_teen_second"
+preview_depth_rows = 10500
+
+[node name="moody_teen" type="Node2D" parent="." index="5"]
+editor_description = "Editor-only Ayden stand-in. It frees itself before a running game can pay for it."
+z_index = 1
+position = Vector2(-43.2, 0)
+script = ExtResource("2_preview")
+actor_id = &"moody_teen"
+appearance = ExtResource("3_teen")
+pose = &"idle"
+metadata/_edit_group_ = true
+
+[node name="Miner" type="Node2D" parent="." index="6"]
+editor_description = "Dead-centre reference landing for the same stage coordinate system as Encounter 4.5."
+z_index = 1
+position = Vector2(-176, 0)
+script = ExtResource("2_preview")
+actor_id = &"miner"
+appearance = SubResource("Resource_miner_preview")
+metadata/_edit_group_ = true
+
+[editable path="ActorMarkers"]
