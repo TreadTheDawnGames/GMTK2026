@@ -4,7 +4,7 @@ extends SceneTree
 ## - Loads encounter 2's committed resource, sculpt, and real stage.
 ## - Proves the higher cavern, safe landing band, ledge, and 95-row shaft.
 ## - Exercises the authored opening/closing camera animations and RESET.
-## - Checks the scene-local staff adjustment and shared shading opt-in.
+## - Checks the scene-local staff adjustment and normal layered terrain contract.
 ## The invariant is that the shaft cannot replace any legal landing support.
 
 const ENCOUNTER_PATH := (
@@ -41,8 +41,9 @@ func _run() -> void:
 		"The prepared chamber ceiling must match the raised cavern."
 	)
 	_expect(
-		encounter.dresses_trodden_floor,
-		"Encounter 2 must consume the shared shaded-floor contract."
+		not encounter.dresses_trodden_floor
+		and not encounter.lights_floor_as_plane,
+		"Encounter 2 must not consume Encounter 9's floor shaders."
 	)
 	if sculpt != null:
 		_verify_sculpt(sculpt)

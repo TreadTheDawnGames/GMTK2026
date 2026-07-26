@@ -5,7 +5,7 @@ extends SceneTree
 ## - Verifies the arrival ceiling matches the rows the room is actually carved.
 ## - Verifies that ceiling row is open air across every landing column.
 ## - Verifies the room still stops a fall within the schedule's tolerance.
-## - Verifies the shot keeps the shared trodden-floor dressing it is composed for.
+## - Verifies the shot keeps normal layered terrain instead of the cafe shader.
 ## - Uses authored data only, so the check is deterministic and headless.
 ## - The invariant is that the miner can always reach the floor he is shown on.
 
@@ -44,12 +44,10 @@ func _initialize() -> void:
 	if room != null:
 		_verify_landing(room)
 	if encounter != null:
-		# The 2.5D read this shot is composed against is the shared walked-floor
-		# dressing Encounter 9 introduced, not a local shader. Losing the opt-in
-		# would not error anywhere; the room would just quietly go flat again.
 		_expect(
-			encounter.dresses_trodden_floor,
-			"Encounter 6 must keep the shared trodden-floor dressing."
+			not encounter.dresses_trodden_floor
+			and not encounter.lights_floor_as_plane,
+			"Encounter 6 must not consume Encounter 9's floor shaders."
 		)
 	_verify_contact_dust()
 	if _failures.is_empty():

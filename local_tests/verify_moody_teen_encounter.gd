@@ -55,7 +55,11 @@ func _verify_encounter(encounter: DepthCharacterEncounter) -> void:
 		encounter.cast_matches_miner_grounding,
 		"Ayden must share the miner's visible sole line."
 	)
-	_expect(encounter.dresses_trodden_floor, "Trodden-floor opt-in is missing.")
+	_expect(
+		not encounter.dresses_trodden_floor
+		and not encounter.lights_floor_as_plane,
+		"Ayden must preserve normal layered terrain outside Encounter 9."
+	)
 	_expect(encounter.pickaxe_reward == null, "The encounter must grant no reward.")
 	_expect(not encounter.occurs_at_run_bottom, "The encounter must be depth-pinned.")
 	_expect(encounter.conversation != null, "Conversation is missing.")

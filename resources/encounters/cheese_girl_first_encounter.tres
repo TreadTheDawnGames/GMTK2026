@@ -18,6 +18,5 @@ conversation = ExtResource("3_dialogue")
 stage_scene = ExtResource("5_stage")
 sequence = ExtResource("4_26vmj")
 speaker_slot = &"cheese_girl"
-lights_floor_as_plane = true
 miner_cutscene_depth_offset_pixels = 28.0
 terrain_sculpt = ExtResource("5_nacqn")

@@ -1249,6 +1249,10 @@ func has_pending_or_active_interaction() -> bool:
 ## Releases only this encounter's named ownership of mining and camera state.
 func _finish_cinematic_flow() -> void:
 	_reset_speech_reactions()
+	# Encounter floor treatments belong to the shot. Leaving the trodden-floor
+	# shader enabled after ownership returns makes newly exposed gameplay terrain
+	# render as a flat black plane instead of the normal layered mine.
+	terrain_renderer.set_trodden_floor(false)
 	terrain_renderer.set_cutscene_floor_plane(false)
 	# Nobody is left face down when the shot releases him, whatever ended it. A
 	# stampede that was cancelled mid-run never reaches its own finished signal,

@@ -21,5 +21,4 @@ plays_authored_timeline = true
 prestage_before_landing = true
 cast_matches_miner_grounding = true
 speaker_slot = &"moody_teen"
-dresses_trodden_floor = true
 terrain_sculpt = ExtResource("6_sculpt")

@@ -2,7 +2,7 @@ extends SceneTree
 
 ## How it works:
 ## - Loads Encounter 1 and the shared cafe encounter as shipped resources.
-## - Verifies Encounter 1 requests the temporary plane, not persistent dressing.
+## - Verifies Encounter 1 uses the normal layered terrain, not cafe floor shaders.
 ## - Verifies its Miner depth override and legacy fallback resolution.
 ## - The invariant is that release restores gameplay layers and existing rooms
 ##   keep their established staging unless they explicitly opt into an offset.
@@ -41,8 +41,8 @@ func _verify_encounter_one(encounter: DepthCharacterEncounter) -> void:
 		"Encounter 1 must not leave persistent trodden-floor dressing."
 	)
 	_expect(
-		encounter.lights_floor_as_plane,
-		"Encounter 1 must light its floor as a temporary cutscene plane."
+		not encounter.lights_floor_as_plane,
+		"Encounter 1 must preserve the normal layered terrain floor."
 	)
 	_expect(
 		is_equal_approx(

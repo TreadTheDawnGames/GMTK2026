@@ -526,6 +526,15 @@ func _verify_mining_scene() -> void:
 		# same renderer. Otherwise the test prepares combo 0 while the renderer
 		# intentionally retains combo 1 from the synthetic contact above.
 		terrain_renderer._on_dig_presentation_started(0)
+	if encounter_controller != null and terrain_renderer != null:
+		terrain_renderer.set_trodden_floor(true, 1000.0)
+		terrain_renderer.set_cutscene_floor_plane(true, 1000.0)
+		encounter_controller._finish_cinematic_flow()
+		_expect(
+			not terrain_renderer._trodden_floor_is_enabled
+			and not terrain_renderer._cutscene_floor_plane_is_enabled,
+			"Cutscene release must restore normal layered terrain before mining."
+		)
 	if encounter_controller != null:
 		if miner_rig != null and miner_rig.speech_reaction != null:
 			miner_rig.speech_reaction.play_bounce(
@@ -606,14 +615,21 @@ func _verify_mining_scene() -> void:
 		)
 		var cafe_is_prestaged := false
 		var cafe_framing_is_authored := false
+		var shader_floor_encounters := PackedStringArray()
 		for encounter: DepthCharacterEncounter in (
 			encounter_controller.encounter_config.encounters
 		):
+			if (
+				encounter.dresses_trodden_floor
+				or encounter.lights_floor_as_plane
+			):
+				shader_floor_encounters.append(str(encounter.encounter_id))
 			if encounter.encounter_id != &"cafe_gathering":
 				continue
 			cafe_is_prestaged = (
 				encounter.prestage_before_landing
 				and encounter.dresses_trodden_floor
+				and encounter.lights_floor_as_plane
 			)
 			cafe_framing_is_authored = (
 				is_equal_approx(
@@ -637,6 +653,11 @@ func _verify_mining_scene() -> void:
 		_expect(
 			cafe_framing_is_authored,
 			"Encounter 9 must own its high focus, shallow bars, and recession."
+		)
+		_expect(
+			shader_floor_encounters == PackedStringArray(["cafe_gathering"]),
+			"Only Encounter 9 may opt into the black floor shader; observed %s."
+				% [", ".join(shader_floor_encounters)]
 		)
 	if dialogue_director != null:
 		var art_conversation := DialogueConversation.new()
@@ -1952,6 +1973,7 @@ func _verify_rat_colony_support(
 	))
 	var required_fall_rows := ceili(gameplay_view_height / cell_size)
 	var tall_mouse_encounters := 0
+	var mouse_shader_encounters := PackedStringArray()
 	var mouse_encounter_diagnostics := PackedStringArray()
 	for encounter in terrain_manager.encounter_config.encounters:
 		if encounter == null or encounter.encounter_id not in [
@@ -1963,24 +1985,32 @@ func _verify_rat_colony_support(
 			terrain_manager.encounter_config.chamber_height_rows
 		)
 		mouse_encounter_diagnostics.append(
-			"%s(height=%d,trodden=%s)"
+			"%s(height=%d,trodden=%s,plane=%s)"
 			% [
 				encounter.encounter_id,
 				resolved_height,
 				str(encounter.dresses_trodden_floor),
+				str(encounter.lights_floor_as_plane),
 			]
 		)
+		if resolved_height >= required_fall_rows:
+			tall_mouse_encounters += 1
 		if (
 			encounter.dresses_trodden_floor
-			and resolved_height >= required_fall_rows
+			or encounter.lights_floor_as_plane
 		):
-			tall_mouse_encounters += 1
+			mouse_shader_encounters.append(str(encounter.encounter_id))
 	_expect(
 		tall_mouse_encounters == 2,
 		(
-			"Both Rotini encounters need a full-screen fall and 2.5D floor "
-			+ "dressing; required=%d observed=%s."
+			"Both Rotini encounters need a full-screen fall; "
+			+ "required=%d observed=%s."
 		) % [required_fall_rows, ", ".join(mouse_encounter_diagnostics)]
+	)
+	_expect(
+		mouse_shader_encounters.is_empty(),
+		"Rotini must keep normal layered terrain outside Encounter 9; observed %s."
+			% [", ".join(mouse_shader_encounters)]
 	)
 
 

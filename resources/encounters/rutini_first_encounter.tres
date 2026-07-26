@@ -18,6 +18,4 @@ conversation = ExtResource("3_dialogue")
 stage_scene = ExtResource("4_1ww4k")
 sequence = ExtResource("4_16q8a")
 speaker_slot = &"rutini"
-lights_floor_as_plane = true
-dresses_trodden_floor = true
 terrain_sculpt = ExtResource("5_room")
