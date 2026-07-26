@@ -173,7 +173,7 @@ is the primary target.
 
 ## The cutscene editor
 
-`addons/cutscene_editor/` adds a **Cutscene** panel to the bottom dock and takes
+`Addons/cutscene_editor/` adds a **Cutscene** panel to the bottom dock and takes
 over the 2D viewport while one of its tools is armed. It replaces the old
 `cutscene_terrain_tools` dig toggle, which is gone.
 
@@ -280,13 +280,35 @@ follows the floor you sculpted. A beat marked **blocks** holds the clock until i
 genuinely finishes, and everything after it slides — a walk that runs long over
 rough ground does not desynchronise the lines that follow it.
 
+BOUNCE is visual-only: the actor's feet and shadow stay planted while its art
+moves to **Peak offset** and back. **Bounce count** sets the cycles inside the
+beat's total duration. **Gentle**, **Snappy**, and **Linear** change the response
+without changing timing. Negative Y bobs up, positive Y dips down, and X adds a
+sideways hop. Scrubbing evaluates the same tween curve the runtime uses.
+
 Dragging the playhead moves the cast stand-ins, because the scrubber calls
 `CutsceneSequencePlayer.evaluate_at()` — the same path maths playback uses, with
 no side effects. What you scrub is what plays.
 
 Dialogue beats do not open dialogue themselves. They ask their owner to run a
 conversation and wait; `DialogueDirector` stays the only thing that presents a
-line.
+line. The beat inspector edits the selected inclusive line range in place:
+speaker, text, speaker pose, stage animation cue, typing speed, and
+auto-advance. Splitting one conversation across several DIALOGUE beats is valid;
+the director preserves the original global line indices so existing per-line
+poses and cues still fire on the intended line.
+
+Click the timeline before using its shortcuts:
+
+- `Space` plays or pauses; `Left`/`Right` steps one grid division.
+- `Shift+Left`/`Shift+Right` steps ten divisions.
+- `Ctrl+Left`/`Ctrl+Right` nudges the selected beat.
+- `Home`/`End` jumps to the sequence ends.
+- `Ctrl+D` duplicates and `Delete` removes the selected beat.
+- Hold `Shift` or `Ctrl` while dragging to bypass grid and neighbour snapping.
+
+The same instructions are on the timeline's tooltip, and every motion/dialogue
+field explains its unit and runtime effect on hover.
 
 ### Playtest
 
@@ -474,9 +496,8 @@ Two related traps in the same family, both worth knowing:
 
 Timelines used to be a document nothing read. They are not any more: a stage is
 handed its encounter's sequence, the actor resolver reaches the whole cast, and a
-blocking DIALOGUE beat is released when the conversation the schedule ran
-finishes. **Encounter 5, the Lantern Keeper's Warning, is the first shot driven
-this way** and is the one to copy from.
+blocking DIALOGUE beat is released when exactly the requested line range
+finishes. The Lantern Keeper's Warning remains the smallest shot to copy from.
 
 It stays opt-in per encounter, behind `plays_authored_timeline` on the
 encounter's `.tres`. That switch is deliberately separate from `sequence` being
@@ -485,7 +506,7 @@ from before any of this ran. Turning them all on at once would replace the
 choreography each stage was tuned to and run every conversation twice — once
 from the beat, once from the schedule. **A sequence file existing means nothing.
 Only the switch does.** Encounters opt in as their timelines are genuinely
-authored; the other ten are still notes.
+authored and playtested.
 
 What the timeline owns and what it does not:
 
@@ -499,14 +520,9 @@ What the timeline owns and what it does not:
 - Rewards and teardown belong to the encounter ending, not to a beat, and happen
   the same way on both paths.
 
-Two sharp edges worth knowing before you author one:
-
-- `line_range` is authored and validated on a DIALOGUE beat, and then
-  **`depth_encounter_controller.gd` ignores it** — every DIALOGUE beat plays the
-  whole conversation. You cannot currently land a cue between two lines by
-  splitting the beat.
-- The clock is clamped to the sequence's own duration, so a beat authored past
-  the last beat's end never starts.
+One sharp edge worth knowing before you author one: the clock is clamped to the
+sequence's own duration, so a beat authored past the last beat's end never
+starts.
 
 Choreography that does not need per-beat timing is still better authored through
 the stage's own exports — move durations, poses, the facing trio,

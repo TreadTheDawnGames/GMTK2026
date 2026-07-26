@@ -34,6 +34,9 @@ var _missing_warning_cross_b: Line2D
 var _ground_shadow: ActorGroundShadow
 var _watched_appearance: CharacterAppearance
 var _watched_pose_set: ActorPoseSet
+## Timeline-only displacement applied after authored sprite placement. It is
+## never serialized and never moves the feet or their ground shadow.
+var _presentation_offset: Vector2 = Vector2.ZERO
 
 
 ## Stops the editor-only stand-in before a game can ready its sprite child.
@@ -85,6 +88,17 @@ func get_preview_error() -> String:
 	if not is_instance_valid(_ensure_sprite()):
 		return "Actor preview needs its Sprite2D child."
 	return ""
+
+
+## Applies the visual-only offset returned by CutsceneSequencePlayer.evaluate_at.
+func set_presentation_offset(offset: Vector2) -> void:
+	_presentation_offset = offset
+	_rebuild_sprite()
+
+
+## Returns the current scrub-preview offset so panel state can be restored.
+func get_presentation_offset() -> Vector2:
+	return _presentation_offset
 
 
 func _ensure_sprite() -> Sprite2D:
@@ -296,7 +310,7 @@ func _rebuild_sprite() -> void:
 	target.position = Vector2(
 		appearance.sprite_offset.x,
 		ActorSoleMeasure.get_sprite_y(appearance)
-	)
+	) + _presentation_offset
 	target.modulate = appearance.tint
 	target.flip_h = appearance.flip_h
 

@@ -1151,14 +1151,15 @@ func _resolve_cast_member(actor_id: StringName) -> Node2D:
 ## read.
 func _on_sequence_dialogue_requested(
 	conversation: DialogueConversation,
-	_line_range: Vector2i
+	line_range: Vector2i
 ) -> void:
 	if conversation == null:
 		return
 	_active_conversation = conversation
 	_sequence_is_awaiting_dialogue = dialogue_director.start_conversation(
 		conversation,
-		true
+		true,
+		line_range
 	)
 	if not _sequence_is_awaiting_dialogue:
 		push_error(

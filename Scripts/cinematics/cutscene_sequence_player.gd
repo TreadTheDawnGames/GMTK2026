@@ -339,7 +339,12 @@ func _start_face(beat: CutsceneBeat, beat_index: int, generation: int) -> void:
 func _start_bounce(beat: CutsceneBeat, beat_index: int, generation: int) -> void:
 	var actor := _resolve_actor(beat.actor)
 	if actor is CharacterPresenter:
-		(actor as CharacterPresenter).react_to_presented_line()
+		(actor as CharacterPresenter).play_cutscene_bounce(
+			beat.bounce_offset,
+			beat.duration_seconds,
+			beat.bounce_count,
+			_bounce_transition(beat.bounce_style)
+		)
 	_schedule_delay(beat_index, beat.duration_seconds, generation)
 
 
@@ -532,6 +537,8 @@ func _evaluate_actor_at(
 	var persistent_pose: StringName = state.get(&"pose", StringName())
 	var active_move_pose: StringName
 	var active_move_pose_start: float = -INF
+	var visual_offset := Vector2.ZERO
+	var visual_offset_start := -INF
 	for beat in sequence.get_beats_sorted():
 		if beat.actor != actor_id or beat.start_seconds > seconds + 0.00001:
 			continue
@@ -593,6 +600,13 @@ func _evaluate_actor_at(
 				persistent_pose = beat.pose
 			CutsceneBeat.Kind.FACE:
 				state[&"facing"] = beat.facing
+			CutsceneBeat.Kind.BOUNCE:
+				if (
+					_beat_is_active_at(beat, seconds)
+					and beat.start_seconds >= visual_offset_start
+				):
+					visual_offset = _bounce_offset_at(beat, seconds)
+					visual_offset_start = beat.start_seconds
 			CutsceneBeat.Kind.SHOW:
 				state[&"visible"] = true
 			CutsceneBeat.Kind.HIDE:
@@ -611,6 +625,7 @@ func _evaluate_actor_at(
 			if not active_move_pose.is_empty()
 			else persistent_pose
 		)
+	state[&"visual_offset"] = visual_offset
 	return state
 
 
@@ -657,6 +672,52 @@ func _position_for_move(move: Dictionary, seconds: float) -> Vector2:
 			float(move["step_height"])
 		)
 	return (move["start"] as Vector2).lerp(move["target"], progress)
+
+
+## Returns the visual displacement for one bounce at an arbitrary scrub time.
+##
+## Tween.interpolate_value is the same response function runtime Tweeners use,
+## so the editor does not approximate gentle or snappy motion differently.
+func _bounce_offset_at(beat: CutsceneBeat, seconds: float) -> Vector2:
+	if beat.duration_seconds <= 0.0 or beat.bounce_count <= 0:
+		return Vector2.ZERO
+	var progress := clampf(
+		(seconds - beat.start_seconds) / beat.duration_seconds,
+		0.0,
+		1.0
+	)
+	if progress >= 1.0:
+		return Vector2.ZERO
+	var cycle_progress := fposmod(
+		progress * float(beat.bounce_count),
+		1.0
+	)
+	var is_outbound := cycle_progress <= 0.5
+	var half_progress := (
+		cycle_progress * 2.0
+		if is_outbound
+		else (cycle_progress - 0.5) * 2.0
+	)
+	var response := float(Tween.interpolate_value(
+		0.0 if is_outbound else 1.0,
+		1.0 if is_outbound else -1.0,
+		half_progress,
+		1.0,
+		_bounce_transition(beat.bounce_style),
+		Tween.EASE_OUT if is_outbound else Tween.EASE_IN
+	))
+	return beat.bounce_offset * response
+
+
+## Maps the authored style to the tween response used during real playback.
+func _bounce_transition(style: int) -> Tween.TransitionType:
+	match style:
+		CutsceneBeat.BounceStyle.GENTLE:
+			return Tween.TRANS_SINE
+		CutsceneBeat.BounceStyle.SNAPPY:
+			return Tween.TRANS_EXPO
+		_:
+			return Tween.TRANS_LINEAR
 
 
 func _evaluate_dialogue_at(

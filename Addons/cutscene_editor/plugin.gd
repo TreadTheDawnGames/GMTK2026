@@ -67,16 +67,16 @@ func _enter_tree() -> void:
 	_cast_panel = CutsceneCastPanel.new()
 	_timeline_panel = CutsceneTimelinePanel.new()
 	_beat_inspector = CutsceneBeatInspector.new()
+	_timeline_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_beat_inspector.size_flags_horizontal = Control.SIZE_SHRINK_END
 
 	var timeline_tab := HSplitContainer.new()
 	timeline_tab.name = "Timeline"
 	timeline_tab.add_child(_timeline_panel)
 	timeline_tab.add_child(_beat_inspector)
-	# Negative offsets are measured from the right edge, so the beat editor keeps
-	# this much width however wide the dock is. Left to itself the split gave the
-	# whole tab to the timeline, whose canvas asks for 900 pixels, and the panel
-	# holding the fields you edit a beat with was pushed off the end.
-	timeline_tab.split_offset = -420
+	# Only the timeline expands. The beat editor keeps its compact minimum and
+	# the native dragger still lets a designer lend it more space temporarily.
+	timeline_tab.split_offset = 0
 
 	var tabs := TabContainer.new()
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -538,7 +538,7 @@ func _apply_operation(
 ##
 ## Returns whether the gesture was claimed.
 func _handle_move_target_input(event: InputEvent) -> bool:
-	var target_variant := _get_selected_move_target()
+	var target_variant: Variant = _get_selected_move_target()
 	if target_variant == null:
 		_dragging_handle = &""
 		return false
@@ -552,7 +552,7 @@ func _handle_move_target_input(event: InputEvent) -> bool:
 			# yet both ends sit on the same point, and grabbing the end you can
 			# still move is the useful outcome.
 			if _selected_beat.starts_from_authored_point:
-				var origin_variant := _get_selected_move_origin()
+				var origin_variant: Variant = _get_selected_move_origin()
 				if origin_variant != null:
 					var origin_screen := transform * (origin_variant as Vector2)
 					if (
@@ -684,13 +684,13 @@ func _draw_selected_actor_marker(
 ## playhead and watch. Drawing it makes the walk a thing on screen, and the
 ## handle makes it a thing you can move.
 func _draw_selected_move_path(overlay: Control, transform: Transform2D) -> void:
-	var target_variant := _get_selected_move_target()
+	var target_variant: Variant = _get_selected_move_target()
 	if target_variant == null:
 		_draw_selected_actor_marker(overlay, transform)
 		return
 	var target: Vector2 = target_variant
 	var target_screen := transform * target
-	var origin_variant := _get_selected_move_origin()
+	var origin_variant: Variant = _get_selected_move_origin()
 	if origin_variant != null:
 		var origin: Vector2 = origin_variant
 		var origin_screen := transform * origin

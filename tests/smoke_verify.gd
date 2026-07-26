@@ -28,6 +28,8 @@ const TREASURE_HUNTER_TREASURE_CONVERSATION: DialogueConversation = preload(
 )
 
 var _failures: Array[String] = []
+var _presented_line_indices: PackedInt32Array = PackedInt32Array()
+var _finished_conversation_ids: Array[StringName] = []
 
 
 func _initialize() -> void:
@@ -230,6 +232,7 @@ func _verify_mining_scene() -> void:
 			dialogue_director.finish_conversation()
 		dialogue_director.pause_gameplay = previous_pause_gameplay
 		dialogue_director.auto_frame_conversations = previous_auto_frame
+		_verify_dialogue_line_ranges(dialogue_director)
 	# Sculpt streaming now expands eight authored cells per packed byte. Compare
 	# complete representative rows to the authoritative resource so the faster
 	# bulk path cannot reverse bit order or change protected-floor collision.
@@ -341,6 +344,8 @@ func _verify_mining_scene() -> void:
 		exits_without_pickaxe,
 		"Treasure Hunter must leave and reach the cafe without his pickaxe."
 	)
+	if encounter_controller != null:
+		_verify_authored_bounces(encounter_controller)
 	_expect(
 		run_state != null
 		and run_state.depth_changed.is_connected(
@@ -583,6 +588,104 @@ func _verify_review_camera(
 
 	view_controller.follow_mining_position(original_target)
 	view_controller.snap_follow_to_target()
+
+
+## Confirms a timeline can present an inclusive subset without renumbering lines.
+func _verify_dialogue_line_ranges(dialogue_director: DialogueDirector) -> void:
+	_presented_line_indices.clear()
+	_finished_conversation_ids.clear()
+	if not dialogue_director.line_presented.is_connected(
+		_on_smoke_line_presented
+	):
+		dialogue_director.line_presented.connect(_on_smoke_line_presented)
+	if not dialogue_director.conversation_finished.is_connected(
+		_on_smoke_conversation_finished
+	):
+		dialogue_director.conversation_finished.connect(
+			_on_smoke_conversation_finished
+		)
+	var started := dialogue_director.start_conversation(
+		TREASURE_HUNTER_TREASURE_CONVERSATION,
+		true,
+		Vector2i(1, 2)
+	)
+	_expect(started, "DialogueDirector must accept a valid timeline line range.")
+	if not started:
+		return
+	dialogue_director.advance()
+	dialogue_director.advance()
+	_expect(
+		_presented_line_indices == PackedInt32Array([1, 2]),
+		"Dialogue line ranges must present only their inclusive global indices."
+	)
+	_expect(
+		_finished_conversation_ids == [
+			TREASURE_HUNTER_TREASURE_CONVERSATION.conversation_id
+		],
+		"A ranged dialogue beat must finish through the normal conversation contract."
+	)
+	dialogue_director.close_cinematic_frame(true)
+
+
+## Confirms every shipped BOUNCE now has editable, playable motion data.
+func _verify_authored_bounces(
+	encounter_controller: DepthEncounterController
+) -> void:
+	var bounce_count := 0
+	for encounter in encounter_controller.encounter_config.encounters:
+		if encounter == null or encounter.sequence == null:
+			continue
+		for beat: CutsceneBeat in encounter.sequence.beats:
+			if beat == null or beat.kind != CutsceneBeat.Kind.BOUNCE:
+				continue
+			bounce_count += 1
+			_expect(
+				beat.duration_seconds > 0.0
+				and beat.bounce_count > 0
+				and not beat.bounce_offset.is_zero_approx(),
+				"Every authored BOUNCE must define duration, cycles, and peak offset."
+			)
+			var player := CutsceneSequencePlayer.new()
+			var actor := Node2D.new()
+			player.bind(
+				func(actor_id: StringName) -> Node2D:
+					return actor if actor_id == beat.actor else null,
+				Callable(),
+				Callable(),
+				null
+			)
+			var midpoint := (
+				beat.start_seconds
+				+ beat.duration_seconds / float(beat.bounce_count * 4)
+			)
+			var state: Dictionary = player.evaluate_at(
+				encounter.sequence,
+				midpoint
+			).get(&"actors", {}).get(beat.actor, {})
+			var visual_offset: Vector2 = state.get(
+				&"visual_offset",
+				Vector2.ZERO
+			)
+			_expect(
+				not visual_offset.is_zero_approx(),
+				"Timeline scrub preview must evaluate authored BOUNCE motion."
+			)
+			player.free()
+			actor.free()
+	_expect(bounce_count >= 7, "Every current cutscene bounce must stay authored.")
+
+
+func _on_smoke_line_presented(
+	_conversation_id: StringName,
+	line_index: int,
+	_speaker_slot: StringName,
+	_speaker_pose: StringName
+) -> void:
+	_presented_line_indices.append(line_index)
+
+
+func _on_smoke_conversation_finished(conversation_id: StringName) -> void:
+	_finished_conversation_ids.append(conversation_id)
 
 
 func _expect(condition: bool, failure_message: String) -> void:
