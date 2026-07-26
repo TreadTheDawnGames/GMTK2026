@@ -10,18 +10,18 @@
 
 [resource]
 script = ExtResource("1_profile")
-layer_tints = PackedColorArray(0.54, 0.41, 0.29, 1, 0.4, 0.29, 0.21, 1, 0.27, 0.19, 0.15, 1, 0.15, 0.12, 0.12, 1)
+layer_tints = PackedColorArray(0.54, 0.41, 0.29, 1, 0.4, 0.29, 0.21, 1, 0.27, 0.19, 0.15, 1, 0.19, 0.13, 0.1, 1)
 layer_z_indices = PackedInt32Array(2, 0, -1, -2)
 mask_pixels_per_cell = 16
 layer_dirt_detail_scales_px = PackedFloat32Array(64, 48, 32, 104)
-layer_dirt_detail_colors = PackedColorArray(0.25, 0.19, 0.15, 0.69, 0.2, 0.15, 0.11, 0.66, 0.15, 0.11, 0.09, 0.66, 0.08, 0.07, 0.08, 0.7)
+layer_dirt_detail_colors = PackedColorArray(0.25, 0.19, 0.15, 0.69, 0.2, 0.15, 0.11, 0.66, 0.15, 0.11, 0.09, 0.66, 0.11, 0.08, 0.06, 0.7)
 layer_dirt_variance_strengths = PackedFloat32Array(0.16, 0.15, 0.14, 0.18)
 layer_rock_densities = PackedFloat32Array(0.13, 0.26, 0.44, 0.58)
 layer_rock_detail_strengths = PackedFloat32Array(0.92, 0.94, 0.96, 0.88)
 rock_texture = ExtResource("6_rocks")
 rock_cluster_coverage = 0.46
-layer_rock_body_colors = PackedColorArray(0.6, 0.55, 0.48, 1, 0.47, 0.42, 0.37, 1, 0.35, 0.31, 0.28, 1, 0.24, 0.22, 0.21, 1)
-layer_rock_outline_colors = PackedColorArray(0.13, 0.1, 0.08, 1, 0.1, 0.08, 0.07, 1, 0.07, 0.06, 0.05, 1, 0.05, 0.04, 0.04, 1)
+layer_rock_body_colors = PackedColorArray(0.6, 0.55, 0.48, 1, 0.47, 0.42, 0.37, 1, 0.35, 0.31, 0.28, 1, 0.26, 0.23, 0.2, 1)
+layer_rock_outline_colors = PackedColorArray(0.13, 0.1, 0.08, 1, 0.1, 0.08, 0.07, 1, 0.07, 0.06, 0.05, 1, 0.06, 0.05, 0.04, 1)
 foreground_gem_texture = ExtResource("7_gems")
 edge_shade_world_pixels = 3.5
 edge_shade_strength = 0.32
