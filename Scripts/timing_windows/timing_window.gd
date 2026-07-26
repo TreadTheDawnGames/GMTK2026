@@ -364,6 +364,8 @@ func _apply_success_target_rules(
 		var group_index := _resolve_combo_target_group_index(reached_combo)
 		if target_set_completed:
 			_apply_combo_target_group(reached_combo, true)
+		#for i in _progression_bonus_target_combos:
+			#if reached_combo > i and mining_window.targets.size()
 		if reached_combo in _progression_bonus_target_combos:
 			if (
 				target_set_completed

@@ -2,10 +2,11 @@
 
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/rat_colony_encounter_stage.tscn" id="1_stage"]
 [ext_resource type="Script" uid="uid://7qy8qeox17tk" path="res://Scripts/cinematics/cutscene_actor_preview.gd" id="3_breov"]
-[ext_resource type="Resource" path="res://resources/encounters/rutini_character_appearance.tres" id="4_f2wmh"]
+[ext_resource type="Resource" uid="uid://ckltv12x6klri" path="res://resources/encounters/rutini_character_appearance.tres" id="4_f2wmh"]
 [ext_resource type="Script" uid="uid://bpg6fvsw6y7ai" path="res://resources/encounters/character_appearance.gd" id="6_ytped"]
 [ext_resource type="Texture2D" uid="uid://bq8qwl3xn5qny" path="res://Assets/Characters/miner_idle-Pickaxe.png" id="7_wh1q7"]
-[ext_resource type="Script" path="res://Scripts/cinematics/cinematic_rat_appearance.gd" id="8_rat_appearance"]
+[ext_resource type="AudioStream" uid="uid://dsljbbkn2txla" path="res://Assets/Audio/SFX/Stampede.mp3" id="7_ytped"]
+[ext_resource type="Script" uid="uid://bnwk2upes76ot" path="res://Scripts/cinematics/cinematic_rat_appearance.gd" id="8_rat_appearance"]
 [ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_clump.tres" id="9_clump"]
 [ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_brown.tres" id="10_brown"]
 [ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_grey.tres" id="11_grey"]
@@ -35,31 +36,40 @@ Four ranks need the recession flattened or the back row climbs off the floor: Ro
 The clumps STAY, and this is the one place to resist tidying. A clump is a drawn crowd and at Clump Scale Multiplier 3 it is what supplies the mass; twelve individual mice cannot be a stampede on their own. Replacing the clump entries with single mice thins the wall to a line at exactly the cap where the wall is the whole effect. Individuals become the right call only if the cap itself is ever raised.
 
 Nothing here bounds how long it runs. Spawning continues while _is_spawning, and only play_closing -> _await_stampede_drained stops it - which is the player clearing the last line. Stampede Minimum Run stays 3.0 as a floor, not a ceiling: it stops a mashed dialogue advance from cutting the horde to one mouse."
-opening_move_seconds = 1.5
-closing_move_seconds = 2.0
-opening_step_height = 3.0
-conversation_facing = -1
-hide_actor_after_closing = true
-conversation_tracks_miner = true
-conversation_root_offset_from_miner_x = 178.0
-procession_mines = false
+rat_appearances = Array[ExtResource("8_rat_appearance")]([ExtResource("9_clump"), ExtResource("10_brown"), ExtResource("9_clump"), ExtResource("11_grey"), ExtResource("9_clump"), ExtResource("12_white")])
 max_live_followers = 12
 web_max_live_followers = 8
 spawn_interval_seconds = 0.15
+run_seconds = 0.65
 exit_seconds = 3.0
+strike_interval_seconds = 0.08
+strikes_per_rat = 2
 floor_offset_y = 0.0
+procession_mines = false
 procession_cue = &"stampede"
 stampede_warning_seconds = 3.0
 stampede_rumble_strength_px = 6.0
 stampede_minimum_run_seconds = 4.0
 stampede_audio = NodePath("StampedeAudio")
+stampede_drain_timeout_seconds = 6.0
+clump_draw_order = -1
+single_draw_order = 0
 clump_scale_multiplier = 3.0
 single_scale_multiplier = 1.35
 procession_rows = 4
 procession_row_rise_pixels = 18.0
 procession_row_scale_falloff = 0.96
 procession_hop_pixels = 26.0
-rat_appearances = Array[ExtResource("8_rat_appearance")]([ExtResource("9_clump"), ExtResource("10_brown"), ExtResource("9_clump"), ExtResource("11_grey"), ExtResource("9_clump"), ExtResource("12_white")])
+mining_floor_half_span_pixels = 520.0
+mining_center_clearance_pixels = 132.0
+mining_slot_spacing_pixels = 96.0
+opening_move_seconds = 1.5
+closing_move_seconds = 2.0
+opening_step_height = 3.0
+hide_actor_after_closing = true
+conversation_facing = -1
+conversation_tracks_miner = true
+conversation_root_offset_from_miner_x = 178.0
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
 editor_description = "600px right of Conversation, which puts both Rotini and every mouse past the frame edge at any landing column: the frame is 1152 wide and centred on the miner, so anything closer than 480px would have them appear from nothing in open shot. The colony spawns here too."
@@ -83,10 +93,10 @@ position = Vector2(-796, 0)
 editor_description = "Zero rather than the base scene's 7, so the colony lands on the SECOND layer with the rest of the cast instead of on top of every stratum.
 
 The number is relative and the chain matters: DepthEncounterController puts CharacterLayer on cutscene_draw_order (1) for the shot, this container adds its own, and each mouse adds a row offset on top. At 7 the whole colony came out around 8 - in front of all four strata and of the miner - which is the first layer, not the second. At 0 the front row sits exactly where MinerRig.buried_draw_order stands him while he digs, and the rows behind recede from there."
-z_index = 0
 
-[node name="StampedeAudio" type="AudioStreamPlayer" parent="." index="4"]
+[node name="StampedeAudio" type="AudioStreamPlayer" parent="." index="4" unique_id=111383770]
 editor_description = "Assign the authored stampede sound here. The warning still supplies camera rumble when no stream has been assigned."
+stream = ExtResource("7_ytped")
 bus = &"SFX"
 
 [node name="EditorTerrainPreview" parent="." index="6"]
@@ -109,5 +119,3 @@ script = ExtResource("3_breov")
 actor_id = &"miner"
 appearance = SubResource("Resource_c8jes")
 metadata/_edit_group_ = true
-
-[editable path="ActorMarkers"]
