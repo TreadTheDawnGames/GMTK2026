@@ -5,6 +5,7 @@ extends SceneTree
 ## - Instantiates mining long enough for code-owned signal wiring to run.
 ## - Verifies the composition root's required gameplay dependencies.
 ## - Resolves one real terrain dig through the production TerrainManager.
+## - Confirms damaged terrain restores byte-exactly without replaying history.
 ## - Exits nonzero on any failed contract so agents get a fast merge gate.
 ## - This intentionally stays small; detailed behavior remains in local_tests.
 ## - The invariant is that a parseable game can complete one mining mutation.
@@ -338,6 +339,50 @@ func _verify_mining_scene() -> void:
 		not terrain_manager.is_solid_cell(impact_cell),
 		"Removed terrain must become logically open."
 	)
+	# Drain only the bounded production scheduler, then retire and restore the
+	# impacted chunk. This catches stale or lossy snapshot changes; detailed
+	# timing remains in the non-blocking terrain benchmark so smoke stays fast.
+	var impact_chunk_index := terrain_renderer._world_row_to_chunk(
+		impact_cell.y
+	)
+	for _terrain_frame in range(64):
+		terrain_renderer._process(1.0 / 60.0)
+		if terrain_renderer._compressed_chunk_snapshots.has(
+			impact_chunk_index
+		):
+			break
+	var has_terrain_snapshot := (
+		terrain_renderer._compressed_chunk_snapshots.has(
+			impact_chunk_index
+		)
+	)
+	_expect(
+		has_terrain_snapshot,
+		"Settled damaged terrain must produce a bounded review snapshot."
+	)
+	if (
+		has_terrain_snapshot
+		and terrain_renderer._active_chunks.has(impact_chunk_index)
+	):
+		var original_mask_data: Array[PackedByteArray] = []
+		for mask_image: Image in terrain_renderer._active_chunks[
+			impact_chunk_index
+		].mask_images:
+			original_mask_data.append(mask_image.get_data())
+		terrain_renderer._unload_chunk(impact_chunk_index)
+		terrain_renderer._load_chunk(impact_chunk_index)
+		var restored_images: Array[Image] = terrain_renderer._active_chunks[
+			impact_chunk_index
+		].mask_images
+		for layer_index in range(original_mask_data.size()):
+			_expect(
+				restored_images[layer_index].get_data()
+					== original_mask_data[layer_index],
+				(
+					"Review snapshot restore must preserve every byte "
+					+ "of terrain layer %d."
+				) % layer_index
+			)
 
 	game_root.queue_free()
 	await process_frame
