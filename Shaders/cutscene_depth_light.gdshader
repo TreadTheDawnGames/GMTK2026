@@ -29,12 +29,18 @@ void fragment() {
 	float alpha_right = texture(TEXTURE, UV + vec2(TEXTURE_PIXEL_SIZE.x, 0.0)).a;
 	float alpha_up = texture(TEXTURE, UV - vec2(0.0, TEXTURE_PIXEL_SIZE.y)).a;
 	float alpha_down = texture(TEXTURE, UV + vec2(0.0, TEXTURE_PIXEL_SIZE.y)).a;
-	vec2 alpha_normal = normalize(
-		vec2(alpha_left - alpha_right, alpha_up - alpha_down) + vec2(0.0001)
-	);
+	// Flat interior pixels have no alpha gradient at all. Normalizing that
+	// zero vector used to return a fixed diagonal, which dotted against the
+	// light to ~0.96 and washed EVERY body pixel 0.59 of the way to
+	// light_color - bleaching all four mouse colours into one cream blob.
+	// Edge presence gates the lighting so only real silhouette edges light.
+	vec2 alpha_gradient = vec2(alpha_left - alpha_right, alpha_up - alpha_down);
+	float gradient_length = length(alpha_gradient);
+	float edge_presence = clamp(gradient_length, 0.0, 1.0);
+	vec2 alpha_normal = alpha_gradient / max(gradient_length, 0.0001);
 	vec2 resolved_light = normalize(light_direction + vec2(0.0001));
-	float lit_edge = max(dot(alpha_normal, -resolved_light), 0.0);
-	float shaded_edge = max(dot(alpha_normal, resolved_light), 0.0);
+	float lit_edge = max(dot(alpha_normal, -resolved_light), 0.0) * edge_presence;
+	float shaded_edge = max(dot(alpha_normal, resolved_light), 0.0) * edge_presence;
 
 	vec3 lit_rgb = mix(
 		source.rgb,

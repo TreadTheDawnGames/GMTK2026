@@ -6,6 +6,6 @@
 [resource]
 script = ExtResource("1_appearance")
 texture = ExtResource("2_texture")
-sprite_scale = Vector2(0.38, 0.38)
+sprite_scale = Vector2(0.199, 0.199)
 sprite_offset = Vector2(0, -33.4)
 art_faces_left = true

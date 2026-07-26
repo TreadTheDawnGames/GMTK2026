@@ -24,10 +24,19 @@ extends Resource
 ## - A drawing of another shape keeps those offsets by padding its canvas, not
 ##   by moving anything in the scene, and then by raising its own size_limit in
 ##   the same proportion as its canvas so the drawn rats stay the size the
-##   single mice are. mouse_clump.png is 2264x1252 at size_limit 1236 for that
-##   reason - 1236/2264 is approximately 512/938. Change one of that pair
+##   single mice are. mouse_clump.png is 2257x1194 at size_limit 1232 for that
+##   reason - 1232/2257 is approximately 512/938. Change one of that pair
 ##   without the other and the crowd silently renders at the wrong scale or
 ##   floating off the floor, with no error anywhere.
+##
+## The clump drawing is the source art rotated 3.33 degrees to level its own
+## front-row footline, then re-padded to those same two marks. Unrotated, that
+## footline fell 3.33 degrees across the canvas, which rat_miner.tscn's
+## flip_h mirrors into a RISE to the right on screen: seating the drawing by
+## its lowest pixel planted the left of the crowd and left the right of it
+## hanging up to 32px off the floor. A drawing whose footline is level is the
+## only kind one registration point can seat all of, mirrored or not - so
+## level the art rather than adding a per-appearance rotation.
 
 @export var idle_texture: Texture2D
 ## Contact art. A clump may point this at its idle drawing: the actor still
