@@ -22,6 +22,8 @@ extends Node2D
 signal arrival_finished
 signal attendant_picked_up
 
+const _AUDIO_HANDLER_PATH: NodePath = ^"/root/AudioHandler"
+
 @export_category("References")
 @export var miner_rig: MinerRig
 @export var bus: Node2D
@@ -159,6 +161,9 @@ var _wheel_material: ShaderMaterial
 var _wheel_radius_pixels: float = 1.0
 var _wheel_spin_phase: float = 0.0
 var _previous_bus_x: float = 0.0
+@onready var _audio_handler: PlayerAudioHandler = (
+	get_node_or_null(_AUDIO_HANDLER_PATH) as PlayerAudioHandler
+)
 
 
 func _ready() -> void:
@@ -264,9 +269,11 @@ func play_arrival() -> void:
 	if not _is_playing:
 		return
 
-	var bus_audio := AudioHandler.play_sound(AudioLibrary.BUS_FULL)
-	create_tween().tween_property(bus_audio, "volume_linear", 0.0, 0.0)
-	create_tween().tween_property(bus_audio, "volume_linear", 1, 1)
+	var bus_audio: AudioStreamPlayer
+	if _audio_handler != null:
+		bus_audio = _audio_handler.play_sound(AudioLibrary.BUS_FULL)
+		create_tween().tween_property(bus_audio, "volume_linear", 0.0, 0.0)
+		create_tween().tween_property(bus_audio, "volume_linear", 1, 1)
 	
 	
 	await _drive_bus_to(_bus_rest_position.x, bus_arrival_seconds, true)
@@ -285,7 +292,8 @@ func play_arrival() -> void:
 	_place_miner_at_drop_off()
 	_begin_bus_departure()
 	
-	create_tween().tween_property(bus_audio, "volume_linear", 0, 3)
+	if is_instance_valid(bus_audio):
+		create_tween().tween_property(bus_audio, "volume_linear", 0, 3)
 	await _await_prop_tween()
 
 	if not _is_playing:
@@ -477,12 +485,29 @@ func _run_drive_past() -> void:
 		bus_exit_anchor.position.x,
 		bus_stop_anchor.position.y
 	)
-	var bus_audio := AudioHandler.PlaySoundAtGlobalPosition(AudioLibrary.BUS, bus.global_position, bus)
-	bus_audio.volume_db = 0
-	var t : Tween = create_tween()
-	t.tween_property(bus_audio, "volume_linear", 0.0, 0.0)
-	t.tween_property(bus_audio, "volume_linear", 1.0, drive_past_seconds/2)
-	t.tween_property(bus_audio, "volume_linear", 0, drive_past_seconds/2)
+	var bus_audio: AudioStreamPlayer2D
+	if _audio_handler != null:
+		bus_audio = _audio_handler.PlaySoundAtGlobalPosition(
+			AudioLibrary.BUS,
+			bus.global_position,
+			bus
+		)
+	if bus_audio != null:
+		bus_audio.volume_db = 0
+		var audio_tween: Tween = create_tween()
+		audio_tween.tween_property(bus_audio, "volume_linear", 0.0, 0.0)
+		audio_tween.tween_property(
+			bus_audio,
+			"volume_linear",
+			1.0,
+			drive_past_seconds / 2
+		)
+		audio_tween.tween_property(
+			bus_audio,
+			"volume_linear",
+			0,
+			drive_past_seconds / 2
+		)
 
 	_previous_bus_x = bus.position.x
 	_begin_ambient_pass()
