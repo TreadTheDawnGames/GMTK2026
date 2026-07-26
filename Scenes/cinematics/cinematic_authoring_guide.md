@@ -329,7 +329,24 @@ the man. Measured bodies: miner **52.8px**, Cheese Girl **34.3px**, Rotini
 **62.7px** — the rat is wider than the man, because the art is long.
 
 House spacing is one miner-width of daylight between two bodies, so root to root
-is `(a + b) / 2 + 52.8`. Cheese Girl sits at 96px, Rotini at 110px.
+is `(a + b) / 2 + 52.8`. Measured, so nobody has to derive them again:
+
+| Character | Body | Shoulders touching | One miner apart |
+| --- | ---: | ---: | ---: |
+| miner | 52.8 | — | — |
+| cheese_girl | 34.3 | 43.5 | **96.3** |
+| moody_teen | 45.0 | 48.9 | 101.7 |
+| newspaper_reader | 43.4 | 48.1 | 100.9 |
+| rutini | 62.7 | 57.7 | **110.5** |
+| thief | 63.4 | 58.1 | 110.9 |
+| treasure_hunter | 86.5 | 69.7 | 122.5 |
+| cloak_lantern | 100.4 | 76.6 | 129.4 |
+| coffee_cat | 202.4 | 127.6 | 180.4 |
+
+Two of those are worth a look before they are used as-is. Quibble reads 202px
+wide against the miner's 52.8 — nearly four times him, filling a third of the
+frame — and the lantern man 100px. Both are plausibly a scale that was set by eye
+against the old sunken grounding rather than a deliberate size.
 
 ### Entrances and exits must clear the frame
 

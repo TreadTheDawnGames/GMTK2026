@@ -9,11 +9,11 @@ closing_move_seconds = 1.8
 opening_step_height = 9.0
 hide_actor_after_closing = true
 conversation_tracks_miner = true
-conversation_root_offset_from_miner_x = 72.0
+conversation_root_offset_from_miner_x = 122.5
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
 editor_description = "Right of the miner, close enough that the walk in is brisk rather than a long approach."
-position = Vector2(224, 0)
+position = Vector2(504, 0)
 
 [node name="Conversation" parent="ActorMarkers" index="1"]
 position = Vector2(-96, 0)
@@ -23,7 +23,7 @@ position = Vector2(-96, 0)
 
 [node name="Exit" parent="ActorMarkers" index="4"]
 editor_description = "Past the right edge of the frame, so he is out of shot well before he is hidden."
-position = Vector2(496, 0)
+position = Vector2(604, 0)
 
 [node name="EditorTerrainPreview" parent="." index="4"]
 editor_description = "Previews treasure_hunter_first at its authored depth."
