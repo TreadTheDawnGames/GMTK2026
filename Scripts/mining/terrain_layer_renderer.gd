@@ -79,6 +79,7 @@ class ImpactRasterWork:
 	var raster_band_count: int
 	var prepare_only: bool = false
 	var finish_preparation: bool = false
+	var publish_layer: bool = true
 	var prepared_patch: PreparedLayerPatch
 	var image_preparation
 
@@ -250,6 +251,9 @@ var _sculpt_logical_mask_images: Dictionary[CutsceneTerrainSculpt, Array] = {}
 # The cache is bounded by authored mask pixels and replaces transient scaled
 # room-strip allocations during traversal.
 var _sculpt_mask_runs: Dictionary[CutsceneTerrainSculpt, Array] = {}
+# A packed sculpt byte expands to two LA8 pixels per source bit. This fixed
+# 4 KiB table replaces per-cell GDScript writes when logical room rows stream.
+var _sculpt_byte_expansion_words: PackedInt64Array = PackedInt64Array()
 # Historical stamps are retained so review mode can rebuild old terrain.
 # Growth is bounded by the configured run and accepted hit count; only the
 # viewport-sized _active_chunks set owns Image and ImageTexture allocations.
@@ -371,6 +375,7 @@ func _ready() -> void:
 	)
 	_prepare_hole_masks()
 	_prepare_chamber_transition_stamps()
+	_prepare_sculpt_byte_expansion_words()
 	_on_view_position_changed(terrain_manager.get_view_position())
 
 
@@ -921,6 +926,7 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 			affected_chunk_lookup[chunk_index] = true
 	if _defer_impact_rasterization:
 		var layer_count: int = profile.get_gameplay_layer_count()
+		var grouped_work_start := _pending_impact_work.size()
 		var queued_authoritative_preparation := false
 		var prepared_patches_by_stamp: Array[Dictionary] = []
 		prepared_patches_by_stamp.resize(stamps.size())
@@ -1040,6 +1046,24 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 							raster_band_index,
 							raster_band_count
 						)
+		# CPU masks still consume every stamp in order. Publish only the final
+		# item for each chunk/layer so a stacked hit cannot upload the same tile
+		# repeatedly before any rendered frame can display the intermediates.
+		var last_work_by_chunk_layer: Dictionary[int, int] = {}
+		for work_index in range(
+			maxi(grouped_work_start, _pending_impact_work_head),
+			_pending_impact_work.size()
+		):
+			var grouped_work := _pending_impact_work[work_index]
+			if grouped_work.chunk == null or grouped_work.prepare_only:
+				continue
+			grouped_work.publish_layer = false
+			last_work_by_chunk_layer[
+				grouped_work.chunk_index * layer_count
+					+ grouped_work.layer_index
+			] = work_index
+		for work_index in last_work_by_chunk_layer.values():
+			_pending_impact_work[work_index].publish_layer = true
 		_prepared_layer_patches.clear()
 		_preparing_layer_patches.clear()
 		if not queued_authoritative_preparation:
@@ -1096,6 +1120,7 @@ func _append_impact_work(
 	work.raster_band_count = raster_band_count
 	work.prepare_only = prepare_only
 	work.finish_preparation = finish_preparation
+	work.publish_layer = true
 	work.prepared_patch = prepared_patch
 	work.image_preparation = null
 	_pending_impact_work.append(work)
@@ -1130,7 +1155,8 @@ func _process_next_pending_impact_work() -> void:
 					work.prepared_patch.dirty_tile_bits
 				)
 				work.chunk.layer_revisions[work.layer_index] += 1
-				_publish_layer_texture(work.chunk, work.layer_index)
+				if work.publish_layer:
+					_publish_layer_texture(work.chunk, work.layer_index)
 			else:
 				# A non-mining terrain mutation invalidated the candidate after
 				# queue construction. This rare path stays authoritative.
@@ -1140,7 +1166,8 @@ func _process_next_pending_impact_work() -> void:
 					work.stamp,
 					work.layer_index
 				)
-				_publish_layer_texture(work.chunk, work.layer_index)
+				if work.publish_layer:
+					_publish_layer_texture(work.chunk, work.layer_index)
 	elif work.prepare_only:
 		if not _advance_committed_stamp_images(work):
 			_pending_impact_work_head -= 1
@@ -1156,7 +1183,7 @@ func _process_next_pending_impact_work() -> void:
 			work.raster_band_index,
 			work.raster_band_count
 		)
-		if work.raster_band_index == work.raster_band_count - 1:
+		if work.publish_layer:
 			_publish_layer_texture(work.chunk, work.layer_index)
 	work.chunk = null
 	work.stamp = null
@@ -1164,6 +1191,7 @@ func _process_next_pending_impact_work() -> void:
 	work.raster_band_count = 1
 	work.prepare_only = false
 	work.finish_preparation = false
+	work.publish_layer = true
 	work.prepared_patch = null
 	work.image_preparation = null
 	if _impact_work_pool.size() < MAX_PENDING_IMPACT_WORK_ITEMS:
@@ -1203,6 +1231,7 @@ func _compact_pending_impact_work(
 			work.raster_band_count = 1
 			work.prepare_only = false
 			work.finish_preparation = false
+			work.publish_layer = true
 			work.prepared_patch = null
 			work.image_preparation = null
 			if _impact_work_pool.size() < MAX_PENDING_IMPACT_WORK_ITEMS:
@@ -1241,6 +1270,9 @@ func rebuild_all_chunks() -> void:
 		pending_work.stamp = null
 		pending_work.raster_band_index = 0
 		pending_work.raster_band_count = 1
+		pending_work.prepare_only = false
+		pending_work.finish_preparation = false
+		pending_work.publish_layer = true
 		pending_work.prepared_patch = null
 		pending_work.image_preparation = null
 		if _impact_work_pool.size() < MAX_PENDING_IMPACT_WORK_ITEMS:
@@ -2719,6 +2751,26 @@ func _queue_sculpt_run_preparation(
 	return preparation
 
 
+## Builds the fixed binary-byte to eight-LA8-pixel decode table once at boot.
+func _prepare_sculpt_byte_expansion_words() -> void:
+	_sculpt_byte_expansion_words.resize(256 * 2)
+	for packed_cells in range(256):
+		var expanded_cells := PackedByteArray()
+		expanded_cells.resize(8 * 2)
+		for bit_index in range(8):
+			var cell_value := (
+				255 if packed_cells & (1 << bit_index) != 0 else 0
+			)
+			expanded_cells[bit_index * 2] = cell_value
+			expanded_cells[bit_index * 2 + 1] = cell_value
+		_sculpt_byte_expansion_words[packed_cells * 2] = (
+			expanded_cells.decode_s64(0)
+		)
+		_sculpt_byte_expansion_words[packed_cells * 2 + 1] = (
+			expanded_cells.decode_s64(8)
+		)
+
+
 ## Converts exactly one cached source row into [start, end, alpha] runs.
 func _advance_sculpt_run_preparation(
 	preparation: SculptRunPreparation
@@ -2747,27 +2799,63 @@ func _advance_sculpt_run_preparation(
 			var byte_index := (
 				padded_y * preparation.padded_size.x * 2
 			)
-			for padded_x in range(preparation.padded_size.x):
-				var local_x := padded_x - 1
-				var bit_index := local_y * grid.x + local_x
-				var cell_value := (
-					255
-					if (
-						row_is_solid
-						or local_x < 0
-						or local_x >= grid.x
-						or (
-							preparation.solid_bits[
-								bit_index >> 3
-							]
-							& (1 << (bit_index & 7))
-						) != 0
-					)
-					else 0
-				)
-				preparation.cell_bytes[byte_index] = cell_value
-				preparation.cell_bytes[byte_index + 1] = cell_value
+			var row_byte_end := (
+				byte_index + preparation.padded_size.x * 2
+			)
+			if row_is_solid:
+				while byte_index + 8 <= row_byte_end:
+					preparation.cell_bytes.encode_u64(byte_index, -1)
+					byte_index += 8
+				while byte_index < row_byte_end:
+					preparation.cell_bytes[byte_index] = 255
+					byte_index += 1
+			else:
+				# Every shipped sculpt row is byte-aligned. Keep a correct
+				# fallback for editor-authored widths that are not.
+				preparation.cell_bytes[byte_index] = 255
+				preparation.cell_bytes[byte_index + 1] = 255
 				byte_index += 2
+				if grid.x % 8 == 0:
+					var source_row_bytes := grid.x >> 3
+					var source_byte_index := (
+						local_y * source_row_bytes
+					)
+					for source_byte_offset in range(source_row_bytes):
+						var packed_cells := preparation.solid_bits[
+							source_byte_index + source_byte_offset
+						]
+						var expansion_index := packed_cells * 2
+						preparation.cell_bytes.encode_u64(
+							byte_index,
+							_sculpt_byte_expansion_words[
+								expansion_index
+							]
+						)
+						preparation.cell_bytes.encode_u64(
+							byte_index + 8,
+							_sculpt_byte_expansion_words[
+								expansion_index + 1
+							]
+						)
+						byte_index += 16
+				else:
+					for local_x in range(grid.x):
+						var bit_index := local_y * grid.x + local_x
+						var cell_value := (
+							255
+							if (
+								preparation.solid_bits[
+									bit_index >> 3
+								]
+								& (1 << (bit_index & 7))
+							) != 0
+							else 0
+						)
+						preparation.cell_bytes[byte_index] = cell_value
+						preparation.cell_bytes[byte_index + 1] = cell_value
+						byte_index += 2
+				preparation.cell_bytes[byte_index] = 255
+				preparation.cell_bytes[byte_index + 1] = 255
 			preparation.next_cell_row += 1
 			return false
 		preparation.cell_image = Image.create_from_data(

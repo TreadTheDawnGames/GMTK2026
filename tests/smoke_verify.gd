@@ -126,6 +126,43 @@ func _verify_mining_scene() -> void:
 		game_root.queue_free()
 		await process_frame
 		return
+	# Sculpt streaming now expands eight authored cells per packed byte. Compare
+	# complete representative rows to the authoritative resource so the faster
+	# bulk path cannot reverse bit order or change protected-floor collision.
+	var sculpt_placements := terrain_manager.get_sculpt_placements()
+	_expect(
+		not sculpt_placements.is_empty(),
+		"Terrain smoke verification requires one authored sculpt."
+	)
+	if not sculpt_placements.is_empty():
+		var sculpt: CutsceneTerrainSculpt = sculpt_placements[0].sculpt
+		var logical_mask := (
+			terrain_renderer._get_sculpt_logical_mask_image(sculpt, -1)
+		)
+		var logical_mask_matches := logical_mask != null
+		var sample_rows := PackedInt32Array([
+			0,
+			sculpt.grid_size.y >> 1,
+			sculpt.grid_size.y - 1,
+		])
+		if logical_mask_matches:
+			for local_y in sample_rows:
+				for local_x in range(sculpt.grid_size.x):
+					var expected_solid := sculpt.is_solid_local(
+						Vector2i(local_x, local_y)
+					)
+					var actual_solid := (
+						logical_mask.get_pixel(local_x, local_y).a >= 0.5
+					)
+					if actual_solid != expected_solid:
+						logical_mask_matches = false
+						break
+				if not logical_mask_matches:
+					break
+		_expect(
+			logical_mask_matches,
+			"Bulk sculpt decoding changed the authored logical room mask."
+		)
 	_expect(run_state != null, "GameState autoload must exist.")
 	_expect(audio_handler != null, "AudioHandler autoload must exist.")
 	_expect(
