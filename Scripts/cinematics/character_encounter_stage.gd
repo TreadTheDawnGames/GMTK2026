@@ -92,6 +92,10 @@ signal sequence_dialogue_requested(
 var _presenter: CharacterPresenter
 var _sequence_player: CutsceneSequencePlayer
 var _floor_sampler: Callable
+## Looks up any cast member by actor id. Injected by whoever owns the whole cast,
+## because a stage only ever holds the one visitor it was given.
+var cast_resolver: Callable
+
 var _restore_position: Vector2
 var _restore_visible: bool = false
 var _restore_flip_h: bool = false
@@ -455,9 +459,25 @@ func _ensure_sequence_player() -> void:
 		)
 
 
+## Resolves a timeline's actor id to something on screen.
+##
+## The stage owns exactly one presenter - the visitor it took in prepare() - so
+## anything else a timeline names has to come from the schedule, which is the
+## only thing holding the whole cast. A cafe beat addressing four characters
+## resolves all four through the injected lookup; a stage running on its own in
+## the editor resolves none and simply plays nothing, which is the old behaviour.
+##
+## `miner` deliberately still answers with the visitor rather than MinerRig. Every
+## generated placeholder timeline in the project addresses its actor by that name,
+## and repointing it at the real rig would have those timelines drive the player
+## around his own cutscene the moment the runtime went live.
 func _resolve_sequence_actor(actor_id: StringName) -> Node2D:
 	if actor_id == &"miner":
 		return _presenter
+	if cast_resolver.is_valid():
+		var resolved: Variant = cast_resolver.call(actor_id)
+		if is_instance_valid(resolved):
+			return resolved as Node2D
 	return null
 
 
@@ -477,3 +497,20 @@ func _on_sequence_dialogue_requested(
 	line_range: Vector2i
 ) -> void:
 	sequence_dialogue_requested.emit(conversation, line_range)
+
+
+## Releases a timeline that is holding for dialogue it asked somebody else to run.
+##
+## A blocking DIALOGUE beat stops the sequence clock and waits, because a line
+## takes as long as the player takes to read it and no authored duration can know
+## that. The stage never presents dialogue itself, so the owner that did has to
+## say when it finished; without this the timeline holds for the rest of the run.
+func notify_dialogue_finished() -> void:
+	if is_instance_valid(_sequence_player):
+		_sequence_player.notify_dialogue_finished()
+
+
+## Reports whether a timeline is driving this stage, so an owner knows whether
+## the sequence or the conversation is the thing in charge.
+func is_playing_sequence() -> bool:
+	return is_instance_valid(_sequence_player) and _sequence_player.is_playing()

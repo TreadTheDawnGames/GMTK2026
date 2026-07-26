@@ -88,6 +88,13 @@ var _latest_landing_world_y: int = -1
 var _active_conversation: DialogueConversation
 var _is_final_breakthrough_armed: bool = false
 var _is_final_breakthrough_resolving: bool = false
+## True while a timeline's DIALOGUE beat is holding on a conversation this
+## controller started for it, so the conversation ending releases that beat
+## instead of ending the whole encounter.
+var _sequence_is_awaiting_dialogue: bool = false
+## True once a timeline's DIALOGUE beat has run the encounter's conversation, so
+## the schedule knows not to start it again when the timeline finishes.
+var _timeline_presented_conversation: bool = false
 var _game_state: RunState
 
 
@@ -407,6 +414,14 @@ func _begin_active_encounter() -> void:
 		await _active_stage.play_opening()
 		if _active_encounter_index < 0:
 			return
+		# A timeline that ran the conversation itself has already played the whole
+		# shot, so the schedule must not start it a second time. Its beats are
+		# done by the time play_opening returns, which is where an encounter
+		# driven this way ends.
+		if _timeline_presented_conversation:
+			_timeline_presented_conversation = false
+			_complete_encounter_after_dialogue(encounter)
+			return
 	_active_conversation = encounter.conversation
 	if (
 		encounter.encrypted_conversation != null
@@ -504,6 +519,30 @@ func _on_conversation_finished(conversation_id: StringName) -> void:
 	):
 		return
 
+	# A timeline that asked for this conversation is still holding its clock on
+	# it. Release the beat and let the sequence finish the shot; the rewards and
+	# teardown below belong to the encounter ending, not to one beat of it.
+	if _sequence_is_awaiting_dialogue:
+		_sequence_is_awaiting_dialogue = false
+		_timeline_presented_conversation = true
+		_active_conversation = null
+		if _active_stage != null:
+			_active_stage.notify_dialogue_finished()
+		return
+
+	await _complete_encounter_after_dialogue(encounter)
+
+
+## Grants the encounter's rewards, closes the shot, and hands mining back.
+##
+## Factored out because an encounter can now end in one of two places. Normally
+## the conversation finishing is the end of the shot. When an authored timeline
+## owns the encounter, the conversation is one beat inside it and the shot ends
+## when the timeline does, so both paths arrive here rather than one of them
+## quietly skipping the rewards.
+func _complete_encounter_after_dialogue(
+	encounter: DepthCharacterEncounter
+) -> void:
 	if (
 		encounter.pickaxe_reward != null
 		and not pickaxe_progression.grant_upgrade(
@@ -512,7 +551,7 @@ func _on_conversation_finished(conversation_id: StringName) -> void:
 	):
 		push_error(
 			"Encounter '%s' could not grant pickaxe '%s'."
-			% [conversation_id, encounter.pickaxe_reward.id]
+			% [encounter.encounter_id, encounter.pickaxe_reward.id]
 		)
 	if encounter.grants_coffee_speed_boost:
 		coffee_speed_boost_requested.emit()
@@ -677,6 +716,22 @@ func _prepare_authored_characters() -> bool:
 				return false
 			character_parent.add_child(stage)
 			stage.position = encounter_position
+			# Hand the stage its timeline and a way to reach the rest of the cast.
+			#
+			# The sequence lives on the encounter because that is where a designer
+			# picks it, and the stage is the thing that can play it. Nothing wired
+			# these two together before, so every authored timeline in the project
+			# was an editor document that no run ever read.
+			stage.sequence = (
+				encounter.sequence
+				if encounter.plays_authored_timeline
+				else null
+			)
+			stage.cast_resolver = _resolve_cast_member
+			_connect_once(
+				stage.sequence_dialogue_requested,
+				_on_sequence_dialogue_requested
+			)
 			_connect_once(
 				stage.presentation_strike_requested,
 				_on_character_stage_strike_requested
@@ -790,6 +845,41 @@ func _reset_speech_reactions() -> void:
 	for presenter in _presenters_by_actor_id.values():
 		presenter.reset_speech_motion()
 	miner_rig.reset_speech_motion()
+
+
+## Returns any cast member by their stable actor id, for a timeline that names
+## somebody other than the visitor its own stage is holding.
+func _resolve_cast_member(actor_id: StringName) -> Node2D:
+	return _presenters_by_actor_id.get(actor_id)
+
+
+## Runs the conversation a timeline asked for, and remembers that the timeline is
+## waiting on it.
+##
+## A DIALOGUE beat only requests; DialogueDirector stays the one thing that ever
+## presents a line. The beat blocks until the conversation reports back, which is
+## the only way a timeline can hold for exactly as long as the player takes to
+## read.
+func _on_sequence_dialogue_requested(
+	conversation: DialogueConversation,
+	_line_range: Vector2i
+) -> void:
+	if conversation == null:
+		return
+	_active_conversation = conversation
+	_sequence_is_awaiting_dialogue = dialogue_director.start_conversation(
+		conversation,
+		true
+	)
+	if not _sequence_is_awaiting_dialogue:
+		push_error(
+			"A timeline asked for dialogue '%s' that could not start."
+			% conversation.conversation_id
+		)
+		# Release the beat rather than leaving the timeline held forever on a
+		# conversation that is never going to arrive.
+		if _active_stage != null:
+			_active_stage.notify_dialogue_finished()
 
 
 ## Relays a stage-local action through the cross-system wiring boundary.

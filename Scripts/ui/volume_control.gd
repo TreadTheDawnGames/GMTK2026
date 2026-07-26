@@ -49,3 +49,5 @@ func set_bus_volume(wanted_volume: float) -> void:
 func set_bus_mute() -> void:
 	if _bus_index >= 0:
 		AudioServer.set_bus_mute(_bus_index, check_box.button_pressed)
+
+	
