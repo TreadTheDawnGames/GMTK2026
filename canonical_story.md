@@ -178,7 +178,7 @@ chamber.*
 ### Encounter 9 — The Cheese Cafe, 14,000 depth
 
 *The Miner reaches the cafe. Cheese Girl, the Treasure Hunter, Rotini and his
-rats, Quibble, and the Lantern Keeper have gathered there.*
+rats, Quibble, Moody Teen, and the Lantern Keeper have gathered there.*
 
 **ROTINI: Easy, lads. We're here.**
 
@@ -191,6 +191,8 @@ rats, Quibble, and the Lantern Keeper have gathered there.*
 **Treasure Hunter: What do you mean how did I get here? You didn’t take the elevator?**
 
 **QUIBBLE: C-C-CAFE COFFEE! WE MADE IT! DID WE MAKE IT FAST? I THINK WE MADE IT FAST!**
+
+**MOODY TEEN: ...**
 
 **LANTERN KEEPER: Stay a while. Not every minute needs somewhere to go.**
 

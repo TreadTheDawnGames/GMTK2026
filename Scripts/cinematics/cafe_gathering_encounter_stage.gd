@@ -5,19 +5,29 @@ extends CharacterEncounterStage
 ## - Dialogue speaker notifications only toggle the cafe's local shader material.
 ## - Cheese Girl's painted window glows while her line is the active line.
 ## - A fixed eight-actor rat crowd is visible before the miner enters the room.
+## - One stage-owned Moody Teen presenter fills the rear dining-table depth lane.
 ## - A new speaker or cancellation clears the effect immediately.
 ## - The invariant is that cancelled staging leaves no highlight or duplicate rats.
 
 const _CHEESE_GIRL_SPEAKER := &"cheese_girl"
+const _MOODY_TEEN_ACTOR := &"moody_teen"
 const _SPEAKING_PARAMETER := &"coco_speaking"
+
+@export var moody_teen_appearance: CharacterAppearance
 
 @onready var _cafe_sprite: Sprite2D = $PropMarkers/DasQuesoCafe
 @onready var _rat_crowd: Node2D = $PropMarkers/RatCrowd
+@onready var _moody_teen: CharacterPresenter = (
+	$ActorMarkers/MoodyTeenPresenter
+)
 
 
 func _ready() -> void:
 	super._ready()
 	_set_coco_speaking(false)
+	_moody_teen.apply_appearance(moody_teen_appearance)
+	_moody_teen.set_facing_direction(-1)
+	_moody_teen.show()
 	# RatMiner instances hide themselves during their own readiness. The stage
 	# runs after its children and restores this authored, bounded set now so the
 	# occupied cafe is already present while the miner falls into the room.
@@ -39,11 +49,22 @@ func on_dialogue_line_presented(
 	_line_index: int
 ) -> void:
 	_set_coco_speaking(speaker_slot == _CHEESE_GIRL_SPEAKER)
+	_moody_teen.reset_speech_motion()
+	if speaker_slot == _MOODY_TEEN_ACTOR:
+		_moody_teen.react_to_presented_line()
 
 
 func cancel_and_restore() -> void:
 	_set_coco_speaking(false)
+	_moody_teen.reset_speech_motion()
 	super.cancel_and_restore()
+
+
+## Resolves the one cafe-only cast member before asking the run-wide roster.
+func _resolve_sequence_actor(actor_id: StringName) -> Node2D:
+	if actor_id == _MOODY_TEEN_ACTOR:
+		return _moody_teen
+	return super._resolve_sequence_actor(actor_id)
 
 
 func _set_coco_speaking(is_speaking: bool) -> void:
