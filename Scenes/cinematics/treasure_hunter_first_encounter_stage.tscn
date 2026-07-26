@@ -21,17 +21,18 @@ The closing move is NOT dead. play_closing() runs whether or not a timeline drov
 
 He keeps his pickaxe through this whole encounter. The no_pickaxe pose exists in his set but belongs to encounter 6, where he gives up digging for good; here he hands over a spare and goes straight back to work, so nothing in this shot may empty his hands.
 
-The room is cut to match: a pocket with a wandering rock wall at each end and a bore through the right-hand one, which is the rock he comes through. See local_tests/carve_treasure_hunter_first_room.gd for the geometry and why each wall stands where it does."
+The room is cut to match: a pocket with a wandering rock wall at each end and a bore through the right-hand one, which is the rock he comes through. That bore is authored SEALED - eight cells of plug across columns 246 to 253 - and his three strikes open it for real at runtime through Strike Breaks Rock Radius Cells. He is genuinely mining in. Author the bore open and the swings go back to being dust thrown at a hole that was always there, which is what the first cut of this shot did. See local_tests/carve_treasure_hunter_first_room.gd for the geometry and why each wall stands where it does."
 opening_move_seconds = 1.0
 closing_move_seconds = 1.8
 opening_step_height = 9.0
+strike_breaks_rock_radius_cells = 6
 hide_actor_after_closing = true
 conversation_tracks_miner = true
 conversation_root_offset_from_miner_x = 122.5
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
-editor_description = "Inside his own bore and 600px right of Conversation, which keeps him past the frame edge at every landing column: the frame is 1152 wide and centred on the miner, so anything under 480px would have him appear from nothing in open shot. The bore is open from column 244 to the room's right edge, so this mark is in air wherever the landing puts it."
-position = Vector2(504, 0)
+editor_description = "Inside his own bore, BEHIND the plug, and 700px right of Conversation. Two things set that distance and both are floors rather than preferences. It has to clear 480px or he appears from nothing in open shot, because the frame is 1152 wide and centred on the miner. And it has to be past terrain column 265, the far side of the plug, at the LEFTMOST landing the descent can reach - otherwise a run that lands at column 168 starts him inside the rock he is about to break, and he walks out of a wall instead of through a hole. 700px puts him at column 270 in that worst case, five cells clear."
+position = Vector2(604, 0)
 
 [node name="Conversation" parent="ActorMarkers" index="1"]
 editor_description = "122.5px right of the miner, root to root: his body measures 86.5px and the miner's 52.8px, so this leaves exactly one miner-width of daylight between them."
@@ -41,14 +42,26 @@ position = Vector2(-96, 0)
 position = Vector2(-96, 0)
 
 [node name="Exit" parent="ActorMarkers" index="4"]
-editor_description = "Back into the bore he arrived through, 700px right of Conversation, so he is out of shot well before he is hidden. He leaves the way he came rather than walking past the miner."
-position = Vector2(604, 0)
+editor_description = "Back into the bore he arrived through, 800px right of Conversation, so he is out of shot well before he is hidden. He leaves the way he came rather than walking past the miner. Kept 100px beyond Entrance so the departure carries him past the hole rather than stopping in it."
+position = Vector2(704, 0)
 
-[node name="WallStrike" type="Marker2D" parent="ActionMarkers" index="0"]
-editor_description = "Where the three STRIKE beats throw dirt, smoke and shake, through the shared presentation-strike bridge. Pinned to the rock rather than to the miner: ActionMarkers does not slide with the landing column the way ActorMarkers does, and the wall does not move.
+[node name="WallStrikeHigh" type="Marker2D" parent="ActionMarkers" index="0"]
+editor_description = "First swing, head height. The three strike marks all sit on terrain column 262, the middle of the plug sealing his bore, and step down it: x 384 is that column measured from this stage's own origin at column 214, and y is (row - 110) * 8 against the floor row.
 
-x 248 is the bore mouth, terrain column 246, measured from this stage's own origin at column 214. y -48 is six cells above the floor line, which is chest height on him. Both stay inside the frame at every landing column, so the wall is always seen coming apart."
-position = Vector2(248, -48)
+Column 262 puts the impact hard against the right edge of frame at a centre landing, which is what the shot wants. It is a compromise and it has a cost: the camera centres on the miner, his descent can land him anywhere across 48 columns, and fixed terrain cannot follow him, so a run landing in the left third of the band never sees the wall break. carve_treasure_hunter_first_room.gd carries the full working.
+
+Pinned to the rock, not to the miner. ActionMarkers does not slide with the landing column the way ActorMarkers does, which is correct here because the wall does not move when he lands somewhere else.
+
+Row 95. With Strike Breaks Rock Radius Cells at 6, the three discs together clear the whole plug; local_tests/carve_treasure_hunter_first_room.gd asserts that, because a plug and a marker set that disagree leave him walking into rock with nothing in any log to say why."
+position = Vector2(384, -120)
+
+[node name="WallStrikeMid" type="Marker2D" parent="ActionMarkers" index="1"]
+editor_description = "Second swing, chest height. Row 100."
+position = Vector2(384, -80)
+
+[node name="WallStrikeLow" type="Marker2D" parent="ActionMarkers" index="2"]
+editor_description = "Third swing, the one that opens the floor of the hole and lets him step through. Row 105. The terrain call refuses guarded floor rows, so this cannot reach the ground the cast stand on however large the radius gets."
+position = Vector2(384, -40)
 
 [node name="EditorTerrainPreview" parent="." index="4"]
 editor_description = "Previews treasure_hunter_first at its authored depth."

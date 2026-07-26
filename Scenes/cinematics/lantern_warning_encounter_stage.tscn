@@ -104,8 +104,12 @@ position = Vector2(-46.6, 0)
 [node name="Bench" parent="PropMarkers" index="0" instance=ExtResource("6_bench")]
 editor_description = "Authored at 71.4, which is 118 right of his mark at -46.6. That clears his measured 100.4px body and the bench's own 110px length with about 12px of air between them: close enough to read as his bench, far enough that they never overlap.
 
+Y IS -23 AND MUST NOT BE ZERO. Every actor marker here sits on y = 0, the dig line, and that is right for them because the cast are floor-sampled at runtime - DepthEncounterController seats every one of them through _sample_cutscene_floor. A prop is not. The level tunnel lays up to three cells of loose rock on the floor row, which is 24px, so a prop dropped on y = 0 is buried to its knees in the surface the cast are standing on. -23 is measured, not guessed: local_tests/capture_lantern_warning_stage.gd samples the same floor the controller uses at every column this bench can slide to and prints the answer.
+
+The surface moves about 8px either side of that as the bench tracks across the landing band, because loose rock is uneven and a static prop cannot follow it. That is the accepted cost of not floor-sampling props; it is a few pixels on a 60px bench.
+
 Its alpha is animated by this stage's closing and RESET clips. Nothing restores it after a completed shot, and that is the point - the bench is meant to still be gone. RESET exists so an encounter that is interrupted and rolled back does not leave it invisible for the rest of the run."
-position = Vector2(71.4, 0)
+position = Vector2(71.4, -23)
 
 [node name="AnimationPlayer" parent="." index="3"]
 libraries/ = SubResource("AnimationLibrary_warning")

@@ -372,6 +372,10 @@ func _ready() -> void:
 		rat_colony_followers.presentation_strike_requested,
 		_on_character_stage_strike_requested
 	)
+	_connect_once(
+		encounter_controller.character_stage_rock_break_requested,
+		_on_character_stage_rock_break_requested
+	)
 	timing_window.set_bounce_muted(_game_state.save_game.mute_bounce)
 	_on_run_depth_changed(_game_state.depth)
 
@@ -420,6 +424,32 @@ func _on_character_stage_strike_requested(
 	screen_position: Vector2
 ) -> void:
 	_play_cinematic_strike_feedback(screen_position)
+
+
+## Opens real rock where a staged strike landed, for a character mining their way
+## into a room.
+##
+## Terrain is reached from here rather than from the stage that asked, because
+## this file is the cross-system boundary and a cutscene stage owns actors, props
+## and local effects only. The feedback for the same strike has already played
+## through the signal above; this is the half that removes the wall.
+func _on_character_stage_rock_break_requested(
+	screen_position: Vector2,
+	radius_cells: int
+) -> void:
+	# screen_to_terrain_position answers in world units; the terrain call takes
+	# cells, the same unit dig_tunnel takes.
+	var terrain_position := terrain_manager.screen_to_terrain_position(
+		screen_position
+	)
+	var cell_size := float(terrain_manager.config.terrain_cell_world_size)
+	terrain_manager.break_presentation_pocket(
+		Vector2i(
+			floori(terrain_position.x / cell_size),
+			floori(terrain_position.y / cell_size)
+		),
+		radius_cells
+	)
 
 
 func _play_cinematic_strike_feedback(screen_position: Vector2) -> void:

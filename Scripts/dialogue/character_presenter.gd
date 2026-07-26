@@ -19,6 +19,20 @@ const GroundWalkType = preload(
 var _base_sprite_position: Vector2
 var _departure_tween: Tween
 var _art_faces_left: bool = false
+## Which way the appearance was authored, so "mirrored" means mirrored from the
+## state the offset was tuned against rather than from flip_h being true.
+var _base_flip_h: bool = false
+## How far the drawn body sits from the sprite node, along x, in world pixels,
+## measured in the authored orientation. Turning the character round moves the
+## body to the other side of the node by this much, so twice it is the correction
+## that puts it back. Zero for art drawn centred in its canvas.
+var _body_offset_from_node_x: float = 0.0
+
+## Opaque-body measurements, keyed by texture path. get_used_rect() scans every
+## pixel of a 2224x1668 sheet, and apply_appearance runs for all eleven encounters
+## at startup and again on every visit; there are only eight distinct textures, so
+## measuring each once is the difference between a boot cost and a boot stall.
+static var _body_centre_cache: Dictionary = {}
 
 
 ## Stores the authored sprite position before an appearance is assigned.
@@ -60,7 +74,9 @@ func apply_appearance(appearance: CharacterAppearance) -> void:
 	character_sprite.modulate = appearance.tint
 	character_sprite.flip_h = appearance.flip_h
 	_art_faces_left = appearance.art_faces_left
+	_base_flip_h = appearance.flip_h
 	_base_sprite_position = character_sprite.position
+	_body_offset_from_node_x = _measure_body_offset(appearance)
 	speech_reaction.capture_rest_position()
 	if actor_sprite_view != null:
 		actor_sprite_view.pose_set = appearance.pose_set
@@ -71,6 +87,9 @@ func apply_appearance(appearance: CharacterAppearance) -> void:
 func reset_speech_motion() -> void:
 	speech_reaction.reset_speech_motion()
 	character_sprite.position = _base_sprite_position
+	# Reassigning the authored baseline would put a turned character back on the
+	# unturned correction, so the turn has to be re-applied on top of it.
+	_apply_facing_offset(character_sprite.flip_h)
 	if actor_sprite_view != null:
 		actor_sprite_view.play_pose(&"idle")
 
@@ -101,7 +120,98 @@ func play_pose(pose_name: StringName) -> bool:
 func set_facing_direction(direction: int) -> void:
 	if not is_instance_valid(character_sprite) or direction == 0:
 		return
-	character_sprite.flip_h = (direction < 0) != _art_faces_left
+	var flipped := (direction < 0) != _art_faces_left
+	character_sprite.flip_h = flipped
+	_apply_facing_offset(flipped)
+
+
+## Keeps the drawn body on its mark when the character turns round.
+##
+## Sprite2D is centred, so flip_h mirrors the texture about the SPRITE NODE, not
+## about the character. Art drawn off-centre in its canvas therefore swings to the
+## far side of the node the moment it is turned - by twice however far off-centre
+## it was drawn. Measured on the shipped art that is 39px for the Lantern Keeper,
+## 31px for the Treasure Hunter and 29px for Rotini, and it happens in whichever
+## direction the art happens to lean, which is usually straight into whoever they
+## are talking to.
+##
+## sprite_offset does not save you: it is authored against one orientation, so
+## once the body mirrors the offset stops cancelling the lean and starts adding
+## to it. There is no single value that is right both ways.
+##
+## The correction deliberately restores the body to where the AUTHORED
+## orientation put it, rather than centring it on the node. Every shot in the game
+## was staged against the authored orientation; centring would silently re-space
+## all of them. This changes only the turned state, which was the broken one.
+func _apply_facing_offset(flipped: bool) -> void:
+	if not is_instance_valid(character_sprite):
+		return
+	var mirrored := flipped != _base_flip_h
+	character_sprite.position.x = _base_sprite_position.x + (
+		2.0 * _body_offset_from_node_x if mirrored else 0.0
+	)
+
+
+## Returns how far the drawn body sits from the sprite node along x, in world
+## pixels, in the orientation the appearance was authored in.
+func _measure_body_offset(appearance: CharacterAppearance) -> float:
+	if appearance.texture == null:
+		return 0.0
+	var columns := maxi(appearance.horizontal_frames, 1)
+	var rows := maxi(appearance.vertical_frames, 1)
+	# Keyed on the frame, not just the texture: a sheet's frames do not all
+	# carry their body in the same place, and reusing one frame's answer for
+	# another would move the character by the difference.
+	var cache_key := "%s#%d/%dx%d" % [
+		appearance.texture.resource_path,
+		appearance.frame,
+		columns,
+		rows,
+	]
+	if _body_centre_cache.has(cache_key):
+		return _apply_authored_orientation(
+			appearance,
+			_body_centre_cache[cache_key]
+		)
+
+	var image := appearance.texture.get_image()
+	if image == null:
+		return 0.0
+	var frame_width := image.get_width() / columns
+	var frame_height := image.get_height() / rows
+	if frame_width <= 0 or frame_height <= 0:
+		return 0.0
+	var frame_index := clampi(appearance.frame, 0, columns * rows - 1)
+	var frame_region := Rect2i(
+		(frame_index % columns) * frame_width,
+		(frame_index / columns) * frame_height,
+		frame_width,
+		frame_height
+	)
+	# Scan only this frame. get_used_rect() over the whole sheet would report the
+	# union of every pose, which is not where any single one of them is drawn.
+	var frame_image := (
+		image if columns * rows == 1 else image.get_region(frame_region)
+	)
+	var opaque := frame_image.get_used_rect()
+	if opaque.size.x <= 0:
+		return 0.0
+	var frame_centre_px := (
+		float(opaque.position.x) + float(opaque.size.x) * 0.5
+		- float(frame_width) * 0.5
+	)
+	_body_centre_cache[cache_key] = frame_centre_px
+	return _apply_authored_orientation(appearance, frame_centre_px)
+
+
+## Turns a measured body centre into the offset for the authored orientation,
+## in world pixels.
+func _apply_authored_orientation(
+	appearance: CharacterAppearance,
+	frame_centre_px: float
+) -> float:
+	var oriented := -frame_centre_px if appearance.flip_h else frame_centre_px
+	return oriented * appearance.sprite_scale.x
 
 
 ## Walks to one authored global position over sampled terrain.

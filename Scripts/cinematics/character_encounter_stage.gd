@@ -16,6 +16,12 @@ signal cue_started(cue_id: StringName, line_index: int)
 signal cue_finished(cue_id: StringName)
 signal closing_finished
 signal presentation_strike_requested(screen_position: Vector2)
+## Asks the owner to open real rock where a strike landed, for a character who
+## mines their way into a room rather than walking into one.
+signal presentation_rock_break_requested(
+	screen_position: Vector2,
+	radius_cells: int
+)
 signal sequence_dialogue_requested(
 	conversation: DialogueConversation,
 	line_range: Vector2i
@@ -100,6 +106,19 @@ signal sequence_dialogue_requested(
 ## shift that tracking already applied. Off by default, so every room whose
 ## props are authored against its own terrain is untouched.
 @export var props_track_tracked_cast: bool = false
+## How much rock a strike on this stage opens, as a radius in terrain cells.
+##
+## Zero, the default, leaves a strike exactly what it has always been: dirt,
+## smoke, shake and sparks against rock nothing removes. That is right for
+## Rotini's rats, who are mining alongside the miner rather than through anything.
+##
+## Above zero the strike also breaks a bounded pocket of real terrain, which is
+## what lets a character mine their way into a room. Pair it with a room whose
+## approach is authored SEALED: the point is that the wall is intact when the shot
+## opens, so a room already open makes the swing decorative again. The floor is
+## never at risk however large this is, because the terrain call refuses guarded
+## floor rows outright.
+@export_range(0, 16, 1) var strike_breaks_rock_radius_cells: int = 0
 ## Optional visual-editor timeline. Null preserves the legacy opening walk.
 @export var sequence: CutsceneSequence
 ## Actors already painted into this stage's own artwork, by actor id.
@@ -334,6 +353,13 @@ func request_presentation_strike(marker_name: StringName) -> bool:
 		)
 		return false
 	presentation_strike_requested.emit(marker.global_position)
+	# Rock second, so the feedback and the opening are asked for in the order they
+	# read: the swing lands, then the wall gives.
+	if strike_breaks_rock_radius_cells > 0:
+		presentation_rock_break_requested.emit(
+			marker.global_position,
+			strike_breaks_rock_radius_cells
+		)
 	return true
 
 

@@ -348,6 +348,45 @@ wide against the miner's 52.8 — nearly four times him, filling a third of the
 frame — and the lantern man 100px. Both are plausibly a scale that was set by eye
 against the old sunken grounding rather than a deliberate size.
 
+### A prop is not floor-sampled; the cast are
+
+Every actor marker is authored at `y = 0`, the dig line, and that is correct for
+actors: `DepthEncounterController` seats every one of them through
+`_sample_cutscene_floor`, so the marker says *which column*, and the terrain says
+*how high*. **A prop gets no such treatment.** It is a static node at the y you
+typed.
+
+The two are not the same line. A room's ground is not its floor row — the level
+tunnel lays up to three cells of loose rock on top, which is **24px**. So a prop
+dropped on `y = 0` beside a cast member standing on `y = 0` is buried to its
+knees in the surface they are standing on, and in the editor it looks fine,
+because the preview draws the rock over it exactly as the game will.
+
+Measure it rather than nudging until it looks right: call
+`get_layer_opening_floor_support_screen_y` — the same sampler the controller
+uses — at the prop's own columns and author against the answer.
+`local_tests/capture_lantern_warning_stage.gd` does this and prints the number.
+The bench in encounter 5 came out at `y = -23`.
+
+If the prop also tracks the miner (below), sample across the **whole landing
+band**, not just the centre: loose rock is uneven, and a static prop cannot
+follow it. Encounter 5's bench sees about 8px of movement either way, which is
+the accepted cost of props not being sampled.
+
+### Props stay in the room unless you say otherwise
+
+`conversation_tracks_miner` slides the **`ActorMarkers` root only**. That is
+right for a prop that belongs to the terrain — a ledge, a shaft, the lantern
+staff standing at the bottom of a drop — and wrong for one that belongs to the
+conversation. Left pinned, a prop the visitor is meant to be standing at is up to
+**392px** away from them, the full width of the landing band, and the shot has no
+subject.
+
+`props_track_tracked_cast` carries `PropMarkers` under the same shift. It only
+does anything with `conversation_tracks_miner` on, because it copies the shift
+tracking already applied. The Treasure Hunter's hoard and the Lantern Keeper's
+bench both use it.
+
 ### Entrances and exits must clear the frame
 
 The frame is 1152px wide and centred on the miner, so anything within 576px of
@@ -379,17 +418,89 @@ back to a `SubResource`, carving the file in `sculpts/` does nothing at all and
 the failure is silent — the editor and the game simply keep drawing the embedded
 copy. The landing check reports this.
 
-### Timelines do not run yet
+### A room can be cut by a script, and then it has to prove itself
 
-`CutsceneSequence` resources exist for all eleven encounters and the Timeline tab
-authors them, but **nothing plays them at runtime**: `stage.sequence` is never
-assigned, the actor resolver answers only to `&"miner"`, and a blocking DIALOGUE
-beat has nobody to complete it. Assigning `sequence` would switch a stage onto
-that path and override the authored stage settings with a generated placeholder.
+Rooms are normally painted in the Cutscene panel. Two are not: the Treasure
+Hunter's and the Lantern Keeper's Warning are each cut by a script in
+`local_tests/` — `carve_treasure_hunter_first_room.gd`,
+`carve_lantern_warning_room.gd`. Both compose `CutsceneSculptBaker` and the
+panel's own `CutsceneSculptBrush`, so the result is the same rock the brush would
+have made and a designer reopening the room finds work they can continue. Every
+pass is deterministic from the cell coordinate, so re-running reproduces the room
+exactly.
 
-Until someone closes those three gaps deliberately, author choreography through
+A carve script **must verify before it saves**, and must not save if a check
+fails. Both of these do. The reason is the failure mode: a room that is wrong is
+not a room that looks wrong, it is a run that stops.
+
+**Nothing may hang below the ceiling line.** This is the trap, and it cost two
+failed carves to find. The roughen brush only knows where edges are, not what a
+shot needs, so it will happily leave a lump of rock floating in mid-air.
+`get_landing_local_rows` — and the real fall — stop the miner on *the first solid
+cell under the first opening*, so a single detached cell twenty-five rows up is a
+landing surface. He never reaches the floor, the encounter never starts, and it
+sits pending forever with the cinematic gate already claimed. In game that looks
+like mining that simply stopped working, with nothing in any log.
+
+A band of protected rock under the ceiling is **not** enough, which is the
+tempting fix and the second thing that failed: a lump inside the band catches him
+just the same. The rule has to be absolute — per column, empty everything from
+the topmost opening down to the rock lying on the floor. The ceiling still reads
+jagged, because its height varies column to column, which is what the roughen
+pass moved. It does not need debris underneath it to look like rock.
+
+Two related traps in the same family, both worth knowing:
+
+- Find the ground by scanning **up** from the floor row, not down from the
+  ceiling. Downward finds the first solid cell below the opening, which is the
+  right answer only when nothing is hanging — and the whole reason you are
+  checking is that something might be.
+- Measure headroom as the **contiguous** open air standing on the ground, not as
+  the gap between ceiling and floor. The second number cheerfully ignores
+  whatever is floating in the middle of it.
+
+### Timelines run, but only where you say so
+
+Timelines used to be a document nothing read. They are not any more: a stage is
+handed its encounter's sequence, the actor resolver reaches the whole cast, and a
+blocking DIALOGUE beat is released when the conversation the schedule ran
+finishes. **Encounter 5, the Lantern Keeper's Warning, is the first shot driven
+this way** and is the one to copy from.
+
+It stays opt-in per encounter, behind `plays_authored_timeline` on the
+encounter's `.tres`. That switch is deliberately separate from `sequence` being
+set, because every encounter still carries a *generated placeholder* timeline
+from before any of this ran. Turning them all on at once would replace the
+choreography each stage was tuned to and run every conversation twice — once
+from the beat, once from the schedule. **A sequence file existing means nothing.
+Only the switch does.** Encounters opt in as their timelines are genuinely
+authored; the other ten are still notes.
+
+What the timeline owns and what it does not:
+
+- The timeline owns the shot **up to the end of its last beat**. That is what
+  `play_opening()` runs.
+- `play_closing()` still runs afterwards, and still owns the departure — the
+  closing pose, `closing_facing`, `closing_fade_seconds`, the move to `Exit`,
+  and the `closing` AnimationPlayer clip. So do not end a timeline by walking the
+  actor off or hiding them; you will be fighting the thing that is about to do it
+  properly. Encounter 5 ends on a WAIT for exactly this reason.
+- Rewards and teardown belong to the encounter ending, not to a beat, and happen
+  the same way on both paths.
+
+Two sharp edges worth knowing before you author one:
+
+- `line_range` is authored and validated on a DIALOGUE beat, and then
+  **`depth_encounter_controller.gd` ignores it** — every DIALOGUE beat plays the
+  whole conversation. You cannot currently land a cue between two lines by
+  splitting the beat.
+- The clock is clamped to the sequence's own duration, so a beat authored past
+  the last beat's end never starts.
+
+Choreography that does not need per-beat timing is still better authored through
 the stage's own exports — move durations, poses, the facing trio,
-`closing_fade_seconds`, `procession_mines` — and treat the timelines as notes.
+`closing_fade_seconds`, `procession_mines`. Reach for a timeline when beats have
+to be placed against each other in time, or against the player's reading speed.
 
 ## Authoring tools
 

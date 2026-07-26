@@ -263,6 +263,86 @@ func _destroy_tunnel_row(
 	return removed_count
 
 
+## Opens a bounded disc of rock for a cutscene strike, so a character mining into
+## a room actually removes the wall instead of throwing dust at rock that was
+## already open.
+##
+## This is presentation destruction, not mining. It takes no combo, grants no
+## depth, reports nothing to the run, and is driven by an authored strike beat
+## rather than by a swing. It exists because the alternative is authoring the room
+## already open, which is what made "he mines in from the side" read as a man
+## waving a pickaxe at a hole that had always been there.
+##
+## It can never open a guarded floor row. A room's floor is what the miner lands
+## on and what the cast walk along, so a strike aimed low enough to clip it would
+## drop them through the stage they are standing on - and the failure would appear
+## one encounter later, wherever the pocket happened to reach.
+##
+## Returns how many cells were removed, so a caller can tell a strike that broke
+## rock from one that hit an opening.
+func break_presentation_pocket(
+	center_cell: Vector2i,
+	radius_cells: int
+) -> int:
+	if radius_cells <= 0:
+		return 0
+	var destroyed_cells: Array[Vector2i] = []
+	var minimum_cell := Vector2i(
+		config.terrain_width_cells,
+		config.get_bottom_surface_row() + 1
+	)
+	var maximum_cell := Vector2i(-1, -1)
+	for row_offset in range(-radius_cells, radius_cells + 1):
+		var cell_y := center_cell.y + row_offset
+		if cell_y < 0 or _is_guarded_floor_row(cell_y):
+			continue
+		# The disc is resolved per row rather than per cell so each row can reuse
+		# the tunnel row destroyer, which already knows about authored openings,
+		# chamber bounds and the destruction mask.
+		var half_width := floori(sqrt(
+			float(radius_cells * radius_cells - row_offset * row_offset)
+		))
+		var first_new_index := destroyed_cells.size()
+		var removed_in_row := _destroy_tunnel_row(
+			cell_y,
+			center_cell.x - half_width,
+			center_cell.x + half_width,
+			destroyed_cells
+		)
+		if removed_in_row <= 0:
+			continue
+		minimum_cell.x = mini(
+			minimum_cell.x,
+			destroyed_cells[first_new_index].x
+		)
+		minimum_cell.y = mini(minimum_cell.y, cell_y)
+		maximum_cell.x = maxi(maximum_cell.x, destroyed_cells[-1].x)
+		maximum_cell.y = maxi(maximum_cell.y, cell_y)
+
+	if destroyed_cells.is_empty():
+		return 0
+	terrain_damaged.emit(
+		destroyed_cells,
+		0,
+		center_cell,
+		Rect2i(
+			minimum_cell,
+			maximum_cell - minimum_cell + Vector2i.ONE
+		)
+	)
+	return destroyed_cells.size()
+
+
+## Reports whether a terrain row is an authored room's guarded floor.
+func _is_guarded_floor_row(world_row: int) -> bool:
+	var placement := get_sculpt_placement_for_row(world_row)
+	if placement == null:
+		return false
+	return placement.sculpt.is_protected_floor_row(
+		world_row - placement.world_rect.position.y
+	)
+
+
 ## Breaks shallow left/right cracks from a combo-sized blast's outer edge.
 func dig_branching_lightning(
 	impact_center_cell: Vector2i,
