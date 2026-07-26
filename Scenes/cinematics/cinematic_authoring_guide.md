@@ -91,16 +91,23 @@ render every beat to PNG and check the framing by eye.
 
 ### Layering rule: the cast stands behind the ground they stand in
 
-The miner stands on a different stratum depending on what the game is doing.
-**Mining puts him on the second layer; a cutscene lifts him to the first.**
+**Every character stands on the second layer, mining or in a cutscene.** Only
+the surface is different, because there he is on the ground rather than in it.
 
 With `layer_z_indices` at `(2, 0, -1, -2)`:
 
 | State | Order | Reads as |
 | --- | ---: | --- |
 | Mining (`buried_draw_order`) | `1` | between the two frontmost strata, down in his dig |
-| Cutscene (`cutscene_draw_order`) | `3` | clear of every stratum, so a held shot shows a whole man |
+| Cutscene (`cutscene_draw_order`) | `1` | the same stratum, so the foreground rock closes over the cast too |
 | Surface (`surface_draw_order`) | `3` | standing on the ground rather than in it |
+
+The cutscene order was `3` until Zephan's direction that every character sit on
+the second layer. Clear of every stratum reads as a more legible frame and as a
+different world: the cast were pasted on top of rock everything else in the game
+is inside. The two numbers are kept separate even though they now agree, because
+they mean different things — where a man stands while working, and where a shot
+puts its cast — and a later change to one should not silently move the other.
 
 `local_tests/verify_cutscene_cast_draw_order.gd` asserts both ends of that.
 These numbers live in `miner_rig.gd` while the strata live in the terrain
@@ -115,9 +122,14 @@ he is genuinely inside the ground. Being occluded by the ground he stands in is
 the read.
 
 The cast layer follows him. `CharacterLayer` rests at `z_index 1` and
-`DepthEncounterController` lifts the whole layer to `cutscene_draw_order` for the
-duration of an encounter, because a visitor left behind the rock while the miner
-is in front of it is worse than either of them being consistent.
+`DepthEncounterController` copies `cutscene_draw_order` onto the whole layer for
+the duration of an encounter, because a visitor on a different stratum from the
+miner is worse than either of them being consistent.
+
+**That single number is the whole cast's draw order.** There is no per-character
+value to keep in step with it, so moving every character to another layer is one
+edit in `miner_rig.gd` rather than one per character — worth knowing before
+several people set out to move their own.
 
 The surface is the one exception, because there he is standing *on* the ground
 rather than in it:
