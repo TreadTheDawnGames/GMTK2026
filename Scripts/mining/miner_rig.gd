@@ -18,25 +18,19 @@ signal swing_finished
 @export_range(0.0, 1.0, 0.05) var combo_speed_bonus: float = 0.35
 
 @export_category("Placement")
-## Seats the miner on the pale top stratum at the surface and character floors.
+## Seats Eve's redrawn miner on the pale top stratum at the surface.
 ##
-## Measured rather than guessed: on an authored encounter floor his sole landed
-## ten pixels under the floor line the cast are placed on, so he read as standing
-## in the ground while whoever he was talking to stood on it. Six puts the sole
-## on that line. This is one value for the surface and for cutscene floors, so
-## check the bus-stop opening if it is changed again.
-@export_range(0.0, 64.0, 1.0) var intact_floor_grounding_offset_y: float = 6.0
-## The same seating, for the run's own starting surface.
+## The rig root is at y 202 and the visible sole is 66.83 px below VisualRoot,
+## so -11 keeps the boot a little over two pixels above the y 260 terrain rim.
+## Dynamic mined floors use the measured LandingFootAnchor below.
+@export_range(-64.0, 64.0, 1.0) var intact_floor_grounding_offset_y: float = -11.0
+## The same measured seating for the run's starting surface.
 ##
-## It is separate because the two floors are not the same thing. A cutscene
-## floor is a cut room he shares with a standing cast, so his sole goes on their
-## line. The surface is the top of the terrain, where the shelf falls away
-## toward the camera and the value that seats him on a room floor leaves him
-## standing high on the lip. Six put him right in a room and too high at the bus
-## stop; this is the one the opening is measured against.
-@export_range(0.0, 64.0, 1.0) var surface_grounding_offset_y: float = 16.0
-## Slightly overlaps the sampled dirt edge so texture filtering cannot show a gap.
-@export_range(0.0, 4.0, 0.25) var grounding_overlap_y: float = 1.0
+## It remains a separate value because a future surface redraw must not silently
+## move every underground encounter.
+@export_range(-64.0, 64.0, 1.0) var surface_grounding_offset_y: float = -11.0
+## Keeps the measured sole above the sampled dirt edge rather than inside it.
+@export_range(0.0, 4.0, 0.25) var grounding_clearance_y: float = 1.0
 ## Lifts the sole baseline slightly on each cinematic walking step.
 @export_range(0.0, 12.0, 0.5) var cinematic_walk_step_height: float = 4.0
 ## Controls how many visible walking steps fit along a traversal segment.
@@ -61,8 +55,8 @@ signal swing_finished
 ## of his own shaft in every frame, and the foreground stratum cut him off at the
 ## shins for the whole descent rather than only while he was genuinely inside the
 ## ground. That is the cost of this value, and it is accepted on purpose: being
-## occluded by the ground he is standing in is the read, and a cutscene lifts him
-## clear of it anyway through cutscene_draw_order.
+## occluded by the foreground while his soles remain above the second stratum is
+## the read.
 ##
 ## Kept strictly between the two frontmost strata z indices, currently 2 and 0.
 ## verify_cutscene_cast_draw_order.gd asserts that relationship, because this
@@ -547,7 +541,7 @@ func seat_landing_foot_at_screen_y(support_screen_y: float) -> void:
 	# foot happened to be and keep it there.
 	var grounding_delta: float = (
 		support_screen_y
-		+ grounding_overlap_y
+		- grounding_clearance_y
 		- (landing_foot_anchor.global_position.y + _get_walk_step_lift())
 	)
 	var current_grounding_offset: float = (

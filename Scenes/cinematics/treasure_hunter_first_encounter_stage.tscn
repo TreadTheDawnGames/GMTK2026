@@ -9,8 +9,8 @@
 [sub_resource type="Resource" id="Resource_miner"]
 script = ExtResource("4_appearance")
 texture = ExtResource("5_miner")
-sprite_scale = Vector2(0.44, 0.44)
-sprite_offset = Vector2(0, -68)
+sprite_scale = Vector2(0.203, 0.203)
+sprite_offset = Vector2(0, -88)
 
 [node name="TreasureHunterFirstEncounterStage" instance=ExtResource("1_stage")]
 editor_description = "Encounter 4, depth 4,000: the Treasure Hunter mines in through the side wall, introduces himself by complaining, and gives away the first improved pickaxe while insisting the treasure is still his. His art is drawn looking left, so he stays on the miner's right.
@@ -70,7 +70,7 @@ preview_depth_rows = 4000
 
 [node name="treasure_hunter" type="Node2D" parent="." index="5"]
 editor_description = "Editor stand-in only; it frees itself before a running game can pay for it. Placed at the conversation offset from the Miner stand-in rather than on the Conversation marker, because at runtime the whole marker set slides to wherever the miner landed and it is that spacing, not the authored mark, that survives."
-z_index = 3
+z_index = 1
 position = Vector2(122, 0)
 script = ExtResource("2_preview")
 actor_id = &"treasure_hunter"
@@ -79,7 +79,7 @@ pose = &"idle"
 metadata/_edit_group_ = true
 
 [node name="Miner" type="Node2D" parent="." index="6"]
-z_index = 3
+z_index = 1
 script = ExtResource("2_preview")
 actor_id = &"miner"
 appearance = SubResource("Resource_miner")

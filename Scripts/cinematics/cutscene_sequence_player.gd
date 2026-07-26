@@ -290,6 +290,10 @@ func _start_move(
 	_actor_motion_beats[beat.actor] = beat_index
 	if beat.duration_seconds <= 0.0:
 		_set_actor_facing(actor, signi(target_position.x - actor.global_position.x))
+		if grounded and actor is CharacterPresenter and _floor_sampler.is_valid():
+			var floor_y := float(_floor_sampler.call(target_position.x))
+			if not is_nan(floor_y) and not is_inf(floor_y):
+				target_position.y = floor_y
 		actor.global_position = target_position
 		_finish_beat(beat_index, generation)
 		return

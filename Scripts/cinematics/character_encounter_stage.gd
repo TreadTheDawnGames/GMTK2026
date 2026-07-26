@@ -220,7 +220,12 @@ func prepare(
 	_restore_modulate = presenter.modulate
 	presenter.modulate.a = 1.0
 	_presenter.cancel_grounded_motion()
-	_presenter.global_position = entrance_marker.global_position
+	var entrance_position := entrance_marker.global_position
+	if _floor_sampler.is_valid():
+		var entrance_floor_y := float(_floor_sampler.call(entrance_position.x))
+		if not is_nan(entrance_floor_y) and not is_inf(entrance_floor_y):
+			entrance_position.y = entrance_floor_y
+	_presenter.global_position = entrance_position
 	_presenter.show()
 	_apply_facing(entrance_facing)
 	_is_active = true
@@ -399,18 +404,13 @@ func validate_stage() -> String:
 	return ""
 
 
-## Samples the injected floor but refuses ground that falls away below where the
-## walk set out from. The miner arrives by breaking a crater through the room's
-## floor, and the shared sampler reports the bottom of that crater as support,
-## so an actor crossing it walks down into the hole and climbs back out. Rising
-## ground is still followed; only falling ground is refused.
-func _sample_level_floor(screen_x: float, walk_floor_y: float) -> float:
+## Samples the same authored support used by every cutscene actor. Markers own
+## horizontal staging only; their Y values must never pull a character away
+## from the second-stratum support while entering, conversing, or leaving.
+func _sample_level_floor(screen_x: float, _walk_floor_y: float) -> float:
 	if not _floor_sampler.is_valid():
 		return NAN
-	var sampled_y := float(_floor_sampler.call(screen_x))
-	if is_nan(sampled_y):
-		return sampled_y
-	return minf(sampled_y, walk_floor_y)
+	return float(_floor_sampler.call(screen_x))
 
 
 func _play_named_animation(animation_name: StringName) -> StringName:

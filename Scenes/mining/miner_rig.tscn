@@ -80,7 +80,7 @@ tracks/4/keys = {
 tracks/5/type = "value"
 tracks/5/imported = false
 tracks/5/enabled = true
-tracks/5/path = NodePath("VisualRoot/DrawnMinerSprite:frame")
+tracks/5/path = NodePath("VisualRoot/PoseRoot/DrawnMinerSprite:frame")
 tracks/5/interp = 1
 tracks/5/loop_wrap = true
 tracks/5/keys = {
@@ -92,14 +92,14 @@ tracks/5/keys = {
 tracks/6/type = "value"
 tracks/6/imported = false
 tracks/6/enabled = true
-tracks/6/path = NodePath("VisualRoot/DrawnMinerSprite:position")
+tracks/6/path = NodePath("VisualRoot/PoseRoot:position")
 tracks/6/interp = 1
 tracks/6/loop_wrap = true
 tracks/6/keys = {
 "times": PackedFloat32Array(0),
 "transitions": PackedFloat32Array(1),
 "update": 0,
-"values": [Vector2(0, 6)]
+"values": [Vector2(0, 0)]
 }
 
 [sub_resource type="Animation" id="Animation_idle"]
@@ -145,7 +145,7 @@ tracks/2/keys = {
 tracks/3/type = "value"
 tracks/3/imported = false
 tracks/3/enabled = true
-tracks/3/path = NodePath("VisualRoot/DrawnMinerSprite:frame")
+tracks/3/path = NodePath("VisualRoot/PoseRoot/DrawnMinerSprite:frame")
 tracks/3/interp = 1
 tracks/3/loop_wrap = true
 tracks/3/keys = {
@@ -157,14 +157,14 @@ tracks/3/keys = {
 tracks/4/type = "value"
 tracks/4/imported = false
 tracks/4/enabled = true
-tracks/4/path = NodePath("VisualRoot/DrawnMinerSprite:position")
+tracks/4/path = NodePath("VisualRoot/PoseRoot:position")
 tracks/4/interp = 2
 tracks/4/loop_wrap = true
 tracks/4/keys = {
 "times": PackedFloat32Array(0, 0.45, 0.9),
 "transitions": PackedFloat32Array(1, 1, 1),
 "update": 0,
-"values": [Vector2(0, 6), Vector2(0, 9), Vector2(0, 6)]
+"values": [Vector2(0, 0), Vector2(0, 3), Vector2(0, 0)]
 }
 
 [sub_resource type="Animation" id="Animation_miss_motion"]
@@ -209,7 +209,7 @@ tracks/2/keys = {
 tracks/3/type = "value"
 tracks/3/imported = false
 tracks/3/enabled = true
-tracks/3/path = NodePath("VisualRoot/DrawnMinerSprite:frame")
+tracks/3/path = NodePath("VisualRoot/PoseRoot/DrawnMinerSprite:frame")
 tracks/3/interp = 1
 tracks/3/loop_wrap = true
 tracks/3/keys = {
@@ -221,14 +221,14 @@ tracks/3/keys = {
 tracks/4/type = "value"
 tracks/4/imported = false
 tracks/4/enabled = true
-tracks/4/path = NodePath("VisualRoot/DrawnMinerSprite:position")
+tracks/4/path = NodePath("VisualRoot/PoseRoot:position")
 tracks/4/interp = 1
 tracks/4/loop_wrap = true
 tracks/4/keys = {
 "times": PackedFloat32Array(0, 0.07, 0.28),
 "transitions": PackedFloat32Array(1, 1, 1),
 "update": 0,
-"values": [Vector2(0, 6), Vector2(0, 10), Vector2(0, 6)]
+"values": [Vector2(0, 0), Vector2(0, 4), Vector2(0, 0)]
 }
 
 [sub_resource type="Animation" id="Animation_success_motion"]
@@ -287,7 +287,7 @@ tracks/3/keys = {
 tracks/4/type = "value"
 tracks/4/imported = false
 tracks/4/enabled = true
-tracks/4/path = NodePath("VisualRoot/DrawnMinerSprite:frame")
+tracks/4/path = NodePath("VisualRoot/PoseRoot/DrawnMinerSprite:frame")
 tracks/4/interp = 1
 tracks/4/loop_wrap = true
 tracks/4/keys = {
@@ -299,14 +299,14 @@ tracks/4/keys = {
 tracks/5/type = "value"
 tracks/5/imported = false
 tracks/5/enabled = true
-tracks/5/path = NodePath("VisualRoot/DrawnMinerSprite:position")
+tracks/5/path = NodePath("VisualRoot/PoseRoot:position")
 tracks/5/interp = 1
 tracks/5/loop_wrap = true
 tracks/5/keys = {
 "times": PackedFloat32Array(0, 0.09, 0.16, 0.38),
 "transitions": PackedFloat32Array(1, 1, 1, 1),
 "update": 0,
-"values": [Vector2(0, 6), Vector2(0, 10), Vector2(0, 8), Vector2(0, 6)]
+"values": [Vector2(0, 0), Vector2(0, 4), Vector2(0, 2), Vector2(0, 0)]
 }
 
 [sub_resource type="Animation" id="Animation_three_frame_success"]
@@ -315,7 +315,7 @@ length = 0.62
 tracks/0/type = "value"
 tracks/0/imported = false
 tracks/0/enabled = true
-tracks/0/path = NodePath("VisualRoot/DrawnMinerSprite:frame")
+tracks/0/path = NodePath("VisualRoot/PoseRoot/DrawnMinerSprite:frame")
 tracks/0/interp = 0
 tracks/0/loop_wrap = true
 tracks/0/keys = {
@@ -327,14 +327,14 @@ tracks/0/keys = {
 tracks/1/type = "value"
 tracks/1/imported = false
 tracks/1/enabled = true
-tracks/1/path = NodePath("VisualRoot/DrawnMinerSprite:position")
+tracks/1/path = NodePath("VisualRoot/PoseRoot:position")
 tracks/1/interp = 0
 tracks/1/loop_wrap = true
 tracks/1/keys = {
 "times": PackedFloat32Array(0, 0.08, 0.24),
 "transitions": PackedFloat32Array(1, 1, 1),
 "update": 1,
-"values": [Vector2(0, 6), Vector2(0, 6), Vector2(0, 8)]
+"values": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 2)]
 }
 tracks/2/type = "method"
 tracks/2/imported = false
@@ -396,7 +396,7 @@ tracks/2/keys = {
 tracks/3/type = "value"
 tracks/3/imported = false
 tracks/3/enabled = true
-tracks/3/path = NodePath("VisualRoot/DrawnMinerSprite:frame")
+tracks/3/path = NodePath("VisualRoot/PoseRoot/DrawnMinerSprite:frame")
 tracks/3/interp = 1
 tracks/3/loop_wrap = true
 tracks/3/keys = {
@@ -408,14 +408,14 @@ tracks/3/keys = {
 tracks/4/type = "value"
 tracks/4/imported = false
 tracks/4/enabled = true
-tracks/4/path = NodePath("VisualRoot/DrawnMinerSprite:position")
+tracks/4/path = NodePath("VisualRoot/PoseRoot:position")
 tracks/4/interp = 1
 tracks/4/loop_wrap = true
 tracks/4/keys = {
 "times": PackedFloat32Array(0, 0.1, 0.2),
 "transitions": PackedFloat32Array(1, 1, 1),
 "update": 0,
-"values": [Vector2(0, 6), Vector2(0, 10), Vector2(0, 8)]
+"values": [Vector2(0, 0), Vector2(0, 4), Vector2(0, 2)]
 }
 
 [sub_resource type="Animation" id="Animation_wind_up"]
@@ -460,7 +460,7 @@ tracks/2/keys = {
 tracks/3/type = "value"
 tracks/3/imported = false
 tracks/3/enabled = true
-tracks/3/path = NodePath("VisualRoot/DrawnMinerSprite:frame")
+tracks/3/path = NodePath("VisualRoot/PoseRoot/DrawnMinerSprite:frame")
 tracks/3/interp = 1
 tracks/3/loop_wrap = true
 tracks/3/keys = {
@@ -472,14 +472,14 @@ tracks/3/keys = {
 tracks/4/type = "value"
 tracks/4/imported = false
 tracks/4/enabled = true
-tracks/4/path = NodePath("VisualRoot/DrawnMinerSprite:position")
+tracks/4/path = NodePath("VisualRoot/PoseRoot:position")
 tracks/4/interp = 1
 tracks/4/loop_wrap = true
 tracks/4/keys = {
 "times": PackedFloat32Array(0, 0.25),
 "transitions": PackedFloat32Array(1, 1),
 "update": 0,
-"values": [Vector2(0, 6), Vector2(0, 8)]
+"values": [Vector2(0, 0), Vector2(0, 2)]
 }
 
 [sub_resource type="AnimationLibrary" id="AnimationLibrary_rig"]
@@ -499,8 +499,8 @@ position = Vector2(576, 202)
 script = ExtResource("1_rig")
 animation_player = NodePath("AnimationPlayer")
 visual_root = NodePath("VisualRoot")
-drawn_miner_sprite = NodePath("VisualRoot/DrawnMinerSprite")
-landing_foot_anchor = NodePath("VisualRoot/LandingFootAnchor")
+drawn_miner_sprite = NodePath("VisualRoot/PoseRoot/DrawnMinerSprite")
+landing_foot_anchor = NodePath("VisualRoot/PoseRoot/LandingFootAnchor")
 idle_miner_texture = ExtResource("2_6q48d")
 wind_up_miner_texture = ExtResource("6_wind_up_miner")
 impact_miner_texture = ExtResource("5_impact_miner")
@@ -521,15 +521,18 @@ speech_reaction = NodePath("SpeechReaction")
 [node name="VisualRoot" type="Node2D" parent="." unique_id=465234156]
 editor_description = "Animate this for whole-character bounce, squash, recoil, and small fall offsets. Do not use it to calculate mining progress."
 
-[node name="DrawnMinerSprite" type="Sprite2D" parent="VisualRoot" unique_id=611169088]
+[node name="PoseRoot" type="Node2D" parent="VisualRoot"]
+editor_description = "Owns pose-only bob motion. The drawn sprite and its sole marker move together, while VisualRoot remains free to seat that shared foot against terrain."
+
+[node name="DrawnMinerSprite" type="Sprite2D" parent="VisualRoot/PoseRoot" unique_id=611169088]
 texture_filter = 2
 position = Vector2(0, -20)
 scale = Vector2(0.203, 0.203)
 texture = ExtResource("2_6q48d")
 
-[node name="LandingFootAnchor" type="Marker2D" parent="VisualRoot" unique_id=410620658]
-editor_description = "Authored underside of the idle miner's soles. Landings align this point to visible terrain support."
-position = Vector2(0, 52)
+[node name="LandingFootAnchor" type="Marker2D" parent="VisualRoot/PoseRoot" unique_id=410620658]
+editor_description = "Measured underside of Eve's idle, wind-up, and impact soles. Landings align this point just above visible terrain support, and PoseRoot keeps it attached to animation bob."
+position = Vector2(0, 68)
 
 [node name="CinematicFocusAnchor" type="Marker2D" parent="VisualRoot"]
 editor_description = "Shared body center for the tracked iris and retained entrance."

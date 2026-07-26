@@ -16,8 +16,8 @@
 [sub_resource type="Resource" id="Resource_miner_preview"]
 script = ExtResource("6_appearance")
 texture = ExtResource("7_miner")
-sprite_scale = Vector2(0.44, 0.44)
-sprite_offset = Vector2(0, -68)
+sprite_scale = Vector2(0.203, 0.203)
+sprite_offset = Vector2(0, -88)
 
 [node name="CafeGatheringEncounterStage" instance=ExtResource("1_stage")]
 editor_description = "Encounter 9, depth 14,000: the Cheese Cafe. The Miner breaks through into Das Queso Cafe and finds everybody he met on the way down already there - Cheese Girl serving from the window, the Treasure Hunter with nothing left to carry, Rotini arriving with his colony, Quibble, and the Lantern Keeper standing apart at the open end of the room.
@@ -152,7 +152,7 @@ preview_depth_rows = 14000
 
 [node name="Miner" type="Node2D" parent="." index="5"]
 editor_description = "Where the miner stands for a dead-centre landing: the stage sits 22 cells right of the terrain centre, so he is 176px left of this stage's own origin. Editor-only; it frees itself before a running game can pay for it."
-z_index = 3
+z_index = 1
 position = Vector2(-176, 0)
 script = ExtResource("2_preview")
 actor_id = &"miner"
@@ -161,7 +161,7 @@ metadata/_edit_group_ = true
 
 [node name="treasure_hunter" type="Node2D" parent="." index="6"]
 editor_description = "Standing at the cafe with nothing left to carry. no_pickaxe is the pose his own art already has for exactly this - he gave the second one away at 7,400 - and it is the only visual in the shot that says his story finished."
-z_index = 3
+z_index = 1
 position = Vector2(-413, 0)
 script = ExtResource("2_preview")
 actor_id = &"treasure_hunter"
@@ -170,7 +170,7 @@ pose = &"no_pickaxe"
 metadata/_edit_group_ = true
 
 [node name="rutini" type="Node2D" parent="." index="7"]
-z_index = 3
+z_index = 1
 position = Vector2(-286, 0)
 script = ExtResource("2_preview")
 actor_id = &"rutini"
@@ -178,7 +178,7 @@ appearance = ExtResource("10_rutini")
 metadata/_edit_group_ = true
 
 [node name="coffee_cat" type="Node2D" parent="." index="8"]
-z_index = 3
+z_index = 1
 position = Vector2(-66, 0)
 script = ExtResource("2_preview")
 actor_id = &"coffee_cat"
@@ -187,7 +187,7 @@ pose = &"hold_cup"
 metadata/_edit_group_ = true
 
 [node name="cloak_lantern" type="Node2D" parent="." index="9"]
-z_index = 3
+z_index = 1
 position = Vector2(68, 0)
 script = ExtResource("2_preview")
 actor_id = &"cloak_lantern"

@@ -14,8 +14,8 @@
 [sub_resource type="Resource" id="Resource_miner"]
 script = ExtResource("4_appearance")
 texture = ExtResource("5_miner")
-sprite_scale = Vector2(0.44, 0.44)
-sprite_offset = Vector2(0, -68)
+sprite_scale = Vector2(0.203, 0.203)
+sprite_offset = Vector2(0, -88)
 
 [node name="RotiniColonyEncounterStage" instance=ExtResource("1_stage")]
 editor_description = "Encounter 8, Rotini and the Colony, depth 11,200. The mirror of his introduction: Zephan's clip says \"you're gonna come from this side this time\", so he arrives from the LEFT and holds the conversation on the miner's LEFT, where at 2,500 he came from the right and stood on the right. The room is the same level tunnel open at both ends, because these are the colony's own tunnels and they are lost in them. Nothing is moving when the frame opens - that is the difference from the introduction, where the traffic was the first thing on screen. The tunnel stays empty for three lines and then, on \"Come on boys! Dig!\", the colony floods through and starts swinging: Procession Cue holds the stream until that line's own Stage Cue lets it in. Spacing follows the house rule - his body measures 62.7px and the miner's 52.8px, so 110px root to root leaves one miner-width of daylight. Arrival facing and the approach belong to rutini_second_sequence; only the closing walk is authored here, because play_closing runs either way. The rutini_* resource names refer to Rotini until a coordinated rename is approved."
@@ -62,7 +62,7 @@ encounter_id = &"rutini_second"
 preview_depth_rows = 11200
 
 [node name="rutini" type="Node2D" parent="." index="6"]
-z_index = 3
+z_index = 1
 position = Vector2(-110, 0)
 script = ExtResource("2_preview")
 actor_id = &"rutini"
@@ -71,7 +71,7 @@ pose = &"idle"
 metadata/_edit_group_ = true
 
 [node name="Miner" type="Node2D" parent="." index="7"]
-z_index = 3
+z_index = 1
 script = ExtResource("2_preview")
 actor_id = &"miner"
 appearance = SubResource("Resource_miner")

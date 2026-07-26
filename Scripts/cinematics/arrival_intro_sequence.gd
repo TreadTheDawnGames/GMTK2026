@@ -119,11 +119,6 @@ signal attendant_picked_up
 	576.0,
 	262.0
 )
-## The rig's own landing-foot anchor sits this many pixels below where his
-## boots actually render, so this shot alone corrects for it and seats him
-## right at the ground line instead of shin-deep in the dirt.
-@export_range(0.0, 48.0, 1.0) var miner_ground_seat_lift_px: float = 18.0
-
 @export_category("Motion")
 ## Vertical dip as the bus stops, so the arrival lands instead of gliding.
 @export_range(0.0, 32.0, 0.5) var bus_settle_dip_pixels: float = 5.0
@@ -246,7 +241,7 @@ func begin() -> bool:
 	# surface is flat, so this one point supplies both the ground line the bus
 	# stops on and the exact spot where the miner is revealed.
 	var rest_foot := miner_rig.get_cinematic_foot_screen_position()
-	_ground_foot_y = rest_foot.y - miner_ground_seat_lift_px
+	_ground_foot_y = rest_foot.y
 	_dig_foot_x = rest_foot.x
 	_bus_rest_position = bus_stop_anchor.position
 	bus.position = Vector2(
@@ -305,14 +300,8 @@ func finish(restore_seconds: float = 0.2) -> void:
 	_is_playing = false
 	_kill_prop_tween()
 	miner_rig.show()
-	# Hand back gameplay draw order in place. The miner is already at the exact
-	# dig spot, so he settles without inventing a walk or another translation
-	# before input unlocks. The rig owns the order itself: the shot ends with him
-	# standing on the untouched surface, in front of the foreground stratum.
-	miner_rig.place_cinematic_foot_at(
-		Vector2(_dig_foot_x, _ground_foot_y),
-		miner_rig.get_rest_draw_order()
-	)
+	# The bus drop-off is the gameplay dig spot. Restore scale and draw order
+	# without inventing a second translation after the bus has left him there.
 	var restore_tween := miner_rig.restore_cinematic_visual(restore_seconds)
 	if restore_tween != null:
 		await restore_tween.finished

@@ -335,30 +335,29 @@ encounter camera centres on whatever column he stopped at.
 ### Measure spacing, never guess it
 
 One character-width is the **widest single row of opaque pixels**, times the
-scale that ships. It is not the sprite's bounding box: the miner's box unions his
-pickaxe head at one height with his torso at another and comes out roughly twice
-the man. Measured bodies: miner **52.8px**, Cheese Girl **34.3px**, Rotini
-**62.7px** — the rat is wider than the man, because the art is long.
+scale that ships. It is not the sprite's bounding box: a box unions the pickaxe
+head at one height with his torso at another and comes out roughly twice the
+man. For a spritesheet it is one frame, not the entire sheet.
 
-House spacing is one miner-width of daylight between two bodies, so root to root
-is `(a + b) / 2 + 52.8`. Measured, so nobody has to derive them again:
+The current Eve miner sheet ships at scale `0.203`. Its measured body is about
+**73.5px** wide and **120px** tall. Values derived from the intermediate `0.27`
+scale are stale. House spacing is one miner-width of daylight between bodies,
+so root to root is `(a + b) / 2 + 73.5`:
 
 | Character | Body | Shoulders touching | One miner apart |
 | --- | ---: | ---: | ---: |
-| miner | 52.8 | — | — |
-| cheese_girl | 34.3 | 43.5 | **96.3** |
-| moody_teen | 45.0 | 48.9 | 101.7 |
-| newspaper_reader | 43.4 | 48.1 | 100.9 |
-| rutini | 62.7 | 57.7 | **110.5** |
-| thief | 63.4 | 58.1 | 110.9 |
-| treasure_hunter | 86.5 | 69.7 | 122.5 |
-| cloak_lantern | 100.4 | 76.6 | 129.4 |
-| coffee_cat | 202.4 | 127.6 | 180.4 |
+| miner | **73.5** | — | — |
+| cheese_girl | 34.3 | 53.9 | **127.4** |
+| moody_teen | 45.0 | 59.3 | 132.8 |
+| newspaper_reader | 43.4 | 58.5 | 132.0 |
+| coffee_cat | 61.5 | 67.5 | 141.0 |
+| rutini | 62.7 | 68.1 | **141.6** |
+| thief | 63.4 | 68.5 | 142.0 |
+| treasure_hunter | 86.5 | 80.0 | 153.5 |
+| cloak_lantern | 100.4 | 87.0 | **160.4** |
 
-Two of those are worth a look before they are used as-is. Quibble reads 202px
-wide against the miner's 52.8 — nearly four times him, filling a third of the
-frame — and the lantern man 100px. Both are plausibly a scale that was set by eye
-against the old sunken grounding rather than a deliberate size.
+Re-run the measurement after any miner art or scale change; do not hand-edit
+this table from a full-sheet bounding box.
 
 ### A prop is not floor-sampled; the cast are
 
