@@ -40,6 +40,9 @@ func _run() -> void:
 	var view := game_root.get_node(
 		"MiningScene/Systems/ViewController"
 	) as ViewController
+	var terrain_renderer := game_root.get_node(
+		"MiningScene/TerrainLayerRenderer"
+	) as TerrainLayerRenderer
 	var timing := game_root.get_node(
 		"MiningScene/HUD/TimingWindow"
 	) as TimingWindowTask
@@ -83,6 +86,11 @@ func _run() -> void:
 		director.is_conversation_active(),
 		"Cheese Girl's interrupted strike must activate her conversation."
 	)
+	_expect(
+		not terrain_renderer._cutscene_floor_plane_is_enabled
+		and not terrain_renderer._trodden_floor_is_enabled,
+		"Cheese Girl must use the ordinary layered terrain presentation."
+	)
 	if director.is_conversation_active():
 		director.finish_conversation()
 	for _frame in range(900):
@@ -97,6 +105,11 @@ func _run() -> void:
 		and timing.mining_window.is_processing()
 		and timing.mining_window.targets.size() > 0,
 		"Completing Cheese Girl's cutscene must restore live mining input."
+	)
+	_expect(
+		not terrain_renderer._cutscene_floor_plane_is_enabled
+		and not terrain_renderer._trodden_floor_is_enabled,
+		"Cutscene release must preserve ordinary layered terrain."
 	)
 
 	var resumed_depth := run_state.depth

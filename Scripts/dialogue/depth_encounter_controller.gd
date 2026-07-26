@@ -150,6 +150,9 @@ var _prestaged_encounter_index: int = -1
 ## Normal completion may request one bounded camera hold. Failure and reset clear
 ## it before the shared flow releases, so a broken shot cannot inherit framing.
 var _pending_release_recession_ratio: float = 0.0
+## Normal completion may preserve one encounter's sampled Miner baseline.
+## Reset and failure always clear it so cancellation restores ordinary mining.
+var _pending_keep_miner_grounding_after_release: bool = false
 var _game_state: RunState
 
 
@@ -262,6 +265,7 @@ func _on_run_reset() -> void:
 	_is_final_breakthrough_armed = false
 	_is_final_breakthrough_resolving = false
 	_pending_release_recession_ratio = 0.0
+	_pending_keep_miner_grounding_after_release = false
 	terrain_renderer.set_trodden_floor(false)
 	terrain_renderer.set_cutscene_floor_plane(false)
 	_latest_landing_world_y = (
@@ -278,6 +282,7 @@ func _schedule_next_encounter() -> bool:
 		return false
 	_pending_encounter_index = _next_encounter_index
 	_pending_release_recession_ratio = 0.0
+	_pending_keep_miner_grounding_after_release = false
 	var encounter := encounter_config.encounters[_pending_encounter_index]
 	# The room's ground is part of the set, not an effect revealed by landing.
 	# Publish it before the fall pose so the first frame entering this chamber
@@ -1004,6 +1009,9 @@ func _complete_encounter_after_dialogue(
 	_pending_release_recession_ratio = (
 		encounter.post_cinematic_recession_ratio
 	)
+	_pending_keep_miner_grounding_after_release = (
+		encounter.keeps_miner_grounding_after_release
+	)
 	_active_encounter_index = -1
 	_restore_mining_after_buffer()
 
@@ -1259,9 +1267,12 @@ func _finish_cinematic_flow() -> void:
 	# and the miner would go back to mining lying on his face.
 	miner_rig.release_cutscene_landing()
 	miner_rig.exit_cutscene_draw_order()
-	# Back to the mining grounding, so the shot's seating never follows him into
-	# the rest of the run.
-	miner_rig.show_intact_floor_grounding()
+	if not _pending_keep_miner_grounding_after_release:
+		# Most rooms return to the generic mining baseline. An opted-in room
+		# keeps its sampled floor seating so its first crater begins exactly
+		# where the cutscene left the Miner.
+		miner_rig.show_intact_floor_grounding()
+	_pending_keep_miner_grounding_after_release = false
 	_exit_cast_cutscene_draw_order()
 	var recession_ratio := _pending_release_recession_ratio
 	_pending_release_recession_ratio = 0.0
@@ -1486,6 +1497,7 @@ func _fail_active_encounter() -> void:
 	_is_final_breakthrough_armed = false
 	_is_final_breakthrough_resolving = false
 	_pending_release_recession_ratio = 0.0
+	_pending_keep_miner_grounding_after_release = false
 	if _active_encounter_index >= 0:
 		_next_encounter_index = _active_encounter_index + 1
 	_active_encounter_index = -1

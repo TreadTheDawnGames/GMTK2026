@@ -109,6 +109,12 @@ extends Resource
 ## non-negative value lets one room move only the Miner toward the camera while
 ## its visitor remains on the authored rear plane.
 @export_range(-1.0, 128.0, 1.0) var miner_cutscene_depth_offset_pixels: float = -1.0
+## Keeps the room-seated Miner baseline when the cinematic frame releases.
+##
+## Off preserves every existing encounter's return to generic mining grounding.
+## On lets the next impact originate from the same depth plane shown in the
+## conversation, so the actor and crater do not jump between adjacent frames.
+@export var keeps_miner_grounding_after_release: bool = false
 ## Replaces this encounter's procedural chamber with an authored sculpted room.
 ## Leave it null and terrain generation is unchanged.
 @export var terrain_sculpt: CutsceneTerrainSculpt

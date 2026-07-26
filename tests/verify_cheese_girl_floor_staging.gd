@@ -51,6 +51,10 @@ func _verify_encounter_one(encounter: DepthCharacterEncounter) -> void:
 		),
 		"Encounter 1 must move only the Miner 28px toward the camera."
 	)
+	_expect(
+		encounter.keeps_miner_grounding_after_release,
+		"Encounter 1 must keep its room-seated Miner baseline after release."
+	)
 
 
 func _verify_legacy_fallback(cafe: DepthCharacterEncounter) -> void:
