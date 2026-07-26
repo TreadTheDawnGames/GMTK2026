@@ -70,6 +70,16 @@ extends Resource
 @export var pickaxe_reward: PickaxeDefinition
 ## Requests the canonical persistent coffee speed reward after dialogue.
 @export var grants_coffee_speed_boost: bool = false
+## Fixes this encounter's speaker in one pose for the rest of the run, applied
+## once its dialogue finishes.
+##
+## For a change the story makes to a character permanently, not one shot's
+## staging. The Treasure Hunter hands his pickaxe over in encounter 6 and is
+## never holding one again, so `no_pickaxe` is locked on here rather than being
+## re-authored into the cafe and every other later shot - each of which would be
+## a separate place to forget. A locked pose outranks stage pose exports,
+## timeline POSE beats, and per-line speaker poses.
+@export var locks_speaker_pose_after: StringName = &""
 ## Starts bounded rat-colony support after dialogue.
 @export var starts_rat_colony_support: bool = false
 ## Holds this encounter until the non-blocking credits presentation completes.

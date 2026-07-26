@@ -108,8 +108,10 @@ Y IS -23 AND MUST NOT BE ZERO. Every actor marker here sits on y = 0, the dig li
 
 The surface moves about 8px either side of that as the bench tracks across the landing band, because loose rock is uneven and a static prop cannot follow it. That is the accepted cost of not floor-sampling props; it is a few pixels on a 60px bench.
 
+Remeasured to -11 on 2026-07-26 after Jared saw it floating in play. The room supports this bench's columns on row 109, one row of loose rock above the dig line, which is y = -8; the cast are then lifted 3px off that support by CUTSCENE_FLOOR_LIFT_PIXELS, so -11 puts the bench's feet on the same visible line the Keeper and the miner stand on. The old -23 was measured by local_tests/capture_lantern_warning_stage.gd, which no longer exists in this branch, so it could not simply be re-run.
+
 Its alpha is animated by this stage's closing and RESET clips. Nothing restores it after a completed shot, and that is the point - the bench is meant to still be gone. RESET exists so an encounter that is interrupted and rolled back does not leave it invisible for the rest of the run."
-position = Vector2(102.4, -23)
+position = Vector2(102.4, -11)
 
 [node name="AnimationPlayer" parent="." index="3"]
 libraries/ = SubResource("AnimationLibrary_warning")

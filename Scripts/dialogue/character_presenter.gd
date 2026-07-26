@@ -42,6 +42,15 @@ var _body_offset_from_node_x: float = 0.0
 ## Defaults to idle, so a presenter nobody has asked to hold anything behaves
 ## exactly as before.
 var _resting_pose: StringName = &"idle"
+## A pose this character keeps for the rest of the run, across every later
+## encounter, once something in the story has permanently changed them. Empty
+## for everybody who has not.
+##
+## This outranks `_resting_pose`, per-line speaker poses, and stage pose
+## exports, and unlike all three it survives `apply_appearance`. The Treasure
+## Hunter gives his pickaxe away in encounter 6 and cannot be holding one again
+## in any shot after it, so the change has to outlive the shot that made it.
+var _locked_pose: StringName = &""
 
 ## Opaque-body measurements, keyed by texture path. get_used_rect() scans every
 ## pixel of a 2224x1668 sheet, and apply_appearance runs for all thirteen encounters
@@ -118,7 +127,11 @@ func apply_appearance(appearance: CharacterAppearance) -> void:
 	# anything the last encounter asked it to hold goes with the old art. Without
 	# this a presenter reused across visits would carry a held pose forward into a
 	# shot that never asked for one.
-	_resting_pose = &"idle"
+	#
+	# A locked pose is the exception, because it is not something a shot asked
+	# for - it is something the story did. Re-arming idle here is exactly what
+	# put the Treasure Hunter's pickaxe back in his hands at the cafe.
+	_resting_pose = _locked_pose if not _locked_pose.is_empty() else &"idle"
 	if actor_sprite_view != null:
 		actor_sprite_view.pose_set = appearance.pose_set
 		actor_sprite_view.play_pose(_resting_pose)
@@ -176,10 +189,33 @@ func has_pose(pose_name: StringName) -> bool:
 func play_pose(pose_name: StringName, hold: bool = false) -> bool:
 	if actor_sprite_view == null:
 		return false
+	# A locked character refuses every other pose rather than playing it and
+	# being corrected afterwards. Correcting after the fact is a frame of the
+	# wrong art, and this exists precisely so that frame cannot happen.
+	if not _locked_pose.is_empty() and pose_name != _locked_pose:
+		return false
 	if not actor_sprite_view.play_pose(pose_name):
 		return false
 	if hold:
 		_resting_pose = pose_name
+	return true
+
+
+## Fixes this character in one pose for the remainder of the run.
+##
+## For a change the story makes to a character rather than one a shot makes to
+## them: after it, no stage export, timeline beat, or per-line speaker pose can
+## put them back. Call with an empty name to release, which nothing does today.
+func lock_pose(pose_name: StringName) -> bool:
+	if pose_name.is_empty():
+		_locked_pose = &""
+		return true
+	if not has_pose(pose_name):
+		return false
+	_locked_pose = &""
+	if not play_pose(pose_name, true):
+		return false
+	_locked_pose = pose_name
 	return true
 
 
