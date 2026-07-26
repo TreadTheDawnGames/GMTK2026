@@ -28,14 +28,14 @@ opening_step_height = 9.0
 strike_breaks_rock_radius_cells = 6
 hide_actor_after_closing = true
 conversation_tracks_miner = true
-conversation_root_offset_from_miner_x = 122.5
+conversation_root_offset_from_miner_x = 190.0
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
 editor_description = "Inside his own bore, BEHIND the plug, and 700px right of Conversation. Two things set that distance and both are floors rather than preferences. It has to clear 480px or he appears from nothing in open shot, because the frame is 1152 wide and centred on the miner. And it has to be past terrain column 265, the far side of the plug, at the LEFTMOST landing the descent can reach - otherwise a run that lands at column 168 starts him inside the rock he is about to break, and he walks out of a wall instead of through a hole. 700px puts him at column 270 in that worst case, five cells clear."
 position = Vector2(604, 0)
 
 [node name="Conversation" parent="ActorMarkers" index="1"]
-editor_description = "122.5px right of the miner, root to root: his body measures 86.5px and the miner's 52.8px, so this leaves exactly one miner-width of daylight between them."
+editor_description = "190px right of the miner, root to root. Remeasured after the miner's art changed: his body is 86.5px and the miner's is now 97.7px, not the 52.8px the authoring guide's spacing table was built on, so the house rule gives (86.5 + 97.7) / 2 + 97.7 = 190. At the old 122.5 the two of them overlapped. Any spacing in this project still quoting 52.8 predates the new sheet and is stale."
 position = Vector2(-96, 0)
 
 [node name="Rest" parent="ActorMarkers" index="3"]
