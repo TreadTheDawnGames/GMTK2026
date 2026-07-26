@@ -57,7 +57,16 @@ const LANDING_FLOOR_TOLERANCE_ROWS: int = 4
 ## own origin, and she reads as low anyway. Both the miner's seating and the
 ## stage's walking sampler go through this, so the cast cannot drift apart from
 ## the man they are talking to.
-const CUTSCENE_FLOOR_LIFT_PIXELS: float = 7.0
+##
+## Fourteen rather than the original seven. Seven cleared the stroked outline on
+## a flat floor and no more, so the cast read as standing level with the ground
+## rather than on top of it - and once the rooms carried the shared floor bumps,
+## a character standing on the near side of a three-cell lump had that lump drawn
+## over their soles. The intent is that everyone stands visibly on the floor,
+## which costs a few pixels of gap on perfectly flat rock and is the cheaper of
+## the two mistakes: a character floating slightly reads as a character, and a
+## character sunk slightly reads as a bug.
+const CUTSCENE_FLOOR_LIFT_PIXELS: float = 14.0
 ## How still the sampled floor has to be, and for how many readings, before the
 ## room counts as having arrived. Half a pixel is under the sub-cell resolution
 ## the mask is written at, so it cannot be met by a room still travelling.
