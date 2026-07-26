@@ -1,18 +1,24 @@
-[gd_resource type="Resource" script_class="DepthCharacterEncounter" load_steps=6 format=3]
+[gd_resource type="Resource" script_class="DepthCharacterEncounter" load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://resources/encounters/depth_character_encounter.gd" id="1_encounter"]
 [ext_resource type="Resource" path="res://resources/encounters/moody_teen_character_appearance.tres" id="2_appearance"]
 [ext_resource type="Resource" path="res://resources/dialogue/moody_teen_first_conversation.tres" id="3_dialogue"]
-[ext_resource type="Resource" path="res://resources/pickaxes/lantern_pickaxe.tres" id="4_pickaxe"]
-[ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="5_stage"]
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/moody_teen_encounter_stage.tscn" id="4_stage"]
+[ext_resource type="Resource" path="res://resources/cinematics/sequences/moody_teen_first_sequence.tres" id="5_sequence"]
+[ext_resource type="Resource" path="res://resources/cinematics/sculpts/moody_teen_first_room.tres" id="6_sculpt"]
 
 [resource]
 script = ExtResource("1_encounter")
 encounter_id = &"moody_teen_first"
 actor_id = &"moody_teen"
-depth_from_surface = 25000
+depth_from_surface = 5000
+chamber_height_rows_override = 72
 appearance = ExtResource("2_appearance")
 conversation = ExtResource("3_dialogue")
-stage_scene = ExtResource("5_stage")
+stage_scene = ExtResource("4_stage")
+sequence = ExtResource("5_sequence")
+plays_authored_timeline = true
+prestage_before_landing = true
 speaker_slot = &"moody_teen"
-pickaxe_reward = ExtResource("4_pickaxe")
+dresses_trodden_floor = true
+terrain_sculpt = ExtResource("6_sculpt")

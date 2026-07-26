@@ -14,43 +14,43 @@ script = ExtResource("2_participant")
 slot = &"moody_teen"
 display_name = "Moody Teen"
 
-[sub_resource type="Resource" id="Line_one"]
-script = ExtResource("3_line")
-speaker_slot = &"moody_teen"
-text = "..."
-
 [sub_resource type="Resource" id="Line_miner_one"]
 script = ExtResource("3_line")
 speaker_slot = &"miner"
 text = "..."
 
-[sub_resource type="Resource" id="Line_two"]
+[sub_resource type="Resource" id="Line_teen_one"]
 script = ExtResource("3_line")
 speaker_slot = &"moody_teen"
-text = ". . ."
+text = "..."
 
 [sub_resource type="Resource" id="Line_miner_two"]
 script = ExtResource("3_line")
 speaker_slot = &"miner"
 text = "..."
 
-[sub_resource type="Resource" id="Line_three"]
+[sub_resource type="Resource" id="Line_teen_two"]
 script = ExtResource("3_line")
 speaker_slot = &"moody_teen"
-text = ".  .  ."
+text = "..."
 
 [sub_resource type="Resource" id="Line_miner_three"]
 script = ExtResource("3_line")
 speaker_slot = &"miner"
 text = "..."
 
-[sub_resource type="Resource" id="Line_gift"]
+[sub_resource type="Resource" id="Line_teen_question"]
 script = ExtResource("3_line")
 speaker_slot = &"moody_teen"
-text = "(He silently slides a lantern pickaxe across the floor.)"
+text = "Are you just gonna stand there and stare at me?"
+
+[sub_resource type="Resource" id="Line_miner_four"]
+script = ExtResource("3_line")
+speaker_slot = &"miner"
+text = "..."
 
 [resource]
 script = ExtResource("1_conversation")
 conversation_id = &"moody_teen_first"
 participants = Array[ExtResource("2_participant")]([SubResource("Participant_miner"), SubResource("Participant_moody_teen")])
-lines = Array[ExtResource("3_line")]([SubResource("Line_one"), SubResource("Line_miner_one"), SubResource("Line_two"), SubResource("Line_miner_two"), SubResource("Line_three"), SubResource("Line_miner_three"), SubResource("Line_gift")])
+lines = Array[ExtResource("3_line")]([SubResource("Line_miner_one"), SubResource("Line_teen_one"), SubResource("Line_miner_two"), SubResource("Line_teen_two"), SubResource("Line_miner_three"), SubResource("Line_teen_question"), SubResource("Line_miner_four")])
