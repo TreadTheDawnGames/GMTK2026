@@ -233,6 +233,28 @@ func _verify_encounter_wiring() -> void:
 		and FINALE_ENCOUNTER.appearance.texture != null,
 		"The figure at the organ must have art."
 	)
+	# The organ has to draw behind the figure sitting at it.
+	#
+	# At runtime the stage and the cast presenters are siblings under
+	# CharacterLayer at the same effective z, so equal z_index hands the decision
+	# to tree order - and the stage is added long after the presenters were built.
+	# The instrument then covers the figure completely, with nothing wrong in any
+	# log and the encounter reporting that it played. This is a static check
+	# because it is cheap and because the failure is invisible.
+	var stage_scene: PackedScene = FINALE_ENCOUNTER.stage_scene
+	_expect(stage_scene != null, "The finale must carry its stage scene.")
+	if stage_scene != null:
+		var stage := stage_scene.instantiate()
+		var organ := stage.get_node_or_null(^"PropMarkers/Organ") as Node2D
+		_expect(organ != null, "The finale stage must hold the organ.")
+		if organ != null:
+			_expect(
+				organ.z_index < 0,
+				"The organ must draw behind the cast; z_index is %d."
+				% organ.z_index
+			)
+		stage.queue_free()
+
 	var sequence_errors := FINALE_SEQUENCE.validate(
 		PackedStringArray([str(FINALE_ENCOUNTER.actor_id)])
 	)
