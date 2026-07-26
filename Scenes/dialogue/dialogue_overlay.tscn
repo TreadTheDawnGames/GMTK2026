@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3 uid="uid://bwnqpopl5iayr"]
+[gd_scene load_steps=19 format=3 uid="uid://bwnqpopl5iayr"]
 
 [ext_resource type="Script" uid="uid://1h124vfbvc4" path="res://Scripts/dialogue/dialogue_director.gd" id="1_director"]
 [ext_resource type="Script" path="res://Scripts/dialogue/cinematic_frame.gd" id="2_frame"]
@@ -10,6 +10,12 @@
 [ext_resource type="Texture2D" path="res://Assets/UI/dialogue_textboxes/zeb_textbox.png" id="9_zeb"]
 [ext_resource type="Texture2D" path="res://Assets/UI/dialogue_textboxes/ayden_textbox.png" id="10_ayden"]
 [ext_resource type="Texture2D" path="res://Assets/UI/dialogue_textboxes/coco_textbox.png" id="11_coco"]
+[ext_resource type="AudioStream" path="res://Assets/Audio/Voices/Coco.wav" id="12_coco_voice"]
+[ext_resource type="AudioStream" path="res://Assets/Audio/Voices/Mr_Sitts.wav" id="13_mr_sitts_voice"]
+[ext_resource type="AudioStream" path="res://Assets/Audio/Voices/Quibble.wav" id="14_quibble_voice"]
+[ext_resource type="AudioStream" path="res://Assets/Audio/Voices/Rotini.wav" id="15_rotini_voice"]
+[ext_resource type="AudioStream" path="res://Assets/Audio/Voices/The Lantern Keeper.wav" id="16_lantern_voice"]
+[ext_resource type="AudioStream" path="res://Assets/Audio/Voices/Zeb.wav" id="17_zeb_voice"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_dialogue"]
 bg_color = Color(0.075, 0.055, 0.047, 0.97)
@@ -29,7 +35,7 @@ shadow_size = 9
 resource_local_to_scene = true
 shader = ExtResource("4_iris")
 
-[node name="DialogueDirector" type="CanvasLayer" unique_id=1373788107 node_paths=PackedStringArray("dialogue_root", "bottom_panel", "textbox_art", "fallback_panel", "dialogue_margin", "speaker_label", "body_label", "cinematic_frame")]
+[node name="DialogueDirector" type="CanvasLayer" unique_id=1373788107 node_paths=PackedStringArray("dialogue_root", "bottom_panel", "textbox_art", "fallback_panel", "dialogue_margin", "speaker_label", "body_label", "cinematic_frame", "voice_player")]
 process_mode = 3
 layer = 20
 script = ExtResource("1_director")
@@ -41,6 +47,19 @@ dialogue_margin = NodePath("DialogueRoot/BottomPanel/Margin")
 speaker_label = NodePath("DialogueRoot/BottomPanel/Margin/Content/SpeakerLabel")
 body_label = NodePath("DialogueRoot/BottomPanel/Margin/Content/BodyLabel")
 cinematic_frame = NodePath("CinematicFrame")
+voice_player = NodePath("VoicePlayer")
+coco_voice = ExtResource("12_coco_voice")
+coco_voice_pitch = 1.18
+mr_sitts_voice = ExtResource("13_mr_sitts_voice")
+mr_sitts_voice_pitch = 0.84
+quibble_voice = ExtResource("14_quibble_voice")
+quibble_voice_pitch = 1.32
+rotini_voice = ExtResource("15_rotini_voice")
+rotini_voice_pitch = 1.12
+lantern_keeper_voice = ExtResource("16_lantern_voice")
+lantern_keeper_voice_pitch = 0.72
+zeb_voice = ExtResource("17_zeb_voice")
+zeb_voice_pitch = 0.94
 mr_sitts_textbox_texture = ExtResource("5_mr_sitts")
 quibble_textbox_texture = ExtResource("6_quibble")
 rotini_textbox_texture = ExtResource("7_rotini")
@@ -48,6 +67,10 @@ sparky_textbox_texture = ExtResource("8_sparky")
 zeb_textbox_texture = ExtResource("9_zeb")
 ayden_textbox_texture = ExtResource("10_ayden")
 coco_textbox_texture = ExtResource("11_coco")
+
+[node name="VoicePlayer" type="AudioStreamPlayer" parent="."]
+process_mode = 3
+bus = &"SFX"
 
 [node name="CinematicFrame" type="Control" parent="." node_paths=PackedStringArray("iris_overlay", "top_bar", "bottom_bar")]
 process_mode = 3

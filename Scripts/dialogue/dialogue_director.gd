@@ -30,6 +30,21 @@ signal cinematic_frame_closed
 @export var speaker_label: Label
 @export var body_label: RichTextLabel
 @export var cinematic_frame: CinematicFrameType
+@export var voice_player: AudioStreamPlayer
+
+@export_category("Character Voices")
+@export var coco_voice: AudioStream
+@export_range(0.5, 2.0, 0.01) var coco_voice_pitch: float = 1.18
+@export var mr_sitts_voice: AudioStream
+@export_range(0.5, 2.0, 0.01) var mr_sitts_voice_pitch: float = 0.84
+@export var quibble_voice: AudioStream
+@export_range(0.5, 2.0, 0.01) var quibble_voice_pitch: float = 1.32
+@export var rotini_voice: AudioStream
+@export_range(0.5, 2.0, 0.01) var rotini_voice_pitch: float = 1.12
+@export var lantern_keeper_voice: AudioStream
+@export_range(0.5, 2.0, 0.01) var lantern_keeper_voice_pitch: float = 0.72
+@export var zeb_voice: AudioStream
+@export_range(0.5, 2.0, 0.01) var zeb_voice_pitch: float = 0.94
 
 @export_category("Textbox Art")
 @export var mr_sitts_textbox_texture: Texture2D
@@ -82,6 +97,9 @@ var _keep_frame_open_after_conversation: bool = false
 var _references_valid: bool = false
 var _advance_input_enabled: bool = true
 var _current_line_word_count: int = 0
+## At most one bounded character clip loops while one line is revealing.
+## Advancing, skipping, or finishing always clears this before another can play.
+var _voice_should_loop: bool = false
 
 
 ## Starts hidden and owns the internal presentation signal connections.
@@ -105,6 +123,7 @@ func _ready() -> void:
 		cinematic_frame.frame_closed,
 		_on_cinematic_frame_closed
 	)
+	_connect_once(voice_player.finished, _on_voice_finished)
 
 
 ## Advances active dialogue from keyboard or mouse input.
@@ -191,6 +210,7 @@ func start_conversation(
 func advance() -> void:
 	if not is_conversation_active():
 		return
+	_stop_voice()
 	_current_line_index += 1
 	_presentation_token += 1
 	if _current_line_index > _active_last_line_index:
@@ -203,6 +223,7 @@ func advance() -> void:
 func finish_conversation() -> void:
 	if not is_conversation_active():
 		return
+	_stop_voice()
 	var finished_id := _active_conversation.conversation_id
 	var keep_frame_open := _keep_frame_open_after_conversation
 	_presentation_token += 1
@@ -442,6 +463,7 @@ func _present_current_line() -> void:
 	body_label.text = DialogueTokens.resolve(line.text, _player_history)
 	_current_line_word_count = 0
 	_set_visible_character_count(0)
+	_start_voice_for_speaker(line.speaker_slot)
 	_show_next_character(_presentation_token)
 
 	line_presented.emit(
@@ -466,6 +488,8 @@ func _auto_advance_after_delay(delay_seconds: float, token: int) -> void:
 
 func _set_visible_character_count(value: int) -> void:
 	body_label.visible_characters = value
+	if value >= _get_current_text_length():
+		_stop_voice()
 
 
 func _get_visible_character_count() -> int:
@@ -474,6 +498,54 @@ func _get_visible_character_count() -> int:
 
 func _get_current_text_length() -> int:
 	return body_label.text.length()
+
+
+## Selects the one authored voice and character pitch for the presented speaker.
+## Unknown speakers and the intentionally silent Miner stop rather than inheriting
+## the previous character's sound.
+func _start_voice_for_speaker(speaker_slot: StringName) -> void:
+	_stop_voice()
+	var stream: AudioStream
+	var pitch := 1.0
+	match speaker_slot:
+		&"cheese_girl":
+			stream = coco_voice
+			pitch = coco_voice_pitch
+		&"mr_sitts", &"newspaper_reader", &"opening_voice":
+			stream = mr_sitts_voice
+			pitch = mr_sitts_voice_pitch
+		&"coffee_cat":
+			stream = quibble_voice
+			pitch = quibble_voice_pitch
+		&"rutini":
+			stream = rotini_voice
+			pitch = rotini_voice_pitch
+		&"cloak_lantern", &"thief":
+			stream = lantern_keeper_voice
+			pitch = lantern_keeper_voice_pitch
+		&"treasure_hunter":
+			stream = zeb_voice
+			pitch = zeb_voice_pitch
+	if stream == null:
+		return
+	voice_player.stream = stream
+	voice_player.pitch_scale = pitch
+	_voice_should_loop = true
+	voice_player.play()
+
+
+func _stop_voice() -> void:
+	_voice_should_loop = false
+	voice_player.stop()
+
+
+func _on_voice_finished() -> void:
+	if (
+		_voice_should_loop
+		and is_conversation_active()
+		and _get_visible_character_count() < _get_current_text_length()
+	):
+		voice_player.play()
 
 
 func _connect_once(source_signal: Signal, callback: Callable) -> void:
@@ -491,6 +563,7 @@ func _validate_references() -> bool:
 		and speaker_label != null
 		and body_label != null
 		and cinematic_frame != null
+		and voice_player != null
 	)
 
 
