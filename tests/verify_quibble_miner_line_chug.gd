@@ -31,7 +31,7 @@ func _run() -> void:
 	if encounter == null:
 		_finish()
 		return
-	_verify_canon_and_reward(encounter)
+	_verify_canon_and_retired_reward(encounter)
 
 	var presenter_scene := load(
 		"res://Scenes/dialogue/character_presenter.tscn"
@@ -139,10 +139,13 @@ func _run() -> void:
 	_finish()
 
 
-func _verify_canon_and_reward(encounter: DepthCharacterEncounter) -> void:
+func _verify_canon_and_retired_reward(
+	encounter: DepthCharacterEncounter
+) -> void:
 	_expect(
-		encounter.grants_coffee_speed_boost,
-		"Quibble's canonical permanent coffee reward is disabled."
+		not encounter.grants_coffee_speed_boost,
+		"Quibble must not also apply the retired permanent speed boost; "
+			+ "Encounter 7 now advances combo-target availability."
 	)
 	_expect(
 		encounter.conversation != null
