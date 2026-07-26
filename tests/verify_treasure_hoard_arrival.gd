@@ -15,6 +15,14 @@ const _ENCOUNTER_PATH := (
 const _ROOM_PATH := (
 	"res://resources/cinematics/sculpts/treasure_hunter_treasure_room.tres"
 )
+const _STAGE_PATH := (
+	"res://Scenes/cinematics/treasure_hunter_hoard_encounter_stage.tscn"
+)
+const _SEQUENCE_PATH := (
+	"res://resources/cinematics/sequences/treasure_hunter_treasure_sequence.tres"
+)
+## The ActionMarkers child the landing dust is thrown from.
+const _CONTACT_MARKER := &"LandingContact"
 ## The schedule default, passed in so this never depends on the shared config.
 const _SCHEDULE_DEFAULT_ROWS := 24
 ## DepthEncounterController.LANDING_FLOOR_TOLERANCE_ROWS, restated so a headless
@@ -43,6 +51,7 @@ func _initialize() -> void:
 			encounter.dresses_trodden_floor,
 			"Encounter 6 must keep the shared trodden-floor dressing."
 		)
+	_verify_contact_dust()
 	if _failures.is_empty():
 		print("TREASURE_HOARD_ARRIVAL_PASS")
 		quit(0)
@@ -139,6 +148,91 @@ func _verify_landing(room: CutsceneTerrainSculpt) -> void:
 				)
 			)
 			return
+
+
+## The dust the landing throws up has to land on the miner, not on the room.
+##
+## The plume is asked for by a STRIKE beat, and a STRIKE resolves its point from
+## ActionMarkers - the one marker root that historically never moved. The miner
+## can stop on any of 49 columns and the camera centres on whichever one he
+## stopped at, so a mark left pinned to the room is up to 192px from his feet:
+## the dust goes off in open floor or inside the hoard. Three things have to hold
+## together for it to land, they live in three different files, and none of them
+## errors on its own.
+func _verify_contact_dust() -> void:
+	var stage_scene := load(_STAGE_PATH) as PackedScene
+	_expect(stage_scene != null, "Encounter 6 stage scene must load.")
+	if stage_scene == null:
+		return
+	var stage := stage_scene.instantiate() as CharacterEncounterStage
+	_expect(stage != null, "Encounter 6 stage must be a CharacterEncounterStage.")
+	if stage == null:
+		return
+
+	_expect(
+		stage.conversation_tracks_miner
+		and stage.strike_markers_track_tracked_cast,
+		"Encounter 6 must carry its strike marks to the landing column."
+	)
+	var contact := stage.action_markers_root.get_node_or_null(
+		NodePath(_CONTACT_MARKER)
+	)
+	_expect(
+		contact != null,
+		"Encounter 6 needs ActionMarkers/%s for its landing dust." % _CONTACT_MARKER
+	)
+	# A strike aimed at a marker that does not exist push_errors at runtime and
+	# is otherwise silent, so the beat and the mark are checked against each
+	# other rather than each being checked alone.
+	var has_contact_beat := false
+	var sequence := load(_SEQUENCE_PATH) as CutsceneSequence
+	_expect(sequence != null, "Encounter 6 sequence must load.")
+	if sequence != null:
+		for beat: CutsceneBeat in sequence.beats:
+			if (
+				beat.kind == CutsceneBeat.Kind.STRIKE
+				and beat.cue == _CONTACT_MARKER
+			):
+				has_contact_beat = true
+	_expect(
+		has_contact_beat,
+		"Encounter 6 needs a STRIKE beat on %s for the landing dust."
+			% _CONTACT_MARKER
+	)
+	# Presentation only. Above zero a strike also opens real terrain, which would
+	# turn a landing effect into a hole in the room the cast are standing in.
+	_expect(
+		stage.strike_breaks_rock_radius_cells == 0,
+		"Encounter 6's landing dust must not break real rock."
+	)
+
+	# And the shift itself. This is the part with no symptom when it is wrong:
+	# the plume still plays, just somewhere else.
+	var shift_x := 137.0
+	stage.actor_markers_root.position.x = shift_x
+	stage._follow_tracked_cast_with_authored_roots()
+	_expect(
+		is_equal_approx(stage.action_markers_root.position.x, shift_x),
+		(
+			"Strike marks did not follow the tracked cast: expected %.1f, got %.1f."
+			% [shift_x, stage.action_markers_root.position.x]
+		)
+	)
+	_expect(
+		is_equal_approx(stage.prop_markers_root.position.x, shift_x),
+		"The hoard must keep following the tracked cast as well."
+	)
+
+	# Default-preserving: with the opt-in off, ActionMarkers stays where the room
+	# put it, which is what every other stage relies on.
+	stage.strike_markers_track_tracked_cast = false
+	stage.action_markers_root.position.x = 0.0
+	stage._follow_tracked_cast_with_authored_roots()
+	_expect(
+		is_zero_approx(stage.action_markers_root.position.x),
+		"Strike marks must not move for a stage that did not opt in."
+	)
+	stage.free()
 
 
 ## Returns how many rows above the floor line the room is actually cut open.

@@ -208,6 +208,7 @@ closing_facing = -1
 conversation_tracks_miner = true
 conversation_root_offset_from_miner_x = 150.0
 props_track_tracked_cast = true
+strike_markers_track_tracked_cast = true
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
 editor_description = "On the conversation stop, not off screen. He is not a visitor arriving; the room is his find and he is in it when the ceiling breaks. prepare() places him here, so an entrance anywhere else would make him walk in from a tunnel the reference does not have."
@@ -224,6 +225,9 @@ position = Vector2(150, 0)
 [node name="Exit" parent="ActorMarkers" index="4"]
 editor_description = "Past the frame edge. The authored sequence sends him here in his no-pickaxe pose before hiding him."
 position = Vector2(840, 0)
+
+[node name="LandingContact" type="Marker2D" parent="ActionMarkers"]
+editor_description = "Where the miner's feet hit the ground, and the point the contact STRIKE beat hands to the shared cutscene strike feedback - the same dirt, dust, shake and sparks a pickaxe hit throws. It sits at the stage origin because ActorMarkers is authored there too: the controller slides that root so the Conversation mark lands 150px right of the miner, which puts the root's own origin exactly on his foot column. strike_markers_track_tracked_cast carries ActionMarkers under the same shift, so this mark is on his feet at every one of the 49 landing columns rather than up to 192px away in open floor."
 
 [node name="GemGlow" type="Polygon2D" parent="PropMarkers" index="0"]
 z_index = -4

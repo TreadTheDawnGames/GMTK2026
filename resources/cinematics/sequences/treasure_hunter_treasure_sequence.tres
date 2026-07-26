@@ -18,7 +18,14 @@ duration_seconds = 0.3
 camera_action = 1
 camera_shake_strength = 11.0
 blocks = false
-notes = "The contact jolt, through the shared ImpactShake the pickaxe already uses rather than a second shake owner. It stacks with the dirt burst MiningSceneWiring already fires from the encounter-floor landing. The dust plume that should go with it is not here: the shared cutscene strike route reads ActionMarkers, and that root is the one marker set that does not slide to the miner's landing column, so a plume authored on it would sit up to 192px away from his feet. See requests/encounter_6_strike_markers_track_cast.md - the beat goes in when that opt-in lands, not before."
+notes = "The contact jolt, through the shared ImpactShake the pickaxe already uses rather than a second shake owner. It stacks with the dirt burst MiningSceneWiring already fires from the encounter-floor landing."
+
+[sub_resource type="Resource" id="Beat_contact_dust"]
+script = ExtResource("1_g737l")
+kind = 8
+cue = &"LandingContact"
+blocks = false
+notes = "The dust he throws up landing. It asks for the shared cutscene strike feedback that already exists - MiningSceneWiring._play_cinematic_strike_feedback drives the same hit particles, impact smoke, shake and sparks a pickaxe swing does - rather than instancing a second smoke presenter. mining_impact_smoke.gd warns against exactly that at its declaration site, and a standalone copy could not collide dust against rock anyway without the terrain manager, renderer and view controller injected into it. Aimed at ActionMarkers/LandingContact, which only lands on his feet because the stage now carries ActionMarkers under the same shift it gives the tracked cast; without that the plume would be up to 192px away. strike_breaks_rock_radius_cells stays zero, so this is presentation only and no terrain cell moves."
 
 [sub_resource type="Resource" id="Resource_show"]
 script = ExtResource("1_g737l")
@@ -89,4 +96,4 @@ notes = "He has handed off the pickaxe and leaves the hoard before his later caf
 [resource]
 script = ExtResource("3_fftny")
 sequence_id = &"treasure_hunter_treasure_sequence"
-beats = Array[ExtResource("1_g737l")]([SubResource("Beat_frame_contact"), SubResource("Beat_contact_shake"), SubResource("Resource_show"), SubResource("Resource_face"), SubResource("Resource_pose"), SubResource("Beat_frame_room"), SubResource("Resource_celebrate"), SubResource("Resource_dialogue"), SubResource("Beat_reset_camera"), SubResource("Resource_leave")])
+beats = Array[ExtResource("1_g737l")]([SubResource("Beat_frame_contact"), SubResource("Beat_contact_shake"), SubResource("Beat_contact_dust"), SubResource("Resource_show"), SubResource("Resource_face"), SubResource("Resource_pose"), SubResource("Beat_frame_room"), SubResource("Resource_celebrate"), SubResource("Resource_dialogue"), SubResource("Beat_reset_camera"), SubResource("Resource_leave")])
