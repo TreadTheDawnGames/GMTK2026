@@ -10,3 +10,4 @@ const MINE_SOUNDS = [preload("uid://dv0xbfqt1h8x2"), preload("uid://css4yiv58xd3
 const IMPACT = preload("uid://bptrknuwih5g2")
 const BUS = preload("uid://cxrfceg3n2vh0")
 const BUS_DRIVE_AWAY = preload("uid://bnf6pj6dv2rad")
+const BUS_FULL = preload("uid://bro08rtyp75d6")
