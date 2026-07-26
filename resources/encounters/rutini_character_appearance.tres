@@ -8,4 +8,4 @@ script = ExtResource("1_appearance")
 texture = ExtResource("2_texture")
 sprite_scale = Vector2(0.38, 0.38)
 sprite_offset = Vector2(0, -45)
-flip_h = true
+art_faces_left = true
