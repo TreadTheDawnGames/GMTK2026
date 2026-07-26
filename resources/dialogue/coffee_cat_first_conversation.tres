@@ -24,7 +24,7 @@ text = "..."
 [sub_resource type="Resource" id="Line_coffee_gift"]
 script = ExtResource("3_line")
 speaker_slot = &"coffee_cat"
-speaker_pose = &"hold_cup"
+speaker_pose = &"idle"
 text = "THIS IS IS IS TRAVEL COFFEE. T-T-TAKE IT."
 
 [sub_resource type="Resource" id="Line_go"]

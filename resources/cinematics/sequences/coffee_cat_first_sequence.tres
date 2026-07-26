@@ -21,13 +21,15 @@ notes = "He comes in mid-swig rather than presenting the cup. The mug is already
 script = ExtResource("1_ti7jl")
 kind = 0
 actor = &"coffee_cat"
-start_seconds = 2.0
+start_seconds = 0.25
 duration_seconds = 0.35
 target_marker = &"Conversation"
 starts_from_authored_point = true
 start_marker = &"Entrance"
 step_height = 12.0
 notes = "600px in 0.35s, against Cheese Girl's 600px in 2.1s. This is the whole characterisation and the number is deliberate: fast enough that the eye reads an arrival rather than a walk, slow enough that he is on screen for three or four frames of it instead of teleporting.
+
+The quarter second in front of it is not padding. A grounded MOVE builds its path once and then tweens the actor through absolute positions, so a walk that overlaps the encounter camera settling onto the room is written against a view that is still moving and lands the actor wherever the difference took it. Waiting until the shot has stopped moving costs nothing and is better staging anyway: the player gets a beat to register the room and the man standing in it, and then something very fast arrives in it.
 
 Staged from Entrance rather than chained off wherever he was left, so the dart begins on its exact mark however the beats above it are retimed. It blocks, so everything after it slides if rough ground makes it run long.
 
@@ -37,7 +39,7 @@ No pose is set, so hold_cup carries through the dart: he crosses the room withou
 script = ExtResource("1_ti7jl")
 kind = 2
 actor = &"coffee_cat"
-start_seconds = 2.35
+start_seconds = 0.6
 facing = -1
 notes = "After the dart, never before it: a MOVE aims the actor along its own travel, so a facing set earlier is overwritten by the approach. The dart already arrives leftward, so this is belt and braces against a later edit that moves Entrance.
 
@@ -47,7 +49,7 @@ Facing is a world direction and the presenter folds Art Faces Left in, which is 
 script = ExtResource("1_ti7jl")
 kind = 1
 actor = &"coffee_cat"
-start_seconds = 2.35
+start_seconds = 0.6
 pose = &"idle"
 notes = "The mug swings out toward the miner the instant he stops. idle is the cup-out frame; the pose names came from the art, not from what the character is doing.
 
@@ -57,7 +59,7 @@ The stage's own caffeine loop takes the poses back over within about a second an
 script = ExtResource("1_ti7jl")
 kind = 3
 actor = &"coffee_cat"
-start_seconds = 2.35
+start_seconds = 0.6
 duration_seconds = 0.35
 bounce_count = 4
 notes = "Four bounces on arrival, before anybody has said anything. He is already wound up when he stops, rather than becoming wound up once his line appears.
@@ -67,7 +69,7 @@ This is presentation bounce, which is a different motion from the stage script's
 [sub_resource type="Resource" id="Resource_dialogue"]
 script = ExtResource("1_ti7jl")
 kind = 5
-start_seconds = 2.7
+start_seconds = 0.95
 duration_seconds = 6.0
 conversation = ExtResource("2_ehpe3")
 notes = "The whole conversation: 'I'M QUIB-QUIB-QUIB-QUIB-QUIBBLE!' / 'HAVE YOU SEEN SEEN SEEN THE CAFE? CAFE? COFFEE? COFFEE CAFE?' / '...' / 'THIS IS IS IS TRAVEL COFFEE. T-T-TAKE IT.' / 'IT MAKES EV-EV-EV-EVERYTHING GO F-F-FASTER!'

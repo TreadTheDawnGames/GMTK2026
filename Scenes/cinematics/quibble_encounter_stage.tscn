@@ -35,29 +35,31 @@ hide_actor_after_closing = true
 conversation_facing = -1
 closing_facing = 1
 conversation_tracks_miner = true
-conversation_root_offset_from_miner_x = 180.4
+conversation_root_offset_from_miner_x = 110.0
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
-editor_description = "600px right of Conversation, which is what keeps him past the frame edge at every landing column: the frame is 1152 wide and centred on the miner, so anything under 480px would have him appear from nothing in open shot. He is 202px wide, so even his own left edge is still 499px clear of the miner here.
+editor_description = "600px right of Conversation, which is what keeps him past the frame edge at every landing column: the frame is 1152 wide and centred on the miner, so anything under 480px would have him appear from nothing in open shot. He is 62px wide, so even his own left edge is still 679px clear of the miner here.
 
 The timeline stages its dart from this marker rather than chaining off wherever he was left, so the approach starts on its exact mark however the beats above it are retimed."
-position = Vector2(780, 0)
+position = Vector2(710, 0)
 
 [node name="Conversation" parent="ActorMarkers" index="1"]
-editor_description = "180.4px right of the miner, root to root. His measured body is 202.4px and the miner's 52.8px, so this is the house rule - (202.4 + 52.8) / 2 + 52.8 - and leaves exactly one miner-width of daylight between them.
+editor_description = "110px right of the miner, root to root. His measured body is 61.6px and the miner's 52.8px, so this is the house rule - (61.6 + 52.8) / 2 + 52.8 - and leaves exactly one miner-width of daylight between them. It lands on the same number as Rotini, who measures about the same across.
 
-Measure the widest opaque row, never the bounding box. His is mug rim to tail tip, which is why he needs nearly twice the gap Cheese Girl does while still reading as standing the same distance away. The mug reaches about 101px back toward the miner from this root, so the travel coffee ends up held out in the middle of that gap, which is the whole point of the shot."
-position = Vector2(180, 0)
+Measure the widest opaque row of the IMPORTED texture, never the artwork on disk and never the bounding box. His widest row is mug rim to tail tip. The mug reaches about 31px back toward the miner from this root, so the travel coffee is held out into the gap rather than tucked against his own body.
+
+This number is derived from his sprite scale. Change the scale and this has to move with it, or the daylight between them changes without anyone having decided to change it."
+position = Vector2(110, 0)
 
 [node name="Rest" parent="ActorMarkers" index="3"]
 editor_description = "The conversation stop. Unused while Hide Actor After Closing is on - he leaves - but kept on the mark so turning that flag off for a test leaves him standing where he was talking rather than somewhere else."
-position = Vector2(180, 0)
+position = Vector2(110, 0)
 
 [node name="Exit" parent="ActorMarkers" index="4"]
 editor_description = "700px right of Conversation, back up the tunnel he came down, so he is out of shot well before he is hidden.
 
 He leaves the way he arrived on purpose: he asked where the Cafe was and nobody answered, so he has no more idea which way to go than he did coming in. Walking him past the miner to the left would read as him having been given directions."
-position = Vector2(880, 0)
+position = Vector2(810, 0)
 
 [node name="EditorTerrainPreview" parent="." index="4"]
 editor_description = "Previews coffee_cat_first at its authored depth, with the right-hand tunnel he arrives down."
@@ -67,7 +69,7 @@ preview_depth_rows = 9200
 [node name="coffee_cat" type="Node2D" parent="." index="5"]
 editor_description = "Editor stand-in only; it frees itself before a running game can pay for it. Placed at the conversation offset from the Miner stand-in rather than on the Conversation marker, because at runtime the whole marker set slides to wherever the miner landed and it is that spacing, not the authored mark, that survives."
 z_index = 3
-position = Vector2(180, 0)
+position = Vector2(110, 0)
 script = ExtResource("3_preview")
 actor_id = &"coffee_cat"
 appearance = ExtResource("4_quibble")
