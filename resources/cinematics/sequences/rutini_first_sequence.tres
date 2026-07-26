@@ -40,6 +40,8 @@ actor = &"rutini"
 start_seconds = 0.7
 duration_seconds = 0.3
 bounce_count = 3
+bounce_offset = Vector2(-2, -8)
+bounce_style = 1
 
 [sub_resource type="Resource" id="Resource_85hrs"]
 script = ExtResource("1_6idn6")

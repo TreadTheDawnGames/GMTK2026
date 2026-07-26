@@ -56,6 +56,9 @@ signal cinematic_frame_closed
 
 var _active_conversation: DialogueConversation
 var _current_line_index: int = -1
+## Inclusive final line for the active presentation. Whole conversations set
+## this to their last line; timeline dialogue beats may select a smaller range.
+var _active_last_line_index: int = -1
 var _presentation_token: int = 0
 var _tree_was_paused: bool = false
 var _keep_frame_open_after_conversation: bool = false
@@ -109,9 +112,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## Validates and starts a conversation. Returns whether it started.
 ## The optional hold keeps the frame open for a linked action or conversation.
+## An inclusive line range lets a timeline place parts of one conversation
+## around animation beats; (-1, -1) preserves whole-conversation playback.
 func start_conversation(
 	conversation: DialogueConversation,
-	keep_frame_open_after_finish: bool = false
+	keep_frame_open_after_finish: bool = false,
+	line_range: Vector2i = Vector2i(-1, -1)
 ) -> bool:
 	if (
 		not _references_valid
@@ -128,8 +134,25 @@ func start_conversation(
 		)
 		return false
 
+	var first_line := 0
+	var last_line := conversation.lines.size() - 1
+	if line_range != Vector2i(-1, -1):
+		if (
+			line_range.x < 0
+			or line_range.y < line_range.x
+			or line_range.y >= conversation.lines.size()
+		):
+			push_error(
+				"Dialogue '%s' requested invalid inclusive line range %s."
+				% [conversation.conversation_id, line_range]
+			)
+			return false
+		first_line = line_range.x
+		last_line = line_range.y
+
 	_active_conversation = conversation
-	_current_line_index = 0
+	_current_line_index = first_line
+	_active_last_line_index = last_line
 	_presentation_token += 1
 	_tree_was_paused = get_tree().paused
 	_advance_input_enabled = true
@@ -150,7 +173,7 @@ func advance() -> void:
 		return
 	_current_line_index += 1
 	_presentation_token += 1
-	if _current_line_index >= _active_conversation.lines.size():
+	if _current_line_index > _active_last_line_index:
 		finish_conversation()
 		return
 	_present_current_line()
@@ -165,6 +188,7 @@ func finish_conversation() -> void:
 	_presentation_token += 1
 	_active_conversation = null
 	_current_line_index = -1
+	_active_last_line_index = -1
 	_advance_input_enabled = true
 	_keep_frame_open_after_conversation = false
 	dialogue_root.hide()

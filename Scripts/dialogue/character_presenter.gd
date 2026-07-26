@@ -122,6 +122,24 @@ func react_to_presented_line() -> void:
 	speech_reaction.react_to_presented_line()
 
 
+## Plays a timeline-authored visual reaction without moving the actor root.
+##
+## This boundary keeps CutsceneSequencePlayer out of the presenter's private
+## sprite hierarchy while still letting the editor author exact motion.
+func play_cutscene_bounce(
+	offset: Vector2,
+	duration: float,
+	bounce_count: int,
+	transition: Tween.TransitionType
+) -> void:
+	speech_reaction.play_bounce(
+		offset,
+		duration,
+		bounce_count,
+		transition
+	)
+
+
 ## Reports whether this presenter can display an optional dialogue pose.
 func has_pose(pose_name: StringName) -> bool:
 	return (

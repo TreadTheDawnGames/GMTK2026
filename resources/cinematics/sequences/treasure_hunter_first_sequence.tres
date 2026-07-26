@@ -107,6 +107,8 @@ kind = 3
 actor = &"treasure_hunter"
 start_seconds = 2.5
 duration_seconds = 0.3
+bounce_offset = Vector2(0, -5)
+bounce_style = 1
 notes = "One bounce on arrival. This is the \"Hey!\" - he is already annoyed when he steps through, rather than becoming annoyed after the line appears."
 
 [sub_resource type="Resource" id="Resource_dialogue"]
@@ -115,7 +117,7 @@ kind = 5
 start_seconds = 2.8
 duration_seconds = 6.0
 conversation = ExtResource("2_252o6")
-notes = "The whole conversation, held for as long as the player takes to read it; the six seconds are nominal. The pickaxe changes hands inside it rather than here - the schedule ignores a beat's line_range, so a timeline cannot address one line. Line three carries the no_pickaxe speaker pose, which is what empties his hands on the line that gives the tool away.
+notes = "The whole conversation, held for as long as the player takes to read it; the six seconds are nominal. Line three carries the no_pickaxe speaker pose, which is what empties his hands on the line that gives the tool away. The editor can split this exchange into inclusive line ranges if later staging needs a separate beat around that handoff.
 
 This is the last beat on purpose. The walk out belongs to the stage's own closing move, because play_closing() runs either way and a timeline that also walked him to Exit would move him twice."
 
