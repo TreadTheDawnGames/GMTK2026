@@ -76,7 +76,7 @@ duration_seconds = 6.0
 conversation = ExtResource("2_ehpe3")
 notes = "The whole conversation: 'I'M QUIB-QUIB-QUIB-QUIB-QUIBBLE!' / 'HAVE YOU SEEN SEEN SEEN THE CAFE? CAFE? COFFEE? COFFEE CAFE?' / '...' / 'THIS IS IS IS TRAVEL COFFEE. T-T-TAKE IT.' / 'IT MAKES EV-EV-EV-EVERYTHING GO F-F-FASTER!'
 
-Line two stays one canonical line but its DialogueLine pauses after word counts 3, 4, 7, 8, and 9. That delivers it as HAVE YOU SEEN / SEEN / SEEN THE CAFE? / CAFE? / COFFEE? / COFFEE CAFE? without adding punctuation or asking the player to advance six separate cards.
+Line two stays one canonical line but its DialogueLine pauses after word counts 3, 4, 7, 8, and 9. That delivers its repeated words as separate bursts without adding punctuation or player advances.
 
 Six seconds is the authored estimate the editor scrubs against, not the real length. This beat blocks, so the clock holds here for exactly as long as the player takes to read.
 

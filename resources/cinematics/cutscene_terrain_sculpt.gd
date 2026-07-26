@@ -149,32 +149,6 @@ func get_floor_local_row() -> int:
 	return -anchor_offset_cells.y
 
 
-## Measures the center-column drop from the first authored opening to the
-## encounter floor. The schedule uses this same geometry as the renderer, so
-## expanding a ceiling also expands the fall that introduces the cutscene.
-func get_center_fall_clearance_rows() -> int:
-	var floor_local_row := get_floor_local_row()
-	var center_local_x := -anchor_offset_cells.x
-	if (
-		floor_local_row <= 0
-		or floor_local_row >= grid_size.y
-		or center_local_x < 0
-		or center_local_x >= grid_size.x
-	):
-		return 0
-	var opening_local_row := 0
-	while (
-		opening_local_row < floor_local_row
-		and is_solid_local(
-			Vector2i(center_local_x, opening_local_row)
-		)
-	):
-		opening_local_row += 1
-	if opening_local_row >= floor_local_row:
-		return 0
-	return floor_local_row - opening_local_row
-
-
 ## Reports whether a grid row is part of the guarded landing floor.
 func is_protected_floor_row(local_row: int) -> bool:
 	if protected_floor_rows <= 0:

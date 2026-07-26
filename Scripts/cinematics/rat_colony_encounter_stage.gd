@@ -21,9 +21,7 @@ signal persistent_colony_requested
 signal stampede_started
 ## The last of them is off screen. The miner can get up.
 signal stampede_finished
-## The approaching horde is close enough to shake the frame.
 signal stampede_rumble_started(strength_px: float)
-## The last mouse has passed and the frame can settle.
 signal stampede_rumble_finished
 
 @export_category("Rat Colony")
@@ -62,17 +60,11 @@ signal stampede_rumble_finished
 ## editing this stage. It is a lower-case verb phrase and not an animation name;
 ## an AnimationPlayer clip of the same name still plays if a stage authors one.
 @export var procession_cue: StringName
-## Advance warning between Rotini's call and the first mouse entering frame.
-##
-## The rumble starts immediately and stays active through the crossing. Zero
-## preserves the immediate procession used by stages without a telegraph.
+## Off-screen warning between Rotini's call and the first mouse entering.
 @export_range(0.0, 6.0, 0.1) var stampede_warning_seconds: float = 0.0
 @export_range(0.0, 20.0, 0.25) var stampede_rumble_strength_px: float = 5.0
-## Minimum time the spawn tap stays open after the warning. This keeps a fast
-## dialogue advance from reducing a whole stampede to its first mouse.
+## Keeps fast dialogue advancement from reducing the horde to one mouse.
 @export_range(0.0, 8.0, 0.1) var stampede_minimum_run_seconds: float = 0.0
-## Optional authored stampede sound. Rotini's introduction owns this player so
-## audio can be dropped into the scene without changing procession code.
 @export var stampede_audio: AudioStreamPlayer
 ## How long the closing waits for the last of them to leave before it gives up
 ## and frees them where they stand. Only reached if a follower is stuck, which

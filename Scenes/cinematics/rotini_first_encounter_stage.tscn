@@ -70,11 +70,13 @@ editor_description = "LEFT, 700px clear of Conversation. Both the mice and Rotin
 position = Vector2(-796, 0)
 
 [node name="RatContainer" parent="." index="3"]
-editor_description = "Five puts even the furthest receding row in front of the miner. The horde is meant to pass over him, Paper-Mario-sheep style, rather than read as traffic behind him."
-z_index = 5
+editor_description = "Zero rather than the base scene's 7, so the colony lands on the SECOND layer with the rest of the cast instead of on top of every stratum.
+
+The number is relative and the chain matters: DepthEncounterController puts CharacterLayer on cutscene_draw_order (1) for the shot, this container adds its own, and each mouse adds a row offset on top. At 7 the whole colony came out around 8 - in front of all four strata and of the miner - which is the first layer, not the second. At 0 the front row sits exactly where MinerRig.buried_draw_order stands him while he digs, and the rows behind recede from there."
+z_index = 0
 
 [node name="StampedeAudio" type="AudioStreamPlayer" parent="." index="4"]
-editor_description = "Assign the authored stampede sound here. The stage starts it with the off-screen rumble and stops it after the last mouse exits."
+editor_description = "Assign the authored stampede sound here. The warning still supplies camera rumble when no stream has been assigned."
 bus = &"SFX"
 
 [node name="EditorTerrainPreview" parent="." index="6"]

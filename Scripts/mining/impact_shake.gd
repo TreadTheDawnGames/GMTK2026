@@ -1,7 +1,7 @@
 class_name ImpactShake
 extends Node
 
-## Shakes the game camera for impacts and sustained cinematic rumble.
+## Shakes the game camera for mining impacts and sustained cinematic rumble.
 
 @export_category("Reference")
 @export var camera: Camera2D
@@ -63,7 +63,6 @@ func play_at_impact(
 	set_process(true)
 
 
-## Holds an even, non-directional shake until the cinematic releases it.
 func begin_sustained(strength_px: float) -> void:
 	_sustained_strength_px = maxf(strength_px, 0.0)
 	_seconds_until_sample = 0.0

@@ -294,9 +294,8 @@ func _activate_pending_encounter() -> void:
 	var encounter := encounter_config.encounters[_active_encounter_index]
 	presenter.apply_appearance(encounter.appearance)
 	var encounter_anchor := _encounter_positions[_active_encounter_index]
-	# A prestaged actor is already standing at the set's entrance while the
-	# miner falls. Moving him back to the room anchor here would create the
-	# exact landing-frame pop that pre-staging exists to remove.
+	# A prestaged actor already stands at the entrance during the fall; moving
+	# him back to the room anchor here would create a landing-frame pop.
 	if not encounter.prestage_before_landing:
 		presenter.position = encounter_anchor
 	var stage := _stages[_active_encounter_index]
@@ -543,11 +542,9 @@ func _begin_active_encounter() -> void:
 			floor_sampler.call(miner_rig.get_landing_foot_screen_x())
 			+ CUTSCENE_FLOOR_LIFT_PIXELS
 		)
-		# prepare() owns restoration and therefore must snapshot the actor's
-		# original hidden state. This hide/show pair has no frame between it;
-		# it transfers an already-visible prestage into normal stage ownership
-		# without a visible pop or leaving him behind after cancellation.
 		if encounter.prestage_before_landing:
+			# prepare() must snapshot the actor's original hidden state so a
+			# cancellation can restore it after taking over the visible prestage.
 			presenter.hide()
 		if not _active_stage.prepare(presenter, floor_sampler):
 			push_error(
@@ -1194,7 +1191,6 @@ func _on_stampede_finished() -> void:
 	miner_rig.release_cutscene_landing()
 
 
-## Relays the stage-local warning to the shared camera presentation.
 func _on_stampede_rumble_started(strength_px: float) -> void:
 	stampede_rumble_started.emit(strength_px)
 
