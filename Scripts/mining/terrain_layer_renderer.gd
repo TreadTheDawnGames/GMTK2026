@@ -5346,6 +5346,11 @@ func _prepare_chamber_transition_stamps() -> void:
 		var encounter_depth := encounter.resolve_depth(
 			config.total_run_depth
 		)
+		var encounter_chamber_height := (
+			encounter.resolve_chamber_height_rows(
+				encounter_config.chamber_height_rows
+			)
+		)
 		var chamber_bounds := (
 			encounter_config.get_chamber_horizontal_bounds(
 				encounter_depth - 1,
@@ -5358,7 +5363,7 @@ func _prepare_chamber_transition_stamps() -> void:
 		var chamber_ceiling_row := (
 			config.initial_surface_row
 			+ encounter_depth
-			- encounter_config.chamber_height_rows
+			- encounter_chamber_height
 		)
 		var random := RandomNumberGenerator.new()
 		random.seed = encounter_depth * 104_729 + 17

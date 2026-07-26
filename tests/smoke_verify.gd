@@ -327,7 +327,78 @@ func _verify_mining_scene() -> void:
 		"Terrain smoke verification requires one authored sculpt."
 	)
 	if not sculpt_placements.is_empty():
+		var cheese_encounter := (
+			terrain_manager.encounter_config.encounters[0]
+		)
+		var shared_chamber_height := (
+			terrain_manager.encounter_config.chamber_height_rows
+		)
+		var cheese_chamber_height := (
+			cheese_encounter.resolve_chamber_height_rows(
+				shared_chamber_height
+			)
+		)
+		_expect(
+			cheese_chamber_height == shared_chamber_height * 3,
+			"Cheese Girl's arrival fall must remain three times the shared height."
+		)
 		var sculpt: CutsceneTerrainSculpt = sculpt_placements[0].sculpt
+		var ceiling_local_row := (
+			sculpt.get_floor_local_row() - cheese_chamber_height
+		)
+		var pre_cutscene_layers_are_intact := ceiling_local_row >= 0
+		for local_y in range(maxi(ceiling_local_row, 0)):
+			for local_x in range(sculpt.grid_size.x):
+				var local_cell := Vector2i(local_x, local_y)
+				if not sculpt.is_solid_local(local_cell):
+					pre_cutscene_layers_are_intact = false
+					break
+				for layer_index in range(
+					sculpt.layer_solid_bits.size()
+				):
+					if not sculpt.is_layer_solid_local(
+						layer_index,
+						local_cell
+					):
+						pre_cutscene_layers_are_intact = false
+						break
+				if not pre_cutscene_layers_are_intact:
+					break
+			if not pre_cutscene_layers_are_intact:
+				break
+		_expect(
+			pre_cutscene_layers_are_intact,
+			"Cheese Girl's sculpt must not overwrite intact layered terrain "
+				+ "before its cutscene ceiling."
+		)
+		var reachable_fall_is_clear := true
+		var first_entry_x := sculpt.get_landing_first_local_x(
+			terrain_manager.config.snake_half_span_cells
+		)
+		var last_entry_x := mini(
+			first_entry_x
+				+ terrain_manager.config.snake_half_span_cells * 2,
+			sculpt.grid_size.x - 1
+		)
+		var clear_fall_last_row := (
+			sculpt.get_floor_local_row()
+			- DepthEncounterController.LANDING_FLOOR_TOLERANCE_ROWS
+		)
+		for local_y in range(
+			ceiling_local_row,
+			clear_fall_last_row + 1
+		):
+			for local_x in range(first_entry_x, last_entry_x + 1):
+				if sculpt.is_solid_local(Vector2i(local_x, local_y)):
+					reachable_fall_is_clear = false
+					break
+			if not reachable_fall_is_clear:
+				break
+		_expect(
+			reachable_fall_is_clear,
+			"Cheese Girl's enlarged cavern must keep every reachable fall "
+				+ "column clear until the landing tolerance."
+		)
 		var logical_mask := (
 			terrain_renderer._get_sculpt_logical_mask_image(sculpt, -1)
 		)

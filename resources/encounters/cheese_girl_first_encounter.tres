@@ -12,6 +12,7 @@ script = ExtResource("1_encounter")
 encounter_id = &"cheese_girl_first"
 actor_id = &"cheese_girl"
 depth_from_surface = 300
+chamber_height_rows_override = 72
 appearance = ExtResource("2_appearance")
 conversation = ExtResource("3_dialogue")
 stage_scene = ExtResource("5_stage")
