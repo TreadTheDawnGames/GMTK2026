@@ -21,6 +21,9 @@ class TerrainChunkVisual:
 	var dirty_mask_tiles: PackedInt32Array = PackedInt32Array()
 	var layer_revisions: PackedInt32Array = PackedInt32Array()
 	var layer_sprites: Array[Sprite2D] = []
+	## True only while the binary logical room is standing in for a smoothed rim.
+	## The background run cache rebuilds this off-screen chunk once complete.
+	var pending_sculpt_refinement: bool = false
 	## One bit per stratum still drawing the shared intact mask. A shared stratum
 	## owns no image and no texture, so streaming untouched rock allocates
 	## nothing; the bit is cleared the moment a stamp needs to write into it.
@@ -100,10 +103,19 @@ class ChunkTexturePublishWork:
 class SculptRunPreparation:
 	var sculpt: CutsceneTerrainSculpt
 	var layer_index: int
+	var mask_cell_size: int = 1
+	var padded_size: Vector2i
+	var solid_bits: PackedByteArray
+	var protected_floor_start: int = 0
+	var protected_floor_end: int = 0
+	var cell_bytes: PackedByteArray
+	var next_cell_row: int = 0
+	var cell_image: Image
 	var room_mask: Image
 	var mask_data: PackedByteArray
 	var mask_runs: Array[PackedInt32Array] = []
 	var next_row: int = 0
+	var phase: int = 0
 	var finished: bool = false
 
 
@@ -136,6 +148,11 @@ const CHUNK_MASK_TEXTURE_POOL_LIMIT: int = 12
 # Four authored samples per cell retain edge_smoothing at one quarter-cell
 # precision while bounding cached room memory independently of shipped density.
 const SCULPT_CACHE_PIXELS_PER_CELL: int = 4
+# A room begins incremental run preparation this many terrain rows before it
+# can enter the streamed window. Traversal also spends at most this bounded
+# slice per crossing, so even a no-frame benchmark reaches the room prepared.
+const SCULPT_RUN_PREFETCH_ROWS: int = 2_200
+const SCULPT_RUN_TRAVERSAL_BUDGET_USEC: int = 400
 # Deferred web raster work is capped and pooled. The 192 slots cover the
 # configured fully-stacked hit (currently under 150 jobs). If mining ever fills
 # them, the oldest single layer completes before another is accepted, so memory
@@ -273,6 +290,7 @@ var _chunk_texture_publish_pool: Array[ChunkTexturePublishWork] = []
 # work moves into the equally bounded immutable _sculpt_mask_runs cache.
 var _pending_sculpt_run_preparations: Array[SculptRunPreparation] = []
 var _pending_sculpt_run_preparation_head: int = 0
+var _chunk_build_needs_sculpt_refinement: bool = false
 var _defer_impact_rasterization: bool = false
 # Five timing targets produce at most five candidates, each with one transform
 # per writable gameplay stratum. A new target batch replaces this bounded queue;
@@ -311,7 +329,6 @@ func _ready() -> void:
 		)
 		_prepare_hole_masks()
 		_prepare_chamber_transition_stamps()
-		_prepare_sculpt_masks()
 		_on_view_position_changed(terrain_manager.get_view_position())
 		return
 	if terrain_manager == null or profile == null:
@@ -351,7 +368,6 @@ func _ready() -> void:
 	)
 	_prepare_hole_masks()
 	_prepare_chamber_transition_stamps()
-	_prepare_sculpt_masks()
 	_on_view_position_changed(terrain_manager.get_view_position())
 
 
@@ -429,48 +445,10 @@ func _process(_delta: float) -> void:
 	_compact_pending_stamp_preparation()
 	# Authored rooms are far below the starting surface, so their immutable row
 	# caches consume only terrain time left after visible and predictive work.
-	while (
-		_pending_sculpt_run_preparation_head
-		< _pending_sculpt_run_preparations.size()
-	):
-		var sculpt_preparation := _pending_sculpt_run_preparations[
-			_pending_sculpt_run_preparation_head
-		]
-		if _advance_sculpt_run_preparation(sculpt_preparation):
-			_pending_sculpt_run_preparation_head += 1
-		if (
-			Time.get_ticks_usec() - frame_started_at
-			>= frame_budget_usec
-		):
-			break
-	if (
-		_pending_sculpt_run_preparation_head
-		>= _pending_sculpt_run_preparations.size()
-	):
-		_pending_sculpt_run_preparations.clear()
-		_pending_sculpt_run_preparation_head = 0
-
-
-## Rasterizes every authored room before the run starts. Reaching one mid-run
-## then costs a clipped copy instead of the build, which is what keeps a room's
-## chunk streaming in at the same cost as the rock around it.
-func _prepare_sculpt_masks() -> void:
-	for placement in terrain_manager.get_sculpt_placements():
-		_get_sculpt_mask_image(placement.sculpt, -1)
-		_get_sculpt_logical_mask_image(placement.sculpt, -1)
-		_queue_sculpt_run_preparation(placement.sculpt, -1)
-		if not placement.sculpt.has_layer_masks():
-			continue
-		for layer_index in range(profile.get_gameplay_layer_count()):
-			_get_sculpt_mask_image(placement.sculpt, layer_index)
-			_get_sculpt_logical_mask_image(
-				placement.sculpt,
-				layer_index
-			)
-			_queue_sculpt_run_preparation(
-				placement.sculpt,
-				layer_index
-			)
+	_advance_pending_sculpt_run_preparations(
+		frame_started_at + frame_budget_usec
+	)
+	_refresh_ready_sculpt_chunks()
 
 
 ## Captures the combo used by synchronous damage stamps for one resolved hit.
@@ -1310,10 +1288,152 @@ func rebuild_all_chunks() -> void:
 func _on_view_position_changed(view_cell_position: Vector2) -> void:
 	_current_view_x = view_cell_position.x
 	_current_view_y = view_cell_position.y
+	_queue_nearby_sculpt_run_preparations(view_cell_position.y)
+	_advance_sculpt_run_preparations_for_traversal()
 	_refresh_active_chunks()
 	_position_active_chunks()
 	if _show_logical_overlay:
 		queue_redraw()
+
+
+## Starts only rooms close enough to enter the stream soon. Both directions are
+## covered because review mode may scroll upward through already mined terrain.
+func _queue_nearby_sculpt_run_preparations(view_y: float) -> void:
+	var view_row := roundi(view_y)
+	var nearby_placements: Array = []
+	var nearby_distances: Array[int] = []
+	for placement in terrain_manager.get_sculpt_placements():
+		var room_rect: Rect2i = placement.world_rect
+		var distance := (
+			room_rect.position.y - view_row
+			if view_row < room_rect.position.y
+			else (
+				view_row - room_rect.end.y
+				if view_row > room_rect.end.y
+				else 0
+			)
+		)
+		if distance > SCULPT_RUN_PREFETCH_ROWS:
+			continue
+		var insert_index := 0
+		while (
+			insert_index < nearby_distances.size()
+			and nearby_distances[insert_index] <= distance
+		):
+			insert_index += 1
+		nearby_distances.insert(insert_index, distance)
+		nearby_placements.insert(insert_index, placement)
+		if nearby_placements.size() > 2:
+			nearby_placements.pop_back()
+			nearby_distances.pop_back()
+	for placement in nearby_placements:
+		_queue_sculpt_run_preparation(placement.sculpt, -1)
+		if not placement.sculpt.has_layer_masks():
+			continue
+		for layer_index in range(profile.get_gameplay_layer_count()):
+			_queue_sculpt_run_preparation(
+				placement.sculpt,
+				layer_index
+			)
+
+
+## No-frame traversal tests and very fast review scrolling still contribute a
+## bounded preparation slice instead of forcing an entire room at its boundary.
+func _advance_sculpt_run_preparations_for_traversal() -> void:
+	_advance_pending_sculpt_run_preparations(
+		Time.get_ticks_usec() + SCULPT_RUN_TRAVERSAL_BUDGET_USEC,
+		true
+	)
+
+
+## Advances immutable room rows until the caller's absolute deadline.
+func _advance_pending_sculpt_run_preparations(
+	deadline_usec: int,
+	logical_only: bool = false
+) -> void:
+	while (
+		_pending_sculpt_run_preparation_head
+		< _pending_sculpt_run_preparations.size()
+	):
+		var head_preparation := _pending_sculpt_run_preparations[
+			_pending_sculpt_run_preparation_head
+		]
+		# Whole-cell logical masks unblock structural streaming. Finish every
+		# nearby logical phase before spending spare work on smoothed row runs.
+		if head_preparation.phase > 0:
+			for work_index in range(
+				_pending_sculpt_run_preparation_head + 1,
+				_pending_sculpt_run_preparations.size()
+			):
+				if _pending_sculpt_run_preparations[work_index].phase == 0:
+					_pending_sculpt_run_preparations[
+						_pending_sculpt_run_preparation_head
+					] = _pending_sculpt_run_preparations[work_index]
+					_pending_sculpt_run_preparations[work_index] = (
+						head_preparation
+					)
+					break
+		var preparation := _pending_sculpt_run_preparations[
+			_pending_sculpt_run_preparation_head
+		]
+		if logical_only and preparation.phase > 0:
+			break
+		if _advance_sculpt_run_preparation(preparation):
+			_pending_sculpt_run_preparation_head += 1
+		if Time.get_ticks_usec() >= deadline_usec:
+			break
+	if (
+		_pending_sculpt_run_preparation_head
+		>= _pending_sculpt_run_preparations.size()
+	):
+		_pending_sculpt_run_preparations.clear()
+		_pending_sculpt_run_preparation_head = 0
+
+
+## Rebuilds only active chunks whose complete smoothed room cache replaced the
+## temporary binary rim. Logical terrain never changes during this refinement.
+func _refresh_ready_sculpt_chunks() -> void:
+	var ready_chunk_indices: Array[int] = []
+	for chunk_index in _active_chunks:
+		var chunk: TerrainChunkVisual = _active_chunks[chunk_index]
+		if (
+			chunk.pending_sculpt_refinement
+			and _are_sculpt_runs_ready_for_chunk(chunk_index)
+		):
+			ready_chunk_indices.append(chunk_index)
+	for chunk_index in ready_chunk_indices:
+		_unload_chunk(chunk_index)
+		_load_chunk(chunk_index)
+
+
+## Reports whether every authored mask touching a chunk has immutable row runs.
+func _are_sculpt_runs_ready_for_chunk(chunk_index: int) -> bool:
+	var config: MiningConfig = terrain_manager.config
+	var chunk_start_row := chunk_index * config.chunk_height_cells
+	var chunk_end_row := chunk_start_row + config.chunk_height_cells
+	for placement in terrain_manager.get_sculpt_placements():
+		var room_rect: Rect2i = placement.world_rect
+		if (
+			room_rect.position.y >= chunk_end_row
+			or room_rect.end.y <= chunk_start_row
+		):
+			continue
+		var layer_runs: Array = _sculpt_mask_runs.get(
+			placement.sculpt,
+			[]
+		)
+		if layer_runs.is_empty() or layer_runs[0] == null:
+			return false
+		if not placement.sculpt.has_layer_masks():
+			continue
+		for layer_index in range(profile.get_gameplay_layer_count()):
+			var cache_index := layer_index + 1
+			if (
+				layer_runs.size() <= cache_index
+				or layer_runs[cache_index] == null
+			):
+				return false
+	return true
 
 
 ## Recalculates streamed coverage when the browser canvas changes size.
@@ -1572,6 +1692,7 @@ func _share_intact_masks(
 		chunk.layer_revisions[layer_index] = 0
 	chunk.shared_layers = (1 << layer_count) - 1
 	chunk.needs_private_texture_tiles.fill(0)
+	chunk.pending_sculpt_refinement = false
 
 
 ## Builds this chunk's own strata for chambers, rooms, and the run's edges.
@@ -1584,6 +1705,7 @@ func _build_chunk_masks(
 	chunk_contains_chamber: bool,
 	chunk_contains_sculpt: bool
 ) -> void:
+	_chunk_build_needs_sculpt_refinement = false
 	var chunk_has_per_layer_sculpt := (
 		chunk_contains_sculpt and _chunk_has_per_layer_sculpt(chunk_index)
 	)
@@ -1659,6 +1781,9 @@ func _build_chunk_masks(
 				)
 				break
 	chunk.needs_private_texture_tiles.fill(0)
+	chunk.pending_sculpt_refinement = (
+		_chunk_build_needs_sculpt_refinement
+	)
 
 
 ## Gives one stratum an image of its own before a stamp writes into it.
@@ -2089,6 +2214,7 @@ func _release_chunk_masks(chunk: TerrainChunkVisual) -> void:
 		chunk.layer_revisions[layer_index] = 0
 	chunk.shared_layers = (1 << chunk.mask_images.size()) - 1
 	chunk.needs_private_texture_tiles.fill(0)
+	chunk.pending_sculpt_refinement = false
 
 
 ## Frees every retired chunk, so a profile or room edit cannot hand stale
@@ -2271,12 +2397,17 @@ func _build_chunk_base_mask(
 		var expansion := profile.mask_pixels_per_cell
 		# Binary room interiors expand as horizontal runs, keeping structural
 		# work proportional to logical rows instead of millions of mask pixels.
+		var source_width := image.get_width()
+		var source_data := image.get_data()
 		for source_y in range(image.get_height()):
 			var opening_run_start := -1
-			for source_x in range(image.get_width() + 1):
+			var row_byte_start := source_y * source_width * 2
+			for source_x in range(source_width + 1):
 				var is_opening := (
-					source_x < image.get_width()
-					and image.get_pixel(source_x, source_y).a <= 0.5
+					source_x < source_width
+					and source_data[
+						row_byte_start + source_x * 2 + 1
+					] <= 127
 				)
 				if is_opening and opening_run_start < 0:
 					opening_run_start = source_x
@@ -2393,6 +2524,9 @@ func _blit_sculpt_rooms(
 			sculpt_layer_index
 		)
 		if room_runs.is_empty():
+			# The logical pass above is already correct. Keep this streamed build
+			# bounded and let the background cache replace only its visual rim.
+			_chunk_build_needs_sculpt_refinement = true
 			continue
 		var clipped_cell_size := Vector2i(
 			last_column - first_column,
@@ -2459,12 +2593,18 @@ func _get_sculpt_mask_image(
 	var layer_masks: Array = _sculpt_mask_images.get(sculpt, [])
 	if layer_masks.size() > cache_index and layer_masks[cache_index] != null:
 		return layer_masks[cache_index]
-	var room_mask := _rasterize_sculpt_mask(sculpt, sculpt_layer_index)
-	while layer_masks.size() <= cache_index:
-		layer_masks.append(null)
-	layer_masks[cache_index] = room_mask
-	_sculpt_mask_images[sculpt] = layer_masks
-	return room_mask
+	var preparation := _queue_sculpt_run_preparation(
+		sculpt,
+		sculpt_layer_index
+	)
+	while preparation != null and preparation.room_mask == null:
+		_advance_sculpt_run_preparation(preparation)
+	layer_masks = _sculpt_mask_images.get(sculpt, [])
+	return (
+		layer_masks[cache_index]
+		if layer_masks.size() > cache_index
+		else null
+	)
 
 
 ## Returns the same authored room as one binary sample per gameplay cell.
@@ -2483,34 +2623,24 @@ func _get_sculpt_logical_mask_image(
 	)
 	if layer_masks.size() > cache_index and layer_masks[cache_index] != null:
 		return layer_masks[cache_index]
-	var logical_bytes := PackedByteArray()
-	logical_bytes.resize(sculpt.grid_size.x * sculpt.grid_size.y * 2)
-	var byte_index := 0
-	for local_y in range(sculpt.grid_size.y):
-		for local_x in range(sculpt.grid_size.x):
-			logical_bytes[byte_index] = 255
-			logical_bytes[byte_index + 1] = (
-				255
-				if _is_sculpt_cell_solid(
-					sculpt,
-					sculpt_layer_index,
-					Vector2i(local_x, local_y)
-				)
-				else 0
-			)
-			byte_index += 2
-	var logical_mask := Image.create_from_data(
-		sculpt.grid_size.x,
-		sculpt.grid_size.y,
-		false,
-		Image.FORMAT_LA8,
-		logical_bytes
+	var preparation := _queue_sculpt_run_preparation(
+		sculpt,
+		sculpt_layer_index
 	)
-	while layer_masks.size() <= cache_index:
-		layer_masks.append(null)
-	layer_masks[cache_index] = logical_mask
-	_sculpt_logical_mask_images[sculpt] = layer_masks
-	return logical_mask
+	while (
+		preparation != null
+		and (
+			layer_masks.size() <= cache_index
+			or layer_masks[cache_index] == null
+		)
+	):
+		_advance_sculpt_run_preparation(preparation)
+		layer_masks = _sculpt_logical_mask_images.get(sculpt, [])
+	return (
+		layer_masks[cache_index]
+		if layer_masks.size() > cache_index
+		else null
+	)
 
 
 ## Returns immutable horizontal alpha runs for a smoothed authored room.
@@ -2532,14 +2662,9 @@ func _get_sculpt_mask_runs(
 	)
 	if preparation == null:
 		return []
-	while not _advance_sculpt_run_preparation(preparation):
-		pass
-	layer_runs = _sculpt_mask_runs.get(sculpt, [])
-	return (
-		layer_runs[cache_index]
-		if layer_runs.size() > cache_index
-		else []
-	)
+	# A cold review-mode teleport draws the correct binary logical room for a
+	# few frames instead of scanning the whole smoothed contour in one frame.
+	return []
 
 
 ## Queues one immutable sculpt/layer cache, deduplicating background and forced
@@ -2564,15 +2689,29 @@ func _queue_sculpt_run_preparation(
 			and pending.layer_index == sculpt_layer_index
 		):
 			return pending
-	var room_mask := _get_sculpt_mask_image(sculpt, sculpt_layer_index)
-	if room_mask == null:
-		return null
 	var preparation := SculptRunPreparation.new()
 	preparation.sculpt = sculpt
 	preparation.layer_index = sculpt_layer_index
-	preparation.room_mask = room_mask
-	preparation.mask_data = room_mask.get_data()
-	preparation.mask_runs.resize(room_mask.get_height())
+	preparation.mask_cell_size = _get_sculpt_cache_pixels_per_cell()
+	preparation.padded_size = sculpt.grid_size + Vector2i(2, 2)
+	preparation.solid_bits = sculpt.solid_bits
+	var required_bytes := ceili(
+		float(sculpt.grid_size.x * sculpt.grid_size.y) / 8.0
+	)
+	if (
+		sculpt_layer_index >= 0
+		and sculpt_layer_index < sculpt.layer_solid_bits.size()
+		and sculpt.layer_solid_bits[sculpt_layer_index].size()
+			>= required_bytes
+	):
+		preparation.solid_bits = (
+			sculpt.layer_solid_bits[sculpt_layer_index]
+		)
+	preparation.protected_floor_start = sculpt.get_floor_local_row()
+	preparation.protected_floor_end = (
+		preparation.protected_floor_start
+		+ sculpt.protected_floor_rows
+	)
 	_pending_sculpt_run_preparations.append(preparation)
 	return preparation
 
@@ -2583,27 +2722,154 @@ func _advance_sculpt_run_preparation(
 ) -> bool:
 	if preparation.finished:
 		return true
+	if preparation.phase == 0:
+		if preparation.cell_bytes.is_empty():
+			preparation.cell_bytes.resize(
+				preparation.padded_size.x
+				* preparation.padded_size.y
+				* 2
+			)
+		if preparation.next_cell_row < preparation.padded_size.y:
+			var padded_y := preparation.next_cell_row
+			var local_y := padded_y - 1
+			var grid := preparation.sculpt.grid_size
+			var row_is_solid := (
+				local_y < 0
+				or local_y >= grid.y
+				or (
+					local_y >= preparation.protected_floor_start
+					and local_y < preparation.protected_floor_end
+				)
+			)
+			var byte_index := (
+				padded_y * preparation.padded_size.x * 2
+			)
+			for padded_x in range(preparation.padded_size.x):
+				var local_x := padded_x - 1
+				var bit_index := local_y * grid.x + local_x
+				var cell_value := (
+					255
+					if (
+						row_is_solid
+						or local_x < 0
+						or local_x >= grid.x
+						or (
+							preparation.solid_bits[
+								bit_index >> 3
+							]
+							& (1 << (bit_index & 7))
+						) != 0
+					)
+					else 0
+				)
+				preparation.cell_bytes[byte_index] = cell_value
+				preparation.cell_bytes[byte_index + 1] = cell_value
+				byte_index += 2
+			preparation.next_cell_row += 1
+			return false
+		preparation.cell_image = Image.create_from_data(
+			preparation.padded_size.x,
+			preparation.padded_size.y,
+			false,
+			Image.FORMAT_LA8,
+			preparation.cell_bytes
+		)
+		var grid := preparation.sculpt.grid_size
+		var logical_mask := preparation.cell_image.get_region(
+			Rect2i(Vector2i.ONE, grid)
+		)
+		var cache_index := preparation.layer_index + 1
+		var logical_layers: Array = _sculpt_logical_mask_images.get(
+			preparation.sculpt,
+			[]
+		)
+		while logical_layers.size() <= cache_index:
+			logical_layers.append(null)
+		logical_layers[cache_index] = logical_mask
+		_sculpt_logical_mask_images[
+			preparation.sculpt
+		] = logical_layers
+		preparation.cell_bytes = PackedByteArray()
+		preparation.phase = 1
+		return false
+	if preparation.phase == 1:
+		var grid := preparation.sculpt.grid_size
+		preparation.cell_image.resize(
+			preparation.padded_size.x * preparation.mask_cell_size,
+			preparation.padded_size.y * preparation.mask_cell_size,
+			(
+				Image.INTERPOLATE_BILINEAR
+				if preparation.sculpt.edge_smoothing > 0.0
+				else Image.INTERPOLATE_NEAREST
+			)
+		)
+		preparation.room_mask = preparation.cell_image.get_region(
+			Rect2i(
+				Vector2i.ONE * preparation.mask_cell_size,
+				grid * preparation.mask_cell_size
+			)
+		)
+		if (
+			preparation.sculpt.edge_smoothing > 0.0
+			and preparation.sculpt.edge_smoothing < 1.0
+		):
+			_harden_sculpt_mask_rims(
+				preparation.room_mask,
+				preparation.sculpt,
+				preparation.layer_index
+			)
+		var room_layers: Array = _sculpt_mask_images.get(
+			preparation.sculpt,
+			[]
+		)
+		var cache_index := preparation.layer_index + 1
+		while room_layers.size() <= cache_index:
+			room_layers.append(null)
+		room_layers[cache_index] = preparation.room_mask
+		_sculpt_mask_images[preparation.sculpt] = room_layers
+		preparation.mask_runs.resize(
+			preparation.room_mask.get_height()
+		)
+		preparation.cell_image = null
+		preparation.phase = 2
+		return false
+	if preparation.phase == 2:
+		# The internal room raster stores coverage in luminance as well as alpha.
+		# Converting a temporary view to L8 packs four samples per decoded word,
+		# then the row scanner can skip long flat rock/air runs natively.
+		var alpha_image := preparation.room_mask.duplicate()
+		alpha_image.convert(Image.FORMAT_L8)
+		preparation.mask_data = alpha_image.get_data()
+		preparation.phase = 3
+		return false
 	var mask_width := preparation.room_mask.get_width()
 	var mask_y := preparation.next_row
 	var row_runs := PackedInt32Array()
 	var run_start := 0
-	var row_byte_start := mask_y * mask_width * 2
-	var run_alpha := preparation.mask_data[row_byte_start + 1]
-	for mask_x in range(1, mask_width + 1):
+	var row_byte_start := mask_y * mask_width
+	var run_alpha := preparation.mask_data[row_byte_start]
+	var mask_x := 1
+	while mask_x <= mask_width:
+		if (
+			mask_x + 4 <= mask_width
+			and preparation.mask_data.decode_u32(
+				row_byte_start + mask_x
+			) == run_alpha * 0x01010101
+		):
+			mask_x += 4
+			continue
 		var alpha := (
 			-1
 			if mask_x == mask_width
-			else preparation.mask_data[
-				row_byte_start + mask_x * 2 + 1
-			]
+			else preparation.mask_data[row_byte_start + mask_x]
 		)
-		if alpha == run_alpha:
-			continue
-		row_runs.append(run_start)
-		row_runs.append(mask_x)
-		row_runs.append(run_alpha)
-		run_start = mask_x
-		run_alpha = alpha
+		if alpha != run_alpha:
+			row_runs.append(run_start)
+			row_runs.append(mask_x)
+			row_runs.append(run_alpha)
+			run_start = mask_x
+			run_alpha = alpha
+		mask_x += 1
 	preparation.mask_runs[mask_y] = row_runs
 	preparation.next_row += 1
 	if preparation.next_row < preparation.room_mask.get_height():
@@ -2644,8 +2910,7 @@ func _rasterize_sculpt_mask(
 	var byte_index := 0
 	for padded_y in range(padded_size.y):
 		for padded_x in range(padded_size.x):
-			cell_bytes[byte_index] = 255
-			cell_bytes[byte_index + 1] = (
+			var cell_value := (
 				255
 				if _is_sculpt_cell_solid(
 					sculpt,
@@ -2654,6 +2919,11 @@ func _rasterize_sculpt_mask(
 				)
 				else 0
 			)
+			# This cached raster is never uploaded directly. Mirroring coverage
+			# into luminance lets run preparation convert it to contiguous L8
+			# without a per-pixel alpha extraction pass.
+			cell_bytes[byte_index] = cell_value
+			cell_bytes[byte_index + 1] = cell_value
 			byte_index += 2
 	var cell_image := Image.create_from_data(
 		padded_size.x,
@@ -2733,6 +3003,9 @@ func _harden_sculpt_mask_rims(
 					var mask_x := local_x * mask_cell_size + sub_x
 					var smoothed := room_mask.get_pixel(mask_x, mask_y)
 					smoothed.a = lerpf(hard_value, smoothed.a, smoothing)
+					smoothed.r = smoothed.a
+					smoothed.g = smoothed.a
+					smoothed.b = smoothed.a
 					room_mask.set_pixel(mask_x, mask_y, smoothed)
 
 
