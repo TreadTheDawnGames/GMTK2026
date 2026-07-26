@@ -3,7 +3,7 @@ extends CharacterEncounterStage
 
 ## How it works:
 ## - The encounter presenter is the lead rat already waiting by the miner.
-## - Opening starts a bounded stream of mouse actors across the normal tunnel.
+## - Opening, or a named cue, starts a bounded stream of mouse actors.
 ## - Each follower runs to the work marker, mines, then exits to the right.
 ## - Strike contacts reuse the shared terrain particles, smoke, and shake route.
 ## - Closing or cancellation stops timers and frees every transient follower.
@@ -37,6 +37,19 @@ signal persistent_colony_requested
 ## passing through, and a rat that stops to swing at a wall on the way reads as
 ## a different scene. Everything else about the procession is shared.
 @export var procession_mines: bool = true
+## The cue that lets the colony in, instead of it arriving with the opening.
+##
+## Empty, and the procession runs from the moment the shot opens. That is
+## Rotini's introduction: the tunnel is already somebody's road, the traffic is
+## the first thing the player sees, and his line explains something already on
+## screen. Named, and the tunnel stays empty until that cue arrives, which is the
+## colony beat: nothing is coming until he calls them, and then everything does.
+##
+## The cue is whatever carries that name - a DialogueLine's Stage Cue, or a
+## timeline STAGE_CUE beat - so moving the flood means moving the cue rather than
+## editing this stage. It is a lower-case verb phrase and not an animation name;
+## an AnimationPlayer clip of the same name still plays if a stage authors one.
+@export var procession_cue: StringName
 
 ## Growth is bounded by max_live_followers (or the web cap) and pruned on exit.
 var _followers: Array[CinematicRatMiner] = []
@@ -57,14 +70,23 @@ func prepare(
 	return true
 
 
-## Starts the colony only after the lead rat has reached the conversation spot.
+## Starts the colony only after the lead rat has reached the conversation spot,
+## unless this stage waits for a cue to let them in.
 func play_opening() -> void:
 	await super.play_opening()
-	if not _is_active:
+	if not procession_cue.is_empty():
 		return
-	_is_spawning = true
-	_spawn_generation += 1
-	_spawn_next_follower(_spawn_generation)
+	_begin_procession()
+
+
+## Starts the colony on its authored cue, and otherwise defers to the shared
+## stage. Returning what the base returned keeps a caller's "did an animation
+## play" answer honest: starting rats is not playing a clip.
+func play_cue(cue_id: StringName, line_index: int) -> bool:
+	var played_animation := super.play_cue(cue_id, line_index)
+	if not procession_cue.is_empty() and cue_id == procession_cue:
+		_begin_procession()
+	return played_animation
 
 
 func play_closing() -> void:
@@ -96,6 +118,16 @@ func validate_stage() -> String:
 	if rat_appearances.is_empty():
 		return "Rat colony stage requires at least one rat appearance."
 	return ""
+
+
+## Opens the stream. Idempotent, because a cue can be re-presented when a player
+## walks the dialogue back over the line that carries it.
+func _begin_procession() -> void:
+	if not _is_active or _is_spawning:
+		return
+	_is_spawning = true
+	_spawn_generation += 1
+	_spawn_next_follower(_spawn_generation)
 
 
 ## Reuses one timer at a time; the generation rejects stale callbacks.

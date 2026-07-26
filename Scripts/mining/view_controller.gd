@@ -229,6 +229,48 @@ func follow_mining_position(mining_position: Vector2i) -> void:
 	target_view_position = Vector2(mining_position)
 
 
+## Places the view where the fall would have left it, without playing the fall.
+##
+## Nothing in a played run calls this, and nothing should: a player's view earns
+## its position by falling, and the descent is the game. It exists for the
+## cutscene preview harness, which teleports the run's depth straight to an
+## encounter and then has to bring the camera with it. The camera's own descent
+## is a real fall at mining speed, so an encounter eleven thousand rows down is
+## nearly two minutes of gliding through solid rock before the shot can begin -
+## far past any watchdog, which is why the harness used to announce a landing
+## while the room was still tens of thousands of pixels above where it would
+## come to rest. The visitor then walked a path baked at that height and stayed
+## there, off the bottom of the screen, with no error anywhere.
+##
+## Everything the fall would have settled is settled here: the follow state, the
+## fall velocity, any encounter tween still running, and the published terrain
+## position. The landing itself is deliberately not reported - whoever teleported
+## the run announces that, and reporting it twice would open the encounter twice.
+func snap_follow_to_target() -> void:
+	_cancel_encounter_view_tween()
+	_is_encounter_focus_active = false
+	_is_encounter_release_active = false
+	_view_mode = ViewMode.FOLLOWING_MINER
+	_current_miner_position = target_view_position
+	_fall_start_position = target_view_position
+	_review_target_y = target_view_position.y
+	_mining_fall_velocity = 0.0
+	_return_velocity = 0.0
+	current_view_x = target_view_position.x
+	current_view_y = (
+		_get_chunk_camera_y(target_view_position.y)
+		if (
+			config.mining_camera_style
+				== MiningConfig.MiningCameraStyle.CHUNK_SNAP
+		)
+		else target_view_position.y
+	)
+	terrain_manager.set_view_position(
+		Vector2(current_view_x, current_view_y)
+	)
+	_publish_miner_screen_offset()
+
+
 ## Moves the detached view toward earlier or later visited terrain.
 func scroll_review(direction: int) -> void:
 	var safe_direction := clampi(direction, -1, 1)

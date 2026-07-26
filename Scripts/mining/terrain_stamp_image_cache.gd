@@ -115,6 +115,39 @@ func get_images(
 		is_preparation,
 		source_supersample
 	)
+	if preparation.completed:
+		return preparation.stamp_images
+	# Historical chunk replay is synchronous: spreading the same resize across
+	# many GDScript calls cannot yield a frame there, it only multiplies call
+	# overhead. Erase coverage stays direct-nearest and therefore binary; only
+	# fracture luminance uses the bilinear supersample that preserves line weight.
+	if not is_preparation:
+		var erase_mask_result := preparation.oriented.erase_mask.duplicate()
+		erase_mask_result.resize(
+			stamp_size.x,
+			stamp_size.y,
+			Image.INTERPOLATE_NEAREST
+		)
+		preparation.stamp_images.erase_mask = erase_mask_result
+		if preparation.oriented.fracture_source != null:
+			var fracture_result := (
+				preparation.oriented.fracture_source.duplicate()
+			)
+			if source_supersample > 1:
+				fracture_result.resize(
+					fracture_result.get_width() * source_supersample,
+					fracture_result.get_height() * source_supersample,
+					Image.INTERPOLATE_BILINEAR
+				)
+			fracture_result.resize(
+				stamp_size.x,
+				stamp_size.y,
+				Image.INTERPOLATE_NEAREST
+			)
+			preparation.stamp_images.fracture_source = fracture_result
+		preparation.phase = 10
+		advance_image_preparation(preparation)
+		return preparation.stamp_images
 	while not advance_image_preparation(preparation):
 		pass
 	return preparation.stamp_images

@@ -162,7 +162,7 @@ chamber.*
 
 ### Encounter 8 — Rotini and the Colony, 11,200 depth
 
-**ROTINI: You again? Did you find the cheese cafe? We seem to have gotten lost in our own tunnels.k**
+**ROTINI: You again? Did you find the cheese cafe? We seem to have gotten lost in our own tunnels.**
 
 **MINER: ...**
 

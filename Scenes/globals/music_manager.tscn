@@ -1,19 +1,67 @@
 [gd_scene format=3 uid="uid://qi6w5ueftd0u"]
 
 [ext_resource type="Script" uid="uid://8lrsitody4v4" path="res://Scripts/Global/music_manager.gd" id="1_a0ngj"]
-[ext_resource type="AudioStream" uid="uid://cqkwcxf3rel2b" path="res://Assets/Audio/Music/Tracks/Intensity 1 DEV.wav" id="2_libwa"]
-[ext_resource type="AudioStream" uid="uid://faveg3gkt8ky" path="res://Assets/Audio/Music/Tracks/Intensity 2 DEV.wav" id="3_f6o2p"]
-[ext_resource type="AudioStream" uid="uid://ckomcfc02jij3" path="res://Assets/Audio/Music/Tracks/Intensity 3 DEV.wav" id="4_qe7b2"]
-[ext_resource type="AudioStream" uid="uid://df37op8y3fdo7" path="res://Assets/Audio/Music/Tracks/Intensity 4 DEV.wav" id="5_fxo4j"]
-[ext_resource type="AudioStream" uid="uid://cq0hggco73ie2" path="res://Assets/Audio/Music/Fills/Fill 1 DEV.wav" id="6_rv6of"]
-[ext_resource type="AudioStream" uid="uid://c42p4tw3aicd2" path="res://Assets/Audio/Music/Fills/Filll 2 DEV.wav" id="7_0kwba"]
-[ext_resource type="AudioStream" uid="uid://77vudy25abmn" path="res://Assets/Audio/Music/Fills/Fill 3 DEV.wav" id="8_h6ha5"]
+[ext_resource type="Script" uid="uid://s4frj7oy6eh" path="res://resources/music/intensity.gd" id="2_q3b56"]
+[ext_resource type="AudioStream" uid="uid://chhsdowl4uikj" path="res://Assets/Audio/Music/Tracks/Track 0_A.wav" id="3_j7o0d"]
+[ext_resource type="AudioStream" uid="uid://b65hvbkhrokt0" path="res://Assets/Audio/Music/Tracks/Track 1_A.wav" id="4_t3xlo"]
+[ext_resource type="AudioStream" uid="uid://dxgkdgbyrag1f" path="res://Assets/Audio/Music/Tracks/Track 1_B.wav" id="5_l6m5y"]
+[ext_resource type="AudioStream" uid="uid://ccgj86e6x5a1r" path="res://Assets/Audio/Music/Tracks/Track 1_C.wav" id="6_hc7r0"]
+[ext_resource type="AudioStream" uid="uid://ddcsk5epb2xpu" path="res://Assets/Audio/Music/Tracks/Track 2_A.wav" id="7_bo57w"]
+[ext_resource type="AudioStream" uid="uid://bf0f27joim14q" path="res://Assets/Audio/Music/Tracks/Track 2_B.wav" id="8_c4rao"]
+[ext_resource type="AudioStream" uid="uid://cc5qcx2fbc38y" path="res://Assets/Audio/Music/Tracks/Track 3_A.wav" id="9_knyyj"]
+[ext_resource type="AudioStream" uid="uid://cch53t88rosm1" path="res://Assets/Audio/Music/Tracks/Track 3_B.wav" id="10_4e8v3"]
+[ext_resource type="AudioStream" uid="uid://dpux8n4chc4j7" path="res://Assets/Audio/Music/Tracks/Track 3_C.wav" id="11_md4lg"]
+[ext_resource type="AudioStream" uid="uid://dr3tn2l7ok45g" path="res://Assets/Audio/Music/Tracks/Track 3_D.wav" id="12_ccwyb"]
+[ext_resource type="AudioStream" uid="uid://bafg84pi387x2" path="res://Assets/Audio/Music/Tracks/Track 4_A.wav" id="13_3clkn"]
+[ext_resource type="AudioStream" uid="uid://d15qdd2u7norw" path="res://Assets/Audio/Music/Tracks/Track 4_B.wav" id="14_hpsl2"]
+[ext_resource type="AudioStream" uid="uid://sb84n3ygkn3w" path="res://Assets/Audio/Music/Tracks/Track 4_C.wav" id="15_clf6b"]
+[ext_resource type="AudioStream" uid="uid://cp00cgjcbl4un" path="res://Assets/Audio/Music/Tracks/Track 4_D.wav" id="16_tso0d"]
+[ext_resource type="AudioStream" uid="uid://cscee8nxpmatj" path="res://Assets/Audio/Music/Fills/Fill 1.wav" id="17_knyyj"]
+[ext_resource type="AudioStream" uid="uid://cyqiofo2rxlqj" path="res://Assets/Audio/Music/Fills/Fill 2.wav" id="18_4e8v3"]
+[ext_resource type="AudioStream" uid="uid://uyffheadki3i" path="res://Assets/Audio/Music/Fills/Fill 3.wav" id="19_md4lg"]
+[ext_resource type="AudioStream" uid="uid://bndigfegx8cfd" path="res://Assets/Audio/Music/Fills/Fill 4.wav" id="20_ccwyb"]
+[ext_resource type="AudioStream" uid="uid://q654521kyu7h" path="res://Assets/Audio/Music/Fills/Fill 5.wav" id="21_3clkn"]
+[ext_resource type="AudioStream" uid="uid://bo5sy6yuoip68" path="res://Assets/Audio/Music/Fills/Fill 6.wav" id="22_hpsl2"]
+[ext_resource type="AudioStream" uid="uid://b4bih3mqb56ek" path="res://Assets/Audio/Music/Fills/Fill 7.wav" id="23_clf6b"]
+[ext_resource type="AudioStream" uid="uid://ci4splx28rtho" path="res://Assets/Audio/Music/Fills/Fill 8.wav" id="24_tso0d"]
+[ext_resource type="AudioStream" uid="uid://b3pwotopllh27" path="res://Assets/Audio/Music/Fills/Fill 9.wav" id="25_hva2u"]
+[ext_resource type="AudioStream" uid="uid://doiji28kkb828" path="res://Assets/Audio/Music/Fills/Fill 10.wav" id="26_462tb"]
+
+[sub_resource type="Resource" id="Resource_ikl7l"]
+resource_name = "Intensity 0"
+script = ExtResource("2_q3b56")
+tracks = Array[AudioStream]([ExtResource("3_j7o0d")])
+metadata/_custom_type_script = "uid://s4frj7oy6eh"
+
+[sub_resource type="Resource" id="Resource_hmpdo"]
+resource_name = "Intensity 1"
+script = ExtResource("2_q3b56")
+tracks = Array[AudioStream]([ExtResource("4_t3xlo"), ExtResource("5_l6m5y"), ExtResource("6_hc7r0")])
+metadata/_custom_type_script = "uid://s4frj7oy6eh"
+
+[sub_resource type="Resource" id="Resource_65g0b"]
+resource_name = "Intensity 2"
+script = ExtResource("2_q3b56")
+tracks = Array[AudioStream]([ExtResource("7_bo57w"), ExtResource("8_c4rao")])
+metadata/_custom_type_script = "uid://s4frj7oy6eh"
+
+[sub_resource type="Resource" id="Resource_nmsjp"]
+resource_name = "Intensity 3"
+script = ExtResource("2_q3b56")
+tracks = Array[AudioStream]([ExtResource("9_knyyj"), ExtResource("10_4e8v3"), ExtResource("11_md4lg"), ExtResource("12_ccwyb")])
+metadata/_custom_type_script = "uid://s4frj7oy6eh"
+
+[sub_resource type="Resource" id="Resource_libwa"]
+resource_name = "Intensity 4"
+script = ExtResource("2_q3b56")
+tracks = Array[AudioStream]([ExtResource("13_3clkn"), ExtResource("14_hpsl2"), ExtResource("15_clf6b"), ExtResource("16_tso0d")])
+metadata/_custom_type_script = "uid://s4frj7oy6eh"
 
 [node name="MusicManager" type="Node" unique_id=1863380187]
 process_mode = 3
 script = ExtResource("1_a0ngj")
-tracks = Array[AudioStream]([ExtResource("2_libwa"), ExtResource("3_f6o2p"), ExtResource("4_qe7b2"), ExtResource("5_fxo4j")])
-fills = Array[AudioStream]([ExtResource("6_rv6of"), ExtResource("7_0kwba"), ExtResource("8_h6ha5")])
+tracks = Array[ExtResource("2_q3b56")]([SubResource("Resource_ikl7l"), SubResource("Resource_hmpdo"), SubResource("Resource_65g0b"), SubResource("Resource_nmsjp"), SubResource("Resource_libwa")])
+fills = Array[AudioStream]([ExtResource("17_knyyj"), ExtResource("18_4e8v3"), ExtResource("19_md4lg"), ExtResource("20_ccwyb"), ExtResource("21_3clkn"), ExtResource("22_hpsl2"), ExtResource("23_clf6b"), ExtResource("24_tso0d"), ExtResource("25_hva2u"), ExtResource("26_462tb")])
 
 [node name="Track1" type="AudioStreamPlayer" parent="." unique_id=1408430976]
 unique_name_in_owner = true
