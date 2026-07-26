@@ -101,7 +101,7 @@ func _verify_sculpt(sculpt: CutsceneTerrainSculpt) -> void:
 	# opening, then back down to rock. Scanning from the top of the grid finds
 	# the ledge from the tip too, which is exactly how the tip passed for a
 	# standable mark while dropping him into the shaft at runtime.
-	for keeper_x in [145, 153]:
+	for keeper_x in [145, 148]:
 		_expect(
 			_get_runtime_support(sculpt, keeper_x) == LEDGE_TOP_ROW,
 			"Keeper column %d does not seat on the ledge root at row 102."
@@ -136,8 +136,8 @@ func _verify_stage(stage: CharacterEncounterStage) -> void:
 	)
 	_expect(
 		stage.entrance_marker.position == Vector2(-552, -64)
-			and stage.conversation_marker.position == Vector2(-488, -64),
-		"The Keeper must approach 56px toward the miner on his ledge."
+			and stage.conversation_marker.position == Vector2(-528, -64),
+		"The Keeper must approach toward the miner along his ledge root."
 	)
 	# Both marks must sit on the ledge ROOT, columns 145 to 158, which is the
 	# only span the runtime can seat him on. Over the drawn tip the sampler
@@ -153,7 +153,7 @@ func _verify_stage(stage: CharacterEncounterStage) -> void:
 	for mark: Marker2D in [stage.entrance_marker, stage.conversation_marker]:
 		var mark_column := _get_marker_column(mark)
 		_expect(
-			mark_column >= 145 and mark_column <= 158,
+			mark_column >= 145 and mark_column <= 159,
 			"Keeper mark '%s' is on column %d, off the ledge root."
 			% [mark.name, mark_column]
 		)
@@ -181,7 +181,7 @@ func _verify_stage(stage: CharacterEncounterStage) -> void:
 	_expect(bench != null, "The Keeper's approved bench must remain composed.")
 	if bench != null:
 		_expect(
-			bench.position == Vector2(-600, -64),
+			bench.position == Vector2(-480, -64),
 			"The bench must keep its measured clearance and layer-one footing."
 		)
 		# The drawn ledge top runs columns 132 to 158. A prop is never floor
@@ -189,7 +189,7 @@ func _verify_stage(stage: CharacterEncounterStage) -> void:
 		# but off the end of it there is nothing to draw it standing on.
 		var bench_column := _get_marker_column(bench)
 		_expect(
-			bench_column >= 138 and bench_column <= 152,
+			bench_column >= 140 and bench_column <= 154,
 			"The bench is on column %d; its feet leave the drawn ledge top."
 			% bench_column
 		)

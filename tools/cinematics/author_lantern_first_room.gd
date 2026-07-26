@@ -32,9 +32,19 @@ const STAFF_LOCAL_X: int = 128
 const STAFF_PIT_HALF_WIDTH: int = 18
 const STAFF_PIT_RISE_ROWS: int = 10
 const LEDGE_TIP_X: int = 132
+## Where the overhang stops being a lip and becomes rock reaching the room
+## floor. This cannot move left: the staff shaft owns columns 108 to 144 at the
+## floor row, so a root any wider would have to fill the shaft, and a column
+## open at the floor row cannot seat anybody however solid its ledge top is.
 const LEDGE_ROOT_X: int = 145
 const LEDGE_TOP_ROW: int = 102
-const LEDGE_WALL_X: int = 160
+## Where the ledge's fractured face lands. Pushed out from 160 so the root's
+## top surface reaches the miner's arrival throat, which is what makes room for
+## the Keeper and his bench to stand side by side on it. The face wobbles up to
+## two cells past this, and the face scallops then bite a further 3.2, so 161 is
+## the furthest it can sit before that brush reaches the miner's first arrival
+## column at 168 and takes the room floor out from under it.
+const LEDGE_WALL_X: int = 161
 ## The Keeper's marks stand on the ledge ROOT, not on its tip.
 ##
 ## The runtime seats a cast member by scanning up from the miner's landing row
@@ -49,7 +59,7 @@ const LEDGE_WALL_X: int = 160
 ## encounter_horizontal_offset_cells. Reading a marker against the room without
 ## that offset shifts every mark 22 cells and walks the cast off this ledge.
 const KEEPER_ENTRANCE_X: int = 145
-const KEEPER_CONVERSATION_X: int = 153
+const KEEPER_CONVERSATION_X: int = 148
 ## A column out on the tip, used only to prove the overhang is still an
 ## overhang. It cannot be a Keeper column any more: those stand on the root,
 ## where rock reaching the floor row is exactly what holds them up.
@@ -349,9 +359,16 @@ func _build_keeper_ledge(sculpt: CutsceneTerrainSculpt) -> void:
 	# visible staircase this remake is replacing; a wandering vertical face
 	# gives the mask renderer a continuous fractured contour instead.
 	for local_y in range(LEDGE_TOP_ROW, floor_row):
-		var face_x := LEDGE_WALL_X + roundi(
-			sin(float(local_y) * 1.31) * 1.2
-			+ sin(float(local_y) * 0.47 + 0.8) * 0.8
+		# The wobble may only ADD rock past the wall line. Letting it cut inward
+		# leaves a hole partway down an outer column, and the runtime seats a
+		# cast member by scanning up from the floor to the first opening - so a
+		# single missing cell takes that whole column out of the standable root.
+		var face_x := maxi(
+			LEDGE_WALL_X + roundi(
+				sin(float(local_y) * 1.31) * 1.2
+				+ sin(float(local_y) * 0.47 + 0.8) * 0.8
+			),
+			LEDGE_WALL_X
 		)
 		for local_x in range(LEDGE_ROOT_X, face_x + 1):
 			sculpt.set_solid_local(Vector2i(local_x, local_y), true)
@@ -363,9 +380,13 @@ func _build_keeper_ledge(sculpt: CutsceneTerrainSculpt) -> void:
 	brush.carve(sculpt, Vector2(132.0, 106.0))
 	brush.carve(sculpt, Vector2(138.5, 107.0))
 	brush.carve(sculpt, Vector2(142.0, 107.0))
+	# The two face scallops ride the wall line rather than sitting at fixed
+	# columns. Authored against the old 160 face they now bite 3.2 cells into
+	# the middle of a wider ledge, and a hole anywhere between the ledge top and
+	# the floor row takes that whole column out of the standable root.
 	brush.radius_cells = 3.2
-	brush.carve(sculpt, Vector2(161.5, 104.0))
-	brush.carve(sculpt, Vector2(162.0, 108.0))
+	brush.carve(sculpt, Vector2(float(LEDGE_WALL_X) + 1.5, 104.0))
+	brush.carve(sculpt, Vector2(float(LEDGE_WALL_X) + 2.0, 108.0))
 
 
 func _verify_room(

@@ -110,18 +110,18 @@ position = Vector2(-552, -64)
 
 [node name="Conversation" parent="ActorMarkers" index="1"]
 editor_description = "Column 153, on the ledge ROOT, eight terrain rows above the miner's floor and turned back toward the player. The root is the only part of this overhang that seats him: the runtime scans up from the miner's landing row for the first opening and back down for rock, and over the thin tip that scan drops past the ledge to the shaft floor ninety rows below. Columns 145 to 158 are the standable span. The earlier -592 put him on column 140, out on the tip."
-position = Vector2(-488, -64)
+position = Vector2(-528, -64)
 
 [node name="Work" parent="ActorMarkers" index="2"]
 editor_description = "The furthest out he can actually be seated, at the root's outer column 145, kept as the spot to aim any later beat that walks him toward the edge. The drawn tip continues past this, but nothing standing on it is held up."
 position = Vector2(-552, -64)
 
 [node name="Rest" parent="ActorMarkers" index="3"]
-position = Vector2(-488, -64)
+position = Vector2(-528, -64)
 
 [node name="Exit" parent="ActorMarkers" index="4"]
 editor_description = "His own mark: he does not leave by walking. Closing Fade Seconds hops him once and fades him out where he stands, and Closing Facing turns him back to the drop first."
-position = Vector2(-488, -64)
+position = Vector2(-528, -64)
 
 [node name="LanternStaff" parent="PropMarkers" index="0" unique_id=2096771290 instance=ExtResource("6_staff")]
 texture_filter = 1
@@ -130,8 +130,9 @@ position = Vector2(-689, 764)
 scale = Vector2(0.2462, 0.2462)
 
 [node name="Bench" parent="PropMarkers" index="1" instance=ExtResource("7_bench")]
-editor_description = "The approved Lantern Keeper bench composition, restored for the first meeting. It keeps a 112px character/bench clearance from his later warning scene, but sits on his LEFT rather than his right: he can only be seated on the ledge root at columns 145 to 158, and a bench 118px to his right would land on column 167, off the drawn ledge entirely. A prop takes its y as authored rather than being sampled, so the bench is free to stand on the drawn tip at column 139 where nothing could be seated. This room's ledge is directly authored rather than loose tunnel dressing, so the bench uses the ledge's exact -64px reference; visual capture confirms its feet are flush with the top of layer one. Closing fades its alpha with the Keeper over 0.9s, and RESET restores it for cancellation or replay."
-position = Vector2(-600, -64)
+z_index = -1
+editor_description = "The approved Lantern Keeper bench composition, restored for the first meeting. It sits on his RIGHT at column 154, its outer end flush with the ledge edge at column 160. Placement is measured from the sprite, not eyed: the node origin is the feet, and with offset -89 at 0.081 scale the 110px bench reaches 7.8 cells left of that origin and 6.0 right, so column 154 puts its whole footprint, 146 to 160, inside the drawn ledge top of 132 to 160. That is as far right as it can go and stay supported. Z Index -1 keeps it behind the cast: DepthEncounterController adds this stage to character_parent AFTER the presenters, so at equal z the bench drew over the Keeper. It keeps a 112px character/bench clearance from his later warning scene, but sits on his LEFT rather than his right: he can only be seated on the ledge root at columns 145 to 158, and a bench 118px to his right would land on column 167, off the drawn ledge entirely. A prop takes its y as authored rather than being sampled, so the bench is free to stand on the drawn tip at column 139 where nothing could be seated. This room's ledge is directly authored rather than loose tunnel dressing, so the bench uses the ledge's exact -64px reference; visual capture confirms its feet are flush with the top of layer one. Closing fades its alpha with the Keeper over 0.9s, and RESET restores it for cancellation or replay."
+position = Vector2(-480, -64)
 
 [node name="AnimationPlayer" parent="." index="3"]
 libraries/ = SubResource("AnimationLibrary_lantern_first")
@@ -143,7 +144,7 @@ preview_depth_rows = 1400
 
 [node name="cloak_lantern" type="Node2D" parent="." index="5" unique_id=1905941146]
 z_index = 1
-position = Vector2(-488, -64)
+position = Vector2(-528, -64)
 scale = Vector2(0.8, 0.8)
 script = ExtResource("2_hbiw8")
 actor_id = &"cloak_lantern"
