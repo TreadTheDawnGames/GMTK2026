@@ -21,6 +21,8 @@ var has_reached_thief: bool = false
 
 var times_pressed : int = 0
 
+var already_had_rats : bool = false
+
 # Backward-compatible name for callers that still treat reaching the thief as
 # reaching the run bottom. Keep both names backed by the same state.
 var has_reached_bottom: bool:

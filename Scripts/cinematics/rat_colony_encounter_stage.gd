@@ -179,9 +179,10 @@ func play_closing() -> void:
 	# run off under their own power, and only then does the shot close.
 	await _await_stampede_drained()
 	_stop_procession()
-	if should_request_persistence:
+	if should_request_persistence and not GameState.already_had_rats:
 		_has_requested_persistent_colony = true
 		persistent_colony_requested.emit()
+		GameState.already_had_rats = true
 	await super.play_closing()
 
 

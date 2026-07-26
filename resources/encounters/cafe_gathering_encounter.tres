@@ -23,7 +23,6 @@ cinematic_focus_viewport_y_ratio = 0.72
 cinematic_bar_height_ratio = 0.08
 post_cinematic_recession_ratio = 0.06
 speaker_slot = &"cloak_lantern"
-locks_speaker_pose_after = null
 ends_rat_colony_support = true
 dresses_trodden_floor = true
 lights_floor_as_plane = true
