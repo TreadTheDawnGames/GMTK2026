@@ -13,7 +13,9 @@ sprite_scale = Vector2(0.44, 0.44)
 sprite_offset = Vector2(0, -68)
 
 [node name="RotiniFirstEncounterStage" unique_id=1625704577 instance=ExtResource("1_stage")]
-editor_description = "Story beat 4, depth 2,500: Rotini stops the miner on the cave path. The room is a level tunnel OPEN AT BOTH ENDS - no wall on either side - because the whole beat is traffic passing through it. The colony starts with the opening, so the mice are already streaming right to left when the frame opens and Rotini walks up out of them; he then tells the miner the path is taken and leaves with them to the LEFT. Inherits the rat colony stage rather than repeating it, with Procession Mines off: these mice are commuting, not digging. Spacing follows the house rule - his body measures 62.7px and the miner's 52.8px, so 110px root to root leaves one miner-width of daylight. The rutini_* resource names refer to Rotini until a coordinated rename is approved.
+editor_description = "Story beat 4, depth 2,500: Rotini stops the miner on the cave path. The room is a level tunnel OPEN AT BOTH ENDS - no wall on either side - because the whole beat is traffic passing through it.
+
+The shot is a STAMPEDE, and the order is the point. The tunnel is EMPTY when the frame opens. Rotini walks up out of nothing, says his piece, and only on \"Come on, boys!\" does the horde pour through, right to left, while the miner is knocked flat and stays down until the last of them has gone. Stampede Cue is what holds it back: with it set the colony does not start at the opening, it starts on the DialogueLine carrying the same name. Clear it and this reverts to the old shape, where the mice are already running when the frame opens and the line is answered by nothing. Inherits the rat colony stage rather than repeating it, with Procession Mines off: these mice are commuting, not digging. Spacing follows the house rule - his body measures 62.7px and the miner's 52.8px, so 110px root to root leaves one miner-width of daylight. The rutini_* resource names refer to Rotini until a coordinated rename is approved.
 
 Conversation Facing is -1 so he turns to the miner on his left after the walk, rather than inheriting whatever direction the approach happened to end on. It is declared here because the walk's direction is a side effect: move the entrance to the other side and an undeclared facing silently turns his back on the man he is talking to.
 
@@ -28,7 +30,8 @@ conversation_root_offset_from_miner_x = 110.0
 procession_mines = false
 spawn_interval_seconds = 0.3
 exit_seconds = 2.0
-floor_offset_y = 0.0
+floor_offset_y = 10.0
+stampede_cue = &"stampede"
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
 editor_description = "600px right of Conversation, which puts both Rotini and every mouse past the frame edge at any landing column: the frame is 1152 wide and centred on the miner, so anything closer than 480px would have them appear from nothing in open shot. The colony spawns here too."

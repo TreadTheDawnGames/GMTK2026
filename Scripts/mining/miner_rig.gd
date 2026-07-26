@@ -107,6 +107,16 @@ var _playing_full_swing: bool = false
 var _rest_position: Vector2
 var _visual_root_rest_y: float
 var _cinematic_override_active: bool = false
+## True while a shot is deliberately keeping him face down, so neither the
+## landing sprawl's own timer nor anything else stands him back up early.
+var _is_landing_held: bool = false
+## The drawn sprite's authored placement, captured before anything swaps a pose.
+var _base_drawn_sprite_position: Vector2
+var _base_drawn_sprite_scale: Vector2
+## Opaque-body measurements per pose texture. get_used_rect scans every pixel of
+## a half-megapixel canvas, and poses swap on every swing, so each is measured
+## once for the life of the run.
+var _pose_metrics_cache: Dictionary = {}
 var _cinematic_rest_position: Vector2
 var _cinematic_rest_visual_scale: Vector2
 var _cinematic_rest_z_as_relative: bool
@@ -132,6 +142,10 @@ func set_audio_handler(audio_handler: PlayerAudioHandler) -> void:
 func _ready() -> void:
 	_rest_position = position
 	_visual_root_rest_y = visual_root.position.y
+	# The authored placement of the drawn sprite, which every mining pose is
+	# measured against and which the cutscene poses are aligned back to.
+	_base_drawn_sprite_position = drawn_miner_sprite.position
+	_base_drawn_sprite_scale = drawn_miner_sprite.scale
 	# The rig owns its own draw order from here on, so the two authored values
 	# above are the only place it is decided.
 	z_index = get_rest_draw_order()
@@ -377,6 +391,32 @@ func show_cutscene_fall() -> void:
 	_set_miner_texture(falling_miner_texture)
 
 
+## Puts him face down and leaves him there until somebody picks him up.
+##
+## show_cutscene_landing() below gets him up again after its own authored sprawl,
+## which is right for arriving in a room: he hits the floor, gets up, the scene
+## carries on. This is the other case - he is on the ground because something is
+## happening around him, and how long that lasts is decided by the thing
+## happening rather than by a duration authored here. A rat stampede runs for as
+## long as the player takes to read the line that started it.
+func hold_cutscene_landing() -> void:
+	if landed_miner_texture == null:
+		return
+	_is_landing_held = true
+	animation_player.stop()
+	_set_miner_texture(landed_miner_texture)
+
+
+## Picks him up from a held landing. Safe to call when nothing is being held, so
+## a cancelled encounter can call it without knowing whether it ever floored him.
+func release_cutscene_landing() -> void:
+	if not _is_landing_held:
+		return
+	_is_landing_held = false
+	if not _cinematic_override_active:
+		_play_idle()
+
+
 ## Lands him on his face and picks him up again. Safe to call when no fall pose
 ## was ever shown; it simply returns him to idle.
 func show_cutscene_landing() -> void:
@@ -398,8 +438,10 @@ func show_cutscene_landing() -> void:
 	)
 	await sprawl_timer.timeout
 	# Only if nothing else has claimed his presentation in the meantime: a
-	# cancelled encounter restores its own pose and must not be overwritten.
-	if not _cinematic_override_active:
+	# cancelled encounter restores its own pose and must not be overwritten, and
+	# a shot that has since floored him deliberately must not be stood up by a
+	# timer that started before it.
+	if not _cinematic_override_active and not _is_landing_held:
 		_play_idle()
 
 
@@ -655,8 +697,100 @@ func _finish_cinematic_visual_restore() -> void:
 
 ## Swaps authored full-frame poses without changing gameplay coordinates.
 func _set_miner_texture(texture: Texture2D) -> void:
-	if texture != null and is_instance_valid(drawn_miner_sprite):
-		drawn_miner_sprite.texture = texture
+	if texture == null or not is_instance_valid(drawn_miner_sprite):
+		return
+	drawn_miner_sprite.texture = texture
+	_align_cutscene_pose(texture)
+
+
+## Puts a cutscene pose at the size and on the ground line the mining poses use.
+##
+## Every pose shares one sprite, one position and one scale, which is only right
+## while they all share a canvas and put the body in the same place inside it.
+## They do not. The landed pose is drawn 343 opaque pixels wide against the idle
+## pose's 243 - forty per cent larger - and its lowest opaque row sits about 39
+## units higher, so swapped as-is he lies oversized and floating clear of the
+## floor he is supposed to be lying on.
+##
+## Only the two cutscene poses are touched. The mining poses are left exactly as
+## authored, because their placement is what the swing animations key against and
+## nothing about ordinary digging is being fixed here.
+##
+## Derived from the images rather than authored as two magic numbers, because an
+## authored offset is right until somebody redraws the art and then silently
+## wrong. CharacterPresenter measures its own bodies the same way for the same
+## reason.
+func _align_cutscene_pose(texture: Texture2D) -> void:
+	var is_cutscene_pose := (
+		texture == falling_miner_texture
+		or texture == landed_miner_texture
+	)
+	if not is_cutscene_pose or idle_miner_texture == null:
+		drawn_miner_sprite.position = _base_drawn_sprite_position
+		drawn_miner_sprite.scale = _base_drawn_sprite_scale
+		return
+	var reference := _get_pose_metrics(idle_miner_texture)
+	var pose := _get_pose_metrics(texture)
+	if reference.is_empty() or pose.is_empty() or float(pose["width"]) <= 0.0:
+		return
+
+	# Match the drawing scale of the standing art, so the man lying down is the
+	# same man. Width is the measure because the two mining poses already agree
+	# on it exactly; height cannot be, since a sprawled figure is legitimately
+	# shorter than a standing one.
+	var scale_multiplier: float = (
+		float(reference["width"]) / float(pose["width"])
+	)
+	drawn_miner_sprite.scale = _base_drawn_sprite_scale * scale_multiplier
+	# Then drop it so this pose's lowest drawn row sits exactly where the idle
+	# pose's does. That row is his soles standing up and his side lying down, and
+	# it is the line the floor is under either way.
+	drawn_miner_sprite.position = Vector2(
+		_base_drawn_sprite_position.x,
+		_get_body_bottom_y(
+			reference,
+			_base_drawn_sprite_scale.y,
+			_base_drawn_sprite_position.y
+		)
+		- _get_body_bottom_y(
+			pose,
+			_base_drawn_sprite_scale.y * scale_multiplier,
+			0.0
+		)
+	)
+
+
+## Returns where a pose's lowest opaque row is drawn, for a sprite scale and a
+## node y. A centred Sprite2D draws its canvas centre on the node position, so
+## the canvas top is half the scaled canvas above it.
+func _get_body_bottom_y(
+	metrics: Dictionary,
+	scale_y: float,
+	node_y: float
+) -> float:
+	return (
+		node_y
+		- float(metrics["canvas_height"]) * scale_y * 0.5
+		+ float(metrics["bottom"]) * scale_y
+	)
+
+
+## Measures one pose's opaque body inside its canvas, once per texture.
+func _get_pose_metrics(texture: Texture2D) -> Dictionary:
+	var cache_key := texture.resource_path
+	if _pose_metrics_cache.has(cache_key):
+		return _pose_metrics_cache[cache_key]
+	var image := texture.get_image()
+	if image == null:
+		return {}
+	var opaque := image.get_used_rect()
+	var metrics := {
+		"width": float(opaque.size.x),
+		"bottom": float(opaque.end.y),
+		"canvas_height": float(image.get_height()),
+	}
+	_pose_metrics_cache[cache_key] = metrics
+	return metrics
 
 
 ## Returns finished actions to idle after any queued strike plays.
