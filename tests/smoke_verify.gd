@@ -83,9 +83,25 @@ func _run() -> void:
 	_expect(
 		terrain_shader_source.contains("impact_crush_timing")
 		and terrain_shader_source.contains(
-			"mask_sample = mix(vec4(1.0), mask_sample, crush_reveal)"
+			"previous_mask_sample = sample_streamed_terrain_mask(safe_uv)"
 		),
-		"Mining impacts must retain the sample-neutral crushed-mask transition."
+		"Mining impacts must reveal from the prior mask without a white frame."
+	)
+	# Same reasoning for the mining dust: headless cannot judge whether a cloud
+	# shimmers, so protect the three choices that stopped it. The noise domain is
+	# measured in world pixels recovered from the instance transform, so a lobe
+	# growing or stretching no longer re-scales its own field; the fine octaves
+	# fade out by screen footprint instead of aliasing; and the tone bands are
+	# softened by their own derivative instead of being hard-stepped.
+	var smoke_shader_source := FileAccess.get_file_as_string(
+		"res://Shaders/mining_smoke.gdshader"
+	)
+	_expect(
+		smoke_shader_source.contains("MODEL_MATRIX")
+		and smoke_shader_source.contains("quad_half_size")
+		and smoke_shader_source.contains("cell_span")
+		and smoke_shader_source.contains("fwidth"),
+		"Mining dust must keep its world-anchored, derivative-aware noise field."
 	)
 	await _verify_mining_scene()
 	_verify_finale_text_resolves()
@@ -1212,6 +1228,23 @@ func _verify_mining_scene() -> void:
 		terrain_manager.config.terrain_width_cells / 2,
 		terrain_manager.config.initial_surface_row
 	)
+	# Exercise the production successful-target path rather than the cold debug
+	# path: the timing window predicts this exact hit during wind-up, including
+	# its bounded GPU patch, before terrain changes at the contact frame.
+	terrain_renderer._on_dig_visuals_preparation_started(false)
+	terrain_renderer._on_dig_visuals_preparation_requested(
+		impact_cell,
+		1,
+		0,
+		impact_cell.x,
+		0
+	)
+	while (
+		terrain_renderer._pending_stamp_preparation_head
+		< terrain_renderer._pending_stamp_preparation.size()
+	):
+		terrain_renderer._prepare_next_pending_stamp_layer()
+	terrain_renderer._compact_pending_stamp_preparation()
 	var was_solid := terrain_manager.is_solid_cell(impact_cell)
 	var dig_result := terrain_manager.dig_tunnel(impact_cell, 1, 0)
 	_expect(was_solid, "Smoke-test impact cell must begin solid.")
@@ -1229,39 +1262,65 @@ func _verify_mining_scene() -> void:
 	var impact_chunk: TerrainLayerRenderer.TerrainChunkVisual = (
 		terrain_renderer._active_chunks.get(impact_chunk_index)
 	)
-	var impact_crush_is_active := false
+	# The transition must not start at input time. Web preparation may need more
+	# than one frame, so the production scheduler starts it only when the exact
+	# prepared patch becomes visible and the complete 90 ms reveal can play.
+	var impact_crush_is_active := (
+		terrain_renderer._active_impact_crush_count > 0
+	)
+	_expect(
+		not impact_crush_is_active,
+		"A terrain crush must wait until its prepared patch is visible."
+	)
+	for _presentation_frame in range(16):
+		terrain_renderer._process(1.0 / 60.0)
+		if terrain_renderer._active_impact_crush_count > 0:
+			break
+	impact_crush_is_active = false
 	if impact_chunk != null:
 		for layer_index in range(impact_chunk.layer_sprites.size()):
 			var material := (
 				impact_chunk.layer_sprites[layer_index].material
 				as ShaderMaterial
 			)
-			var crush_timing: Vector2 = material.get_shader_parameter(
+			var crush_timing: Variant = material.get_shader_parameter(
 				&"impact_crush_timing"
 			)
-			if crush_timing.y > 0.0:
+			if crush_timing is Vector2 and crush_timing.y > 0.0:
 				impact_crush_is_active = true
 				break
 	_expect(
 		impact_crush_is_active
 		and terrain_renderer._active_impact_crush_count > 0,
-		"A production dig must start one bounded terrain crush transition."
+		"A visible prepared patch must start one bounded crush transition."
 	)
+	# Fold every prepared patch into its base tile first. Active overlays must
+	# survive this upload work until their own reveal deadline, otherwise the
+	# animation would still collapse to a visible final-frame snap.
+	for _fold_frame in range(32):
+		terrain_renderer._process(1.0 / 60.0)
+		if (
+			terrain_renderer._pending_impact_work_head
+			>= terrain_renderer._pending_impact_work.size()
+		):
+			break
 	# Expire the fixed deadlines directly instead of sleeping for the authored
 	# 90 ms. This keeps the branch gate deterministic and proves cleanup cannot
 	# leave a shader transition active without making the suite wait in real time.
-	if impact_chunk != null:
+	for active_chunk: TerrainLayerRenderer.TerrainChunkVisual in (
+		terrain_renderer._active_chunks.values()
+	):
 		for layer_index in range(
-			impact_chunk.impact_crush_deadlines_usec.size()
+			active_chunk.impact_crush_deadlines_usec.size()
 		):
 			if (
-				impact_chunk.impact_crush_deadlines_usec[layer_index]
+				active_chunk.impact_crush_deadlines_usec[layer_index]
 				> 0
 			):
-				impact_chunk.impact_crush_deadlines_usec[layer_index] = (
+				active_chunk.impact_crush_deadlines_usec[layer_index] = (
 					Time.get_ticks_usec() - 1
 				)
-	terrain_renderer._process(0.0)
+	terrain_renderer._retire_completed_impact_crushes()
 	var impact_crush_retired := (
 		terrain_renderer._active_impact_crush_count == 0
 	)
@@ -1332,8 +1391,83 @@ func _verify_mining_scene() -> void:
 		terrain_manager,
 		terrain_renderer
 	)
+	_verify_impact_smoke(
+		game_root.get_node_or_null(
+			"MiningScene/MiningImpactSmoke"
+		) as MiningImpactSmoke
+	)
 	game_root.queue_free()
 	await process_frame
+
+
+## Guards the two dust contracts a still frame cannot show.
+##
+## Mining at the lobe cap used to reset the puff receiving each strike to a full
+## lifetime, which snapped a half-faded puff back to full opacity: continuous
+## digging read as the dust flickering brighter rather than thickening. A strike
+## may now only top a puff up by a bounded share of its life.
+##
+## The shader also flattens a puff against rock it is touching, and it decides
+## that from the confinement the open-space scan measures, so that value has to
+## stay inside the 0..1 range custom data can carry.
+func _verify_impact_smoke(smoke: MiningImpactSmoke) -> void:
+	_expect(smoke != null, "MiningImpactSmoke must exist in the mining scene.")
+	if smoke == null:
+		return
+	var impact_position := Vector2(
+		smoke.terrain_manager.config.terrain_screen_center_x,
+		smoke.terrain_manager.config.mining_face_screen_y
+	)
+	# Dust must be leaving the rock the moment it appears. Buoyancy alone takes
+	# about half a second to overcome a fresh puff's own growth, and for that
+	# half second the drawn shape spread downward off the strike; the detailed
+	# frame-by-frame check is local_tests/trace_smoke_rise.gd.
+	smoke.play_at_impact(impact_position, 40, 0.5, 1.0, 1)
+	_expect(
+		smoke._cloud != null
+		and not smoke._cloud.lobes.is_empty()
+		and smoke._cloud.lobes[0].velocity.y <= -smoke.initial_rise_speed * 0.9,
+		"A puff must be born already rising, not waiting for buoyancy."
+	)
+
+	var lobe_budget := smoke.maximum_lobes
+	if OS.has_feature("web"):
+		lobe_budget = mini(lobe_budget, smoke.web_maximum_lobes)
+	for _fill_index in range(lobe_budget + 2):
+		smoke.play_at_impact(impact_position, 40, 0.5, 1.0, 1)
+	_expect(
+		smoke._cloud != null and smoke._cloud.lobes.size() == lobe_budget,
+		"Repeated strikes must fill to the lobe cap and stop there."
+	)
+	if smoke._cloud == null or smoke._cloud.lobes.is_empty():
+		return
+
+	# Take a puff most of the way through its life, then strike it again.
+	var fading_lobe: MiningImpactSmoke.SmokeLobe = smoke._cloud.lobes[0]
+	for lobe in smoke._cloud.lobes:
+		lobe.remaining_lifetime = lobe.total_lifetime * 0.1
+	var life_before := fading_lobe.remaining_lifetime
+	smoke.play_at_impact(impact_position, 40, 0.5, 1.0, 1)
+	var largest_life_ratio := 0.0
+	var confinement_stays_normalised := true
+	for lobe in smoke._cloud.lobes:
+		largest_life_ratio = maxf(
+			largest_life_ratio,
+			lobe.remaining_lifetime / maxf(lobe.total_lifetime, 0.001)
+		)
+		if lobe.wall_confinement < 0.0 or lobe.wall_confinement > 1.0:
+			confinement_stays_normalised = false
+	_expect(
+		largest_life_ratio <= 0.1 + smoke.lobe_refresh_share + 0.001,
+		(
+			"A strike at the lobe cap must top a fading puff up by at most "
+			+ "lobe_refresh_share, not reset it (life went to %.2f from %.2f)."
+		) % [largest_life_ratio, life_before / fading_lobe.total_lifetime]
+	)
+	_expect(
+		confinement_stays_normalised,
+		"Measured wall confinement must stay inside the 0..1 custom data range."
+	)
 
 
 ## Proves the finale's lines still finish themselves.

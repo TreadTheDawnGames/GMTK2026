@@ -23,5 +23,6 @@ cinematic_focus_viewport_y_ratio = 0.72
 cinematic_bar_height_ratio = 0.08
 post_cinematic_recession_ratio = 0.06
 dresses_trodden_floor = true
+lights_floor_as_plane = true
 speaker_slot = &"cloak_lantern"
 terrain_sculpt = ExtResource("6_57dlj")

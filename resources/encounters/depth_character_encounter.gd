@@ -82,6 +82,19 @@ extends Resource
 ## the renderer and any encounter can opt in - so turning this on is the whole
 ## cost of using it.
 @export var dresses_trodden_floor: bool = false
+## Lights this room's floor as a horizontal plane while the shot is running.
+##
+## Off by default, so every existing encounter draws exactly as before. On, and
+## DepthEncounterController asks TerrainLayerRenderer for the shared ground stack
+## at this encounter's own floor line - the lit top face, its far edge, the cut
+## face below it, and the bounce band on rock standing on it - and clears it when
+## the shot releases.
+##
+## This is the 2.5D read the world surface gets for free and every room below it
+## went without: a side-on shot has no horizontal surfaces, so undressed floor
+## reads as a wall the cast stand in front of. It is separate from
+## `dresses_trodden_floor` because form and dressing are separate choices.
+@export var lights_floor_as_plane: bool = false
 ## Replaces this encounter's procedural chamber with an authored sculpted room.
 ## Leave it null and terrain generation is unchanged.
 @export var terrain_sculpt: CutsceneTerrainSculpt

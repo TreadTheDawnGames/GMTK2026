@@ -17,6 +17,14 @@ actor = &"cloak_lantern"
 facing = -1
 notes = "Looking left, at the miner, who is one measured miner-width to his left. Facing is a world direction; the presenter folds art_faces_left in, so -1 is looking left whichever way the art was drawn."
 
+[sub_resource type="Resource" id="Beat_camera_frame"]
+script = ExtResource("1_beat")
+kind = 11
+duration_seconds = 0.5
+camera_offset = Vector2(80.2, -8)
+camera_zoom = Vector2(1.4, 1.4)
+notes = "Pushes from the fall-discovery frame into the two-shot before the Keeper speaks. The 80.2px offset is half the measured 160.4px cast separation, so the shared camera centers their conversation rather than favoring either actor. The 1.40 zoom follows the current Encounter 9-style conversational framing contract."
+
 [sub_resource type="Resource" id="Beat_dialogue"]
 script = ExtResource("1_beat")
 kind = 5
@@ -37,9 +45,17 @@ start_seconds = 6.6
 duration_seconds = 0.9
 notes = "A held beat on the two of them after the last line, before the timeline ends and play_closing takes him. Without it the shot cuts straight from the dialogue box closing to him fading, and the line does not get to land.
 
-This is the last beat. The timeline deliberately does not walk him off or hide him: play_closing owns the departure, and that is what fades him and the bench out together over the same 1.2s."
+The timeline deliberately does not walk him off or hide him: play_closing owns the departure, and that is what fades him and the bench out together over the same 0.75s."
+
+[sub_resource type="Resource" id="Beat_camera_reset"]
+script = ExtResource("1_beat")
+kind = 11
+start_seconds = 7.15
+duration_seconds = 0.35
+camera_action = 2
+notes = "Eases back to gameplay framing during the final held beat. The reset completes before the quicker joint Keeper-and-bench fade begins, so mining resumes without inheriting a cutscene zoom."
 
 [resource]
 script = ExtResource("3_sequence")
 sequence_id = &"cloak_lantern_warning_sequence"
-beats = Array[ExtResource("1_beat")]([SubResource("Beat_show"), SubResource("Beat_face"), SubResource("Beat_dialogue"), SubResource("Beat_wait")])
+beats = Array[ExtResource("1_beat")]([SubResource("Beat_show"), SubResource("Beat_face"), SubResource("Beat_camera_frame"), SubResource("Beat_dialogue"), SubResource("Beat_wait"), SubResource("Beat_camera_reset")])

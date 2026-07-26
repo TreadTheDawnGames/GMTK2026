@@ -263,6 +263,7 @@ func _on_run_reset() -> void:
 	_is_final_breakthrough_resolving = false
 	_pending_release_recession_ratio = 0.0
 	terrain_renderer.set_trodden_floor(false)
+	terrain_renderer.set_cutscene_floor_plane(false)
 	_latest_landing_world_y = (
 		mining_config.initial_surface_row
 		if mining_config != null
@@ -282,6 +283,7 @@ func _schedule_next_encounter() -> bool:
 	# Publish it before the fall pose so the first frame entering this chamber
 	# already has its complete 2.5D surface and layer-occlusion contract.
 	_apply_trodden_floor(encounter)
+	_apply_cutscene_floor_plane(encounter)
 	if encounter.prestage_before_landing:
 		var stage := _stages[_pending_encounter_index]
 		var presenter := _presenters[_pending_encounter_index]
@@ -363,6 +365,8 @@ func _activate_pending_encounter() -> void:
 	# He has hit the room's floor. Sprawl, then get up, while the frame opens
 	# around him.
 	miner_rig.show_cutscene_landing()
+	_apply_trodden_floor(encounter)
+	_apply_cutscene_floor_plane(encounter)
 	cinematic_flow.focus(
 		FLOW_OWNER,
 		encounter.cinematic_focus_viewport_y_ratio
@@ -694,11 +698,33 @@ func _apply_trodden_floor(encounter: DepthCharacterEncounter) -> void:
 	if not encounter.dresses_trodden_floor:
 		terrain_renderer.set_trodden_floor(false)
 		return
-	var floor_world_y := float(
+	var floor_world_y := _resolve_encounter_floor_world_y(encounter)
+	terrain_renderer.set_trodden_floor(true, floor_world_y)
+
+
+## Lights the room's floor as a plane for the length of the shot.
+##
+## Same line as the trodden floor and the same release path, but its own opt-in:
+## form and dressing are separate choices, and a room that wants depth should not
+## have to accept walked-on ground to get it.
+func _apply_cutscene_floor_plane(encounter: DepthCharacterEncounter) -> void:
+	if not encounter.lights_floor_as_plane:
+		terrain_renderer.set_cutscene_floor_plane(false)
+		return
+	terrain_renderer.set_cutscene_floor_plane(
+		true,
+		_resolve_encounter_floor_world_y(encounter)
+	)
+
+
+## The world y of the row this encounter's cast stand on.
+func _resolve_encounter_floor_world_y(
+	encounter: DepthCharacterEncounter
+) -> float:
+	return float(
 		mining_config.initial_surface_row
 		+ encounter.resolve_depth(mining_config.total_run_depth)
 	) * float(mining_config.terrain_cell_world_size)
-	terrain_renderer.set_trodden_floor(true, floor_world_y)
 
 
 ## Reports whether this conversation is the cast's shared cafe stop.
@@ -1197,6 +1223,7 @@ func has_pending_or_active_interaction() -> bool:
 ## Releases only this encounter's named ownership of mining and camera state.
 func _finish_cinematic_flow() -> void:
 	_reset_speech_reactions()
+	terrain_renderer.set_cutscene_floor_plane(false)
 	# Nobody is left face down when the shot releases him, whatever ended it. A
 	# stampede that was cancelled mid-run never reaches its own finished signal,
 	# and the miner would go back to mining lying on his face.
