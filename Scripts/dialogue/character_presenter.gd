@@ -27,6 +27,19 @@ var _base_flip_h: bool = false
 ## body to the other side of the node by this much, so twice it is the correction
 ## that puts it back. Zero for art drawn centred in its canvas.
 var _body_offset_from_node_x: float = 0.0
+## The pose this character returns to between spoken lines.
+##
+## Every presented dialogue line resets every presenter's speech motion, and that
+## reset used to hard-code "idle" as the pose to come back to. That is right for a
+## pose a line puts on for the length of that line - Quibble raising his cup to
+## speak - and wrong for one the shot is built on: the Treasure Hunter arrives at
+## the cafe holding nothing, because he gave both pickaxes away, and his authored
+## no_pickaxe pose was being wiped by the first line anybody spoke. He then said "I
+## was tired of carrying things" while holding a pickaxe.
+##
+## Defaults to idle, so a presenter nobody has asked to hold anything behaves
+## exactly as before.
+var _resting_pose: StringName = &"idle"
 
 ## Opaque-body measurements, keyed by texture path. get_used_rect() scans every
 ## pixel of a 2224x1668 sheet, and apply_appearance runs for all eleven encounters
@@ -78,9 +91,14 @@ func apply_appearance(appearance: CharacterAppearance) -> void:
 	_base_sprite_position = character_sprite.position
 	_body_offset_from_node_x = _measure_body_offset(appearance)
 	speech_reaction.capture_rest_position()
+	# A new appearance is a new character as far as this node is concerned, so
+	# anything the last encounter asked it to hold goes with the old art. Without
+	# this a presenter reused across visits would carry a held pose forward into a
+	# shot that never asked for one.
+	_resting_pose = &"idle"
 	if actor_sprite_view != null:
 		actor_sprite_view.pose_set = appearance.pose_set
-		actor_sprite_view.play_pose(&"idle")
+		actor_sprite_view.play_pose(_resting_pose)
 
 
 ## Resets bounce timing before a new character conversation begins.
@@ -91,7 +109,7 @@ func reset_speech_motion() -> void:
 	# unturned correction, so the turn has to be re-applied on top of it.
 	_apply_facing_offset(character_sprite.flip_h)
 	if actor_sprite_view != null:
-		actor_sprite_view.play_pose(&"idle")
+		actor_sprite_view.play_pose(_resting_pose)
 
 
 ## Bounces until another speaker or the conversation takes over.
@@ -108,11 +126,20 @@ func has_pose(pose_name: StringName) -> bool:
 
 
 ## Displays an optional dialogue pose without changing speech motion.
-func play_pose(pose_name: StringName) -> bool:
-	return (
-		actor_sprite_view != null
-		and actor_sprite_view.play_pose(pose_name)
-	)
+##
+## `hold` decides whether the pose survives the next spoken line. Off, which is
+## every existing caller, it is worn until the next line resets speech motion and
+## the character drops back to idle - which is what a per-line Speaker Pose wants.
+## On, it becomes the pose this character rests in for the remainder of the shot,
+## for a pose the staging depends on rather than one a sentence puts on.
+func play_pose(pose_name: StringName, hold: bool = false) -> bool:
+	if actor_sprite_view == null:
+		return false
+	if not actor_sprite_view.play_pose(pose_name):
+		return false
+	if hold:
+		_resting_pose = pose_name
+	return true
 
 
 ## Faces the visible character along its current travel direction, mirroring

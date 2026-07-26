@@ -321,7 +321,7 @@ func _start_move(
 func _start_pose(beat: CutsceneBeat, beat_index: int, generation: int) -> void:
 	var actor := _resolve_actor(beat.actor)
 	if actor is CharacterPresenter:
-		(actor as CharacterPresenter).play_pose(beat.pose)
+		(actor as CharacterPresenter).play_pose(beat.pose, beat.holds_pose)
 	_schedule_delay(beat_index, beat.duration_seconds, generation)
 
 

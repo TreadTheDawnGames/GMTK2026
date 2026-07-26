@@ -1,63 +1,123 @@
 [gd_resource type="Resource" script_class="CutsceneSequence" format=3 uid="uid://bls5tpjbahtrq"]
 
-[ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="1_nh4gs"]
-[ext_resource type="Resource" uid="uid://btlq5nsfh84a6" path="res://resources/dialogue/cafe_gathering_conversation.tres" id="2_puacd"]
-[ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="3_7coql"]
+[ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="1_beat"]
+[ext_resource type="Resource" uid="uid://btlq5nsfh84a6" path="res://resources/dialogue/cafe_gathering_conversation.tres" id="2_conversation"]
+[ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="3_sequence"]
 
-[sub_resource type="Resource" id="Resource_sys8h"]
-script = ExtResource("1_nh4gs")
+[sub_resource type="Resource" id="Beat_show_treasure_hunter"]
+script = ExtResource("1_beat")
+kind = 9
+actor = &"treasure_hunter"
+notes = "Nobody walks into this shot. The gathering is already standing when the ceiling comes in - canonical story says they HAVE gathered - so the timeline opens by stating the room rather than by assembling it.
+
+DepthEncounterController has already placed and shown all four of them on their own marks under ActorMarkers by the time this runs. These SHOW beats state it anyway, so the timeline is the whole account of the shot and does not depend on the schedule having done half of it first. That is the same reason encounter 5 opens on a SHOW for a man who is already visible.
+
+Cheese Girl gets no beat at all. She is painted into the storefront, the stage names her in Actors Drawn Into Set, and the controller leaves her presenter hidden - a SHOW here would put a second one of her on the floor in front of her own shop."
+
+[sub_resource type="Resource" id="Beat_pose_treasure_hunter"]
+script = ExtResource("1_beat")
+kind = 1
+actor = &"treasure_hunter"
+pose = &"no_pickaxe"
+holds_pose = true
+notes = "He is holding nothing. This is the only visual in the shot that says his story finished: he gave the first pickaxe away at 4,000 and the second at 7,400, and his own art already carries the pose for it.
+
+Set before the first line rather than on his own line, because the point is that the player sees it the moment the frame opens. 'No treasure here. Good. I was tired of carrying things.' is then the joke rather than the reveal.
+
+HOLDS POSE IS ON AND HAS TO BE. Every presented line calls _reset_speech_reactions, which drops every presenter back to its resting pose, and that resting pose used to be a hard-coded idle - so without this the pickaxe reappeared on line one and he delivered the line about being tired of carrying things while carrying it."
+
+[sub_resource type="Resource" id="Beat_face_treasure_hunter"]
+script = ExtResource("1_beat")
+kind = 2
+actor = &"treasure_hunter"
+facing = 1
+notes = "Looking right, at the miner, who is 237px to his right. Facing is a world direction; CharacterPresenter folds art_faces_left in, so 1 is looking right whichever way the art was drawn."
+
+[sub_resource type="Resource" id="Beat_show_rutini"]
+script = ExtResource("1_beat")
+kind = 9
+actor = &"rutini"
+
+[sub_resource type="Resource" id="Beat_face_rutini"]
+script = ExtResource("1_beat")
+kind = 2
+actor = &"rutini"
+facing = 1
+notes = "Looking right - past the miner, down the room. He is the only one here who has just arrived, and the shop is behind him: turning him toward the miner instead would aim the one moving character back at the wall."
+
+[sub_resource type="Resource" id="Beat_show_coffee_cat"]
+script = ExtResource("1_beat")
+kind = 9
+actor = &"coffee_cat"
+
+[sub_resource type="Resource" id="Beat_pose_coffee_cat"]
+script = ExtResource("1_beat")
+kind = 1
+actor = &"coffee_cat"
+pose = &"hold_cup"
+holds_pose = true
+notes = "He arrives already holding one. His own line in the conversation carries the same pose in its Speaker Pose field, so this is what he is doing before he says anything rather than something he starts doing in order to say it."
+
+[sub_resource type="Resource" id="Beat_face_coffee_cat"]
+script = ExtResource("1_beat")
+kind = 2
+actor = &"coffee_cat"
+facing = -1
+notes = "Looking left, at the miner, who is 110px to his left."
+
+[sub_resource type="Resource" id="Beat_show_cloak_lantern"]
+script = ExtResource("1_beat")
 kind = 9
 actor = &"cloak_lantern"
 
-[sub_resource type="Resource" id="Resource_f8n7n"]
-script = ExtResource("1_nh4gs")
-kind = 0
-actor = &"cloak_lantern"
-duration_seconds = 2.0
-target_marker = &"Conversation"
-starts_from_authored_point = true
-start_marker = &"Entrance"
-pose = &"walk"
-
-[sub_resource type="Resource" id="Resource_qeygh"]
-script = ExtResource("1_nh4gs")
+[sub_resource type="Resource" id="Beat_face_cloak_lantern"]
+script = ExtResource("1_beat")
 kind = 2
 actor = &"cloak_lantern"
-start_seconds = 2.0
 facing = -1
+notes = "Looking left, back down the room at all of them. He stands 244px right of the miner, furthest from the shop and nearest the open end the tunnel carries on into, which is the staging his other two appearances established: he is at the edge of the thing rather than in it."
 
-[sub_resource type="Resource" id="Resource_7pqn3"]
-script = ExtResource("1_nh4gs")
-kind = 1
-actor = &"cloak_lantern"
-start_seconds = 2.0
-pose = &"idle"
+[sub_resource type="Resource" id="Beat_open_silence"]
+script = ExtResource("1_beat")
+kind = 4
+duration_seconds = 0.9
+notes = "Held silence on the whole room before anybody speaks. The miner has just come through the ceiling into the one place the entire run has been walking toward, and the shot needs a moment for the player to read the sign over his head before a dialogue box covers the bottom of the frame.
 
-[sub_resource type="Resource" id="Resource_lef3u"]
-script = ExtResource("1_nh4gs")
+Longer than encounter 5's 0.6 on purpose. That shot had two people in it; this one has a building, four characters and a colony of rats, and it is worth the extra third of a second."
+
+[sub_resource type="Resource" id="Beat_rutini_arrives"]
+script = ExtResource("1_beat")
 kind = 3
-actor = &"cloak_lantern"
-start_seconds = 2.0
-duration_seconds = 0.5
+actor = &"rutini"
+start_seconds = 0.55
+duration_seconds = 0.35
+bounce_count = 2
+notes = "Two bounces just before his first line, so 'Easy, lads. We're here.' reads as him calling the colony to a stop rather than as a reaction to his own dialogue box. He is the only one in the shot who is arriving - everybody else has been waiting - and this is the beat that says so.
 
-[sub_resource type="Resource" id="Resource_xoc8n"]
-script = ExtResource("1_nh4gs")
+Two rather than one because one bounce reads as a nod and two reads as somebody shouting over a crowd."
+
+[sub_resource type="Resource" id="Beat_dialogue"]
+script = ExtResource("1_beat")
 kind = 5
-start_seconds = 2.5
-duration_seconds = 6.0
-conversation = ExtResource("2_puacd")
-notes = "The cast is already here; only the lantern-staff man walks in. Nobody hides at the end, because the gathering stays."
+start_seconds = 0.9
+duration_seconds = 12.0
+conversation = ExtResource("2_conversation")
+notes = "The whole conversation, all eight lines, held for exactly as long as the player takes to read it. The twelve seconds are the authored estimate the editor scrubs against, not the real length: this beat blocks, so the clock stops here and every beat after it slides by the same amount.
 
-[sub_resource type="Resource" id="Resource_bgk7t"]
-script = ExtResource("1_nh4gs")
-kind = 0
-actor = &"cloak_lantern"
-start_seconds = 8.5
-duration_seconds = 2.4
-target_marker = &"Exit"
-pose = &"walk"
+THE READING ORDER IS THE CAMERA MOVE. Zephan's IMG_1647 plans this beat as a pan across the gathering that ends on the Lantern Keeper. The encounter camera cannot pan - it centres on the miner's landing column and holds - so the cast are laid out left to right in the order they speak and the conversation walks the eye across the room instead: Rotini beside the miner, Cheese Girl at the shop window on the far left, the Treasure Hunter, the miner's silence, the Treasure Hunter again, Quibble on the right, and the Keeper at the far right end. Reorder these lines and the shot stops being a pan.
+
+Every reaction inside this beat is already free. DepthEncounterController bounces whichever gathered actor owns the presented line and applies that line's Speaker Pose, so Quibble raises his cup on his own line without a beat here asking him to. Do not try to split this into per-line beats to land a cue between two of them: line_range is authored and validated, and then the schedule ignores it, so any DIALOGUE beat plays the whole conversation."
+
+[sub_resource type="Resource" id="Beat_closing_hold"]
+script = ExtResource("1_beat")
+kind = 4
+start_seconds = 12.9
+duration_seconds = 1.1
+notes = "A held beat on the gathering after the Keeper's last line, before the timeline ends and play_closing takes him. Without it the shot cuts straight from the dialogue box closing to him fading, and 'Stay a while. Not every minute needs somewhere to go.' does not get the moment it is asking for.
+
+This is the last beat, deliberately. play_closing owns the departure: Closing Fade Seconds hops him once and fades him out where he stands over 1.2s, which is Zephan's 'and then he goes shoom'. A timeline that also walked him off would be fighting the thing that is about to do it properly. Nobody else fades, because the gathering stays - a player who scrolls back up to 14,000 later should still find them there."
 
 [resource]
-script = ExtResource("3_7coql")
+script = ExtResource("3_sequence")
 sequence_id = &"cafe_gathering_sequence"
-beats = Array[ExtResource("1_nh4gs")]([SubResource("Resource_sys8h"), SubResource("Resource_f8n7n"), SubResource("Resource_qeygh"), SubResource("Resource_7pqn3"), SubResource("Resource_lef3u"), SubResource("Resource_xoc8n"), SubResource("Resource_bgk7t")])
+beats = Array[ExtResource("1_beat")]([SubResource("Beat_show_treasure_hunter"), SubResource("Beat_pose_treasure_hunter"), SubResource("Beat_face_treasure_hunter"), SubResource("Beat_show_rutini"), SubResource("Beat_face_rutini"), SubResource("Beat_show_coffee_cat"), SubResource("Beat_pose_coffee_cat"), SubResource("Beat_face_coffee_cat"), SubResource("Beat_show_cloak_lantern"), SubResource("Beat_face_cloak_lantern"), SubResource("Beat_open_silence"), SubResource("Beat_rutini_arrives"), SubResource("Beat_dialogue"), SubResource("Beat_closing_hold")])
