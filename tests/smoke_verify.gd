@@ -677,6 +677,12 @@ func _verify_mining_scene() -> void:
 					== dialogue_director.art_body_font_size
 				)
 				and (
+					dialogue_director.dialogue_margin.get_theme_constant(
+						"margin_top"
+					)
+					== 34
+				)
+				and (
 					dialogue_director.textbox_art.texture
 					== expected_textures[speaker_slot]
 				),
