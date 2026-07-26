@@ -12,6 +12,7 @@ extends SceneTree
 ##   restart, which is the whole reason it is not kept in savegame.tres.
 ## - Checks the encounter wiring the shot depends on: the authored timeline,
 ##   external room, 30%-larger figures, and typed two-axis camera animation.
+## - Rejects the removed terminal overlays so finishing can only return to mining.
 ## - Exits nonzero on any failure so this can gate a merge.
 
 const ENCRYPTED_DIALOGUE: EncryptedDialogueConversation = preload(
@@ -207,6 +208,22 @@ func _verify_tokens_resolve(
 
 ## Checks the wiring the shot cannot play without.
 func _verify_encounter_wiring() -> void:
+	var mining_scene_source := FileAccess.get_file_as_string(
+		"res://Scenes/mining/mining_proof.tscn"
+	)
+	_expect(
+		not mining_scene_source.contains("FinalEncounter"),
+		"The mining scene must not instantiate a terminal finale overlay."
+	)
+	_expect(
+		not ResourceLoader.exists(
+			"res://Scenes/dialogue/final_encounter.tscn"
+		)
+			and not ResourceLoader.exists(
+				"res://Scenes/dialogue/departure_choice.tscn"
+			),
+		"Return-to-title finale scenes must stay removed."
+	)
 	_expect(
 		FINALE_ENCOUNTER.occurs_at_run_bottom,
 		"The finale must stay pinned to the configured run bottom."

@@ -481,7 +481,7 @@ func _on_dialogue_line_presented(
 		presenter.react_to_presented_line()
 
 
-## Opens dialogue or stops at the unwritten thief endpoint.
+## Opens the authored dialogue or releases a malformed encounter safely.
 func _begin_active_encounter() -> void:
 	var encounter := encounter_config.encounters[_active_encounter_index]
 	var presenter := _presenters[_active_encounter_index]
@@ -585,8 +585,11 @@ func _begin_active_encounter() -> void:
 			encounter.encrypted_conversation.decrypt_conversation()
 		)
 	if encounter.occurs_at_run_bottom and _active_conversation == null:
-		dialogue_director.open_cinematic_frame()
-		final_encounter_reached.emit(encounter.encounter_id)
+		push_error(
+			"Final encounter '%s' has no authored dialogue."
+			% encounter.encounter_id
+		)
+		_fail_active_encounter()
 		return
 	if (
 		_active_conversation != null
@@ -602,8 +605,7 @@ func _begin_active_encounter() -> void:
 		"Encounter '%s' could not start dialogue." % encounter.encounter_id
 	)
 	if encounter.occurs_at_run_bottom:
-		dialogue_director.open_cinematic_frame()
-		final_encounter_reached.emit(encounter.encounter_id)
+		_fail_active_encounter()
 		return
 	_fail_active_encounter()
 
@@ -823,10 +825,12 @@ func _complete_encounter_after_dialogue(
 		return
 	if encounter.occurs_at_run_bottom:
 		final_encounter_reached.emit(encounter.encounter_id)
-		return
-	if _active_stage != null:
+		_is_final_breakthrough_armed = false
+	var had_active_stage := _active_stage != null
+	if had_active_stage:
 		await _active_stage.play_closing()
 		_active_stage = null
+	if encounter.occurs_at_run_bottom or had_active_stage:
 		dialogue_director.close_cinematic_frame()
 		await dialogue_director.wait_until_frame_closed()
 
@@ -1131,6 +1135,8 @@ func _on_final_breakthrough_mined(
 func _complete_final_breakthrough() -> void:
 	_reset_speech_reactions()
 	dialogue_director.close_cinematic_frame()
+	var encounter := encounter_config.encounters[_active_encounter_index]
+	final_encounter_reached.emit(encounter.encounter_id)
 	_next_encounter_index = _active_encounter_index + 1
 	_active_encounter_index = -1
 	_active_stage = null
@@ -1238,6 +1244,8 @@ func _fail_active_encounter() -> void:
 	await dialogue_director.wait_until_frame_closed()
 	_reset_speech_reactions()
 	_active_conversation = null
+	_is_final_breakthrough_armed = false
+	_is_final_breakthrough_resolving = false
 	if _active_encounter_index >= 0:
 		_next_encounter_index = _active_encounter_index + 1
 	_active_encounter_index = -1

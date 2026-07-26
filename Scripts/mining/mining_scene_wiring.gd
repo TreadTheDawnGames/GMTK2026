@@ -57,7 +57,6 @@ const MINER_FLOOR_LAYER_INDEX: int = 0
 @export var depth_review_control: DepthReviewControl
 @export var encounter_controller: DepthEncounterController
 @export var dialogue_director: DialogueDirector
-@export var final_encounter_controller: FinalEncounterController
 @export var credits_overlay: CreditsOverlay
 
 @onready var _game_state: RunState = (
@@ -353,14 +352,6 @@ func _ready() -> void:
 	_connect_once(
 		dialogue_director.line_presented,
 		encounter_controller._on_dialogue_line_presented
-	)
-	_connect_once(
-		encounter_controller.final_encounter_reached,
-		final_encounter_controller.show_finale
-	)
-	_connect_once(
-		final_encounter_controller.run_reset_requested,
-		_game_state.reset_run
 	)
 	_connect_once(
 		encounter_controller.coffee_speed_boost_requested,
