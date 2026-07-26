@@ -44,7 +44,8 @@ script from `sign(scale.x)`.
   `ArrivalIntro` processes after the terrain view, eliminating one-frame scroll
   lag during vertical and snaking movement, and remains under the shared
   `Camera2D` so terrain and stop receive the exact same impact shake.
-- The letterbox top bar covers the first **91 px**. Keep every prop's art below
+- The default letterbox top bar covers the first **91 px** at the 1152x648
+  reference viewport. Keep every prop's art below
   that, and check `sun_screen_position` on `SurfacePresentation` against it too.
 - The bus, the station, and the door each expose a `Sprite2D` art slot
   (`BusSprite`, `DoorSprite`, `StationSprite`). Assign a transparent PNG whose
@@ -298,6 +299,14 @@ auto-advance. Splitting one conversation across several DIALOGUE beats is valid;
 the director preserves the original global line indices so existing per-line
 poses and cues still fire on the intended line.
 
+Author a pan or zoom with a typed `CAMERA` beat. `FRAME` accepts a stage-relative
+pixel offset and positive zoom, then eases both through `CutsceneActionPresenter`
+for the beat's duration. `RESET` eases both back to the neutral encounter frame,
+and `SHAKE` uses the same typed route for impact presentation. Do not key
+`Camera2D`, `ViewController`, or parallel stage camera properties in an
+`AnimationPlayer`: the shared presenter is the single camera owner and clears
+its state on normal release or cancellation.
+
 Click the timeline before using its shortcuts:
 
 - `Space` plays or pauses; `Left`/`Right` steps one grid division.
@@ -517,6 +526,10 @@ What the timeline owns and what it does not:
   and the `closing` AnimationPlayer clip. So do not end a timeline by walking the
   actor off or hiding them; you will be fighting the thing that is about to do it
   properly. Encounter 5 ends on a WAIT for exactly this reason.
+- Typed CAMERA beats may pan, zoom, reset, or shake during the timeline. End a
+  composed pan/zoom with CAMERA/RESET when the audience should see the neutral
+  room before teardown; encounter release is still the final cancellation-safe
+  restoration boundary.
 - Rewards and teardown belong to the encounter ending, not to a beat, and happen
   the same way on both paths.
 
@@ -611,6 +624,19 @@ give a false pass.
 `DialogueDirector` owns the letterbox and the single in-universe bottom
 dialogue box. Dialogue advancement and story resources remain independent from
 the box presentation.
+
+At the 1152x648 reference viewport, the default encounter framing remains a
+0.50 viewport focus and 0.14 letterbox bars. An encounter may opt into a
+different composition through
+`DepthCharacterEncounter.cinematic_focus_viewport_y_ratio`,
+`cinematic_bar_height_ratio`, and `post_cinematic_recession_ratio`; negative
+focus/bar values and zero recession preserve the defaults for later encounters.
+
+Encounter 9 is the current opt-in example: focus 0.72 (ground near y=467), bars
+0.08 (about 52 px), and a 0.06 post-cinematic recession. Its **130 px dialogue
+strip** begins at y=510. Keep feet, stool seats, table legs, and speaking faces
+above that line through every CAMERA beat. The terrain shelf may taper into the
+lower matte, but raw buried Layer 1 may never appear above it.
 
 Every visible speaker needs a `SpeechReaction` targeting only their visual
 root. Dialogue does not draw or register speaker anchors. Do not connect

@@ -39,19 +39,19 @@ signal cinematic_frame_closed
 @export var zeb_textbox_texture: Texture2D
 @export var ayden_textbox_texture: Texture2D
 @export var coco_textbox_texture: Texture2D
-@export var art_margin_left: int = 147
-@export var art_margin_top: int = 44
-@export var art_margin_right: int = 16
-@export var art_margin_bottom: int = 34
-@export var art_body_minimum_height: float = 64.0
+@export var art_margin_left: int = 110
+@export var art_margin_top: int = 28
+@export var art_margin_right: int = 12
+@export var art_margin_bottom: int = 20
+@export var art_body_minimum_height: float = 40.0
 @export var art_body_font_size: int = 14
 @export var fallback_panel_horizontal_margin: float = 90.0
 @export var fallback_margin_left: int = 22
-@export var fallback_margin_top: int = 16
+@export var fallback_margin_top: int = 8
 @export var fallback_margin_right: int = 22
-@export var fallback_margin_bottom: int = 14
-@export var fallback_body_minimum_height: float = 72.0
-@export var fallback_body_font_size: int = 20
+@export var fallback_margin_bottom: int = 6
+@export var fallback_body_minimum_height: float = 40.0
+@export var fallback_body_font_size: int = 18
 
 @export_category("Typewriter")
 @export_range(0.001, 0.2, 0.001) var character_display_speed: float = 0.03
@@ -235,10 +235,13 @@ func begin_gameplay_handoff() -> bool:
 	return true
 
 
-## Slides the authored letterbox bars into view.
-func open_cinematic_frame(instant: bool = false) -> void:
+## Slides the authored or encounter-specific letterbox bars into view.
+func open_cinematic_frame(
+	instant: bool = false,
+	bar_height_ratio_override: float = -1.0
+) -> void:
 	if cinematic_frame != null:
-		cinematic_frame.open_frame(instant)
+		cinematic_frame.open_frame(instant, bar_height_ratio_override)
 
 
 ## Slides the authored letterbox bars out of view.

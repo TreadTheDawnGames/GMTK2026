@@ -31,7 +31,7 @@ script = ExtResource("1_beat")
 kind = 2
 actor = &"treasure_hunter"
 facing = 1
-notes = "Looking right, at the miner, who is 237px to his right. Facing is a world direction; CharacterPresenter folds art_faces_left in, so 1 is looking right whichever way the art was drawn."
+notes = "Looking right toward the Miner from the left-middle crowd. Facing is a world direction; CharacterPresenter folds art_faces_left in, so the value is independent of how the source art was drawn."
 
 [sub_resource type="Resource" id="Beat_show_rutini"]
 script = ExtResource("1_beat")
@@ -42,8 +42,8 @@ actor = &"rutini"
 script = ExtResource("1_beat")
 kind = 2
 actor = &"rutini"
-facing = 1
-notes = "Looking right - past the miner, down the room. He is the only one here who has just arrived, and the shop is behind him: turning him toward the miner instead would aim the one moving character back at the wall."
+facing = -1
+notes = "Looking left from his table toward the Miner. The cafe is immediately behind him on the right, exactly as Zephan's paper arrangement places it."
 
 [sub_resource type="Resource" id="Beat_show_coffee_cat"]
 script = ExtResource("1_beat")
@@ -63,7 +63,7 @@ script = ExtResource("1_beat")
 kind = 2
 actor = &"coffee_cat"
 facing = -1
-notes = "Looking left, at the miner, who is 110px to his left."
+notes = "Looking left from the cafe window toward the rest of the gathering. Quibble remains seated on the right serving-window stool."
 
 [sub_resource type="Resource" id="Beat_show_cloak_lantern"]
 script = ExtResource("1_beat")
@@ -74,22 +74,42 @@ actor = &"cloak_lantern"
 script = ExtResource("1_beat")
 kind = 2
 actor = &"cloak_lantern"
-facing = -1
-notes = "Looking left, back down the room at all of them. He stands 244px right of the miner, furthest from the shop and nearest the open end the tunnel carries on into, which is the staging his other two appearances established: he is at the edge of the thing rather than in it."
+facing = 1
+notes = "Looking right across the whole gathering from the far-left edge. He remains apart from the cafe, but his last line is addressed toward everyone rather than out into empty rock."
 
 [sub_resource type="Resource" id="Beat_open_silence"]
 script = ExtResource("1_beat")
-duration_seconds = 0.9
-notes = "Held silence on the whole room before anybody speaks. The miner has just come through the ceiling into the one place the entire run has been walking toward, and the shot needs a moment for the player to read the sign over his head before a dialogue box covers the bottom of the frame.
+start_seconds = 1.0
+duration_seconds = 0.6
+notes = "Held silence on the cafe framing before anybody speaks. The miner has just come through the ceiling into the one place the entire run has been walking toward, and the shot needs a moment for the player to read the sign over his head before a dialogue box covers the bottom of the frame.
 
 Longer than encounter 5's 0.6 on purpose. That shot had two people in it; this one has a building, four characters and a colony of rats, and it is worth the extra third of a second."
+
+[sub_resource type="Resource" id="Beat_frame_cafe"]
+script = ExtResource("1_beat")
+kind = 11
+duration_seconds = 1.0
+camera_offset = Vector2(220, 40)
+camera_zoom = Vector2(1.3, 1.3)
+notes = "The opening typed CAMERA/FRAME beat establishes the occupied cafe before isolating speakers. Its positive Y offset lifts the extended 2.5D ground and every depth lane above the dialogue strip.
+
+CutsceneActionPresenter owns the shared camera and view offset. No stage-local zoom signal or AnimationPlayer track duplicates that ownership."
+
+[sub_resource type="Resource" id="Beat_frame_rutini"]
+script = ExtResource("1_beat")
+kind = 11
+start_seconds = 1.6
+duration_seconds = 0.75
+camera_offset = Vector2(100, 75)
+camera_zoom = Vector2(1.55, 1.55)
+notes = "Smoothly closes from the cafe establishing frame onto Rotini at the separate perspective table. The ground remains in view below him and the move finishes before his bounce or line."
 
 [sub_resource type="Resource" id="Beat_rutini_arrives"]
 script = ExtResource("1_beat")
 kind = 3
 actor = &"rutini"
-start_seconds = 0.55
-duration_seconds = 0.35
+start_seconds = 2.35
+duration_seconds = 0.3
 bounce_count = 2
 bounce_offset = Vector2(-2, -8)
 bounce_style = 0
@@ -97,27 +117,147 @@ notes = "Two bounces just before his first line, so 'Easy, lads. We're here.' re
 
 Two rather than one because one bounce reads as a nod and two reads as somebody shouting over a crowd."
 
-[sub_resource type="Resource" id="Beat_dialogue"]
+[sub_resource type="Resource" id="Beat_cafe_arrival_dialogue"]
 script = ExtResource("1_beat")
 kind = 5
-start_seconds = 0.9
-duration_seconds = 12.0
+start_seconds = 2.65
+duration_seconds = 2.0
 conversation = ExtResource("2_conversation")
-notes = "The whole conversation, all eight lines, held for exactly as long as the player takes to read it. The twelve seconds are the authored estimate the editor scrubs against, not the real length: this beat blocks, so the clock stops here and every beat after it slides by the same amount.
+line_range = Vector2i(0, 0)
+notes = "Rotini's welcome on his own close frame."
 
-THE READING ORDER IS THE CAMERA MOVE. Zephan's IMG_1647 plans this beat as a pan across the gathering that ends on the Lantern Keeper. The encounter camera cannot pan - it centres on the miner's landing column and holds - so the cast are laid out left to right in the order they speak and the conversation walks the eye across the room instead: Rotini beside the miner, Cheese Girl at the shop window on the far left, the Treasure Hunter, the miner's silence, the Treasure Hunter again, Quibble on the right, and the Keeper at the far right end. Reorder these lines and the shot stops being a pan.
+[sub_resource type="Resource" id="Beat_frame_coco"]
+script = ExtResource("1_beat")
+kind = 11
+start_seconds = 4.65
+duration_seconds = 0.75
+camera_offset = Vector2(255, 60)
+camera_zoom = Vector2(1.6, 1.6)
+notes = "Moves from Rotini to Coco's serving window and enlarges the painted speaking treatment without losing the two stools below it."
 
-Every reaction inside this beat is already free. DepthEncounterController bounces whichever gathered actor owns the presented line and applies that line's Speaker Pose, so Quibble raises his cup on his own line without a beat here asking him to. This remains one beat for a continuous group exchange; the editor can split it into inclusive line ranges if a later animation has to land between two lines."
+[sub_resource type="Resource" id="Beat_coco_dialogue"]
+script = ExtResource("1_beat")
+kind = 5
+start_seconds = 5.4
+duration_seconds = 2.5
+conversation = ExtResource("2_conversation")
+line_range = Vector2i(1, 1)
+notes = "Coco's line starts only after the camera has reached her window."
+
+[sub_resource type="Resource" id="Beat_frame_treasure"]
+script = ExtResource("1_beat")
+kind = 11
+start_seconds = 7.9
+duration_seconds = 0.85
+camera_offset = Vector2(-110, 80)
+camera_zoom = Vector2(1.55, 1.55)
+notes = "A smooth right-to-left CAMERA/FRAME transition from Coco to Treasure Hunter and the layered rat crowd. It finishes before his line, so the speaker never changes on a moving frame."
+
+[sub_resource type="Resource" id="Beat_treasure_dialogue"]
+script = ExtResource("1_beat")
+kind = 5
+start_seconds = 8.75
+duration_seconds = 2.5
+conversation = ExtResource("2_conversation")
+line_range = Vector2i(2, 2)
+notes = "Treasure Hunter's first line on his individual frame."
+
+[sub_resource type="Resource" id="Beat_frame_miner"]
+script = ExtResource("1_beat")
+kind = 11
+start_seconds = 11.25
+duration_seconds = 0.65
+camera_offset = Vector2(0, 80)
+camera_zoom = Vector2(1.6, 1.6)
+notes = "A short smooth pan centres the Miner for his silent question. The camera already followed his fall into the room; this is the deliberate dialogue close-up after he has landed."
+
+[sub_resource type="Resource" id="Beat_miner_question"]
+script = ExtResource("1_beat")
+kind = 5
+start_seconds = 11.9
+duration_seconds = 1.5
+conversation = ExtResource("2_conversation")
+line_range = Vector2i(3, 3)
+
+[sub_resource type="Resource" id="Beat_frame_treasure_return"]
+script = ExtResource("1_beat")
+kind = 11
+start_seconds = 13.4
+duration_seconds = 0.65
+camera_offset = Vector2(-110, 80)
+camera_zoom = Vector2(1.55, 1.55)
+notes = "Returns smoothly to Treasure Hunter for his answer instead of leaving the camera on the previous speaker."
+
+[sub_resource type="Resource" id="Beat_treasure_elevator"]
+script = ExtResource("1_beat")
+kind = 5
+start_seconds = 14.05
+duration_seconds = 3.0
+conversation = ExtResource("2_conversation")
+line_range = Vector2i(4, 4)
+
+[sub_resource type="Resource" id="Beat_frame_quibble"]
+script = ExtResource("1_beat")
+kind = 11
+start_seconds = 17.05
+duration_seconds = 0.95
+camera_offset = Vector2(275, 60)
+camera_zoom = Vector2(1.6, 1.6)
+notes = "A smooth return to Quibble on the right stool. His individual close-up keeps the sill and Coco visible as depth context while placing his cup and face clear of the dialogue strip."
+
+[sub_resource type="Resource" id="Beat_quibble_dialogue"]
+script = ExtResource("1_beat")
+kind = 5
+start_seconds = 18.0
+duration_seconds = 2.5
+conversation = ExtResource("2_conversation")
+line_range = Vector2i(5, 5)
+notes = "Quibble's cafe-coffee line on the cafe frame. His authored cup pose remains held while the line is presented."
+
+[sub_resource type="Resource" id="Beat_frame_keeper"]
+script = ExtResource("1_beat")
+kind = 11
+start_seconds = 20.5
+duration_seconds = 2.4
+camera_offset = Vector2(-350, 60)
+camera_zoom = Vector2(1.5, 1.5)
+notes = "The longest smooth CAMERA/FRAME move crosses the entire contiguous gathering from Quibble at the right-middle cafe to the far-left Lantern Keeper, exactly Zephan's right-to-left direction. It blocks before his line, so he cannot speak until the camera has found him."
+
+[sub_resource type="Resource" id="Beat_keeper_dialogue"]
+script = ExtResource("1_beat")
+kind = 5
+start_seconds = 22.9
+duration_seconds = 3.0
+conversation = ExtResource("2_conversation")
+line_range = Vector2i(6, 6)
+notes = "The Lantern Keeper alone, after the right-to-left world pan has landed on him. The canonical wording ships unchanged; Zephan's shorter alternate still needs a narrative ruling."
+
+[sub_resource type="Resource" id="Beat_miner_reaction"]
+script = ExtResource("1_beat")
+kind = 5
+start_seconds = 25.9
+duration_seconds = 1.5
+conversation = ExtResource("2_conversation")
+line_range = Vector2i(7, 7)
+notes = "The Miner's final silence is a reaction, not another spoken thought, so the Keeper remains the last character to say a line. The tableau framing already keeps both visible and therefore does not cut or snap for the ellipsis."
 
 [sub_resource type="Resource" id="Beat_closing_hold"]
 script = ExtResource("1_beat")
-start_seconds = 12.9
-duration_seconds = 1.1
-notes = "A held beat on the gathering after the Keeper's last line, before the timeline ends and play_closing takes him. Without it the shot cuts straight from the dialogue box closing to him fading, and 'Stay a while. Not every minute needs somewhere to go.' does not get the moment it is asking for.
+start_seconds = 27.4
+duration_seconds = 0.8
+notes = "A held beat on the Keeper after the miner's reaction. Without it the shot cuts straight from the dialogue box closing into the zoom out, and 'Stay a while. Not every minute needs somewhere to go.' does not get the moment it is asking for."
 
-This is the last beat, deliberately. play_closing owns the departure: Closing Fade Seconds hops him once and fades him out where he stands over 1.2s, which is Zephan's 'and then he goes shoom'. A timeline that also walked him off would be fighting the thing that is about to do it properly. Nobody else fades, because the gathering stays - a player who scrolls back up to 14,000 later should still find them there."
+[sub_resource type="Resource" id="Beat_reset_camera"]
+script = ExtResource("1_beat")
+kind = 11
+start_seconds = 28.2
+duration_seconds = 1.8
+camera_action = 2
+notes = "The typed CAMERA/RESET handback. It eases offset and zoom together from the Keeper close-up to the encounter's neutral frame, revealing the whole gathering before play_closing fades the Keeper and MiningCinematicFlow returns control.
+
+This is deliberately the last timeline beat. Shared flow release then applies Encounter 9's small authored recession; nobody else leaves, because review mode should find the gathering still at the cafe."
 
 [resource]
 script = ExtResource("3_sequence")
 sequence_id = &"cafe_gathering_sequence"
-beats = Array[ExtResource("1_beat")]([SubResource("Beat_show_treasure_hunter"), SubResource("Beat_pose_treasure_hunter"), SubResource("Beat_face_treasure_hunter"), SubResource("Beat_show_rutini"), SubResource("Beat_face_rutini"), SubResource("Beat_show_coffee_cat"), SubResource("Beat_pose_coffee_cat"), SubResource("Beat_face_coffee_cat"), SubResource("Beat_show_cloak_lantern"), SubResource("Beat_face_cloak_lantern"), SubResource("Beat_open_silence"), SubResource("Beat_rutini_arrives"), SubResource("Beat_dialogue"), SubResource("Beat_closing_hold")])
+beats = Array[ExtResource("1_beat")]([SubResource("Beat_show_treasure_hunter"), SubResource("Beat_pose_treasure_hunter"), SubResource("Beat_face_treasure_hunter"), SubResource("Beat_show_rutini"), SubResource("Beat_face_rutini"), SubResource("Beat_show_coffee_cat"), SubResource("Beat_pose_coffee_cat"), SubResource("Beat_face_coffee_cat"), SubResource("Beat_show_cloak_lantern"), SubResource("Beat_face_cloak_lantern"), SubResource("Beat_frame_cafe"), SubResource("Beat_open_silence"), SubResource("Beat_frame_rutini"), SubResource("Beat_rutini_arrives"), SubResource("Beat_cafe_arrival_dialogue"), SubResource("Beat_frame_coco"), SubResource("Beat_coco_dialogue"), SubResource("Beat_frame_treasure"), SubResource("Beat_treasure_dialogue"), SubResource("Beat_frame_miner"), SubResource("Beat_miner_question"), SubResource("Beat_frame_treasure_return"), SubResource("Beat_treasure_elevator"), SubResource("Beat_frame_quibble"), SubResource("Beat_quibble_dialogue"), SubResource("Beat_frame_keeper"), SubResource("Beat_keeper_dialogue"), SubResource("Beat_miner_reaction"), SubResource("Beat_closing_hold"), SubResource("Beat_reset_camera")])

@@ -64,25 +64,18 @@ signal swing_finished
 ## verify_cutscene_cast_draw_order.gd asserts that relationship, because this
 ## number and the terrain profile live in different files.
 @export_range(0, 16, 1) var buried_draw_order: int = 1
-## Standing in an authored cutscene room: the SECOND stratum, the same one he
-## occupies while mining.
+## Standing in an authored cutscene room: one explicit plane above the persistent
+## encounter set and every terrain stratum.
 ##
-## Zephan's direction is that every character sits on the second layer, the way
-## the miner already does while he digs, so the foreground rock closes over the
-## cast in a cutscene exactly as it closes over him in the run. This used to be 3
-## - clear of every stratum - on the reasoning that a held shot should show a
-## whole man. That reads as a more legible frame and as a different world: the
-## cast were pasted on top of rock everything else in the game is inside.
+## The earlier contract deliberately put cutscene cast behind Layer 1. The final
+## Encounter 9 review reversed it: Layer 1 must never overlap a person or prop on
+## the shader surface. Ordinary mining still uses buried_draw_order between the
+## first two strata; only a cutscene temporarily takes this foreground order.
 ##
-## Whether it is worth keeping as its own number now that it equals
-## buried_draw_order: yes. They mean different things - one is where a man stands
-## while working, the other is where a shot puts its cast - and a future change to
-## either should not silently move the other.
-##
-## This one value is also the whole cast's. DepthEncounterController copies it
-## onto the character layer, so moving it moves every visitor with him; there is
-## no per-character draw order to keep in step with it.
-@export_range(0, 16, 1) var cutscene_draw_order: int = 1
+## This one value is also the active cast's. DepthEncounterController copies it
+## onto CharacterLayer for the shot, then restores CharacterLayer's persistent
+## encounter order when control returns.
+@export_range(0, 16, 1) var cutscene_draw_order: int = 5
 
 @export_category("References")
 @export var animation_player: AnimationPlayer

@@ -22,6 +22,9 @@ const TREASURE_HUNTER_APPEARANCE: CharacterAppearance = preload(
 const ROTINI_APPEARANCE: CharacterAppearance = preload(
 	"res://resources/encounters/rutini_character_appearance.tres"
 )
+const CLOAK_LANTERN_APPEARANCE: CharacterAppearance = preload(
+	"res://resources/encounters/cloak_lantern_character_appearance.tres"
+)
 const MOODY_TEEN_APPEARANCE: CharacterAppearance = preload(
 	"res://resources/encounters/moody_teen_character_appearance.tres"
 )
@@ -30,6 +33,12 @@ const TREASURE_HUNTER_FIRST_SEQUENCE: CutsceneSequence = preload(
 )
 const TREASURE_HUNTER_TREASURE_SEQUENCE: CutsceneSequence = preload(
 	"res://resources/cinematics/sequences/treasure_hunter_treasure_sequence.tres"
+)
+const CAFE_GATHERING_SEQUENCE: CutsceneSequence = preload(
+	"res://resources/cinematics/sequences/cafe_gathering_sequence.tres"
+)
+const CAFE_GATHERING_STAGE: PackedScene = preload(
+	"res://Scenes/cinematics/cafe_gathering_encounter_stage.tscn"
 )
 const TREASURE_HUNTER_TREASURE_CONVERSATION: DialogueConversation = preload(
 	"res://resources/dialogue/treasure_hunter_treasure_conversation.tres"
@@ -141,6 +150,26 @@ func _verify_entry_scene() -> void:
 			== "res://Assets/Characters/mice/mouse_grey.png",
 		"Rotini must use Jared's approved gray rat asset."
 	)
+	var keeper_measured_sole := ActorSoleMeasure.measure_frame_sole(
+		CLOAK_LANTERN_APPEARANCE.texture,
+		CLOAK_LANTERN_APPEARANCE.horizontal_frames,
+		CLOAK_LANTERN_APPEARANCE.vertical_frames,
+		CLOAK_LANTERN_APPEARANCE.frame
+	)
+	var keeper_uncorrected_y := (
+		-keeper_measured_sole
+		* CLOAK_LANTERN_APPEARANCE.sprite_scale.y
+	)
+	_expect(
+		not is_nan(keeper_measured_sole)
+		and CLOAK_LANTERN_APPEARANCE.body_grounding_offset_y > 0.0
+		and is_equal_approx(
+			ActorSoleMeasure.get_sprite_y(CLOAK_LANTERN_APPEARANCE),
+			keeper_uncorrected_y
+				+ CLOAK_LANTERN_APPEARANCE.body_grounding_offset_y
+		),
+		"Lantern Keeper body grounding must compensate for the lower staff tip."
+	)
 	var opening_uses_mr_sitts := (
 		OPENING_SURFACE_CONVERSATION.validate().is_empty()
 		and OPENING_SURFACE_CONVERSATION.participants.size() == 1
@@ -215,6 +244,9 @@ func _verify_mining_scene() -> void:
 	var miner_rig := game_root.get_node_or_null(
 		"MiningScene/MinerRig"
 	) as MinerRig
+	var character_layer := game_root.get_node_or_null(
+		"MiningScene/CharacterLayer"
+	) as Node2D
 	var hud := game_root.get_node_or_null(
 		"MiningScene/HUD"
 	) as MiningHud
@@ -280,6 +312,27 @@ func _verify_mining_scene() -> void:
 		game_root.queue_free()
 		await process_frame
 		return
+	var override_focus_ratio := 0.76
+	var subject_rest_screen_y := terrain_manager.config.mining_face_screen_y
+	view_controller.focus_miner_for_encounter(
+		subject_rest_screen_y,
+		override_focus_ratio
+	)
+	var expected_focus_view_y := (
+		view_controller.target_view_position.y
+		- (
+			root.get_visible_rect().size.y * override_focus_ratio
+				- subject_rest_screen_y
+		) / float(terrain_manager.config.terrain_cell_world_size)
+	)
+	_expect(
+		is_equal_approx(
+			view_controller._encounter_focus_view.y,
+			expected_focus_view_y
+		),
+		"An encounter focus override must frame against its requested ratio."
+	)
+	view_controller.snap_follow_to_target()
 	# The title camera is wider than gameplay. Cover its real world-space bottom
 	# and keep the cinematic bars out until Start, or the menu exposes grey.
 	if impact_camera != null and not is_zero_approx(impact_camera.zoom.y):
@@ -308,6 +361,176 @@ func _verify_mining_scene() -> void:
 		and dialogue_director.cinematic_frame.is_closed(),
 		"Title menu must keep the cinematic bars off the live terrain."
 	)
+	if (
+		dialogue_director != null
+		and dialogue_director.cinematic_frame != null
+	):
+		var cinematic_frame := dialogue_director.cinematic_frame
+		var requested_bar_ratio := 0.08
+		dialogue_director.open_cinematic_frame(true, requested_bar_ratio)
+		var override_height := (
+			cinematic_frame.size.y * requested_bar_ratio
+		)
+		_expect(
+			cinematic_frame.is_open()
+			and is_equal_approx(
+				cinematic_frame.top_bar.size.y,
+				override_height
+			),
+			"An encounter must be able to opt into its own letterbox height."
+		)
+		# Dialogue may ask to open an already-framed shot. That second request
+		# must not silently replace the encounter's chosen composition.
+		dialogue_director.open_cinematic_frame(true)
+		_expect(
+			is_equal_approx(
+				cinematic_frame.top_bar.size.y,
+				override_height
+			),
+			"Repeated frame opens must retain the active encounter ratio."
+		)
+		dialogue_director.close_cinematic_frame(true)
+		dialogue_director.open_cinematic_frame(true)
+		_expect(
+			is_equal_approx(
+				cinematic_frame.top_bar.size.y,
+				cinematic_frame.size.y
+					* cinematic_frame.bar_height_ratio
+			)
+			and is_equal_approx(
+				cinematic_frame.bar_height_ratio,
+				CinematicFrame.DEFAULT_BAR_HEIGHT_RATIO
+			),
+			"An encounter letterbox override must not leak into the next shot."
+		)
+		dialogue_director.close_cinematic_frame(true)
+		var viewport_height := root.get_visible_rect().size.y
+		var dialogue_panel_bottom := (
+			dialogue_director.bottom_panel.position.y
+			+ dialogue_director.bottom_panel.size.y
+		)
+		_expect(
+			dialogue_director.bottom_panel.position.y
+				>= viewport_height * 0.75
+			and dialogue_panel_bottom <= viewport_height,
+			"Dialogue must stay inside the reserved bottom ground band instead "
+				+ "of covering the encounter scene."
+		)
+	if view_controller != null:
+		var held_view_target := Vector2i(
+			view_controller.target_view_position
+		)
+		view_controller.current_view_y -= 1.0
+		view_controller._on_encounter_release_tween_finished()
+		_expect(
+			view_controller._is_post_encounter_view_held,
+			"Encounter release must hold the recessed room until mining."
+		)
+		view_controller.follow_mining_position(held_view_target)
+		_expect(
+			view_controller._is_post_encounter_view_held,
+			"A zero-depth mining target must not release the recessed room."
+		)
+		view_controller.follow_mining_position(
+			held_view_target + Vector2i.DOWN
+		)
+		_expect(
+			not view_controller._is_post_encounter_view_held,
+			"The first new mining target must release the recessed room."
+		)
+		view_controller.follow_mining_position(held_view_target)
+		view_controller.snap_follow_to_target()
+		view_controller.current_view_y -= 1.0
+		view_controller._on_encounter_release_tween_finished()
+		view_controller.snap_follow_to_target()
+		_expect(
+			not view_controller._is_post_encounter_view_held,
+			"Cancellation or a hard follow reset must clear the recession hold."
+		)
+		view_controller.current_view_y -= 1.0
+		view_controller._on_encounter_release_tween_finished()
+		view_controller.focus_miner_for_encounter(
+			subject_rest_screen_y,
+			override_focus_ratio
+		)
+		_expect(
+			not view_controller._is_post_encounter_view_held,
+			"Entering the next encounter must clear the previous recession hold."
+		)
+		view_controller.snap_follow_to_target()
+		view_controller.focus_miner_for_encounter(
+			subject_rest_screen_y,
+			override_focus_ratio
+		)
+		view_controller._apply_encounter_view_position(
+			view_controller._encounter_focus_view
+		)
+		view_controller._on_encounter_focus_tween_finished()
+		view_controller.release_encounter_focus(0.06)
+		var reduced_motion_release_view := (
+			view_controller._encounter_release_view
+		)
+		view_controller.set_reduce_motion_enabled(true)
+		_expect(
+			Vector2(
+				view_controller.current_view_x,
+				view_controller.current_view_y
+			).is_equal_approx(reduced_motion_release_view)
+			and view_controller._is_post_encounter_view_held,
+			"Reduced motion must snap to, then hold, the authored recession."
+		)
+		view_controller.set_reduce_motion_enabled(false)
+		view_controller.snap_follow_to_target()
+	if terrain_renderer != null:
+		terrain_renderer.set_trodden_floor(true, 1000.0)
+		_expect(
+			terrain_renderer._trodden_floor_is_enabled
+			and terrain_renderer._trodden_floor_seals_mask,
+			"An entering room must seal its complete 2.5D floor."
+		)
+		terrain_renderer._on_dig_presentation_started(1)
+		_expect(
+			terrain_renderer._trodden_floor_is_enabled
+			and not terrain_renderer._trodden_floor_seals_mask,
+			"The first mining contact must retain the floor treatment while "
+				+ "releasing its mask seal for real terrain deformation."
+		)
+		terrain_renderer.set_trodden_floor(false)
+	if encounter_controller != null:
+		var cafe_is_prestaged := false
+		var cafe_framing_is_authored := false
+		for encounter: DepthCharacterEncounter in (
+			encounter_controller.encounter_config.encounters
+		):
+			if encounter.encounter_id != &"cafe_gathering":
+				continue
+			cafe_is_prestaged = (
+				encounter.prestage_before_landing
+				and encounter.dresses_trodden_floor
+			)
+			cafe_framing_is_authored = (
+				is_equal_approx(
+					encounter.cinematic_focus_viewport_y_ratio,
+					0.72
+				)
+				and is_equal_approx(
+					encounter.cinematic_bar_height_ratio,
+					0.08
+				)
+				and is_equal_approx(
+					encounter.post_cinematic_recession_ratio,
+					0.06
+				)
+			)
+			break
+		_expect(
+			cafe_is_prestaged,
+			"The occupied cafe and its 2.5D floor must exist before entry."
+		)
+		_expect(
+			cafe_framing_is_authored,
+			"Encounter 9 must own its high focus, shallow bars, and recession."
+		)
 	if dialogue_director != null:
 		var art_conversation := DialogueConversation.new()
 		art_conversation.conversation_id = &"smoke_textbox_art"
@@ -349,7 +572,7 @@ func _verify_mining_scene() -> void:
 				and not dialogue_director.speaker_label.visible
 				and is_equal_approx(
 					dialogue_director.bottom_panel.size.y,
-					173.0
+					130.0
 				)
 				and dialogue_director.textbox_art.stretch_mode
 					== TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -671,6 +894,232 @@ func _verify_mining_scene() -> void:
 		exits_without_pickaxe,
 		"Treasure Hunter must leave and reach the cafe without his pickaxe."
 	)
+	var cafe_camera_frame_count := 0
+	var cafe_frames_establishing := false
+	var cafe_frames_rutini := false
+	var cafe_frames_coco := false
+	var cafe_frames_keeper := false
+	var cafe_frame_treasure_visit_count := 0
+	var cafe_frames_miner := false
+	var cafe_frames_quibble := false
+	var cafe_resets_camera := false
+	var cafe_individual_dialogue_lines: Array[bool] = []
+	cafe_individual_dialogue_lines.resize(7)
+	cafe_individual_dialogue_lines.fill(false)
+	for beat: CutsceneBeat in CAFE_GATHERING_SEQUENCE.beats:
+		if (
+			beat.kind == CutsceneBeat.Kind.DIALOGUE
+			and beat.conversation != null
+			and beat.conversation.conversation_id == &"cafe_gathering"
+			and beat.line_range.x == beat.line_range.y
+			and beat.line_range.x >= 0
+			and beat.line_range.x < cafe_individual_dialogue_lines.size()
+		):
+			cafe_individual_dialogue_lines[beat.line_range.x] = true
+		if beat.kind != CutsceneBeat.Kind.CAMERA:
+			continue
+		if beat.camera_action == CutsceneBeat.CameraAction.FRAME:
+			cafe_camera_frame_count += 1
+			if (
+				beat.camera_offset.is_equal_approx(Vector2(220.0, 40.0))
+				and beat.camera_zoom.is_equal_approx(
+					Vector2(1.3, 1.3)
+				)
+			):
+				cafe_frames_establishing = true
+			elif (
+				beat.camera_offset.is_equal_approx(Vector2(100.0, 75.0))
+				and beat.camera_zoom.is_equal_approx(
+					Vector2(1.55, 1.55)
+				)
+			):
+				cafe_frames_rutini = true
+			elif (
+				beat.camera_offset.is_equal_approx(Vector2(255.0, 60.0))
+				and beat.camera_zoom.is_equal_approx(
+					Vector2(1.6, 1.6)
+				)
+			):
+				cafe_frames_coco = true
+			elif (
+				beat.camera_offset.is_equal_approx(Vector2(-110.0, 80.0))
+				and beat.camera_zoom.is_equal_approx(
+					Vector2(1.55, 1.55)
+				)
+			):
+				cafe_frame_treasure_visit_count += 1
+			elif (
+				beat.camera_offset.is_equal_approx(Vector2(0.0, 80.0))
+				and beat.camera_zoom.is_equal_approx(
+					Vector2(1.6, 1.6)
+				)
+			):
+				cafe_frames_miner = true
+			elif (
+				beat.camera_offset.is_equal_approx(Vector2(275.0, 60.0))
+				and beat.camera_zoom.is_equal_approx(
+					Vector2(1.6, 1.6)
+				)
+			):
+				cafe_frames_quibble = true
+			elif (
+				beat.camera_offset.is_equal_approx(Vector2(-350.0, 60.0))
+				and beat.camera_zoom.is_equal_approx(
+					Vector2(1.5, 1.5)
+				)
+			):
+				cafe_frames_keeper = true
+		elif beat.camera_action == CutsceneBeat.CameraAction.RESET:
+			cafe_resets_camera = true
+	_expect(
+		cafe_camera_frame_count == 8
+		and cafe_frames_establishing
+		and cafe_frames_rutini
+		and cafe_frames_coco
+		and cafe_frame_treasure_visit_count == 2
+		and cafe_frames_miner
+		and cafe_frames_quibble
+		and cafe_frames_keeper
+		and cafe_resets_camera
+		and not cafe_individual_dialogue_lines.has(false),
+		"Encounter 9 must ease between individual speakers, complete the long "
+			+ "right-to-left Keeper pan, and reset."
+	)
+	var cafe_stage := CAFE_GATHERING_STAGE.instantiate()
+	var cafe_actor_markers := cafe_stage.get_node("ActorMarkers") as Node2D
+	var cafe_props := cafe_stage.get_node("PropMarkers") as Node2D
+	var keeper_mark := cafe_actor_markers.get_node(
+		"cloak_lantern"
+	) as Marker2D
+	var treasure_mark := cafe_actor_markers.get_node(
+		"treasure_hunter"
+	) as Marker2D
+	var rutini_mark := cafe_actor_markers.get_node("rutini") as Marker2D
+	var cat_mark := cafe_actor_markers.get_node("coffee_cat") as Marker2D
+	var cafe_prop := cafe_props.get_node("DasQuesoCafe") as Node2D
+	var dining_table := cafe_props.get_node("DiningTable") as Node2D
+	var left_window_stool := cafe_props.get_node(
+		"CafeStoolWindowLeft"
+	) as Node2D
+	var right_window_stool := cafe_props.get_node(
+		"CafeStoolWindowRight"
+	) as Node2D
+	var left_dining_chair := cafe_props.get_node(
+		"DiningChairLeft"
+	) as Node2D
+	var minimum_cafe_prop_z := 0
+	var cafe_prop_nodes: Array[Node] = [cafe_props]
+	while not cafe_prop_nodes.is_empty():
+		var cafe_prop_node: Node = cafe_prop_nodes.pop_back()
+		var cafe_prop_node_2d := cafe_prop_node as Node2D
+		if cafe_prop_node_2d != null:
+			minimum_cafe_prop_z = mini(
+				minimum_cafe_prop_z,
+				cafe_prop_node_2d.z_index
+			)
+		for child: Node in cafe_prop_node.get_children():
+			cafe_prop_nodes.append(child)
+	var frontmost_terrain_z := -2_147_483_648
+	if terrain_renderer != null and terrain_renderer.profile != null:
+		for layer_index: int in range(
+			terrain_renderer.profile.get_layer_count()
+		):
+			frontmost_terrain_z = maxi(
+				frontmost_terrain_z,
+				terrain_renderer.profile.get_layer_z_index(layer_index)
+			)
+	var window_stool_count := 0
+	var dining_chair_count := 0
+	for cafe_prop_child: Node in cafe_props.get_children():
+		if String(cafe_prop_child.name).begins_with("CafeStoolWindow"):
+			window_stool_count += 1
+		elif String(cafe_prop_child.name).begins_with("DiningChair"):
+			dining_chair_count += 1
+	_expect(
+		keeper_mark.position.x < treasure_mark.position.x
+		and treasure_mark.position.x < -176.0
+		and -176.0 < rutini_mark.position.x
+		and rutini_mark.position.x < cafe_prop.position.x
+		and dining_table.position.x < cafe_prop.position.x
+		and cafe_prop.position.x < cat_mark.position.x
+		and left_window_stool.position.x < right_window_stool.position.x
+		and is_equal_approx(
+			cat_mark.position.x,
+			right_window_stool.position.x
+		)
+		and is_equal_approx(
+			rutini_mark.position.x,
+			left_dining_chair.position.x
+		)
+		and cafe_prop.position.y < left_window_stool.position.y
+		and left_window_stool.position.y < left_dining_chair.position.y
+		and left_dining_chair.position.y < treasure_mark.position.y
+		and treasure_mark.position.y < keeper_mark.position.y
+		and window_stool_count == 2
+		and dining_chair_count == 2
+		and character_layer != null
+		and miner_rig != null
+		and character_layer.z_index + minimum_cafe_prop_z
+			> frontmost_terrain_z
+		and miner_rig.cutscene_draw_order > frontmost_terrain_z,
+		"Encounter 9 must stage Keeper far left, cafe right, and Quibble on "
+			+ "the right of exactly two window stools, with Rotini seated at "
+			+ "the separate two-chair table. Every depth lane must remain above "
+			+ "Layer 1."
+	)
+	cafe_stage.free()
+	if encounter_controller != null:
+		var cafe_encounter_index := -1
+		for encounter_index: int in range(
+			encounter_controller.encounter_config.encounters.size()
+		):
+			if (
+				encounter_controller.encounter_config.encounters[
+					encounter_index
+				].encounter_id
+				== &"cafe_gathering"
+			):
+				cafe_encounter_index = encounter_index
+				break
+		if (
+			cafe_encounter_index >= 0
+			and cafe_encounter_index
+				< encounter_controller._stages.size()
+		):
+			var prestaged_cafe := encounter_controller._stages[
+				cafe_encounter_index
+			] as CharacterEncounterStage
+			encounter_controller._gather_cafe_characters(
+				cafe_encounter_index,
+				prestaged_cafe,
+				Callable()
+			)
+			var prestaged_treasure := (
+				encounter_controller._presenters_by_actor_id.get(
+					&"treasure_hunter"
+				) as CharacterPresenter
+			)
+			var prestaged_cat := (
+				encounter_controller._presenters_by_actor_id.get(
+					&"coffee_cat"
+				) as CharacterPresenter
+			)
+			var prestaged_keeper := (
+				encounter_controller._presenters_by_actor_id.get(
+					&"cloak_lantern"
+				) as CharacterPresenter
+			)
+			_expect(
+				prestaged_treasure != null
+				and prestaged_treasure.get("_resting_pose")
+					== &"no_pickaxe"
+				and prestaged_cat != null
+				and prestaged_cat.get("_resting_pose") == &"hold_cup"
+				and prestaged_keeper != null
+				and prestaged_keeper.visible,
+				"Encounter 9 must prestage the occupied cafe's final poses "
+					+ "before the Miner enters."
+			)
 	if encounter_controller != null:
 		_verify_authored_bounces(encounter_controller)
 	_expect(

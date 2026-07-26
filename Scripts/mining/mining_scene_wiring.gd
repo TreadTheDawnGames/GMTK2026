@@ -527,14 +527,17 @@ func _on_final_encounter_music(_encounter_id: StringName) -> void:
 
 
 ## Frames the authored sole instead of the abstract mining-row coordinate.
-func _on_cinematic_camera_focus_requested() -> void:
+func _on_cinematic_camera_focus_requested(
+	focus_viewport_y_ratio: float
+) -> void:
 	var screen_offset := view_controller.get_miner_screen_offset()
 	var current_offset_y := (
 		0.0 if is_nan(screen_offset.y) else screen_offset.y
 	)
 	view_controller.focus_miner_for_encounter(
 		miner_rig.get_cinematic_foot_screen_position().y
-			- current_offset_y
+			- current_offset_y,
+		focus_viewport_y_ratio
 	)
 
 

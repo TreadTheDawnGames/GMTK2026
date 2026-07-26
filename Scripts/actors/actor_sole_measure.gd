@@ -27,7 +27,10 @@ static func get_sprite_y(appearance: CharacterAppearance) -> float:
 	)
 	if is_nan(measured):
 		return 0.0
-	return -measured * appearance.sprite_scale.y
+	return (
+		-measured * appearance.sprite_scale.y
+		+ appearance.body_grounding_offset_y
+	)
 
 
 ## Returns how far one frame's lowest drawn row falls below its centre, in

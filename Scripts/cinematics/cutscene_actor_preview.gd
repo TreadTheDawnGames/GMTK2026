@@ -321,6 +321,17 @@ func _rebuild_sprite() -> void:
 	target.hframes = active_pose.horizontal_frames
 	target.vframes = active_pose.vertical_frames
 	target.frame = active_pose.first_frame
+	var measured_pose_sole := ActorSoleMeasure.measure_frame_sole(
+		active_pose.texture,
+		active_pose.horizontal_frames,
+		active_pose.vertical_frames,
+		active_pose.first_frame
+	)
+	if not is_nan(measured_pose_sole):
+		target.position.y = (
+			-measured_pose_sole * appearance.sprite_scale.y
+			+ _presentation_offset.y
+		)
 
 
 func _is_drawable_appearance() -> bool:

@@ -102,9 +102,9 @@ anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 90.0
-offset_top = -205.0
+offset_top = -138.0
 offset_right = -90.0
-offset_bottom = -32.0
+offset_bottom = -8.0
 grow_horizontal = 2
 grow_vertical = 0
 mouse_filter = 2
@@ -139,9 +139,9 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/margin_left = 22
-theme_override_constants/margin_top = 16
+theme_override_constants/margin_top = 8
 theme_override_constants/margin_right = 22
-theme_override_constants/margin_bottom = 14
+theme_override_constants/margin_bottom = 6
 
 [node name="Content" type="VBoxContainer" parent="DialogueRoot/BottomPanel/Margin" unique_id=1906505661]
 layout_mode = 2
@@ -150,15 +150,15 @@ theme_override_constants/separation = 8
 [node name="SpeakerLabel" type="Label" parent="DialogueRoot/BottomPanel/Margin/Content" unique_id=316394064]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.94, 0.66, 0.31, 1)
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 20
 text = "Speaker"
 
 [node name="BodyLabel" type="RichTextLabel" parent="DialogueRoot/BottomPanel/Margin/Content" unique_id=104233342]
-custom_minimum_size = Vector2(0, 72)
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_colors/default_color = Color(0.93, 0.86, 0.72, 1)
-theme_override_font_sizes/normal_font_size = 20
+theme_override_font_sizes/normal_font_size = 18
 text = "Dialogue text"
 fit_content = true
 scroll_active = false

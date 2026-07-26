@@ -9,8 +9,8 @@ extends Node
 ## - Finish and cancel are idempotent and only release the matching owner.
 ## The invariant is that one cinematic can never unlock another cinematic.
 
-signal camera_focus_requested
-signal camera_released
+signal camera_focus_requested(focus_viewport_y_ratio: float)
+signal camera_released(recession_viewport_ratio: float)
 signal flow_started(owner: StringName)
 signal flow_finished(owner: StringName)
 
@@ -66,23 +66,23 @@ func try_begin(owner: StringName, focus_camera: bool = false) -> bool:
 
 
 ## Freezes the gameplay view at the miner for the current owner.
-func focus(owner: StringName) -> bool:
+func focus(owner: StringName, focus_viewport_y_ratio: float = -1.0) -> bool:
 	if not is_owned_by(owner):
 		return false
 	if not _camera_is_focused:
 		_camera_is_focused = true
-		camera_focus_requested.emit()
+		camera_focus_requested.emit(focus_viewport_y_ratio)
 	return true
 
 
 ## Restores the state captured by the matching owner.
-func finish(owner: StringName) -> bool:
+func finish(owner: StringName, recession_viewport_ratio: float = 0.0) -> bool:
 	if not is_owned_by(owner):
 		return false
 	var finished_owner := _owner
 	if _camera_is_focused:
 		_camera_is_focused = false
-		camera_released.emit()
+		camera_released.emit(maxf(recession_viewport_ratio, 0.0))
 	mining_controller.set_swing_queue_paused(
 		_previous_swing_queue_paused
 	)
