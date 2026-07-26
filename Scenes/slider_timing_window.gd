@@ -346,7 +346,7 @@ func randomize_all_targets():
 				minimum_center_x
 			)
 			if OS.has_feature("editor") and Input.is_action_pressed("aim_right"):
-				extents[2] = slider_position #+ (speed * direction * 0.1)
+				#extents[2] = slider_position #+ (speed * direction * 0.1)
 				pass
 
 			target.set_target_position(clampf(
