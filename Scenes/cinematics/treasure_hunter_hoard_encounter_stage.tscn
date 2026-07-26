@@ -24,7 +24,7 @@ atlas = ExtResource("2_gems")
 region = Rect2(290, 0, 73, 124)
 
 [node name="TreasureHunterHoardEncounterStage" instance=ExtResource("1_stage")]
-editor_description = "Encounter 6, The Treasure. The Treasure Hunter is already standing at the hoard he spent years looking for when the miner breaks through, so nobody walks in and nobody walks out: he is found here and he stays here. The miner arrives on the left, the hoard heaps up in the floor between them, and he stands just past its far toe looking back down the room over the top of it. His art is drawn facing left, which is why he holds the whole conversation on the miner's right. The 430px root-to-root gap is deliberately wider than the measured 122.5px house spacing for him, because the treasure has to fit in the gap and still read as treasure. Every marker and the hoard itself are authored relative to Conversation and slide to the miner's landing column together."
+editor_description = "Encounter 6, The Treasure. The Treasure Hunter is already standing at the hoard he spent years looking for when the miner breaks through, so he does not walk in: he is found here, gives away his pickaxe, then leaves for the later cafe gathering. The miner arrives on the left, the hoard heaps up in the floor between them, and he stands just past its far toe looking back down the room over the top of it. His art is drawn facing left, which is why he holds the whole conversation on the miner's right. The 430px root-to-root gap is deliberately wider than the measured 122.5px house spacing for him, because the treasure has to fit in the gap and still read as treasure. Every marker and the hoard itself are authored relative to Conversation and slide to the miner's landing column together."
 opening_move_seconds = 0.6
 closing_move_seconds = 0.6
 closing_pose = &"no_pickaxe"
@@ -44,11 +44,11 @@ editor_description = "430px right of the miner, root to root. His measured body 
 position = Vector2(430, 0)
 
 [node name="Rest" parent="ActorMarkers" index="3"]
-editor_description = "The conversation stop. He gives the pickaxe away and stays with the treasure, so the closing move has nowhere to take him."
+editor_description = "The conversation stop. He gives the pickaxe away here before leaving for the later cafe gathering."
 position = Vector2(430, 0)
 
 [node name="Exit" parent="ActorMarkers" index="4"]
-editor_description = "Unused. Nothing in this encounter sends him here - hide_actor_after_closing is off - but it is kept past the frame edge so that turning that flag on for a test cannot strand him in shot."
+editor_description = "Past the frame edge. The authored sequence sends him here in his no-pickaxe pose before hiding him."
 position = Vector2(840, 0)
 
 [node name="GemPile" type="Node2D" parent="PropMarkers" index="0"]
