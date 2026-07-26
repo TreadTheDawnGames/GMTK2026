@@ -20,3 +20,4 @@ sequence = ExtResource("4_ximfy")
 speaker_slot = &"cloak_lantern"
 terrain_sculpt = ExtResource("5_room")
 dresses_trodden_floor = true
+lights_floor_as_plane = true
