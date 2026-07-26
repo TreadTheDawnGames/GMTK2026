@@ -16,6 +16,7 @@ appearance = ExtResource("2_appearance")
 conversation = ExtResource("3_dialogue")
 stage_scene = ExtResource("5_stage")
 sequence = ExtResource("4_wn8ks")
+plays_authored_timeline = true
 speaker_slot = &"coffee_cat"
 grants_coffee_speed_boost = true
 terrain_sculpt = ExtResource("6_wn8ks")
