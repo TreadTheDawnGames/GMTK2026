@@ -12,6 +12,7 @@ var is_hit: bool = false
 
 var target_position : float = 0
 var _bounce_muted: bool = false
+var is_initialized : bool = false
 
 var use_image:bool=true:
 	set(value):
@@ -30,10 +31,13 @@ func get_left_extent() -> float:
 func get_right_extent():
 	return target_position + (my_width*0.5)
 
-func initialize():
+func initialize() :
 	Utils.set_control_width(self, my_width)
-	pass
+	is_initialized = true
+	return 
 
+func reset():
+	pass
 
 ## Receives the owning timing bar's saved bounce preference.
 func set_bounce_muted(is_muted: bool) -> void:

@@ -1,10 +1,10 @@
-[gd_resource type="Resource" script_class="ActorPoseSet" load_steps=10 format=3]
+[gd_resource type="Resource" script_class="ActorPoseSet" format=3 uid="uid://dqvindk2b5g7r"]
 
-[ext_resource type="Script" path="res://resources/actors/actor_pose.gd" id="1_pose"]
-[ext_resource type="Script" path="res://resources/actors/actor_pose_set.gd" id="2_pose_set"]
-[ext_resource type="Texture2D" path="res://Assets/Characters/treasure_hunter/treasure_hunter_idle.png" id="3_idle"]
-[ext_resource type="Texture2D" path="res://Assets/Characters/treasure_hunter/treasure_hunter_hit.png" id="4_hit"]
-[ext_resource type="Texture2D" path="res://Assets/Characters/treasure_hunter/treasure_hunter_idle_no_pickaxe.png" id="5_no_pickaxe"]
+[ext_resource type="Script" uid="uid://tsaiph1d8kq7" path="res://resources/actors/actor_pose.gd" id="1_pose"]
+[ext_resource type="Script" uid="uid://dxi74xec11dh3" path="res://resources/actors/actor_pose_set.gd" id="2_pose_set"]
+[ext_resource type="Texture2D" uid="uid://btuk1mkburwoq" path="res://Assets/Characters/treasure_hunter/treasure_hunter_idle.png" id="3_idle"]
+[ext_resource type="Texture2D" uid="uid://bucbr6fer76mv" path="res://Assets/Characters/treasure_hunter/treasure_hunter_hit.png" id="4_hit"]
+[ext_resource type="Texture2D" uid="uid://b8tpeuj3rdh1" path="res://Assets/Characters/treasure_hunter/treasure_hunter_idle_no_pickaxe.png" id="5_no_pickaxe"]
 
 [sub_resource type="Resource" id="ActorPose_idle"]
 script = ExtResource("1_pose")
