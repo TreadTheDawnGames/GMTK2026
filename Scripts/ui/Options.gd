@@ -7,7 +7,6 @@ class_name OptionsMenu
 ## - Owned state is limited to the currently displayed option values.
 ## - The invariant is that this screen never locates global run state itself.
 
-@onready var tab_container: TabContainer = $TabContainer
 @onready var v_sync_options: OptionButton = (
 	$TabContainer/Panel/VBoxContainer/HBoxContainer2/Control/VSyncOptions
 )
@@ -35,7 +34,6 @@ func set_save_game(save_game: SaveGame) -> void:
 ## Loads options, connects their consumers, and pauses the game behind the menu.
 func _ready() -> void:
 	get_tree().paused = true
-	tab_container.current_tab = 0
 	if _save_game == null:
 		push_error("Options cannot load without an active SaveGame.")
 		return
@@ -53,18 +51,6 @@ func _on_back_button_pressed() -> void:
 	queue_free()
 	get_tree().paused = false
 
-## Shows credits within the same modal menu.
-func _on_credits_button_pressed() -> void:
-	tab_container.current_tab = 1
-	return_to_settings_button.grab_focus()
-
-
-## Returns to settings without discarding the edited control values.
-func _on_return_to_settings_pressed() -> void:
-	tab_container.current_tab = 0
-	mute_bounce.grab_focus()
-
-
 ## Applies VSync immediately; Close persists the selected menu index.
 func _on_v_sync_options_item_selected(index: int) -> void:
 	SaveGame.apply_vsync_mode(index)
@@ -72,24 +58,19 @@ func _on_v_sync_options_item_selected(index: int) -> void:
 
 ## Owns every authored child-signal subscription used by this screen.
 func _connect_controls() -> void:
+	if not v_sync_options:
+		v_sync_options = %VSyncOptions
+	if not back_button:
+		back_button = %BackButton
+
 	if not v_sync_options.item_selected.is_connected(
 		_on_v_sync_options_item_selected
 	):
 		v_sync_options.item_selected.connect(
 			_on_v_sync_options_item_selected
 		)
-	if not credits_button.pressed.is_connected(
-		_on_credits_button_pressed
-	):
-		credits_button.pressed.connect(_on_credits_button_pressed)
 	if not back_button.pressed.is_connected(_on_back_button_pressed):
 		back_button.pressed.connect(_on_back_button_pressed)
-	if not return_to_settings_button.pressed.is_connected(
-		_on_return_to_settings_pressed
-	):
-		return_to_settings_button.pressed.connect(
-			_on_return_to_settings_pressed
-		)
 
 
 ## Maps the saved domain values to their matching controls and audio buses.

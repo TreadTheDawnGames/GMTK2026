@@ -27,6 +27,7 @@
 [ext_resource type="Script" uid="uid://cxysje4e2miht" path="res://Scripts/ui/depth_review_control.gd" id="39_depth_review"]
 [ext_resource type="PackedScene" path="res://Scenes/mining/mining_impact_smoke.tscn" id="40_impact_smoke"]
 [ext_resource type="Script" uid="uid://vrpny10f1lau" path="res://Scripts/dialogue/run_intro_controller.gd" id="42_intro_controller"]
+[ext_resource type="Theme" uid="uid://cy302o2vx18ng" path="res://resources/themes/Menus.tres" id="42_mb17i"]
 [ext_resource type="Resource" path="res://resources/encounters/newspaper_reader_character_appearance.tres" id="44_intro_appearance"]
 [ext_resource type="Script" uid="uid://chh4kyqjtsvyq" path="res://Scripts/mining/mining_cinematic_flow.gd" id="45_cinematic_flow"]
 [ext_resource type="PackedScene" path="res://Scenes/dialogue/final_encounter.tscn" id="50_final_encounter"]
@@ -48,7 +49,7 @@
 [ext_resource type="PackedScene" uid="uid://2pjknhxlb7ux" path="res://Scenes/menu/main_menu.tscn" id="77_main_menu"]
 [ext_resource type="Script" uid="uid://btbtknnj12de6" path="res://Scripts/mining/encounter_progression.gd" id="78_encounter_progression"]
 [ext_resource type="Resource" uid="uid://cd8vkhcsxuokv" path="res://resources/dialogue/opening_surface_conversation.tres" id="79_opening_conversation"]
-[ext_resource type="Script" path="res://Scripts/mining/pickaxe_reward_celebration.gd" id="80_pickaxe_celebration"]
+[ext_resource type="Script" uid="uid://b20qymy23mu2n" path="res://Scripts/mining/pickaxe_reward_celebration.gd" id="80_pickaxe_celebration"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_surface_sky"]
 resource_local_to_scene = true
@@ -217,7 +218,7 @@ view_controller = NodePath("../Systems/ViewController")
 z_index = 4
 terrain_manager = NodePath("../TerrainManager")
 
-[node name="PickaxeRewardCelebration" type="Node2D" parent="MiningScene" node_paths=PackedStringArray("miner_rig")]
+[node name="PickaxeRewardCelebration" type="Node2D" parent="MiningScene" unique_id=1237349751 node_paths=PackedStringArray("miner_rig")]
 z_index = 6
 script = ExtResource("80_pickaxe_celebration")
 miner_rig = NodePath("../MinerRig")
@@ -412,6 +413,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+theme = ExtResource("42_mb17i")
 script = ExtResource("39_depth_review")
 return_button = NodePath("ReturnButton")
 timing_window = NodePath("../TimingWindow")
@@ -447,6 +449,7 @@ theme_override_styles/focus = SubResource("StyleBoxFlat_return_hover")
 text = "↓  RETURN"
 
 [node name="Layout" type="MarginContainer" parent="MiningScene/HUD" unique_id=1832449878]
+visible = false
 offset_left = 20.0
 offset_top = 20.0
 offset_right = 518.0

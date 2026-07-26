@@ -110,7 +110,14 @@ text = "JAM BUILD"
 horizontal_alignment = 2
 
 [node name="ExitConfirmation" type="ConfirmationDialog" parent="." unique_id=129160021]
+transparent_bg = true
 oversampling_override = 1.0
 title = "Exit Game?"
+position = Vector2i(0, 36)
+size = Vector2i(251, 160)
+borderless = true
+always_on_top = true
+transparent = true
+unfocusable = true
 ok_button_text = "Exit"
 dialog_text = "Really exit the game?"

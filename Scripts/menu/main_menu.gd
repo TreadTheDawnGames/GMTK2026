@@ -57,6 +57,7 @@ func _ready() -> void:
 		exit_button.pressed.connect(_on_exit_button_pressed)
 	if not options_button.pressed.is_connected(_on_options_pressed):
 		options_button.pressed.connect(_on_options_pressed)
+	
 	if not exit_confirmation.confirmed.is_connected(
 		_on_exit_confirmation_confirmed
 	):
