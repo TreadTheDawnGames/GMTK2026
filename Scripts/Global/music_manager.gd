@@ -33,12 +33,22 @@ func _ready() -> void:
 	
 	set_process(OS.has_feature("editor"))
 	
-func get_total_beats() -> float:
-	var beat_count = Conductor.stream.get_length() / Conductor.sec_per_beat
-	return beat_count
+func get_total_beats() -> int:
+	if Conductor.stream == null or Conductor.sec_per_beat <= 0.0:
+		return 0
+	return maxi(
+		roundi(Conductor.stream.get_length() / Conductor.sec_per_beat),
+		0
+	)
 
-func get_beats_remaining() -> int:
-	return floor(get_total_beats() - Conductor.current_beat)
+
+func get_beats_remaining(song_beat: float = -1.0) -> float:
+	var sampled_beat: float = (
+		float(Conductor.current_beat)
+		if song_beat < 0.0
+		else song_beat
+	)
+	return maxf(float(get_total_beats()) - sampled_beat, 0.0)
 
 func _transition_to():
 	Conductor.set_song(tracks[music_intensity].pick_random(), bpm, beats_per_measure)
@@ -58,24 +68,52 @@ func _transition_to():
 		#set_intensity_on_beat(music_intensity)
 		#print("music intensity: ", music_intensity)
 
-var fill_overlap : int = 3
+## Number of beats from the song boundary at which its aligned fill becomes
+## audible. The fill itself remains a full phrase and is sought to its tail.
+var fill_overlap: int = 3
 
-func _play_fill(_beat_number : int = 0):
-	if get_beats_remaining() <= fill_overlap and not fill_playing:
-		fill_playing = true
-		track_1.stream = fills.pick_random()
-		
-		play_song_from_beat(fill_overlap-get_beats_remaining(), Conductor.sec_per_beat)
-		await track_1.finished
-		fill_playing = false
-
-func force_play_fill(stream : AudioStream = null):
+func _play_fill(beat_number: int = -1) -> void:
+	var beats_remaining := get_beats_remaining(float(beat_number))
+	if (
+		beats_remaining > float(fill_overlap)
+		or fill_playing
+		or fills.is_empty()
+	):
+		return
+	var fill_stream: AudioStream = fills.pick_random()
+	if fill_stream == null:
+		return
 	fill_playing = true
-	track_1.stream = stream if stream else fills.pick_random()
-	
-	play_song_from_beat(fill_overlap-get_beats_remaining(), Conductor.sec_per_beat)
+	_play_aligned_fill(fill_stream, beats_remaining)
 	await track_1.finished
 	fill_playing = false
+
+func force_play_fill(stream: AudioStream = null) -> void:
+	var fill_stream: AudioStream = stream
+	if fill_stream == null:
+		if fills.is_empty():
+			return
+		fill_stream = fills.pick_random()
+	fill_playing = true
+	_play_aligned_fill(fill_stream, get_beats_remaining())
+	await track_1.finished
+	fill_playing = false
+
+
+## Seeks a full-length fill so its final sample shares the song's final sample.
+func _play_aligned_fill(
+	fill_stream: AudioStream,
+	beats_remaining: float
+) -> void:
+	track_1.stream = fill_stream
+	var seconds_remaining: float = (
+		beats_remaining * float(Conductor.sec_per_beat)
+	)
+	var start_seconds: float = maxf(
+		fill_stream.get_length() - seconds_remaining,
+		0.0
+	)
+	track_1.play(start_seconds)
 
 func set_current_intensity(intensity : int):
 	music_intensity = intensity
