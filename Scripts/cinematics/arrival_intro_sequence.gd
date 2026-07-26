@@ -39,6 +39,10 @@ func set_audio_handler(audio_handler: PlayerAudioHandler) -> void:
 ## between them is a texture change, not a flip — the front must always lead.
 @export var bus_side_right_texture: Texture2D
 @export var bus_side_left_texture: Texture2D
+## Mouse-capable builds use the matching direction-specific prompt art. Touch
+## devices retain the clean bus sides because "click" describes the wrong input.
+@export var bus_side_right_click_texture: Texture2D
+@export var bus_side_left_click_texture: Texture2D
 
 @export_category("Bus Art Placement")
 ## The door art and the right-facing side share one geometry: same opaque bbox,
@@ -46,6 +50,9 @@ func set_audio_handler(audio_handler: PlayerAudioHandler) -> void:
 ## sprite offset and wheel-shine UVs.
 @export var stopped_sprite_offset: Vector2 = Vector2(-14.0, -74.0)
 @export var side_left_sprite_offset: Vector2 = Vector2(14.0, -74.0)
+## The artist shifted this right-facing body and its wheels 62 source pixels
+## left compared with the clean frame, so it needs its own measured placement.
+@export var side_right_click_sprite_offset: Vector2 = Vector2(14.0, -74.0)
 @export var stopped_wheel_uvs: PackedVector2Array = PackedVector2Array([
 	Vector2(0.390962, 0.568345),
 	Vector2(0.684128, 0.568345),
@@ -54,6 +61,12 @@ func set_audio_handler(audio_handler: PlayerAudioHandler) -> void:
 	Vector2(0.315423, 0.568345),
 	Vector2(0.608588, 0.568345),
 ])
+@export var side_right_click_wheel_uvs: PackedVector2Array = (
+	PackedVector2Array([
+		Vector2(0.363084, 0.568345),
+		Vector2(0.656250, 0.568345),
+	])
+)
 @export var station: Node2D
 @export var attendant: CharacterPresenter
 ## Supplies the live ground line so the stop stays planted on the surface as
@@ -80,21 +93,18 @@ func set_audio_handler(audio_handler: PlayerAudioHandler) -> void:
 @export_category("Timing")
 ## The drive-in starts outside the wide title framing, so it covers about two
 ## and a half times the distance the gameplay frame would have needed. This is
-## paced for that longer run at roughly the original speed; shortening it back
-## toward 0.9 makes the bus arrive two and a half times as fast.
-@export_range(0.2, 6.0, 0.05) var bus_arrival_seconds: float = 2.0
-@export_range(0.0, 1.5, 0.05) var bus_settle_seconds: float = 0.12
+## paced as a heavy vehicle rather than as a prop crossing the frame. Its sine
+## ease starts below the old cubic peak speed and brakes progressively.
+@export_range(0.2, 6.0, 0.05) var bus_arrival_seconds: float = 3.25
+@export_range(0.0, 1.5, 0.05) var bus_settle_seconds: float = 0.35
 ## Beat between the bus stopping and the miner being off it. He alights on the
 ## far side, so this is the pause the doors happen in.
-@export_range(0.0, 3.0, 0.05) var miner_exit_delay_seconds: float = 0.2
-@export_range(0.0, 2.0, 0.05) var hold_before_dialogue_seconds: float = 0.0
-## The pull-away is eased in, so this is the length of an accelerating run over
-## the whole 1559 px to the exit anchor, not a constant speed. A cubic ease over
-## 1.5 s left the shot at roughly three times its own average by the end, which
-## is what read as the bus being yanked off screen; a gentler curve over a
-## longer run keeps the trailing edge slow enough to uncover the miner as a
-## wipe rather than a cut.
-@export_range(0.2, 6.0, 0.05) var bus_departure_seconds: float = 2.6
+@export_range(0.0, 3.0, 0.05) var miner_exit_delay_seconds: float = 0.45
+## Lets the road and engine settle before Mr. Sitts owns the frame.
+@export_range(0.0, 2.0, 0.05) var hold_before_dialogue_seconds: float = 0.35
+## The pull-away uses the inverse sine curve: weight comes on gradually without
+## the sharp final burst produced by the old quadratic acceleration.
+@export_range(0.2, 6.0, 0.05) var bus_departure_seconds: float = 3.25
 
 @export_category("Drive Past")
 ## Ambient. A while after control returns the bus runs back the other way,
@@ -167,9 +177,15 @@ var _wheel_material: ShaderMaterial
 var _wheel_radius_pixels: float = 1.0
 var _wheel_spin_phase: float = 0.0
 var _previous_bus_x: float = 0.0
+var _active_wheel_uvs: PackedVector2Array = PackedVector2Array()
+var _show_click_to_mine_art: bool = false
 
 
 func _ready() -> void:
+	_show_click_to_mine_art = not (
+		DisplayServer.is_touchscreen_available()
+		or OS.has_feature("mobile")
+	)
 	_follow_ground_line()
 	_prepare_wheel_shine()
 
@@ -259,6 +275,10 @@ func begin() -> bool:
 	_previous_bus_x = bus.position.x
 	bus.z_index = bus_body_draw_order
 	_set_bus_travel_art(-1)
+	# The arrival anchor is outside the authored frame, but wide window shapes
+	# can reveal a sliver of large prop art. Keep it genuinely absent until the
+	# Start handoff rather than relying on one aspect ratio's crop.
+	bus.hide()
 	station.modulate.a = 1.0
 	attendant.modulate.a = 1.0
 	attendant.show()
@@ -272,6 +292,7 @@ func play_arrival() -> void:
 	if not _is_playing:
 		return
 
+	bus.show()
 	var bus_audio: AudioStreamPlayer
 	if _audio_handler != null:
 		bus_audio = _audio_handler.play_sound(AudioLibrary.BUS_FULL)
@@ -450,11 +471,9 @@ func _kick_bus_bounce() -> void:
 ## authored UVs the wheel shine is placed with, so re-measuring the art moves
 ## the bounce with it.
 func _get_wheel_local_x(wheel_index: int) -> float:
-	var wheel_uvs := (
-		side_left_wheel_uvs
-		if bus_sprite.texture == bus_side_left_texture
-		else stopped_wheel_uvs
-	)
+	var wheel_uvs := _active_wheel_uvs
+	if wheel_uvs.size() < 2:
+		wheel_uvs = stopped_wheel_uvs
 	if wheel_index >= wheel_uvs.size() or bus_sprite.texture == null:
 		return bus.position.x
 	return (
@@ -613,7 +632,7 @@ func _drive_bus_to(
 		"position:x",
 		target_x,
 		maxf(duration, 0.01)
-	).set_trans(Tween.TRANS_CUBIC).set_ease(
+	).set_trans(Tween.TRANS_SINE).set_ease(
 		Tween.EASE_OUT if settle_on_arrival else Tween.EASE_IN
 	)
 	if settle_on_arrival and bus_settle_seconds > 0.0:
@@ -637,16 +656,32 @@ func _drive_bus_to(
 ## leads. Getting this wrong is what makes it look like it is reversing.
 func _set_bus_travel_art(travel_direction: int) -> void:
 	if travel_direction < 0:
+		var left_frame := bus_side_left_texture
+		if (
+			_show_click_to_mine_art
+			and bus_side_left_click_texture != null
+		):
+			left_frame = bus_side_left_click_texture
 		_apply_bus_art(
-			bus_side_left_texture,
+			left_frame,
 			side_left_sprite_offset,
 			side_left_wheel_uvs
 		)
 	else:
+		var right_frame := bus_side_right_texture
+		var right_offset := stopped_sprite_offset
+		var right_wheel_uvs := stopped_wheel_uvs
+		if (
+			_show_click_to_mine_art
+			and bus_side_right_click_texture != null
+		):
+			right_frame = bus_side_right_click_texture
+			right_offset = side_right_click_sprite_offset
+			right_wheel_uvs = side_right_click_wheel_uvs
 		_apply_bus_art(
-			bus_side_right_texture,
-			stopped_sprite_offset,
-			stopped_wheel_uvs
+			right_frame,
+			right_offset,
+			right_wheel_uvs
 		)
 
 
@@ -662,6 +697,7 @@ func _apply_bus_art(
 		return
 	bus_sprite.texture = frame
 	bus_sprite.position = sprite_offset
+	_active_wheel_uvs = wheel_uvs
 	if _wheel_material == null or wheel_uvs.size() < 2:
 		return
 	_wheel_material.set_shader_parameter(&"wheel_one_uv", wheel_uvs[0])
@@ -682,7 +718,7 @@ func _begin_bus_departure() -> void:
 		"position:x",
 		bus_exit_anchor.position.x,
 		maxf(bus_departure_seconds, 0.01)
-	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 
 
 ## Suspends until the current prop motion is done, if one is running.

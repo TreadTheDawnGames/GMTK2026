@@ -28,7 +28,7 @@ const FLOW_OWNER: StringName = &"run_intro"
 @export_category("Animation")
 ## Held after the menu leaves, before the bus enters, so the player reads the
 ## empty stop first.
-@export_range(0.0, 3.0, 0.05) var hold_after_reveal_seconds: float = 0.0
+@export_range(0.0, 3.0, 0.05) var hold_after_reveal_seconds: float = 0.7
 ## The closing beat: how long the miner takes to plant into his dig stance.
 ## Long enough to read as a deliberate settle rather than a snap.
 @export_range(0.0, 2.0, 0.05) var miner_restore_seconds: float = 0.2
@@ -102,6 +102,10 @@ func _apply_title_shot() -> void:
 
 ## Drives the bus in while the camera closes the shot around it.
 func _play_intro() -> void:
+	# Own the wide framing before the establishing hold. A run reset restores
+	# gameplay zoom during this gap; the active opening camera immediately
+	# reasserts its monotonic title zoom until the bus is framed.
+	opening_camera.start_zoom_in()
 	if hold_after_reveal_seconds > 0.0:
 		await get_tree().create_timer(
 			hold_after_reveal_seconds,
@@ -109,7 +113,6 @@ func _play_intro() -> void:
 		).timeout
 	if not _is_intro_active:
 		return
-	opening_camera.start_zoom_in()
 	await arrival_sequence.play_arrival()
 	if not _is_intro_active:
 		return

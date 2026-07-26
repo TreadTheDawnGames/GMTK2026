@@ -26,6 +26,7 @@ var _active_sfx: Array[AudioStreamPlayer] = []
 ## One entry per authored effect id. SPAWN replaces an existing id and STOP,
 ## timed cleanup, or reset erases it, so growth is bounded by live VFX beats.
 var _active_vfx: Dictionary = {}
+var _reduce_motion_enabled: bool = false
 
 
 func configure(
@@ -45,6 +46,24 @@ func configure(
 	_music_player = AudioStreamPlayer.new()
 	_music_player.name = "CutsceneMusic"
 	add_child(_music_player)
+
+
+## Snaps camera framing and suppresses shake and decorative authored VFX.
+func set_reduce_motion_enabled(enabled: bool) -> void:
+	_reduce_motion_enabled = enabled
+	if not enabled:
+		return
+	_shake_generation += 1
+	if _camera_tween != null and _camera_tween.is_valid():
+		_camera_tween.kill()
+	_camera_tween = null
+	if _impact_shake != null:
+		_impact_shake.end_sustained()
+	for effect_variant in _active_vfx.values():
+		var effect := effect_variant as Node
+		if is_instance_valid(effect):
+			effect.queue_free()
+	_active_vfx.clear()
 
 
 func present_camera_action(
@@ -98,7 +117,7 @@ func present_vfx_action(
 	if action == CutsceneBeat.VfxAction.STOP:
 		_remove_vfx(effect_id)
 		return
-	if scene == null:
+	if _reduce_motion_enabled or scene == null:
 		return
 	_remove_vfx(effect_id)
 	var instance := scene.instantiate()
@@ -159,7 +178,7 @@ func _present_frame(
 	if _camera_tween != null and _camera_tween.is_valid():
 		_camera_tween.kill()
 	_camera_tween = null
-	if duration_seconds <= 0.0:
+	if _reduce_motion_enabled or duration_seconds <= 0.0:
 		if _view_controller != null:
 			_apply_view_offset(target_offset_cells)
 		if _camera != null:
@@ -190,7 +209,7 @@ func _apply_view_offset(offset_cells: Vector2) -> void:
 
 
 func _present_shake(strength: float, duration_seconds: float) -> void:
-	if _impact_shake == null:
+	if _reduce_motion_enabled or _impact_shake == null:
 		return
 	_shake_generation += 1
 	var generation := _shake_generation

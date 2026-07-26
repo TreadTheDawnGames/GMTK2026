@@ -2,6 +2,7 @@ extends Resource
 class_name SaveGame
 
 signal settings_applied(mute_bounce: bool)
+signal reduce_motion_applied(enabled: bool)
 
 const SAVE_PATH: String = "user://savegame.tres"
 const MAX_VOLUME: float = 3.5
@@ -16,6 +17,7 @@ const SFX_BUS: StringName = &"SFX"
 @export var music_volume: float = 0.6
 @export var music_mute: bool = false
 @export var mute_bounce: bool = false
+@export var reduce_motion: bool = false
 ## Options stores the authored menu index: disabled, adaptive, then enabled.
 @export_range(0, 2, 1) var vsync_mode: int = 0
 ## Sparse terrain-space gem records. GemOutcropField keeps these chunked while
@@ -76,6 +78,7 @@ func apply_runtime_settings() -> void:
 	_apply_audio_bus(SFX_BUS, sfx_volume, sfx_mute)
 	apply_vsync_mode(vsync_mode)
 	settings_applied.emit(mute_bounce)
+	reduce_motion_applied.emit(reduce_motion)
 
 
 ## Maps the settings menu index to Godot's non-matching enum order.

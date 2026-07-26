@@ -109,6 +109,7 @@ var _tinted_styles: Dictionary[StyleBox, StyleBox] = {}
 # frame for a strip that usually holds still is waste. Comparing is cheaper.
 var _drawn_combo: int = -1
 var _drawn_is_recovering: bool = false
+var _reduce_motion_enabled: bool = false
 
 @onready var combo_bar: NotchedProgressBar = %ComboBar
 
@@ -132,6 +133,12 @@ func _ready() -> void:
 	material = glow_material
 	if timing_window == null:
 		push_error("TimingBarFeedback requires a TimingWindowTask.")
+
+
+## Keeps color confirmation while removing the frame's spatial expansion.
+func set_reduce_motion_enabled(enabled: bool) -> void:
+	_reduce_motion_enabled = enabled
+	queue_redraw()
 
 
 ## Turns one timing result into one Mark at the slider's resolved position.
@@ -378,7 +385,11 @@ func _draw_frame_flash(mark: Mark, bar: SliderTimingWindow) -> void:
 		return
 	var tint := mark.color
 	tint.a = mark.life * shine_strength
-	var kick := frame_kick_px * mark.life
+	var kick := (
+		0.0
+		if _reduce_motion_enabled
+		else frame_kick_px * mark.life
+	)
 	var surface := _get_shine_surface(bar)
 	# -1 keeps the art's authored margins, so the flash lands exactly on the
 	# frame it is flashing.

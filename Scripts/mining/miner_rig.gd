@@ -402,6 +402,12 @@ func reset_speech_motion() -> void:
 		speech_reaction.reset_speech_motion()
 
 
+## Removes presentation-only speech bounce without changing mining animation.
+func set_reduce_motion_enabled(enabled: bool) -> void:
+	if is_instance_valid(speech_reaction):
+		speech_reaction.set_reduce_motion_enabled(enabled)
+
+
 ## Bounces the miner artwork without changing the gameplay rig position.
 func react_to_presented_line() -> void:
 	if is_instance_valid(speech_reaction):

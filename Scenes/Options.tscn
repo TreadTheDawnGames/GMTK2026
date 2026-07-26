@@ -25,9 +25,9 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -153.0
-offset_top = -113.5
+offset_top = -129.5
 offset_right = 153.0
-offset_bottom = 113.5
+offset_bottom = 129.5
 grow_horizontal = 2
 grow_vertical = 2
 current_tab = 0
@@ -35,7 +35,7 @@ tab_0/hidden = true
 tab_1/hidden = true
 
 [node name="Panel" type="PanelContainer" parent="TabContainer" unique_id=1180579019]
-custom_minimum_size = Vector2(306, 227)
+custom_minimum_size = Vector2(306, 259)
 layout_mode = 2
 metadata/_tab_index = 0
 
@@ -107,6 +107,13 @@ theme_override_font_sizes/font_size = 11
 theme_override_icons/checked = ExtResource("4_q4at1")
 button_pressed = true
 text = "Mute Edge Bounce"
+
+[node name="ReduceMotion" type="CheckBox" parent="TabContainer/Panel/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_icons/checked = ExtResource("4_q4at1")
+text = "Reduce Motion"
 
 [node name="HBoxContainer" type="HBoxContainer" parent="TabContainer/Panel/VBoxContainer" unique_id=1635268855]
 layout_mode = 2

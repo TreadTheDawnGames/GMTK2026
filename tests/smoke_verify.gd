@@ -189,6 +189,9 @@ func _verify_mining_scene() -> void:
 	var cutscene_action_presenter := game_root.get_node_or_null(
 		"MiningScene/Systems/SceneWiring/CutsceneActionPresenter"
 	) as CutsceneActionPresenter
+	var arrival_sequence := game_root.get_node_or_null(
+		"MiningScene/ArrivalIntro"
+	) as ArrivalIntroSequence
 	var mining_controller := game_root.get_node_or_null(
 		"MiningScene/Systems/MiningController"
 	) as MiningController
@@ -542,11 +545,57 @@ func _verify_mining_scene() -> void:
 	)
 	_expect(
 		run_intro_controller != null
-		and run_intro_controller.arrival_sequence != null
+		and arrival_sequence != null
+		and run_intro_controller.arrival_sequence == arrival_sequence
 		and run_intro_controller.arrival_sequence._audio_handler
 			== audio_handler,
 		"SceneWiring must inject AudioHandler into ArrivalIntroSequence."
 	)
+	if arrival_sequence != null:
+		_expect(
+			run_intro_controller.hold_after_reveal_seconds >= 0.6
+				and arrival_sequence.bus_arrival_seconds >= 3.0
+				and arrival_sequence.bus_settle_seconds >= 0.3
+				and arrival_sequence.miner_exit_delay_seconds >= 0.4
+				and arrival_sequence.hold_before_dialogue_seconds >= 0.3
+				and arrival_sequence.bus_departure_seconds >= 3.0,
+			"Surface arrival must preserve its deliberate bus pacing."
+		)
+		_expect(
+			not arrival_sequence.bus.visible,
+			"Surface arrival must keep the bus out of the title shot."
+		)
+		arrival_sequence._show_click_to_mine_art = true
+		arrival_sequence._set_bus_travel_art(1)
+		var desktop_right_art_is_valid := (
+			arrival_sequence.bus_sprite.texture
+				== arrival_sequence.bus_side_right_click_texture
+			and arrival_sequence.bus_sprite.position
+				== arrival_sequence.side_right_click_sprite_offset
+			and arrival_sequence.bus_sprite.scale == Vector2(0.44, 0.44)
+			and arrival_sequence._active_wheel_uvs
+				== arrival_sequence.side_right_click_wheel_uvs
+		)
+		arrival_sequence._set_bus_travel_art(-1)
+		_expect(
+			desktop_right_art_is_valid
+				and arrival_sequence.bus_sprite.texture
+					== arrival_sequence.bus_side_left_click_texture,
+			"Desktop travel must use directional Click to Mine bus art."
+		)
+		arrival_sequence._show_click_to_mine_art = false
+		arrival_sequence._set_bus_travel_art(1)
+		var touch_right_art_is_valid := (
+			arrival_sequence.bus_sprite.texture
+				== arrival_sequence.bus_side_right_texture
+		)
+		arrival_sequence._set_bus_travel_art(-1)
+		_expect(
+			touch_right_art_is_valid
+				and arrival_sequence.bus_sprite.texture
+					== arrival_sequence.bus_side_left_texture,
+			"Touch travel must retain the clean directional bus art."
+		)
 	_expect(
 		TREASURE_HUNTER_APPEARANCE.pose_set != null
 		and TREASURE_HUNTER_APPEARANCE.pose_set.has_pose(&"idle")

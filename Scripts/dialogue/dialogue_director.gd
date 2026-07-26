@@ -29,7 +29,6 @@ signal cinematic_frame_closed
 @export var dialogue_margin: MarginContainer
 @export var speaker_label: Label
 @export var body_label: RichTextLabel
-@export var continue_label: Label
 @export var cinematic_frame: CinematicFrameType
 
 @export_category("Textbox Art")
@@ -431,11 +430,6 @@ func _present_current_line() -> void:
 		if uses_authored_textbox
 		else fallback_body_font_size
 	)
-	var continue_text := (
-		"Continuing..."
-		if line.auto_advance_delay_seconds > 0.0
-		else "Space / Enter / Left Click"
-	)
 	speaker_label.text = display_name
 	# Resolved here, at the last possible moment, because a line that names the
 	# player's own hours has to be read when it is shown rather than when the
@@ -443,7 +437,6 @@ func _present_current_line() -> void:
 	# punctuation delays, the length check - already works from the label, so
 	# they all see the resolved text without knowing this happened.
 	body_label.text = DialogueTokens.resolve(line.text, _player_history)
-	continue_label.text = continue_text
 	_current_line_word_count = 0
 	_set_visible_character_count(0)
 	_show_next_character(_presentation_token)
@@ -494,7 +487,6 @@ func _validate_references() -> bool:
 		and dialogue_margin != null
 		and speaker_label != null
 		and body_label != null
-		and continue_label != null
 		and cinematic_frame != null
 	)
 

@@ -327,6 +327,10 @@ func _ready() -> void:
 		_game_state.save_game.settings_applied,
 		timing_window.set_bounce_muted
 	)
+	_connect_once(
+		_game_state.save_game.reduce_motion_applied,
+		_apply_reduce_motion
+	)
 	# A lost streak gives the darkened frame straight back instead of letting it
 	# decay, so the release reads as part of losing the combo.
 	_connect_once(
@@ -428,7 +432,7 @@ func _ready() -> void:
 	# convert a screen position into terrain.
 	_connect_once(
 		encounter_controller.character_stage_camera_pan_requested,
-		view_controller.set_encounter_view_offset_cells
+		_on_character_stage_camera_pan_requested
 	)
 	_connect_once(
 		encounter_controller.character_stage_camera_action_requested,
@@ -459,7 +463,35 @@ func _ready() -> void:
 		impact_shake.end_sustained
 	)
 	timing_window.set_bounce_muted(_game_state.save_game.mute_bounce)
+	_apply_reduce_motion(_game_state.save_game.reduce_motion)
 	_on_run_depth_changed(_game_state.depth)
+
+
+## Fans the accessibility preference out to presentation-only motion owners.
+func _apply_reduce_motion(enabled: bool) -> void:
+	hit_particles.set_reduce_motion_enabled(enabled)
+	impact_smoke.set_reduce_motion_enabled(enabled)
+	impact_spark.set_reduce_motion_enabled(enabled)
+	combo_vignette.set_reduce_motion_enabled(enabled)
+	dig_number_presenter.set_reduce_motion_enabled(enabled)
+	impact_shake.set_reduce_motion_enabled(enabled)
+	pickaxe_reward_celebration.set_reduce_motion_enabled(enabled)
+	view_controller.set_reduce_motion_enabled(enabled)
+	combo_tier_punch.set_reduce_motion_enabled(enabled)
+	timing_bar_feedback.set_reduce_motion_enabled(enabled)
+	encounter_controller.set_reduce_motion_enabled(enabled)
+	run_intro_controller.attendant_presenter.set_reduce_motion_enabled(enabled)
+	_cutscene_action_presenter.set_reduce_motion_enabled(enabled)
+	rat_colony_followers.set_reduce_motion_enabled(enabled)
+
+
+## Holds the stable encounter frame while an authored pan timeline advances.
+func _on_character_stage_camera_pan_requested(
+	offset_cells: Vector2
+) -> void:
+	if _game_state.save_game.reduce_motion:
+		return
+	view_controller.set_encounter_view_offset_cells(offset_cells)
 
 
 ## Resets shared run state before handing the live title shot to its intro.

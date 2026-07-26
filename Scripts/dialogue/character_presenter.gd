@@ -19,6 +19,7 @@ const GroundWalkType = preload(
 var _base_sprite_position: Vector2
 var _departure_tween: Tween
 var _art_faces_left: bool = false
+var _reduce_motion_enabled: bool = false
 ## Which way the appearance was authored, so "mirrored" means mirrored from the
 ## state the offset was tuned against rather than from flip_h being true.
 var _base_flip_h: bool = false
@@ -54,6 +55,12 @@ func _ready() -> void:
 	_base_sprite_position = character_sprite.position
 	speech_reaction.capture_rest_position()
 	_ensure_ground_shadow()
+
+
+## Removes actor bobbing while preserving poses, travel, and arrival callbacks.
+func set_reduce_motion_enabled(enabled: bool) -> void:
+	_reduce_motion_enabled = enabled
+	speech_reaction.set_reduce_motion_enabled(enabled)
 
 
 ## Puts a contact shadow under this character.
@@ -288,7 +295,7 @@ func move_grounded_to(
 		self,
 		ground_path,
 		duration,
-		step_height
+		0.0 if _reduce_motion_enabled else step_height
 	)
 	if _departure_tween != null and hide_on_finish:
 		_departure_tween.tween_callback(hide)

@@ -157,6 +157,14 @@ func set_run_state(run_state: RunState) -> void:
 	_game_state = run_state
 
 
+## Distributes reduced speech and walking bob without changing story timing.
+func set_reduce_motion_enabled(enabled: bool) -> void:
+	miner_rig.set_reduce_motion_enabled(enabled)
+	for presenter in _presenters:
+		if is_instance_valid(presenter):
+			presenter.set_reduce_motion_enabled(enabled)
+
+
 ## Captures the next cutscene when mining crosses its authored tunnel ceiling.
 func _on_depth_changed(depth: int) -> void:
 	if not _can_schedule_next_encounter():

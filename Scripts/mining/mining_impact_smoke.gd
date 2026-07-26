@@ -108,6 +108,7 @@ class SmokeCloud:
 
 var _cloud: SmokeCloud
 var _random := RandomNumberGenerator.new()
+var _reduce_motion_enabled: bool = false
 
 
 ## Prepares random values and sleeps processing until smoke exists.
@@ -123,6 +124,13 @@ func _ready() -> void:
 	set_process(false)
 
 
+## Clears moving dust and controls whether later impacts may create more.
+func set_reduce_motion_enabled(enabled: bool) -> void:
+	_reduce_motion_enabled = enabled
+	if enabled:
+		_clear_cloud()
+
+
 ## Adds a bonded smoke volume and drives it with the visible swing.
 func play_at_impact(
 	impact_screen_position: Vector2,
@@ -131,7 +139,11 @@ func play_at_impact(
 	_debris_multiplier: float = 1.0,
 	swing_side: int = 1
 ) -> void:
-	if cells_removed <= 0 or terrain_manager == null:
+	if (
+		_reduce_motion_enabled
+		or cells_removed <= 0
+		or terrain_manager == null
+	):
 		return
 	var wind_direction := Vector2(
 		-float(signi(swing_side)),

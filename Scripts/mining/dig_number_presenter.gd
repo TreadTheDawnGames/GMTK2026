@@ -32,11 +32,23 @@ var _random := RandomNumberGenerator.new()
 # Oldest-first references are pruned or retired on every spawn. This array's
 # growth is strictly bounded by the active platform cap above.
 var _active_numbers: Array[DigNumber] = []
+var _reduce_motion_enabled: bool = false
 
 
 ## Seeds travel-distance variation and direction fallback for standalone calls.
 func _ready() -> void:
 	_random.randomize()
+
+
+## Removes moving labels and makes later depth feedback remain static.
+func set_reduce_motion_enabled(enabled: bool) -> void:
+	_reduce_motion_enabled = enabled
+	if not enabled:
+		return
+	for active_number in _active_numbers:
+		if is_instance_valid(active_number):
+			active_number.queue_free()
+	_active_numbers.clear()
 
 
 ## Shows the gameplay depth gained by the current impact.
@@ -121,6 +133,7 @@ func _spawn_dig_number(
 	if dig_number == null:
 		push_error("The configured dig number scene is not a DigNumber.")
 		return null
+	dig_number.set_reduce_motion_enabled(_reduce_motion_enabled)
 	add_child(dig_number)
 	_active_numbers.append(dig_number)
 	# Gameplay launches away from the mining side so the marker clears both the

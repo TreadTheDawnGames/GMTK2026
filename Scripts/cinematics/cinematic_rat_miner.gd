@@ -95,6 +95,7 @@ var _land_on_target: bool = false
 var _motion_bounds := Rect2()
 var _idle_texture: Texture2D
 var _strike_texture: Texture2D
+var _reduce_motion_enabled: bool = false
 
 
 ## Owns the AnimationPlayer completion route for repeated mining strikes.
@@ -116,6 +117,13 @@ func _ready() -> void:
 			_on_animation_finished
 		)
 	hide()
+
+
+## Removes arcs, walking bob, and speech bounce without changing destinations.
+func set_reduce_motion_enabled(enabled: bool) -> void:
+	_reduce_motion_enabled = enabled
+	if is_instance_valid(speech_reaction):
+		speech_reaction.set_reduce_motion_enabled(enabled)
 
 
 ## Resets the actor at an authored screen-space procession start.
@@ -194,7 +202,11 @@ func start_run_to_target(
 	var start_position := global_position
 	var bounded_target := _clamp_to_motion_bounds(target)
 	var resolved_duration := maxf(duration, 0.01)
-	var resolved_height := maxf(arc_height, 0.0)
+	var resolved_height := (
+		0.0
+		if _reduce_motion_enabled
+		else maxf(arc_height, 0.0)
+	)
 	var horizontal_direction := bounded_target.x - start_position.x
 	set_facing_direction(
 		0
@@ -246,7 +258,11 @@ func start_run_to_target(
 			self,
 			ground_path,
 			resolved_duration,
-			GroundWalkType.DEFAULT_STEP_HEIGHT
+			(
+				0.0
+				if _reduce_motion_enabled
+				else GroundWalkType.DEFAULT_STEP_HEIGHT
+			)
 		)
 	_action_tween.tween_callback(_finish_run_to_target)
 	return true
@@ -598,7 +614,10 @@ func _set_emergence_progress(
 ) -> void:
 	var next_position := start_position.lerp(landing_position, progress)
 	next_position.y -= (
-		wall_pop_rise * 4.0 * progress * (1.0 - progress)
+		(0.0 if _reduce_motion_enabled else wall_pop_rise)
+		* 4.0
+		* progress
+		* (1.0 - progress)
 	)
 	global_position = _clamp_to_motion_bounds(next_position)
 

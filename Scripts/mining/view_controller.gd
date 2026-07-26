@@ -56,6 +56,7 @@ var _last_miner_screen_offset := Vector2(NAN, NAN)
 var _is_encounter_focus_active: bool = false
 var _is_encounter_release_active: bool = false
 var _encounter_view_tween: Tween
+var _reduce_motion_enabled: bool = false
 ## The frame the encounter focus settled on, which authored camera moves during
 ## that encounter are measured from.
 var _encounter_focus_view := Vector2.ZERO
@@ -140,6 +141,30 @@ func focus_miner_for_encounter(subject_rest_screen_y: float = NAN) -> void:
 	)
 
 
+## Snaps active encounter framing to its endpoint when motion is reduced.
+func set_reduce_motion_enabled(enabled: bool) -> void:
+	_reduce_motion_enabled = enabled
+	if not enabled or _encounter_view_tween == null:
+		return
+	if _is_encounter_release_active:
+		var release_view_position := target_view_position
+		if (
+			config.mining_camera_style
+				== MiningConfig.MiningCameraStyle.CHUNK_SNAP
+		):
+			release_view_position.y = _get_chunk_camera_y(
+				target_view_position.y
+			)
+		_cancel_encounter_view_tween()
+		_apply_encounter_view_position(release_view_position)
+		_on_encounter_release_tween_finished()
+		return
+	if _is_encounter_focus_active:
+		_cancel_encounter_view_tween()
+		_apply_encounter_view_position(_encounter_focus_view)
+		_on_encounter_focus_tween_finished()
+
+
 ## Slides the framed view off the framing an encounter settled on, in terrain
 ## cells, on both axes.
 ##
@@ -211,6 +236,10 @@ func _tween_encounter_view_to(
 ) -> void:
 	var current_view_position := Vector2(current_view_x, current_view_y)
 	if current_view_position.is_equal_approx(view_position):
+		_apply_encounter_view_position(view_position)
+		finished_callback.call()
+		return
+	if _reduce_motion_enabled:
 		_apply_encounter_view_position(view_position)
 		finished_callback.call()
 		return

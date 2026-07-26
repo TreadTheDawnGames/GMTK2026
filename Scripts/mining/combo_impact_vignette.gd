@@ -39,6 +39,7 @@ var _requested_darkness: float = 0.0
 var _current_darkness: float = 0.0
 var _punch: float = 0.0
 var _is_releasing: bool = false
+var _reduce_motion_enabled: bool = false
 
 
 ## Sleeps the layer until the first combo large enough to darken the frame.
@@ -50,6 +51,14 @@ func _ready() -> void:
 	if not get_viewport().size_changed.is_connected(_update_viewport_aspect):
 		get_viewport().size_changed.connect(_update_viewport_aspect)
 	_update_viewport_aspect()
+
+
+## Keeps sustained combo contrast while removing the per-impact inward pulse.
+func set_reduce_motion_enabled(enabled: bool) -> void:
+	_reduce_motion_enabled = enabled
+	if enabled:
+		_punch = 0.0
+		_apply_shader_values()
 
 
 ## Reacts to one landed hit. Shares the impact presentation signature so the
@@ -77,7 +86,8 @@ func play_at_impact(
 		_requested_darkness,
 		engaged_strength * maximum_darkness
 	)
-	_punch = maxf(_punch, engaged_strength * maximum_punch)
+	if not _reduce_motion_enabled:
+		_punch = maxf(_punch, engaged_strength * maximum_punch)
 	vignette_rect.visible = true
 	set_process(true)
 

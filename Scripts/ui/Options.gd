@@ -12,6 +12,7 @@ class_name OptionsMenu
 	$TabContainer/Panel/VBoxContainer/HBoxContainer2/Control/VSyncOptions
 )
 @onready var mute_bounce: CheckBox = %MuteBounce
+@onready var reduce_motion: CheckBox = %ReduceMotion
 @onready var master_volume: VolumeControl = %MasterVolume
 @onready var music: VolumeControl = %Music
 @onready var sfx: VolumeControl = %SFX
@@ -95,6 +96,7 @@ func _connect_controls() -> void:
 ## Maps the saved domain values to their matching controls and audio buses.
 func _load_controls_from_save(save_game: SaveGame) -> void:
 	mute_bounce.set_pressed_no_signal(save_game.mute_bounce)
+	reduce_motion.set_pressed_no_signal(save_game.reduce_motion)
 	v_sync_options.select(save_game.vsync_mode)
 	master_volume.load_bus_setting(
 		save_game.master_volume,
@@ -107,6 +109,7 @@ func _load_controls_from_save(save_game: SaveGame) -> void:
 ## Maps controls back to the matching saved fields without crossing buses.
 func _copy_controls_to_save(save_game: SaveGame) -> void:
 	save_game.mute_bounce = mute_bounce.button_pressed
+	save_game.reduce_motion = reduce_motion.button_pressed
 	save_game.vsync_mode = v_sync_options.selected
 	save_game.master_volume = master_volume.slider.value
 	save_game.master_mute = master_volume.check_box.button_pressed

@@ -29,7 +29,7 @@ shadow_size = 9
 resource_local_to_scene = true
 shader = ExtResource("4_iris")
 
-[node name="DialogueDirector" type="CanvasLayer" unique_id=1373788107 node_paths=PackedStringArray("dialogue_root", "bottom_panel", "textbox_art", "fallback_panel", "dialogue_margin", "speaker_label", "body_label", "continue_label", "cinematic_frame")]
+[node name="DialogueDirector" type="CanvasLayer" unique_id=1373788107 node_paths=PackedStringArray("dialogue_root", "bottom_panel", "textbox_art", "fallback_panel", "dialogue_margin", "speaker_label", "body_label", "cinematic_frame")]
 process_mode = 3
 layer = 20
 script = ExtResource("1_director")
@@ -40,7 +40,6 @@ fallback_panel = NodePath("DialogueRoot/BottomPanel/FallbackPanel")
 dialogue_margin = NodePath("DialogueRoot/BottomPanel/Margin")
 speaker_label = NodePath("DialogueRoot/BottomPanel/Margin/Content/SpeakerLabel")
 body_label = NodePath("DialogueRoot/BottomPanel/Margin/Content/BodyLabel")
-continue_label = NodePath("DialogueRoot/BottomPanel/Margin/Content/ContinueLabel")
 cinematic_frame = NodePath("CinematicFrame")
 mr_sitts_textbox_texture = ExtResource("5_mr_sitts")
 quibble_textbox_texture = ExtResource("6_quibble")
@@ -163,9 +162,3 @@ theme_override_font_sizes/normal_font_size = 20
 text = "Dialogue text"
 fit_content = true
 scroll_active = false
-
-[node name="ContinueLabel" type="Label" parent="DialogueRoot/BottomPanel/Margin/Content" unique_id=2123947753]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.72, 0.72, 0.76, 1)
-text = "Space / Enter"
-horizontal_alignment = 2

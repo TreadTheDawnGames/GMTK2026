@@ -39,6 +39,7 @@ class ConfettiParticle:
 # Growth is hard-capped to the native/web particle count and cleared per burst.
 var _particles: Array[ConfettiParticle] = []
 var _random := RandomNumberGenerator.new()
+var _reduce_motion_enabled: bool = false
 
 
 func _ready() -> void:
@@ -46,8 +47,22 @@ func _ready() -> void:
 	set_process(false)
 
 
+## Clears decorative confetti and controls whether later rewards may spawn it.
+func set_reduce_motion_enabled(enabled: bool) -> void:
+	_reduce_motion_enabled = enabled
+	if not enabled:
+		return
+	_particles.clear()
+	set_process(false)
+	queue_redraw()
+
+
 func play_for_upgrade(_definition: PickaxeDefinition) -> void:
-	if miner_rig == null or palette.is_empty():
+	if (
+		_reduce_motion_enabled
+		or miner_rig == null
+		or palette.is_empty()
+	):
 		return
 	_particles.clear()
 	var burst_count := particle_count

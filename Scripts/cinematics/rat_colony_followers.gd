@@ -106,6 +106,7 @@ var _live_follower_count: int = 0
 ## Rotates through the live rats so each impact hands the strike to a different
 ## few. Without it the same front rats would swing every time.
 var _strike_cursor: int = 0
+var _reduce_motion_enabled: bool = false
 
 
 func _ready() -> void:
@@ -122,6 +123,25 @@ func _ready() -> void:
 		if appearance != null:
 			follower.set_appearance(appearance)
 	deactivate_followers()
+
+
+## Snaps the formation into place and removes repeated decorative strikes.
+func set_reduce_motion_enabled(enabled: bool) -> void:
+	_reduce_motion_enabled = enabled
+	for follower in followers:
+		if is_instance_valid(follower):
+			follower.set_reduce_motion_enabled(enabled)
+	if not enabled or not _is_active:
+		return
+	for follower_index in range(_live_follower_count):
+		var follower := followers[follower_index]
+		if not is_instance_valid(follower):
+			continue
+		follower.prepare_for_sequence(
+			to_global(get_slot_position(follower_index)),
+			follower_index
+		)
+		_apply_rank_look(follower, get_rank_for_index(follower_index))
 
 
 ## Returns the art one pool slot wears: clump art for the ranks at the back,
@@ -233,6 +253,13 @@ func _apply_rank_look(follower: CinematicRatMiner, rank: int) -> void:
 ## stagger.
 func _begin_arrival(follower: CinematicRatMiner, follower_index: int) -> void:
 	var slot_local := get_slot_position(follower_index)
+	if _reduce_motion_enabled:
+		follower.prepare_for_sequence(
+			to_global(slot_local),
+			follower_index
+		)
+		_apply_rank_look(follower, get_rank_for_index(follower_index))
+		return
 	var entry_local := Vector2(
 		(
 			-arrival_offscreen_pixels
@@ -286,7 +313,12 @@ func _on_player_impact_resolved(
 	_debris_multiplier: float,
 	swing_side: int
 ) -> void:
-	if not _is_active or cells_removed <= 0 or _live_follower_count <= 0:
+	if (
+		_reduce_motion_enabled
+		or not _is_active
+		or cells_removed <= 0
+		or _live_follower_count <= 0
+	):
 		return
 	var facing := signi(swing_side) if swing_side != 0 else 1
 	var budget := mini(_get_strike_budget(), _live_follower_count)

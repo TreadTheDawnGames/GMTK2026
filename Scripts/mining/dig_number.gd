@@ -36,6 +36,12 @@ var _arc_end_position: Vector2
 var _arc_maximum_bottom_y: float
 var _maximum_launch_rect: Rect2
 var _player_exclusion_rect: Rect2
+var _reduce_motion_enabled: bool = false
+
+
+## Chooses static or animated presentation before this label is presented.
+func set_reduce_motion_enabled(enabled: bool) -> void:
+	_reduce_motion_enabled = enabled
 
 
 ## Animates the value from the hammer contact using its captured combo.
@@ -164,6 +170,18 @@ func present(
 			maximum_vertical_extent * 2.0
 		)
 	)
+	if _reduce_motion_enabled:
+		scale = Vector2.ONE * final_display_scale
+		rotation = 0.0
+		await get_tree().create_timer(
+			lifetime_seconds,
+			true,
+			false,
+			true
+		).timeout
+		queue_free()
+		return
+
 	var pop_seconds := minf(lifetime_seconds * 0.14, 0.2)
 	var settle_seconds := minf(lifetime_seconds * 0.12, 0.16)
 	var pop_tween := create_tween()
