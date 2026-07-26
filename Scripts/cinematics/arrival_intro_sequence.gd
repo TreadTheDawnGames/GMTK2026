@@ -22,6 +22,14 @@ extends Node2D
 signal arrival_finished
 signal attendant_picked_up
 
+var _audio_handler: PlayerAudioHandler
+
+
+## Receives the shared audio service from the mining composition root.
+func set_audio_handler(audio_handler: PlayerAudioHandler) -> void:
+	_audio_handler = audio_handler
+
+
 @export_category("References")
 @export var miner_rig: MinerRig
 @export var bus: Node2D
@@ -264,7 +272,9 @@ func play_arrival() -> void:
 	if not _is_playing:
 		return
 
-	var bus_audio := AudioHandler.play_sound(AudioLibrary.BUS_FULL)
+	var bus_audio: AudioStreamPlayer = (
+		_audio_handler.play_sound(AudioLibrary.BUS_FULL)
+	)
 	create_tween().tween_property(bus_audio, "volume_linear", 0.0, 0.0)
 	create_tween().tween_property(bus_audio, "volume_linear", 1, 1)
 	
@@ -477,7 +487,13 @@ func _run_drive_past() -> void:
 		bus_exit_anchor.position.x,
 		bus_stop_anchor.position.y
 	)
-	var bus_audio := AudioHandler.PlaySoundAtGlobalPosition(AudioLibrary.BUS, bus.global_position, bus)
+	var bus_audio: AudioStreamPlayer2D = (
+		_audio_handler.PlaySoundAtGlobalPosition(
+			AudioLibrary.BUS,
+			bus.global_position,
+			bus
+		)
+	)
 	bus_audio.volume_db = 0
 	var t : Tween = create_tween()
 	t.tween_property(bus_audio, "volume_linear", 0.0, 0.0)
