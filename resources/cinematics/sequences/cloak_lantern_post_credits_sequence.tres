@@ -1,62 +1,58 @@
 [gd_resource type="Resource" script_class="CutsceneSequence" format=3 uid="uid://cr1rnbl25ljjc"]
 
-[ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="1_23fys"]
-[ext_resource type="Resource" uid="uid://3j8lrt4pcauc" path="res://resources/dialogue/cloak_lantern_post_credits_conversation.tres" id="2_645qm"]
-[ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="3_727ah"]
+[ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="1_beat"]
+[ext_resource type="Resource" uid="uid://3j8lrt4pcauc" path="res://resources/dialogue/cloak_lantern_post_credits_conversation.tres" id="2_conversation"]
+[ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="3_sequence"]
 
-[sub_resource type="Resource" id="Resource_ndvu7"]
-script = ExtResource("1_23fys")
+[sub_resource type="Resource" id="Beat_show"]
+script = ExtResource("1_beat")
 kind = 9
 actor = &"cloak_lantern"
+notes = "prepare() has already stood him on the Entrance mark and shown him. Entrance, Conversation, Rest and Exit are all the same point in this room, so that mark is simply where he is: the frame opens on him already standing there.
 
-[sub_resource type="Resource" id="Resource_mm486"]
-script = ExtResource("1_23fys")
-kind = 0
-actor = &"cloak_lantern"
-duration_seconds = 2.4
-target_marker = &"Conversation"
-starts_from_authored_point = true
-start_marker = &"Entrance"
-pose = &"walk"
+This beat states it anyway so the timeline is the whole account of the shot and does not depend on the stage having done half of it first. Encounter 5 opens the same way and for the same reason."
 
-[sub_resource type="Resource" id="Resource_j7bpi"]
-script = ExtResource("1_23fys")
+[sub_resource type="Resource" id="Beat_face"]
+script = ExtResource("1_beat")
 kind = 2
 actor = &"cloak_lantern"
-start_seconds = 2.4
 facing = -1
+notes = "Looking left, at the miner, who is one measured miner-width to his left. Facing is a world direction; CharacterPresenter folds art_faces_left in, so -1 is looking left whichever way the art was drawn.
 
-[sub_resource type="Resource" id="Resource_83tlx"]
-script = ExtResource("1_23fys")
-kind = 1
-actor = &"cloak_lantern"
-start_seconds = 2.4
-pose = &"idle"
+Nothing moves him in this shot, so this is the only thing that can aim him. A MOVE sets its own facing along its travel, and there is no MOVE here."
 
-[sub_resource type="Resource" id="Resource_v6udw"]
-script = ExtResource("1_23fys")
+[sub_resource type="Resource" id="Beat_hold"]
+script = ExtResource("1_beat")
+kind = 4
+duration_seconds = 1.2
+notes = "A second and a fifth of the two of them and nothing else, before he speaks.
+
+Twice the pause at 5,600, which was 0.6. This is his third and last appearance and the slowest of the three: the credits have run, nothing is chasing anybody, and there is no reason for him to start talking the moment the ceiling comes in. The held silence is what makes the room read as somewhere he has been standing for a while rather than somewhere he has just arrived."
+
+[sub_resource type="Resource" id="Beat_dialogue"]
+script = ExtResource("1_beat")
 kind = 5
-start_seconds = 4.0
+start_seconds = 1.2
 duration_seconds = 6.0
-conversation = ExtResource("2_645qm")
-notes = "His last appearance and the slowest. Nothing follows him, so nothing about it hurries."
+conversation = ExtResource("2_conversation")
+notes = "The whole conversation: 'Yo chud, you been digging a long time.' / 'Only a zillion more swings until you reach The Thief.'
 
-[sub_resource type="Resource" id="Resource_m2qka"]
-script = ExtResource("1_23fys")
-kind = 0
-actor = &"cloak_lantern"
-start_seconds = 10.0
-duration_seconds = 3.2
-target_marker = &"Exit"
-pose = &"walk"
+Six seconds is the authored estimate the editor scrubs against, not the real length. This beat blocks, so the clock holds here for exactly as long as the player takes to read and every beat after it slides by the same amount.
 
-[sub_resource type="Resource" id="Resource_60cri"]
-script = ExtResource("1_23fys")
-kind = 10
-actor = &"cloak_lantern"
-start_seconds = 13.2
+Do not split this into two beats to land a cue between the lines. line_range is authored and validated but depth_encounter_controller currently ignores it, so any DIALOGUE beat plays the whole conversation.
+
+NOTHING IS STAGED AGAINST THE JOKE. 'Yo chud' is a register he has never used - the same figure delivered the Thief foreshadowing at 1,400 and the warning at 5,600 without once being casual - and the shot deliberately does not acknowledge it. No bounce, no quickened pacing, no loosened posture. He says it in the voice he used for everything else, and the break lands because the staging refuses to play along with it. A version that leaned into it was considered and rejected on 2026-07-25."
+
+[sub_resource type="Resource" id="Beat_settle"]
+script = ExtResource("1_beat")
+kind = 4
+start_seconds = 7.2
+duration_seconds = 1.4
+notes = "A held beat on the two of them after the last line, before the timeline ends and play_closing takes him. Without it the shot cuts straight from the dialogue box closing to him fading, and the line does not get to land. Half a second longer than the same beat at 5,600, for the same reason the opening pause is twice as long.
+
+THIS IS THE LAST BEAT ON PURPOSE. The timeline does not walk him off and does not hide him. play_closing owns the departure: Closing Facing turns him away, Closing Fade Seconds hops him once and fades him out where he stands over 1.8s, and Hide Actor After Closing takes him at the end of it. A timeline that also moved or hid him would be fighting the thing that is about to do it properly. Encounter 5 ends on a WAIT for exactly this reason."
 
 [resource]
-script = ExtResource("3_727ah")
+script = ExtResource("3_sequence")
 sequence_id = &"cloak_lantern_post_credits_sequence"
-beats = Array[ExtResource("1_23fys")]([SubResource("Resource_ndvu7"), SubResource("Resource_mm486"), SubResource("Resource_j7bpi"), SubResource("Resource_83tlx"), SubResource("Resource_v6udw"), SubResource("Resource_m2qka"), SubResource("Resource_60cri")])
+beats = Array[ExtResource("1_beat")]([SubResource("Beat_show"), SubResource("Beat_face"), SubResource("Beat_hold"), SubResource("Beat_dialogue"), SubResource("Beat_settle")])

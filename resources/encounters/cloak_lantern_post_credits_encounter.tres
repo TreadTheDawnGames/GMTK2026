@@ -16,6 +16,7 @@ appearance = ExtResource("2_appearance")
 conversation = ExtResource("3_dialogue")
 stage_scene = ExtResource("4_dn0dd")
 sequence = ExtResource("4_hsnfh")
+plays_authored_timeline = true
 speaker_slot = &"cloak_lantern"
 requires_credits_complete = true
 terrain_sculpt = ExtResource("6_hsnfh")
