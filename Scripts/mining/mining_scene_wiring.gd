@@ -227,6 +227,10 @@ func _ready() -> void:
 	)
 	_connect_once(
 		mining_controller.impact_resolved,
+		credits_overlay.play_at_impact
+	)
+	_connect_once(
+		mining_controller.impact_resolved,
 		combo_vignette.play_at_impact
 	)
 	# One escalation model feeds every presenter below, so the music, the
@@ -352,6 +356,10 @@ func _ready() -> void:
 	_connect_once(
 		credits_overlay.credits_completed,
 		encounter_controller._on_credits_completed
+	)
+	_connect_once(
+		credits_overlay.inscription_dig_band_changed,
+		mining_controller.set_inscription_dig_band
 	)
 	_connect_once(
 		# Fractional high-precision wheel steps stay intact across the UI/view
