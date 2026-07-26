@@ -24,10 +24,30 @@ signal cinematic_frame_closed
 @export_category("References")
 @export var dialogue_root: Control
 @export var bottom_panel: Control
+@export var textbox_art: TextureRect
+@export var fallback_panel: Control
+@export var dialogue_margin: MarginContainer
 @export var speaker_label: Label
 @export var body_label: RichTextLabel
 @export var continue_label: Label
 @export var cinematic_frame: CinematicFrameType
+
+@export_category("Textbox Art")
+@export var mr_sitts_textbox_texture: Texture2D
+@export var quibble_textbox_texture: Texture2D
+@export var rotini_textbox_texture: Texture2D
+@export var sparky_textbox_texture: Texture2D
+@export var zeb_textbox_texture: Texture2D
+@export var ayden_textbox_texture: Texture2D
+@export var coco_textbox_texture: Texture2D
+@export var art_margin_left: int = 218
+@export var art_margin_top: int = 72
+@export var art_margin_right: int = 24
+@export var art_margin_bottom: int = 50
+@export var fallback_margin_left: int = 22
+@export var fallback_margin_top: int = 16
+@export var fallback_margin_right: int = 22
+@export var fallback_margin_bottom: int = 14
 
 @export_category("Typewriter")
 @export_range(0.001, 0.2, 0.001) var character_display_speed: float = 0.03
@@ -303,6 +323,43 @@ func _present_current_line() -> void:
 	var display_name := (
 		_active_conversation.get_participant_display_name(line.speaker_slot)
 	)
+	var textbox_texture: Texture2D = null
+	match line.speaker_slot:
+		&"miner":
+			textbox_texture = sparky_textbox_texture
+		&"treasure_hunter":
+			textbox_texture = zeb_textbox_texture
+		&"rutini":
+			textbox_texture = rotini_textbox_texture
+		&"coffee_cat":
+			textbox_texture = quibble_textbox_texture
+		&"cheese_girl":
+			textbox_texture = coco_textbox_texture
+		&"moody_teen":
+			textbox_texture = ayden_textbox_texture
+		&"mr_sitts", &"newspaper_reader":
+			textbox_texture = mr_sitts_textbox_texture
+	var uses_authored_textbox := textbox_texture != null
+	textbox_art.texture = textbox_texture
+	textbox_art.visible = uses_authored_textbox
+	fallback_panel.visible = not uses_authored_textbox
+	speaker_label.visible = not uses_authored_textbox
+	dialogue_margin.add_theme_constant_override(
+		"margin_left",
+		art_margin_left if uses_authored_textbox else fallback_margin_left
+	)
+	dialogue_margin.add_theme_constant_override(
+		"margin_top",
+		art_margin_top if uses_authored_textbox else fallback_margin_top
+	)
+	dialogue_margin.add_theme_constant_override(
+		"margin_right",
+		art_margin_right if uses_authored_textbox else fallback_margin_right
+	)
+	dialogue_margin.add_theme_constant_override(
+		"margin_bottom",
+		art_margin_bottom if uses_authored_textbox else fallback_margin_bottom
+	)
 	var continue_text := (
 		"Continuing..."
 		if line.auto_advance_delay_seconds > 0.0
@@ -356,6 +413,9 @@ func _validate_references() -> bool:
 	return (
 		dialogue_root != null
 		and bottom_panel != null
+		and textbox_art != null
+		and fallback_panel != null
+		and dialogue_margin != null
 		and speaker_label != null
 		and body_label != null
 		and continue_label != null

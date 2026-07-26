@@ -167,6 +167,69 @@ func _verify_mining_scene() -> void:
 		and dialogue_director.cinematic_frame.is_closed(),
 		"Title menu must keep the cinematic bars off the live terrain."
 	)
+	if dialogue_director != null:
+		var art_conversation := DialogueConversation.new()
+		art_conversation.conversation_id = &"smoke_textbox_art"
+		var expected_textures: Dictionary[StringName, Texture2D] = {
+			&"miner": dialogue_director.sparky_textbox_texture,
+			&"treasure_hunter": dialogue_director.zeb_textbox_texture,
+			&"rutini": dialogue_director.rotini_textbox_texture,
+			&"coffee_cat": dialogue_director.quibble_textbox_texture,
+			&"cheese_girl": dialogue_director.coco_textbox_texture,
+			&"moody_teen": dialogue_director.ayden_textbox_texture,
+			&"newspaper_reader": dialogue_director.mr_sitts_textbox_texture,
+		}
+		for speaker_slot: StringName in expected_textures:
+			var participant := DialogueParticipant.new()
+			participant.slot = speaker_slot
+			participant.display_name = str(speaker_slot)
+			art_conversation.participants.append(participant)
+		var opening_participant := DialogueParticipant.new()
+		opening_participant.slot = &"opening_voice"
+		opening_participant.display_name = "..."
+		art_conversation.participants.append(opening_participant)
+		var art_line := DialogueLine.new()
+		art_line.speaker_slot = &"miner"
+		art_line.text = "Textbox art smoke check."
+		art_conversation.lines.append(art_line)
+		var previous_pause_gameplay := dialogue_director.pause_gameplay
+		var previous_auto_frame := dialogue_director.auto_frame_conversations
+		dialogue_director.pause_gameplay = false
+		dialogue_director.auto_frame_conversations = false
+		for speaker_slot: StringName in expected_textures:
+			art_line.speaker_slot = speaker_slot
+			var art_started := dialogue_director.start_conversation(
+				art_conversation
+			)
+			_expect(
+				art_started
+				and dialogue_director.textbox_art.visible
+				and not dialogue_director.fallback_panel.visible
+				and not dialogue_director.speaker_label.visible
+				and (
+					dialogue_director.textbox_art.texture
+					== expected_textures[speaker_slot]
+				),
+				"Dialogue slot '%s' must use its authored textbox art."
+				% speaker_slot
+			)
+			if art_started:
+				dialogue_director.finish_conversation()
+		art_line.speaker_slot = &"opening_voice"
+		var fallback_started := dialogue_director.start_conversation(
+			art_conversation
+		)
+		_expect(
+			fallback_started
+			and not dialogue_director.textbox_art.visible
+			and dialogue_director.fallback_panel.visible
+			and dialogue_director.speaker_label.visible,
+			"Speakers without supplied art must retain the readable fallback."
+		)
+		if fallback_started:
+			dialogue_director.finish_conversation()
+		dialogue_director.pause_gameplay = previous_pause_gameplay
+		dialogue_director.auto_frame_conversations = previous_auto_frame
 	# Sculpt streaming now expands eight authored cells per packed byte. Compare
 	# complete representative rows to the authoritative resource so the faster
 	# bulk path cannot reverse bit order or change protected-floor collision.
