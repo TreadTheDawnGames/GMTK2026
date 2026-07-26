@@ -158,6 +158,11 @@ func _dress_trodden_floor(preview: Node) -> void:
 		MINING_CONFIG.initial_surface_row + ENCOUNTER.depth_from_surface
 	) * float(MINING_CONFIG.terrain_cell_world_size)
 	renderer.set_trodden_floor(true, floor_world_y)
+	# The lit horizontal plane is a second, separate opt-in on the same floor
+	# line - form and dressing are separate choices - so a capture that applied
+	# only the dressing would be a picture of half the shot.
+	if ENCOUNTER.lights_floor_as_plane:
+		renderer.set_cutscene_floor_plane(true, floor_world_y)
 
 
 ## Re-renders the centre landing at every other shape the game can open in.

@@ -20,6 +20,7 @@ stage_scene = ExtResource("5_t6y43")
 sequence = ExtResource("5_lyax5")
 plays_authored_timeline = true
 dresses_trodden_floor = true
+lights_floor_as_plane = true
 speaker_slot = &"treasure_hunter"
 pickaxe_reward = ExtResource("4_pickaxe")
 terrain_sculpt = ExtResource("7_lyax5")
