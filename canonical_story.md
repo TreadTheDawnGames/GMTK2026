@@ -6,6 +6,14 @@ Status: Canonical story order and approved dialogue supplied by Jared on
 July 25, 2026. This supersedes the earlier July 25 numbering that counted the
 opening as an encounter.
 
+Later on July 25, Jared ruled that Zephan's reference videos post-date this
+document and should lead where the two disagree. That ruling is currently
+applied to **Encounter 6 only**, as a split rather than a reversal: the video
+leads on beats, staging, order, and anything missing here, while this document
+keeps the wording of lines both sources have. Encounter 6's "Yippee! Wahoo!" is
+the first change made under it. Every other encounter still follows this
+document as written; do not extend the ruling without asking Jared.
+
 This document is the source of truth for narrative order, dialogue, and intended
 first-run pacing. Do not reorder, remove, replace, paraphrase, or silently correct
 these beats without Jared or Zephan approving the narrative change.
@@ -13,6 +21,9 @@ these beats without Jared or Zephan approving the narrative change.
 ## Story Rules
 
 - The opening at depth 0 is not an encounter.
+- Excluding the menu and opening, there are 11 underground story scenes:
+  Encounters 1 through 9, the post-credits Lantern Keeper warning, and the
+  Thief finale.
 - The pre-thief story targets a roughly 15-minute first playthrough.
 - Depth, not elapsed time, triggers encounters. The times below are pacing targets.
 - Encounters happen in mineable tunnels entered by breaking through from above.
@@ -25,18 +36,18 @@ these beats without Jared or Zephan approving the narrative change.
 | Story beat | Target depth | Target time | Summary |
 | --- | ---: | ---: | --- |
 | Opening | 0 | 0:00 | A bus drops the Miner at the excavation site. An unattributed voice tells him he already knows the Thief lies below and that only fools find him. |
-| Encounter 1 — Cheese Girl | 300 | 0:40 | Cheese Girl checks on the Miner, invites him to her cheese Cafe, and runs away after saying goodbye. |
-| Encounter 2 — Lantern Keeper | 1,400 | 1:30 | The Lantern Keeper approaches slowly and asks how many people the Miner must meet before noticing their loneliness. |
-| Encounter 3 — Rotini | 2,500 | 2:40 | Rotini is introduced on the cave path while searching for the Cafe with his boys. Existing `rutini_*` resource names refer to Rotini until a coordinated rename is approved. |
-| Encounter 4 — Treasure Hunter | 4,000 | 4:00 | The Treasure Hunter mines in from the side and gifts the first improved pickaxe while insisting the treasure remains his. |
-| Encounter 5 — Lantern Keeper’s Warning | 5,600 | 5:30 | The Lantern Keeper warns that people searching for the Thief fail to notice what disappears along the way. |
-| Encounter 6 — The Treasure | 7,400 | 7:15 | The Treasure Hunter finds his treasure and gifts the player another pickaxe because he no longer needs it. This is a second, distinct gift. |
-| Encounter 7 — Quibble | 9,200 | 9:00 | Quibble is introduced while searching for the Cafe and gives the Miner a permanent coffee speed boost. Existing `coffee_cat_*` resource names refer to Quibble. |
-| Encounter 8 — Rotini and the Colony | 11,200 | 11:00 | The Miner tells Rotini that the cheese Cafe is straight down. Rotini’s rat colony joins the Miner and digs downward. |
-| Encounter 9 — The Cheese Cafe | 14,000 | 14:00 | The Miner reaches the Cafe gathering with Cheese Girl, the Treasure Hunter, Rotini and his rats, Quibble, and the Lantern Keeper. |
-| Credits | 15,000 | 15:00 | Credits begin while the player remains able to dig. Continuing through the credits is intentional. |
-| Post-credits warning | 15,200 | Post-credits | The Lantern Keeper remarks on how long the player has been digging and says only a zillion more swings remain before the Thief. |
-| The Thief | 100,000 | Long-term objective | The player finally reaches the Thief. The exact reveal and dialogue remain intentionally unspecified here. |
+| Scene 1 / Encounter 1 — Cheese Girl | 300 | 0:40 | Cheese Girl checks on the Miner, invites him to her cheese Cafe, and runs away after saying goodbye. |
+| Scene 2 / Encounter 2 — Lantern Keeper | 1,400 | 1:30 | The Lantern Keeper approaches slowly and asks how many people the Miner must meet before noticing their loneliness. |
+| Scene 3 / Encounter 3 — Rotini | 2,500 | 2:40 | Rotini is introduced on the cave path while searching for the Cafe with his boys. Existing `rutini_*` resource names refer to Rotini until a coordinated rename is approved. |
+| Scene 4 / Encounter 4 — Treasure Hunter | 4,000 | 4:00 | The Treasure Hunter mines in from the side and gifts the first improved pickaxe while insisting the treasure remains his. |
+| Scene 5 / Encounter 5 — Lantern Keeper’s Warning | 5,600 | 5:30 | The Lantern Keeper warns that people searching for the Thief fail to notice what disappears along the way. |
+| Scene 6 / Encounter 6 — The Treasure | 7,400 | 7:15 | The Treasure Hunter finds his treasure and gifts the player another pickaxe because he no longer needs it. This is a second, distinct gift. |
+| Scene 7 / Encounter 7 — Quibble | 9,200 | 9:00 | Quibble is introduced while searching for the Cafe and gives the Miner a permanent coffee speed boost. Existing `coffee_cat_*` resource names refer to Quibble. |
+| Scene 8 / Encounter 8 — Rotini and the Colony | 11,200 | 11:00 | The Miner tells Rotini that the cheese Cafe is straight down. Rotini’s rat colony joins the Miner and digs downward. |
+| Scene 9 / Encounter 9 — The Cheese Cafe | 14,000 | 14:00 | The Miner reaches the Cafe gathering with Cheese Girl, the Treasure Hunter, Rotini and his rats, Quibble, and the Lantern Keeper. |
+| Credits transition — not a scene | 15,000 | 15:00 | Credits begin while the player remains able to dig. Continuing through the credits is intentional. |
+| Scene 10 — Post-credits Lantern Keeper | 15,200 | Post-credits | The Lantern Keeper remarks on how long the player has been digging and says only a zillion more swings remain before the Thief. |
+| Scene 11 — The Thief | 100,000 | Long-term objective | The player finally reaches the Thief. The exact reveal and dialogue remain intentionally unspecified here. |
 
 ## Approved Dialogue and Action
 
@@ -116,7 +127,11 @@ leaving the Miner at the excavation site.*
 
 ### Encounter 6 — The Treasure, 7,400 depth
 
-*The Treasure Hunter has finally reached the treasure he spent years seeking.*
+*The Treasure Hunter has finally reached the treasure he spent years seeking.
+The Miner hears him celebrating through the rock before he breaks into the
+chamber.*
+
+**TREASURE HUNTER: Yippee! Wahoo!**
 
 **TREASURE HUNTER: I found it. More treasure than I could ever carry.**
 
@@ -150,7 +165,7 @@ leaving the Miner at the excavation site.*
 
 ### Encounter 8 — Rotini and the Colony, 11,200 depth
 
-**ROTINI: You again? Did you find the cheese cafe? We seem to have gotten lost in our own tunnels.k**
+**ROTINI: You again? Did you find the cheese cafe? We seem to have gotten lost in our own tunnels.**
 
 **MINER: ...**
 

@@ -493,4 +493,4 @@ layer = 12
 script = ExtResource("30_dig_number_presenter")
 dig_number_scene = ExtResource("31_dig_number")
 timing_window = NodePath("../MiningScene/HUD/TimingWindow")
-player_visual = NodePath("../MiningScene/MinerRig/VisualRoot/DrawnMinerSprite")
+player_visual = NodePath("../MiningScene/MinerRig/VisualRoot/PoseRoot/DrawnMinerSprite")

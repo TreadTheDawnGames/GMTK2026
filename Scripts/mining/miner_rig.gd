@@ -18,25 +18,19 @@ signal swing_finished
 @export_range(0.0, 1.0, 0.05) var combo_speed_bonus: float = 0.35
 
 @export_category("Placement")
-## Seats the miner on the pale top stratum at the surface and character floors.
+## Seats Eve's redrawn miner on the pale top stratum at the surface.
 ##
-## Measured rather than guessed: on an authored encounter floor his sole landed
-## ten pixels under the floor line the cast are placed on, so he read as standing
-## in the ground while whoever he was talking to stood on it. Six puts the sole
-## on that line. This is one value for the surface and for cutscene floors, so
-## check the bus-stop opening if it is changed again.
-@export_range(0.0, 64.0, 1.0) var intact_floor_grounding_offset_y: float = 6.0
-## The same seating, for the run's own starting surface.
+## The rig root is at y 202 and the visible sole is 66.83 px below VisualRoot,
+## so -11 keeps the boot a little over two pixels above the y 260 terrain rim.
+## Dynamic mined floors use the measured LandingFootAnchor below.
+@export_range(-64.0, 64.0, 1.0) var intact_floor_grounding_offset_y: float = -11.0
+## The same measured seating for the run's starting surface.
 ##
-## It is separate because the two floors are not the same thing. A cutscene
-## floor is a cut room he shares with a standing cast, so his sole goes on their
-## line. The surface is the top of the terrain, where the shelf falls away
-## toward the camera and the value that seats him on a room floor leaves him
-## standing high on the lip. Six put him right in a room and too high at the bus
-## stop; this is the one the opening is measured against.
-@export_range(0.0, 64.0, 1.0) var surface_grounding_offset_y: float = 16.0
-## Slightly overlaps the sampled dirt edge so texture filtering cannot show a gap.
-@export_range(0.0, 4.0, 0.25) var grounding_overlap_y: float = 1.0
+## It remains a separate value because a future surface redraw must not silently
+## move every underground encounter.
+@export_range(-64.0, 64.0, 1.0) var surface_grounding_offset_y: float = -11.0
+## Keeps the measured sole above the sampled dirt edge rather than inside it.
+@export_range(0.0, 4.0, 0.25) var grounding_clearance_y: float = 1.0
 ## Lifts the sole baseline slightly on each cinematic walking step.
 @export_range(0.0, 12.0, 0.5) var cinematic_walk_step_height: float = 4.0
 ## Controls how many visible walking steps fit along a traversal segment.
@@ -61,19 +55,32 @@ signal swing_finished
 ## of his own shaft in every frame, and the foreground stratum cut him off at the
 ## shins for the whole descent rather than only while he was genuinely inside the
 ## ground. That is the cost of this value, and it is accepted on purpose: being
-## occluded by the ground he is standing in is the read, and a cutscene lifts him
-## clear of it anyway through cutscene_draw_order.
+## occluded by the foreground while his soles remain above the second stratum is
+## the read.
 ##
 ## Kept strictly between the two frontmost strata z indices, currently 2 and 0.
 ## verify_cutscene_cast_draw_order.gd asserts that relationship, because this
 ## number and the terrain profile live in different files.
 @export_range(0, 16, 1) var buried_draw_order: int = 1
-## Standing in an authored cutscene room, in front of terrain layer one
-## (z_index 2) again. A cutscene frames the whole cast standing on the room's
-## floor and holds on it, so the foreground stratum cutting him off at the shins
-## reads as a bug there even though it is exactly right while mining the same
-## depth. Ordinary mining is untouched: only an active encounter asks for this.
-@export_range(0, 16, 1) var cutscene_draw_order: int = 3
+## Standing in an authored cutscene room: the SECOND stratum, the same one he
+## occupies while mining.
+##
+## Zephan's direction is that every character sits on the second layer, the way
+## the miner already does while he digs, so the foreground rock closes over the
+## cast in a cutscene exactly as it closes over him in the run. This used to be 3
+## - clear of every stratum - on the reasoning that a held shot should show a
+## whole man. That reads as a more legible frame and as a different world: the
+## cast were pasted on top of rock everything else in the game is inside.
+##
+## Whether it is worth keeping as its own number now that it equals
+## buried_draw_order: yes. They mean different things - one is where a man stands
+## while working, the other is where a shot puts its cast - and a future change to
+## either should not silently move the other.
+##
+## This one value is also the whole cast's. DepthEncounterController copies it
+## onto the character layer, so moving it moves every visitor with him; there is
+## no per-character draw order to keep in step with it.
+@export_range(0, 16, 1) var cutscene_draw_order: int = 1
 
 @export_category("References")
 @export var animation_player: AnimationPlayer
@@ -83,6 +90,14 @@ signal swing_finished
 @export var idle_miner_texture: Texture2D
 @export var wind_up_miner_texture: Texture2D
 @export var impact_miner_texture: Texture2D
+@export_category("Pickaxe Upgrade Poses")
+@export var silver_idle_miner_texture: Texture2D
+@export var silver_wind_up_miner_texture: Texture2D
+@export var silver_impact_miner_texture: Texture2D
+@export var gold_idle_miner_texture: Texture2D
+@export var gold_wind_up_miner_texture: Texture2D
+@export var gold_impact_miner_texture: Texture2D
+@export_category("References")
 ## Drawn while a cutscene drops him into its room. Null keeps the idle frame,
 ## which is how this behaved before the pose existed.
 ##
@@ -107,6 +122,16 @@ var _playing_full_swing: bool = false
 var _rest_position: Vector2
 var _visual_root_rest_y: float
 var _cinematic_override_active: bool = false
+## True while a shot is deliberately keeping him face down, so neither the
+## landing sprawl's own timer nor anything else stands him back up early.
+var _is_landing_held: bool = false
+## The drawn sprite's authored placement, captured before anything swaps a pose.
+var _base_drawn_sprite_position: Vector2
+var _base_drawn_sprite_scale: Vector2
+## Opaque-body measurements per pose texture. get_used_rect scans every pixel of
+## a half-megapixel canvas, and poses swap on every swing, so each is measured
+## once for the life of the run.
+var _pose_metrics_cache: Dictionary = {}
 var _cinematic_rest_position: Vector2
 var _cinematic_rest_visual_scale: Vector2
 var _cinematic_rest_z_as_relative: bool
@@ -121,6 +146,9 @@ var _walked_screen_x: float = 0.0
 var _walk_stride_progress: float = 0.0
 var _walk_step_lift: float = 0.0
 var _audio_handler: PlayerAudioHandler
+var _active_idle_miner_texture: Texture2D
+var _active_wind_up_miner_texture: Texture2D
+var _active_impact_miner_texture: Texture2D
 
 
 ## Supplies the cross-scene audio service at the composition boundary.
@@ -132,10 +160,17 @@ func set_audio_handler(audio_handler: PlayerAudioHandler) -> void:
 func _ready() -> void:
 	_rest_position = position
 	_visual_root_rest_y = visual_root.position.y
+	# The authored placement of the drawn sprite, which every mining pose is
+	# measured against and which the cutscene poses are aligned back to.
+	_base_drawn_sprite_position = drawn_miner_sprite.position
+	_base_drawn_sprite_scale = drawn_miner_sprite.scale
+	_active_idle_miner_texture = idle_miner_texture
+	_active_wind_up_miner_texture = wind_up_miner_texture
+	_active_impact_miner_texture = impact_miner_texture
 	# The rig owns its own draw order from here on, so the two authored values
 	# above are the only place it is decided.
 	z_index = get_rest_draw_order()
-	_set_miner_texture(idle_miner_texture)
+	_set_miner_texture(_active_idle_miner_texture)
 	show_intact_floor_grounding()
 	_ensure_ground_shadow()
 	if not animation_player.animation_finished.is_connected(
@@ -170,7 +205,7 @@ func play_success(
 	path_direction: int
 ) -> void:
 	set_facing_direction(path_direction)
-	_set_miner_texture(idle_miner_texture)
+	_set_miner_texture(_active_idle_miner_texture)
 	var combo_multiplier := lerpf(
 		1.0,
 		1.0 + combo_speed_bonus,
@@ -188,12 +223,12 @@ func play_success(
 
 ## Swaps to the readable anticipation pose before hammer contact.
 func _show_success_wind_up() -> void:
-	_set_miner_texture(wind_up_miner_texture)
+	_set_miner_texture(_active_wind_up_miner_texture)
 
 
 ## Reports the hammer-tip position when the animation reaches the ground.
 func _emit_success_impact() -> void:
-	_set_miner_texture(impact_miner_texture)
+	_set_miner_texture(_active_impact_miner_texture)
 	if _audio_handler != null:
 		_audio_handler.play_sound(AudioLibrary.IMPACT)
 	impact_contact.emit(impact_point.global_position)
@@ -201,7 +236,7 @@ func _emit_success_impact() -> void:
 
 ## Plays the missed-swing animation.
 func play_miss(_combo: int) -> void:
-	_set_miner_texture(idle_miner_texture)
+	_set_miner_texture(_active_idle_miner_texture)
 	_playing_full_swing = false
 	animation_player.stop()
 	animation_player.speed_scale = animation_speed_multiplier
@@ -210,7 +245,7 @@ func play_miss(_combo: int) -> void:
 
 ## Holds the miner in the raised pickaxe pose.
 func play_wind_up() -> void:
-	_set_miner_texture(wind_up_miner_texture)
+	_set_miner_texture(_active_wind_up_miner_texture)
 	_playing_full_swing = false
 	animation_player.stop()
 	animation_player.speed_scale = animation_speed_multiplier
@@ -219,7 +254,7 @@ func play_wind_up() -> void:
 
 ## Holds the miner in the downward impact pose.
 func play_wind_down() -> void:
-	_set_miner_texture(impact_miner_texture)
+	_set_miner_texture(_active_impact_miner_texture)
 	_playing_full_swing = false
 	animation_player.stop()
 	animation_player.speed_scale = animation_speed_multiplier
@@ -229,7 +264,7 @@ func play_wind_down() -> void:
 ## Previews the raised and impact poses in sequence.
 func play_full_swing() -> void:
 	# Authoring preview for the anticipation and contact poses.
-	_set_miner_texture(wind_up_miner_texture)
+	_set_miner_texture(_active_wind_up_miner_texture)
 	_playing_full_swing = true
 	animation_player.stop()
 	animation_player.speed_scale = animation_speed_multiplier
@@ -258,6 +293,24 @@ func set_hammer_head_color(color: Color) -> void:
 			drawn_miner_sprite.material as ShaderMaterial
 		)
 		drawn_material.set_shader_parameter(&"tool_tint", color)
+
+
+## Selects one complete, consistently registered pose set for the newest tool.
+func set_pickaxe_visual_tier(tier: int) -> void:
+	match tier:
+		PickaxeDefinition.VisualTier.SILVER:
+			_active_idle_miner_texture = silver_idle_miner_texture
+			_active_wind_up_miner_texture = silver_wind_up_miner_texture
+			_active_impact_miner_texture = silver_impact_miner_texture
+		PickaxeDefinition.VisualTier.GOLD:
+			_active_idle_miner_texture = gold_idle_miner_texture
+			_active_wind_up_miner_texture = gold_wind_up_miner_texture
+			_active_impact_miner_texture = gold_impact_miner_texture
+		_:
+			_active_idle_miner_texture = idle_miner_texture
+			_active_wind_up_miner_texture = wind_up_miner_texture
+			_active_impact_miner_texture = impact_miner_texture
+	_set_miner_texture(_active_idle_miner_texture)
 
 
 ## Faces the visible miner toward the selected mining side.
@@ -377,6 +430,32 @@ func show_cutscene_fall() -> void:
 	_set_miner_texture(falling_miner_texture)
 
 
+## Puts him face down and leaves him there until somebody picks him up.
+##
+## show_cutscene_landing() below gets him up again after its own authored sprawl,
+## which is right for arriving in a room: he hits the floor, gets up, the scene
+## carries on. This is the other case - he is on the ground because something is
+## happening around him, and how long that lasts is decided by the thing
+## happening rather than by a duration authored here. A rat stampede runs for as
+## long as the player takes to read the line that started it.
+func hold_cutscene_landing() -> void:
+	if landed_miner_texture == null:
+		return
+	_is_landing_held = true
+	animation_player.stop()
+	_set_miner_texture(landed_miner_texture)
+
+
+## Picks him up from a held landing. Safe to call when nothing is being held, so
+## a cancelled encounter can call it without knowing whether it ever floored him.
+func release_cutscene_landing() -> void:
+	if not _is_landing_held:
+		return
+	_is_landing_held = false
+	if not _cinematic_override_active:
+		_play_idle()
+
+
 ## Lands him on his face and picks him up again. Safe to call when no fall pose
 ## was ever shown; it simply returns him to idle.
 func show_cutscene_landing() -> void:
@@ -398,8 +477,10 @@ func show_cutscene_landing() -> void:
 	)
 	await sprawl_timer.timeout
 	# Only if nothing else has claimed his presentation in the meantime: a
-	# cancelled encounter restores its own pose and must not be overwritten.
-	if not _cinematic_override_active:
+	# cancelled encounter restores its own pose and must not be overwritten, and
+	# a shot that has since floored him deliberately must not be stood up by a
+	# timer that started before it.
+	if not _cinematic_override_active and not _is_landing_held:
 		_play_idle()
 
 
@@ -460,7 +541,7 @@ func seat_landing_foot_at_screen_y(support_screen_y: float) -> void:
 	# foot happened to be and keep it there.
 	var grounding_delta: float = (
 		support_screen_y
-		+ grounding_overlap_y
+		- grounding_clearance_y
 		- (landing_foot_anchor.global_position.y + _get_walk_step_lift())
 	)
 	var current_grounding_offset: float = (
@@ -655,14 +736,106 @@ func _finish_cinematic_visual_restore() -> void:
 
 ## Swaps authored full-frame poses without changing gameplay coordinates.
 func _set_miner_texture(texture: Texture2D) -> void:
-	if texture != null and is_instance_valid(drawn_miner_sprite):
-		drawn_miner_sprite.texture = texture
+	if texture == null or not is_instance_valid(drawn_miner_sprite):
+		return
+	drawn_miner_sprite.texture = texture
+	_align_cutscene_pose(texture)
+
+
+## Puts a cutscene pose at the size and on the ground line the mining poses use.
+##
+## Every pose shares one sprite, one position and one scale, which is only right
+## while they all share a canvas and put the body in the same place inside it.
+## They do not. The landed pose is drawn 343 opaque pixels wide against the idle
+## pose's 243 - forty per cent larger - and its lowest opaque row sits about 39
+## units higher, so swapped as-is he lies oversized and floating clear of the
+## floor he is supposed to be lying on.
+##
+## Only the two cutscene poses are touched. The mining poses are left exactly as
+## authored, because their placement is what the swing animations key against and
+## nothing about ordinary digging is being fixed here.
+##
+## Derived from the images rather than authored as two magic numbers, because an
+## authored offset is right until somebody redraws the art and then silently
+## wrong. CharacterPresenter measures its own bodies the same way for the same
+## reason.
+func _align_cutscene_pose(texture: Texture2D) -> void:
+	var is_cutscene_pose := (
+		texture == falling_miner_texture
+		or texture == landed_miner_texture
+	)
+	if not is_cutscene_pose or idle_miner_texture == null:
+		drawn_miner_sprite.position = _base_drawn_sprite_position
+		drawn_miner_sprite.scale = _base_drawn_sprite_scale
+		return
+	var reference := _get_pose_metrics(idle_miner_texture)
+	var pose := _get_pose_metrics(texture)
+	if reference.is_empty() or pose.is_empty() or float(pose["width"]) <= 0.0:
+		return
+
+	# Match the drawing scale of the standing art, so the man lying down is the
+	# same man. Width is the measure because the two mining poses already agree
+	# on it exactly; height cannot be, since a sprawled figure is legitimately
+	# shorter than a standing one.
+	var scale_multiplier: float = (
+		float(reference["width"]) / float(pose["width"])
+	)
+	drawn_miner_sprite.scale = _base_drawn_sprite_scale * scale_multiplier
+	# Then drop it so this pose's lowest drawn row sits exactly where the idle
+	# pose's does. That row is his soles standing up and his side lying down, and
+	# it is the line the floor is under either way.
+	drawn_miner_sprite.position = Vector2(
+		_base_drawn_sprite_position.x,
+		_get_body_bottom_y(
+			reference,
+			_base_drawn_sprite_scale.y,
+			_base_drawn_sprite_position.y
+		)
+		- _get_body_bottom_y(
+			pose,
+			_base_drawn_sprite_scale.y * scale_multiplier,
+			0.0
+		)
+	)
+
+
+## Returns where a pose's lowest opaque row is drawn, for a sprite scale and a
+## node y. A centred Sprite2D draws its canvas centre on the node position, so
+## the canvas top is half the scaled canvas above it.
+func _get_body_bottom_y(
+	metrics: Dictionary,
+	scale_y: float,
+	node_y: float
+) -> float:
+	return (
+		node_y
+		- float(metrics["canvas_height"]) * scale_y * 0.5
+		+ float(metrics["bottom"]) * scale_y
+	)
+
+
+## Measures one pose's opaque body inside its canvas, once per texture.
+func _get_pose_metrics(texture: Texture2D) -> Dictionary:
+	var cache_key := texture.resource_path
+	if _pose_metrics_cache.has(cache_key):
+		return _pose_metrics_cache[cache_key]
+	var image := texture.get_image()
+	if image == null:
+		return {}
+	var opaque := image.get_used_rect()
+	var metrics := {
+		"width": float(opaque.size.x),
+		"bottom": float(opaque.end.y),
+		"canvas_height": float(image.get_height()),
+	}
+	_pose_metrics_cache[cache_key] = metrics
+	return metrics
 
 
 ## Returns finished actions to idle after any queued strike plays.
 func _on_animation_finished(animation_name: StringName) -> void:
 	if animation_name == &"wind_up" and _playing_full_swing:
-		_set_miner_texture(impact_miner_texture)
+		_set_miner_texture(_active_impact_miner_texture)
 		return
 	if animation_name == &"three_frame_success":
 		_playing_full_swing = false
@@ -676,6 +849,6 @@ func _on_animation_finished(animation_name: StringName) -> void:
 
 ## Plays idle at the current speed setting.
 func _play_idle() -> void:
-	_set_miner_texture(idle_miner_texture)
+	_set_miner_texture(_active_idle_miner_texture)
 	animation_player.speed_scale = animation_speed_multiplier
 	animation_player.play(&"idle")

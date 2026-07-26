@@ -16,6 +16,12 @@ signal cue_started(cue_id: StringName, line_index: int)
 signal cue_finished(cue_id: StringName)
 signal closing_finished
 signal presentation_strike_requested(screen_position: Vector2)
+## Asks the owner to open real rock where a strike landed, for a character who
+## mines their way into a room rather than walking into one.
+signal presentation_rock_break_requested(
+	screen_position: Vector2,
+	radius_cells: int
+)
 signal sequence_dialogue_requested(
 	conversation: DialogueConversation,
 	line_range: Vector2i
@@ -78,14 +84,7 @@ signal sequence_dialogue_requested(
 ## Dynamically keeps this actor beside the miner regardless of landing column.
 @export var conversation_tracks_miner: bool = false
 ## Presenter-root offset; actor sprite offsets remain authored by appearance.
-##
-## The range reaches most of the way to the frame edge because a conversation
-## partner is not always the nearest thing to the miner. The Treasure Hunter
-## stands on the far side of his own hoard, so the gap has to be wide enough to
-## hold a set piece and still leave both bodies in a 1152px frame centred on the
-## miner. Tracking keeps that gap constant, so a large offset costs nothing at
-## the extremes of the landing band the way a fixed marker would.
-@export_range(-512.0, 512.0, 1.0) var conversation_root_offset_from_miner_x: float = 0.0
+@export_range(-256.0, 256.0, 1.0) var conversation_root_offset_from_miner_x: float = 0.0
 ## Slides this stage's props with its tracked cast instead of leaving them
 ## pinned to the room.
 ##
@@ -100,6 +99,19 @@ signal sequence_dialogue_requested(
 ## shift that tracking already applied. Off by default, so every room whose
 ## props are authored against its own terrain is untouched.
 @export var props_track_tracked_cast: bool = false
+## How much rock a strike on this stage opens, as a radius in terrain cells.
+##
+## Zero, the default, leaves a strike exactly what it has always been: dirt,
+## smoke, shake and sparks against rock nothing removes. That is right for
+## Rotini's rats, who are mining alongside the miner rather than through anything.
+##
+## Above zero the strike also breaks a bounded pocket of real terrain, which is
+## what lets a character mine their way into a room. Pair it with a room whose
+## approach is authored SEALED: the point is that the wall is intact when the shot
+## opens, so a room already open makes the swing decorative again. The floor is
+## never at risk however large this is, because the terrain call refuses guarded
+## floor rows outright.
+@export_range(0, 16, 1) var strike_breaks_rock_radius_cells: int = 0
 ## Optional visual-editor timeline. Null preserves the legacy opening walk.
 @export var sequence: CutsceneSequence
 ## Actors already painted into this stage's own artwork, by actor id.
@@ -208,7 +220,12 @@ func prepare(
 	_restore_modulate = presenter.modulate
 	presenter.modulate.a = 1.0
 	_presenter.cancel_grounded_motion()
-	_presenter.global_position = entrance_marker.global_position
+	var entrance_position := entrance_marker.global_position
+	if _floor_sampler.is_valid():
+		var entrance_floor_y := float(_floor_sampler.call(entrance_position.x))
+		if not is_nan(entrance_floor_y) and not is_inf(entrance_floor_y):
+			entrance_position.y = entrance_floor_y
+	_presenter.global_position = entrance_position
 	_presenter.show()
 	_apply_facing(entrance_facing)
 	_is_active = true
@@ -241,6 +258,28 @@ func play_opening() -> void:
 	# anything set earlier is overwritten by the approach.
 	_apply_facing(conversation_facing)
 	opening_finished.emit()
+
+
+## Tells a stage that a dialogue line has just gone up, and who is saying it.
+##
+## Does nothing here on purpose. Most stages hold still while people talk and
+## need no notice of it; this exists for the ones running a continuous routine of
+## their own, which otherwise have no way to know the shot is mid-sentence.
+## Quibble's caffeine loop is the case that asked for it - he cannot be seen
+## drinking his coffee while his own line is being typed out.
+##
+## The slot is passed rather than a bare "somebody is speaking", because whose
+## line it is decides the answer: a character is free to carry on with whatever
+## he is doing while the person opposite him talks.
+##
+## This is a notification, never permission. A stage may not present, advance, or
+## delay a line from here; DialogueDirector remains the only thing that runs a
+## conversation.
+func on_dialogue_line_presented(
+	_speaker_slot: StringName,
+	_line_index: int
+) -> void:
+	pass
 
 
 ## Plays one editor-authored animation named by the active dialogue line.
@@ -334,6 +373,13 @@ func request_presentation_strike(marker_name: StringName) -> bool:
 		)
 		return false
 	presentation_strike_requested.emit(marker.global_position)
+	# Rock second, so the feedback and the opening are asked for in the order they
+	# read: the swing lands, then the wall gives.
+	if strike_breaks_rock_radius_cells > 0:
+		presentation_rock_break_requested.emit(
+			marker.global_position,
+			strike_breaks_rock_radius_cells
+		)
 	return true
 
 
@@ -358,18 +404,13 @@ func validate_stage() -> String:
 	return ""
 
 
-## Samples the injected floor but refuses ground that falls away below where the
-## walk set out from. The miner arrives by breaking a crater through the room's
-## floor, and the shared sampler reports the bottom of that crater as support,
-## so an actor crossing it walks down into the hole and climbs back out. Rising
-## ground is still followed; only falling ground is refused.
-func _sample_level_floor(screen_x: float, walk_floor_y: float) -> float:
+## Samples the same authored support used by every cutscene actor. Markers own
+## horizontal staging only; their Y values must never pull a character away
+## from the second-stratum support while entering, conversing, or leaving.
+func _sample_level_floor(screen_x: float, _walk_floor_y: float) -> float:
 	if not _floor_sampler.is_valid():
 		return NAN
-	var sampled_y := float(_floor_sampler.call(screen_x))
-	if is_nan(sampled_y):
-		return sampled_y
-	return minf(sampled_y, walk_floor_y)
+	return float(_floor_sampler.call(screen_x))
 
 
 func _play_named_animation(animation_name: StringName) -> StringName:

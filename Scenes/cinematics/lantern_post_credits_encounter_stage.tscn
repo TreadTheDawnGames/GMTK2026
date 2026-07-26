@@ -1,33 +1,93 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
+[ext_resource type="Script" uid="uid://7qy8qeox17tk" path="res://Scripts/cinematics/cutscene_actor_preview.gd" id="2_preview"]
+[ext_resource type="Resource" uid="uid://dq5euoa1catq7" path="res://resources/encounters/cloak_lantern_character_appearance.tres" id="3_lantern"]
+[ext_resource type="Script" uid="uid://bpg6fvsw6y7ai" path="res://resources/encounters/character_appearance.gd" id="4_appearance"]
+[ext_resource type="Texture2D" uid="uid://bq8qwl3xn5qny" path="res://Assets/Characters/miner_idle-Pickaxe.png" id="5_miner"]
+[ext_resource type="Resource" uid="uid://cr1rnbl25ljjc" path="res://resources/cinematics/sequences/cloak_lantern_post_credits_sequence.tres" id="6_sequence"]
+
+[sub_resource type="Resource" id="Resource_miner_preview"]
+script = ExtResource("4_appearance")
+texture = ExtResource("5_miner")
+sprite_scale = Vector2(0.203, 0.203)
+sprite_offset = Vector2(0, -88)
 
 [node name="LanternPostCreditsEncounterStage" instance=ExtResource("1_stage")]
-editor_description = "Story beat 12, depth 15,200, after the credits: the lantern-staff man tells the player the end has been reached and only miles of stone remain between them and the Thief. His third and last appearance, and the slowest: he enters from further out and leaves without hurry, because nothing follows him. His art is drawn looking left, so he stays on the miner's right."
-opening_move_seconds = 2.2
-closing_move_seconds = 3.2
-opening_step_height = 5.0
+editor_description = "Encounter 10, depth 15,200, after the credits: the Lantern Keeper's last appearance. The miner breaks through into a tunnel the Keeper is already standing in, is told he has been digging a long time and that only a zillion more swings stand between him and the Thief, and the Keeper is gone.
+
+Driven by an authored CutsceneSequence - cloak_lantern_post_credits_encounter.tres has Plays Authored Timeline on. The timeline owns the shot up to the end of its last beat; play_closing runs afterwards and owns the departure. The exports below that the timeline does not use are still set honestly, because a stage whose sequence is ever cleared has to degrade into a shot rather than into nothing.
+
+HE DOES NOT WALK. Entrance, Conversation, Rest and Exit are all the same mark, so prepare() stands him there and the frame simply opens on him. This is the same grammar as both of his earlier appearances - at 1,400 he is on a ledge and hops off into the dark, at 5,600 he is at a bench and fades with it - and it is the whole of what the character is: he does not travel, he is somewhere and then he is not. An earlier placeholder for this room had him entering from 600px out and walking off 700px to the right like Cheese Girl. That was rejected on 2026-07-25: making his last appearance the one where he finally behaves like an ordinary person throws away the only thing the first two established.
+
+He is on the miner's right because his art is drawn looking left, one measured miner-width away (129.4, from the spacing table in the authoring guide). He faces left through the whole conversation, then Closing Facing turns him away before he goes - the turn-away-then-leave language his first appearance set.
+
+THE SHOT IS THE SLOWEST OF THE THREE. Nothing follows him and nothing is at stake, so every duration here is longer than its equivalent at 5,600: 1.2s of held silence before he speaks against 0.6, 1.4s after the last line against 0.9, and a 1.8s hop-and-fade against 1.2.
+
+CONVERSATION TRACKS MINER IS ON AND PROPS TRACK TRACKED CAST IS NOT. Tracking slides ActorMarkers to whatever column the fall left the miner in, which is what keeps the Keeper one measured width from him however the snaking descent arrived. Props Track Tracked Cast is off because this room has no props - unlike 5,600, where the bench had to travel with him. Turn it on only if something is added under PropMarkers that belongs to the conversation rather than to the rock.
+
+THE ROOM IS A CAVE, NOT A CORRIDOR. Cut by local_tests/carve_lantern_post_credits_room.gd. Every other cutscene room in the game is carve_level_tunnel - a rectangle of constant clear height with a scalloped roof - which reads as a passage somebody cut. This one is swept as a chain of overlapping discs whose radius and height both wander, so the rock bulges into alcoves, pinches between them, and hangs stalactites: 16 cells of clear height at the tightest pinch against 37 at the tallest alcove, where a tunnel holds one number end to end. Discs rather than a height per column, because a height per column can only ever give flat or vertical edges and comes out a staircase however finely it is cut - the same reason carve_jagged_end_wall resolves a face one row at a time.
+
+Still open at both ends, and that part is unchanged: this is post-credits and the dig carries on past the last person the player meets, so there is nothing to wall off.
+
+THE FLOOR IS DEAD FLAT FROM COLUMN 160 TO 242 AND THAT IS LOAD-BEARING. That span is the landing band plus the Keeper's 17-cell conversation offset plus half a body each side, and it carries no rubble at all; the profile eases in over ten columns beyond it. This is encounter 7's lesson, not a preference - it textured its whole floor and put an eight pixel step directly under Quibble, which reads as him standing in front of a wall the height of his own shins. A cell is eight pixels, so eight is the smallest step there is, and the marker set slides to the miner's landing column, so a step that misses him one run is underneath him the next.
+
+The carve script refuses to save a room that fails any of it: rubble inside the flat span, headroom under a standing figure, a fall that stops short of the floor, rock left hanging under its own ceiling, or a ceiling so uniform the room has come out a corridor again.
+
+Reference: none. Zephan's package has no clip for this beat - the ten videos cover encounters 1 to 9 - so the staging is derived from the character's own two earlier appearances and from canonical_story.md's one-line entry for the post-credits warning. The dialogue is Jared's, given verbatim on 2026-07-25."
+opening_move_seconds = 0.2
+closing_move_seconds = 1.8
+opening_step_height = 6.0
 hide_actor_after_closing = true
+closing_fade_seconds = 1.8
+entrance_facing = -1
+conversation_facing = -1
+closing_facing = 1
 conversation_tracks_miner = true
 conversation_root_offset_from_miner_x = 129.4
+sequence = ExtResource("6_sequence")
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
-editor_description = "Further out than his earlier two arrivals, so the last approach is the longest."
-position = Vector2(504, 0)
+editor_description = "The same mark as Conversation. He is already standing here when the ceiling comes in, so there is no approach to walk and Opening Move Seconds is only long enough to keep the tween honest. The timeline's first beat is a SHOW, not a MOVE."
+position = Vector2(-46.6, 0)
 
 [node name="Conversation" parent="ActorMarkers" index="1"]
-position = Vector2(-96, 0)
+editor_description = "One measured miner-width (129.4) to the miner's right. The authored x is where he stands for a dead-centre fall: the stage sits 22 cells right of the terrain centre, so the miner is at -176 here and this mark is 129.4 right of him. Conversation Tracks Miner re-derives the whole root's shift from wherever this marker currently is, so the value is for reading the scene, not for the result."
+position = Vector2(-46.6, 0)
+
+[node name="Work" parent="ActorMarkers" index="2"]
+editor_description = "Unused by this shot. Nothing in the timeline walks him anywhere, and the stage requires the marker to exist, so it is parked a short way down the tunnel rather than left on top of the other four. Aim a later beat at it if this room ever grows one."
+position = Vector2(120, 0)
 
 [node name="Rest" parent="ActorMarkers" index="3"]
-position = Vector2(-96, 0)
+editor_description = "His own mark. Hide Actor After Closing is on, so play_closing goes to Exit and this is never the target - it is kept on the same point so that clearing that switch leaves him standing where he was rather than sliding somewhere else."
+position = Vector2(-46.6, 0)
 
 [node name="Exit" parent="ActorMarkers" index="4"]
-editor_description = "Past the right edge of the frame, so he is out of shot well before he is hidden."
-position = Vector2(604, 0)
+editor_description = "His own mark. He does not leave by walking: Closing Fade Seconds hops him once and fades him out where he stands over 1.8s, and the move play_closing runs has nowhere to go. Moving this off his mark would drag the fade across the room and turn a disappearance into an exit."
+position = Vector2(-46.6, 0)
 
 [node name="EditorTerrainPreview" parent="." index="4"]
 editor_description = "Previews cloak_lantern_post_credits at its authored depth."
 encounter_id = &"cloak_lantern_post_credits"
 preview_depth_rows = 15200
+
+[node name="cloak_lantern" type="Node2D" parent="." index="5"]
+z_index = 1
+position = Vector2(-46.6, 0)
+script = ExtResource("2_preview")
+actor_id = &"cloak_lantern"
+appearance = ExtResource("3_lantern")
+pose = &"idle"
+metadata/_edit_group_ = true
+
+[node name="Miner" type="Node2D" parent="." index="6"]
+editor_description = "Where the miner stands for a dead-centre landing: the stage sits 22 cells right of the terrain centre, so he is 176px left of this stage's own origin."
+z_index = 1
+position = Vector2(-176, 0)
+script = ExtResource("2_preview")
+actor_id = &"miner"
+appearance = SubResource("Resource_miner_preview")
+metadata/_edit_group_ = true
 
 [editable path="ActorMarkers"]

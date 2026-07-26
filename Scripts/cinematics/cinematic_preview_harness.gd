@@ -217,6 +217,7 @@ func _play_named_encounter(encounter_id: StringName) -> void:
 		_set_status("No encounter named '%s' is scheduled." % encounter_id)
 		return
 	encounter._next_encounter_index = encounter_index
+	_release_credits_gate_if_needed(encounter, encounter_index)
 	_set_status("Beat: %s (crossing ceiling)" % encounter_id)
 	_descend_to(_get_encounter_ceiling(encounter, encounter_index))
 	await get_tree().process_frame
@@ -225,6 +226,37 @@ func _play_named_encounter(encounter_id: StringName) -> void:
 	_land_at(_get_encounter_floor_depth(encounter, encounter_index))
 	await get_tree().process_frame
 	_set_status("Beat: %s (playing) - R replays" % encounter_id)
+
+
+## Tells the controller the credits have run, but only for an encounter that says
+## it needs them.
+##
+## _can_schedule_next_encounter refuses to reserve a credits-gated encounter until
+## _credits_have_completed is true, and this harness never plays the credits. So
+## the post-credits beat crossed its ceiling, was refused, and the preview sat on
+## a tunnel with nothing in it - indistinguishable from the harness having simply
+## restarted the game, with nothing in any log. It is the same class of silent
+## refusal the descend-and-land pair above exists to avoid.
+##
+## Driven off the encounter's own flag rather than its id, so this stays a general
+## capability of the playtest button rather than a special case for encounter 10,
+## and does nothing at all for the ten encounters that do not ask for it.
+##
+## It goes through _on_credits_completed rather than setting the flag directly,
+## because that is the same entry point the real credits overlay uses and it also
+## retries a depth already reached.
+func _release_credits_gate_if_needed(
+	controller: DepthEncounterController,
+	encounter_index: int
+) -> void:
+	var encounter := controller.encounter_config.encounters[encounter_index]
+	if encounter == null or not encounter.requires_credits_complete:
+		return
+	_set_status(
+		"Releasing the credits gate, which '%s' requires."
+		% encounter.encounter_id
+	)
+	controller._on_credits_completed()
 
 
 func _get_encounter_controller() -> DepthEncounterController:
@@ -302,6 +334,13 @@ func _land_at(depth_rows: int) -> void:
 		view.follow_mining_position(
 			Vector2i(_run_state.mining_x, _run_state.mining_y)
 		)
+		# Bring the camera down with the teleport rather than making it fall.
+		#
+		# The run's depth is set instantly here; the view's is not, because
+		# following the miner is a real fall at mining speed. Eleven thousand
+		# rows of that is nearly two minutes, so the wait below simply expired
+		# and the shot opened over rock nine thousand rows above the room.
+		view.snap_follow_to_target()
 		# Let the fall finish before saying it landed.
 		#
 		# The view travels to its target over time and drags the cast's layer
@@ -312,14 +351,74 @@ func _land_at(depth_rows: int) -> void:
 		# actor stayed behind - standing well below the room, off the bottom of
 		# the screen. A real run only activates an encounter once the fall is
 		# over, so waiting for it is what matches the game rather than racing it.
-		await _wait_until(
-			func() -> bool:
-				return view.target_view_position.is_equal_approx(
-					view.get_current_view_position()
-				),
-			8.0
-		)
+		#
+		# What has to have stopped is TerrainManager's view row, because that is
+		# the value whose changed signal moves the cast layer. This used to
+		# compare ViewController's target against get_current_view_position(),
+		# which returns the miner's presentation position: it converges within a
+		# frame or two of the teleport however far the world still has to
+		# stream. At 300 rows the two are the same answer, which is why every
+		# shallow encounter previewed correctly; at 11,200 the room was still
+		# 70,000px from its resting place when the shot began, and the visitor
+		# walked a path baked at that height and stayed there - far below the
+		# frame, with no error anywhere.
+		await _wait_until_view_settles(view)
 	encounter._on_landing_reached(_run_state.mining_y)
+
+
+## Waits until the presented view row stops moving for several frames running.
+##
+## Stability rather than arrival, because the view reaches its destination in
+## more than one way - streamed rows, a chunk snap, then the encounter framing
+## tween - and only one of those is a target the harness can compare against.
+## What every one of them has in common is that it eventually stops.
+##
+## The count is deliberately generous. Streaming a 11,200-row descent pauses
+## between chunks, and a short window mistakes one of those pauses for the end of
+## the journey - which puts the shot back where it started, only with a smaller
+## error that is harder to recognise. This costs a third of a second on a preview
+## that already teleports through eleven thousand rows.
+##
+## Both the streamed terrain row and ViewController's own presented row have to
+## have stopped, because they stop at different times and only the pair of them
+## covers the whole journey. TerrainManager's row settles as soon as the chunk it
+## is showing is the right one, while ViewController is still gliding the
+## remaining rows underneath the cast layer - which at 11,200 was still 71,000px
+## from home when terrain went quiet. Watching terrain alone therefore reports a
+## landing that has not happened, and the visitor walks a path baked at that
+## height and stays there, far below the frame, with no error anywhere.
+func _wait_until_view_settles(view: ViewController) -> void:
+	const REQUIRED_STILL_FRAMES: int = 20
+	var terrain := _get_terrain_manager()
+	if terrain == null or view == null:
+		return
+	var still_frames := 0
+	var previous_terrain_position := Vector2(INF, INF)
+	var previous_view_row := INF
+	await _wait_until(
+		func() -> bool:
+			var terrain_position := terrain.get_view_position()
+			var view_row := view.current_view_y
+			if (
+				terrain_position.is_equal_approx(previous_terrain_position)
+				and is_equal_approx(view_row, previous_view_row)
+			):
+				still_frames += 1
+			else:
+				still_frames = 0
+			previous_terrain_position = terrain_position
+			previous_view_row = view_row
+			return still_frames >= REQUIRED_STILL_FRAMES,
+		8.0
+	)
+
+
+func _get_terrain_manager() -> TerrainManager:
+	if not is_instance_valid(_game_root):
+		return null
+	return _game_root.get_node_or_null(
+		"MiningScene/TerrainManager"
+	) as TerrainManager
 
 
 func _get_view_controller() -> ViewController:

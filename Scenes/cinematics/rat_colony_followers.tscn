@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://Scripts/cinematics/rat_colony_followers.gd" id="1_followers"]
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/rat_miner.tscn" id="2_rat"]
@@ -7,15 +7,36 @@
 [ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_grey.tres" id="5_grey"]
 [ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_white.tres" id="6_white"]
 [ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_red.tres" id="7_red"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_clump.tres" id="8_clump"]
 
 [node name="RatColonyFollowers" type="Node2D" node_paths=PackedStringArray("followers")]
 editor_description = "Persistent, presentation-only colony activated after Rotini's second encounter. Assign Follow Target to the production MinerRig when instanced. The pool below is the whole colony: rank, scale, tint, draw order and slot position are all derived at runtime from the Depth Ranks settings, so moving a rat here changes nothing. Web builds light a smaller slice of the same pool and swing fewer of them per hit.
 
-Clump art goes in Clump Appearances: make one CinematicRatAppearance per drawing, set its idle and strike textures to the pair, and set Depicted Rat Count to how many rats it shows. Those are handed to every rank from Clump First Rank back, so the crowd deepens without another actor being added. While that array is empty every rank keeps single-rat art and nothing changes."
+Clump art goes in Clump Appearances: make one CinematicRatAppearance per drawing, set its idle and strike textures to the pair, and set Depicted Rat Count to how many rats it shows. Those are handed to every rank from Clump First Rank back, so the crowd deepens without another actor being added. Empty that array and every rank falls back to single-rat art.
+
+Zephan's drawing of the colony is now in it. Every rank except the front one wears mouse_clump.png - two dozen rats swinging pickaxes in three receding rows - so the thirty-two actor pool depicts around five hundred and fifty. That is the encounter-8 payoff read in the reference clip: the answer to Rotini's question was one line long and what comes back is overwhelming. Only the front rank stays single mice, because those are the ones the player looks straight at and a clump that close reads as a smear; everything behind them is crowd.
+
+The pool and the spacing were both set to fill the frame rather than to sit in it. Twenty-four actors at 132px could only reach three distance bands a side, so the colony bracketed the two frame edges and left the miner alone in the middle of his own crowd; tightening the spacing alone just pulled that ring in and left the outer frame empty. Thirty-two actors give four bands a side, and at 48px clearance and 116px spacing the furthest sits 570px out - the exact half-width of the frame. The crowd therefore runs from one edge to the other with the miner inside it.
+
+Web lights half the pool. The cap thins every rank evenly rather than deleting the back, so a web player sees a shallower crowd rather than a smaller one.
+
+Draw order puts the front rank on the SECOND layer - z 1, between terrain strata 0 and 1 - which is exactly where MinerRig.buried_draw_order stands the miner while he is mining. That is the directive for every character: the colony digs beside him, so it is layered as he is, and the foreground rock closes over them together. It used to sit at z 2, level with the frontmost stratum, which drew the nearest rats in front of the rock the miner is buried in. Each rank behind the front recedes one stratum.
+
+These four numbers only mean anything against TerrainLayerProfile.layer_z_indices, currently (2, 0, -1, -2), and nothing ties the two together. Renumber the strata and the colony silently changes which rock it is in front of."
 process_mode = 3
 script = ExtResource("1_followers")
-followers = Array[NodePath]([NodePath("Formation/Rat00"), NodePath("Formation/Rat01"), NodePath("Formation/Rat02"), NodePath("Formation/Rat03"), NodePath("Formation/Rat04"), NodePath("Formation/Rat05"), NodePath("Formation/Rat06"), NodePath("Formation/Rat07"), NodePath("Formation/Rat08"), NodePath("Formation/Rat09"), NodePath("Formation/Rat10"), NodePath("Formation/Rat11"), NodePath("Formation/Rat12"), NodePath("Formation/Rat13"), NodePath("Formation/Rat14"), NodePath("Formation/Rat15"), NodePath("Formation/Rat16"), NodePath("Formation/Rat17"), NodePath("Formation/Rat18"), NodePath("Formation/Rat19"), NodePath("Formation/Rat20"), NodePath("Formation/Rat21"), NodePath("Formation/Rat22"), NodePath("Formation/Rat23")])
+followers = Array[NodePath]([NodePath("Formation/Rat00"), NodePath("Formation/Rat01"), NodePath("Formation/Rat02"), NodePath("Formation/Rat03"), NodePath("Formation/Rat04"), NodePath("Formation/Rat05"), NodePath("Formation/Rat06"), NodePath("Formation/Rat07"), NodePath("Formation/Rat08"), NodePath("Formation/Rat09"), NodePath("Formation/Rat10"), NodePath("Formation/Rat11"), NodePath("Formation/Rat12"), NodePath("Formation/Rat13"), NodePath("Formation/Rat14"), NodePath("Formation/Rat15"), NodePath("Formation/Rat16"), NodePath("Formation/Rat17"), NodePath("Formation/Rat18"), NodePath("Formation/Rat19"), NodePath("Formation/Rat20"), NodePath("Formation/Rat21"), NodePath("Formation/Rat22"), NodePath("Formation/Rat23"), NodePath("Formation/Rat24"), NodePath("Formation/Rat25"), NodePath("Formation/Rat26"), NodePath("Formation/Rat27"), NodePath("Formation/Rat28"), NodePath("Formation/Rat29"), NodePath("Formation/Rat30"), NodePath("Formation/Rat31")])
 rat_appearances = Array[ExtResource("3_appearance")]([ExtResource("4_brown"), ExtResource("5_grey"), ExtResource("6_white"), ExtResource("7_red")])
+clump_appearances = Array[ExtResource("3_appearance")]([ExtResource("8_clump")])
+rank_scales = PackedFloat32Array(1.35, 1.15, 1.28, 1.2)
+rank_tints = PackedColorArray(1, 1, 1, 1, 0.82, 0.79, 0.76, 1, 0.88, 0.86, 0.84, 1, 0.76, 0.74, 0.73, 1)
+rank_vertical_offsets = PackedFloat32Array(40, 26, 22, 14)
+rank_draw_orders = PackedInt32Array(1, 0, -1, -2)
+rank_spacing_pixels = 116.0
+miner_clearance_pixels = 48.0
+clump_first_rank = 0
+max_visible_followers = 32
+web_max_visible_followers = 16
 
 [node name="Formation" type="Node2D" parent="."]
 editor_description = "Fixed twenty-four-actor growth bound. Index modulo four decides a rat's rank, so trimming the live count for web thins all four ranks evenly instead of deleting the back of the crowd."
@@ -90,4 +111,28 @@ visible = false
 visible = false
 
 [node name="Rat23" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat24" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat25" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat26" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat27" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat28" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat29" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat30" parent="Formation" instance=ExtResource("2_rat")]
+visible = false
+
+[node name="Rat31" parent="Formation" instance=ExtResource("2_rat")]
 visible = false

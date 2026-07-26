@@ -16,6 +16,7 @@ extends Node2D
 
 class TerrainChunkVisual:
 	var root: Node2D
+	var stream_generation: int = 0
 	var mask_images: Array[Image] = []
 	var mask_texture_tiles: Array[Array] = []
 	var dirty_mask_tiles: PackedInt32Array = PackedInt32Array()
@@ -107,6 +108,31 @@ class ChunkTexturePublishWork:
 	var layer_indices: PackedInt32Array
 
 
+class CompressedChunkSnapshot:
+	var layer_image_indices: PackedInt32Array = PackedInt32Array()
+	var compressed_images: Array[PackedByteArray] = []
+	var decoded_images: Array[Image] = []
+	var image_rects: Array[Rect2i] = []
+	var image_data_sizes: PackedInt32Array = PackedInt32Array()
+	var layer_revisions: PackedInt32Array = PackedInt32Array()
+	var byte_size: int = 0
+	var decoded_byte_size: int = 0
+
+
+class ChunkSnapshotPreparation:
+	var chunk: TerrainChunkVisual
+	var chunk_index: int
+	var stream_generation: int = 0
+	var layer_image_indices: PackedInt32Array = PackedInt32Array()
+	var unique_images: Array[Image] = []
+	var compressed_images: Array[PackedByteArray] = []
+	var decoded_images: Array[Image] = []
+	var image_rects: Array[Rect2i] = []
+	var image_data_sizes: PackedInt32Array = PackedInt32Array()
+	var layer_revisions: PackedInt32Array = PackedInt32Array()
+	var next_image_index: int = 0
+
+
 class SculptRunPreparation:
 	var sculpt: CutsceneTerrainSculpt
 	var layer_index: int
@@ -156,6 +182,14 @@ const CHUNK_VISUAL_POOL_LIMIT: int = 5
 # existing buffers instead of allocating multi-megabyte images at the boundary.
 const CHUNK_MASK_IMAGE_POOL_LIMIT: int = 4
 const CHUNK_MASK_TEXTURE_POOL_LIMIT: int = 12
+# Exact FastLZ history is usually tens of KiB per damaged chunk. The hard cap
+# prevents a maximum-depth run from growing without bound; oldest snapshots
+# fall back to deterministic stamp replay if a pathological run exceeds it.
+const MAX_COMPRESSED_CHUNK_SNAPSHOT_BYTES: int = 96 * 1024 * 1024
+# Keep only the most recent exact damage patches decoded. Immediate review
+# reversals restore without decompression; older chunks retain their compact
+# archive and still avoid the much larger historical stamp replay.
+const MAX_DECODED_CHUNK_SNAPSHOT_BYTES: int = 48 * 1024 * 1024
 # Four authored samples per cell retain edge_smoothing at one quarter-cell
 # precision while bounding cached room memory independently of shipped density.
 const SCULPT_CACHE_PIXELS_PER_CELL: int = 4
@@ -239,6 +273,18 @@ var _active_chunks: Dictionary[int, TerrainChunkVisual] = {}
 var _chunk_visual_pool: Array[TerrainChunkVisual] = []
 var _chunk_mask_image_pool: Array[Image] = []
 var _chunk_mask_texture_pool: Array[ImageTexture] = []
+# Final damaged CPU masks are compressed after deferred impact work completes.
+# Compressed history and recent decoded regions have independent hard caps;
+# only the small hot window retains Image data for immediate review reversal.
+var _compressed_chunk_snapshots: Dictionary = {}
+var _compressed_chunk_snapshot_order: Array[int] = []
+var _compressed_chunk_snapshot_bytes: int = 0
+var _decoded_chunk_snapshot_order: Array[int] = []
+var _decoded_chunk_snapshot_bytes: int = 0
+var _pending_chunk_snapshots: Array[int] = []
+var _pending_chunk_snapshot_lookup: Dictionary[int, bool] = {}
+var _active_chunk_snapshot_preparation: ChunkSnapshotPreparation
+var _next_chunk_stream_generation: int = 1
 # One solid mask every untouched stratum draws. Sharing it is what makes an
 # ordinary streamed chunk cost no image allocation and no texture upload.
 var _pristine_mask_image: Image
@@ -422,11 +468,16 @@ func _process(_delta: float) -> void:
 		_pending_sculpt_run_preparation_head
 		< _pending_sculpt_run_preparations.size()
 	)
+	var has_chunk_snapshot_work := (
+		_active_chunk_snapshot_preparation != null
+		or not _pending_chunk_snapshots.is_empty()
+	)
 	if (
 		not has_preparation
 		and not has_impact_work
 		and not has_chunk_texture_publish
 		and not has_sculpt_run_preparation
+		and not has_chunk_snapshot_work
 	):
 		return
 	var frame_started_at: int = Time.get_ticks_usec()
@@ -461,6 +512,10 @@ func _process(_delta: float) -> void:
 		):
 			return
 	_compact_pending_chunk_texture_publishes()
+	# Preserve settled damage before speculative target work. A player can move
+	# away at any time, so cache one exact region while its source chunk exists.
+	if Time.get_ticks_usec() - frame_started_at < frame_budget_usec:
+		_process_next_chunk_snapshot()
 	# Only unused terrain time prepares future candidates. If contact arrives
 	# mid-calculation, the authoritative queue above takes ownership next frame.
 	while (
@@ -984,6 +1039,8 @@ func _apply_impact_stamps(stamps: Array[ImpactStamp]) -> void:
 		chunk_indices_by_stamp.append(stamp_chunk_indices)
 		for chunk_index in stamp_chunk_indices:
 			affected_chunk_lookup[chunk_index] = true
+	for chunk_index in affected_chunk_lookup:
+		_queue_chunk_snapshot_refresh(chunk_index)
 	if _defer_impact_rasterization:
 		var layer_count: int = profile.get_gameplay_layer_count()
 		var grouped_work_start := _pending_impact_work.size()
@@ -1353,11 +1410,327 @@ func _compact_pending_impact_work(
 	_pending_impact_work_head = 0
 
 
+## Invalidates an old compressed mask and schedules one exact replacement.
+## The queue is deduplicated because one resolved hit may register several
+## stamps in the same chunk before its authoritative raster work completes.
+func _queue_chunk_snapshot_refresh(chunk_index: int) -> void:
+	_erase_chunk_snapshot(chunk_index)
+	if _pending_chunk_snapshot_lookup.has(chunk_index):
+		return
+	_pending_chunk_snapshot_lookup[chunk_index] = true
+	_pending_chunk_snapshots.append(chunk_index)
+
+
+## Compresses at most one unique LA8 image from one settled damaged chunk.
+## FastLZ is byte-exact, so review streaming cannot soften the shipped outline;
+## splitting shared images across frames keeps this background cache bounded by
+## the same terrain frame budget instead of moving the impact hitch elsewhere.
+func _process_next_chunk_snapshot() -> void:
+	if _pending_impact_work_head < _pending_impact_work.size():
+		return
+	if _active_chunk_snapshot_preparation == null:
+		while not _pending_chunk_snapshots.is_empty():
+			var chunk_index: int = _pending_chunk_snapshots.pop_front()
+			_pending_chunk_snapshot_lookup.erase(chunk_index)
+			var chunk: TerrainChunkVisual = _active_chunks.get(chunk_index)
+			# Never preserve the temporary binary room rim. Its completed smooth
+			# rebuild queues a fresh snapshot below.
+			if chunk == null or chunk.pending_sculpt_refinement:
+				continue
+			var preparation := ChunkSnapshotPreparation.new()
+			preparation.chunk = chunk
+			preparation.chunk_index = chunk_index
+			preparation.stream_generation = chunk.stream_generation
+			preparation.layer_revisions = chunk.layer_revisions.duplicate()
+			preparation.layer_image_indices.resize(
+				chunk.mask_images.size()
+			)
+			var unique_image_indices: Dictionary[int, int] = {}
+			for layer_index in range(chunk.mask_images.size()):
+				var image: Image = chunk.mask_images[layer_index]
+				var damage_rect := Rect2i()
+				var saved_stamps: Array = _impact_stamps_by_chunk.get(
+					chunk_index,
+					[]
+				)
+				for saved_stamp: ImpactStamp in saved_stamps:
+					if not _can_apply_impact_stamp_layer(
+						saved_stamp,
+						layer_index
+					):
+						continue
+					var stamp_rect := (
+						_get_stamp_layer_chunk_mask_rect(
+							saved_stamp,
+							layer_index,
+							chunk_index
+						)
+					)
+					if stamp_rect.has_area():
+						damage_rect = (
+							stamp_rect
+							if not damage_rect.has_area()
+							else damage_rect.merge(stamp_rect)
+						)
+						continue
+					# Branching paths do not use a transformed sheet, so map
+					# their already-bounded world damage rectangle directly.
+					var broad_rect := _get_stamp_broad_rect(saved_stamp)
+					var mask_scale := (
+						float(profile.mask_pixels_per_cell)
+						/ float(
+							terrain_manager.config.terrain_cell_world_size
+						)
+					)
+					var chunk_mask_top := (
+						chunk_index
+						* terrain_manager.config.chunk_height_cells
+						* profile.mask_pixels_per_cell
+					)
+					var mask_start := Vector2i(
+						floori(broad_rect.position.x * mask_scale),
+						floori(broad_rect.position.y * mask_scale)
+					)
+					var mask_end := Vector2i(
+						ceili(broad_rect.end.x * mask_scale),
+						ceili(broad_rect.end.y * mask_scale)
+					)
+					stamp_rect = Rect2i(
+						Vector2i(
+							mask_start.x,
+							mask_start.y - chunk_mask_top
+						),
+						mask_end - mask_start
+					).intersection(
+						Rect2i(Vector2i.ZERO, _get_chunk_mask_size())
+					)
+					if stamp_rect.has_area():
+						damage_rect = (
+							stamp_rect
+							if not damage_rect.has_area()
+							else damage_rect.merge(stamp_rect)
+						)
+				if not damage_rect.has_area():
+					preparation.layer_image_indices[layer_index] = -1
+					continue
+				var image_id := image.get_instance_id()
+				var image_index: int = unique_image_indices.get(
+					image_id,
+					-1
+				)
+				if image_index < 0:
+					image_index = preparation.unique_images.size()
+					unique_image_indices[image_id] = image_index
+					preparation.unique_images.append(image)
+					preparation.image_rects.append(damage_rect)
+				else:
+					preparation.image_rects[image_index] = (
+						preparation.image_rects[image_index].merge(
+							damage_rect
+						)
+					)
+				preparation.layer_image_indices[layer_index] = image_index
+			_active_chunk_snapshot_preparation = preparation
+			break
+	if _active_chunk_snapshot_preparation == null:
+		return
+	var preparation := _active_chunk_snapshot_preparation
+	if (
+		_active_chunks.get(preparation.chunk_index) != preparation.chunk
+		or preparation.chunk.stream_generation
+			!= preparation.stream_generation
+		or preparation.chunk.layer_revisions
+			!= preparation.layer_revisions
+	):
+		_active_chunk_snapshot_preparation = null
+		return
+	if preparation.next_image_index < preparation.unique_images.size():
+		var image_index := preparation.next_image_index
+		var image := preparation.unique_images[
+			image_index
+		]
+		var image_rect := preparation.image_rects[image_index]
+		var decoded_image := image.get_region(image_rect)
+		var image_data := decoded_image.get_data()
+		preparation.decoded_images.append(decoded_image)
+		preparation.compressed_images.append(
+			image_data.compress(FileAccess.COMPRESSION_FASTLZ)
+		)
+		preparation.image_data_sizes.append(image_data.size())
+		preparation.next_image_index += 1
+		return
+	var snapshot := CompressedChunkSnapshot.new()
+	snapshot.layer_image_indices = preparation.layer_image_indices
+	snapshot.compressed_images = preparation.compressed_images
+	snapshot.decoded_images = preparation.decoded_images
+	snapshot.image_rects = preparation.image_rects
+	snapshot.image_data_sizes = preparation.image_data_sizes
+	snapshot.layer_revisions = preparation.layer_revisions
+	for compressed_image in snapshot.compressed_images:
+		snapshot.byte_size += compressed_image.size()
+	for image_data_size in snapshot.image_data_sizes:
+		snapshot.decoded_byte_size += image_data_size
+	_compressed_chunk_snapshots[preparation.chunk_index] = snapshot
+	_compressed_chunk_snapshot_order.append(preparation.chunk_index)
+	_compressed_chunk_snapshot_bytes += snapshot.byte_size
+	_decoded_chunk_snapshot_order.append(preparation.chunk_index)
+	_decoded_chunk_snapshot_bytes += snapshot.decoded_byte_size
+	_active_chunk_snapshot_preparation = null
+	while (
+		_compressed_chunk_snapshot_bytes
+		> MAX_COMPRESSED_CHUNK_SNAPSHOT_BYTES
+		and not _compressed_chunk_snapshot_order.is_empty()
+	):
+		_erase_chunk_snapshot(
+			_compressed_chunk_snapshot_order.front()
+		)
+	while (
+		_decoded_chunk_snapshot_bytes
+		> MAX_DECODED_CHUNK_SNAPSHOT_BYTES
+		and not _decoded_chunk_snapshot_order.is_empty()
+	):
+		var oldest_decoded_chunk: int = (
+			_decoded_chunk_snapshot_order.pop_front()
+		)
+		var oldest_snapshot: CompressedChunkSnapshot = (
+			_compressed_chunk_snapshots.get(oldest_decoded_chunk)
+		)
+		if oldest_snapshot == null:
+			continue
+		oldest_snapshot.decoded_images.clear()
+		_decoded_chunk_snapshot_bytes -= (
+			oldest_snapshot.decoded_byte_size
+		)
+
+
+func _erase_chunk_snapshot(chunk_index: int) -> void:
+	var snapshot: CompressedChunkSnapshot = (
+		_compressed_chunk_snapshots.get(chunk_index)
+	)
+	if snapshot == null:
+		return
+	_compressed_chunk_snapshots.erase(chunk_index)
+	_compressed_chunk_snapshot_order.erase(chunk_index)
+	_compressed_chunk_snapshot_bytes -= snapshot.byte_size
+	if not snapshot.decoded_images.is_empty():
+		_decoded_chunk_snapshot_order.erase(chunk_index)
+		_decoded_chunk_snapshot_bytes -= snapshot.decoded_byte_size
+
+
+## Restores the exact final CPU masks. Missing or evicted snapshots return false
+## so registered stamp history remains the reconstruction fallback.
+func _restore_chunk_snapshot(
+	chunk: TerrainChunkVisual,
+	chunk_index: int
+) -> bool:
+	var snapshot: CompressedChunkSnapshot = (
+		_compressed_chunk_snapshots.get(chunk_index)
+	)
+	if snapshot == null:
+		return false
+	if (
+		snapshot.layer_image_indices.size() != chunk.mask_images.size()
+		or snapshot.layer_revisions.size() != chunk.mask_images.size()
+		or snapshot.image_rects.size()
+			!= snapshot.compressed_images.size()
+		or snapshot.image_data_sizes.size()
+			!= snapshot.compressed_images.size()
+	):
+		_erase_chunk_snapshot(chunk_index)
+		return false
+	for image_index in range(snapshot.image_rects.size()):
+		var image_rect := snapshot.image_rects[image_index]
+		if (
+			not Rect2i(Vector2i.ZERO, _get_chunk_mask_size()).encloses(
+				image_rect
+			)
+			or snapshot.image_data_sizes[image_index]
+				!= image_rect.size.x * image_rect.size.y * 2
+		):
+			_erase_chunk_snapshot(chunk_index)
+			return false
+	var restored_images: Array[Image] = snapshot.decoded_images
+	if (
+		not restored_images.is_empty()
+		and restored_images.size() != snapshot.compressed_images.size()
+	):
+		_erase_chunk_snapshot(chunk_index)
+		return false
+	for image_index in range(
+		0 if restored_images.is_empty() else snapshot.compressed_images.size(),
+		snapshot.compressed_images.size()
+	):
+		var compressed_image := snapshot.compressed_images[image_index]
+		var image_data_size := snapshot.image_data_sizes[image_index]
+		var image_data := compressed_image.decompress(
+			image_data_size,
+			FileAccess.COMPRESSION_FASTLZ
+		)
+		if image_data.size() != image_data_size:
+			_erase_chunk_snapshot(chunk_index)
+			return false
+		var image_rect := snapshot.image_rects[image_index]
+		var restored_image := Image.create_from_data(
+			image_rect.size.x,
+			image_rect.size.y,
+			false,
+			Image.FORMAT_LA8,
+			image_data
+		)
+		if restored_image == null:
+			_erase_chunk_snapshot(chunk_index)
+			return false
+		restored_images.append(restored_image)
+	for layer_index in range(chunk.mask_images.size()):
+		var image_index := snapshot.layer_image_indices[layer_index]
+		if image_index < -1 or image_index >= restored_images.size():
+			_erase_chunk_snapshot(chunk_index)
+			return false
+		chunk.layer_revisions[layer_index] = (
+			snapshot.layer_revisions[layer_index]
+		)
+		if image_index < 0:
+			continue
+		_make_layer_writable(chunk, layer_index)
+		var image_rect := snapshot.image_rects[image_index]
+		chunk.mask_images[layer_index].blit_rect(
+			restored_images[image_index],
+			Rect2i(Vector2i.ZERO, image_rect.size),
+			image_rect.position
+		)
+		var tile_width := (
+			_get_chunk_mask_size().x / MASK_HORIZONTAL_TILE_COUNT
+		)
+		var first_tile := clampi(
+			image_rect.position.x / tile_width,
+			0,
+			MASK_HORIZONTAL_TILE_COUNT - 1
+		)
+		var last_tile := clampi(
+			(image_rect.end.x - 1) / tile_width,
+			first_tile,
+			MASK_HORIZONTAL_TILE_COUNT - 1
+		)
+		var dirty_tiles := 0
+		for tile_index in range(first_tile, last_tile + 1):
+			dirty_tiles |= 1 << tile_index
+		chunk.dirty_mask_tiles[layer_index] |= dirty_tiles
+	return true
+
+
 ## Drops every streamed chunk and its stamp history so the next refresh draws
 ## intact terrain again. The editor preview needs this because moving a test
 ## impact has to un-break the rock the previous position broke.
 func rebuild_all_chunks() -> void:
 	_impact_stamps_by_chunk.clear()
+	_compressed_chunk_snapshots.clear()
+	_compressed_chunk_snapshot_order.clear()
+	_compressed_chunk_snapshot_bytes = 0
+	_decoded_chunk_snapshot_order.clear()
+	_decoded_chunk_snapshot_bytes = 0
+	_pending_chunk_snapshots.clear()
+	_pending_chunk_snapshot_lookup.clear()
+	_active_chunk_snapshot_preparation = null
 	for work_index in range(
 		_pending_impact_work_head,
 		_pending_impact_work.size()
@@ -1535,8 +1908,13 @@ func _refresh_ready_sculpt_chunks() -> void:
 		):
 			ready_chunk_indices.append(chunk_index)
 	for chunk_index in ready_chunk_indices:
+		# The refined room silhouette replaces the binary placeholder captured
+		# by any earlier snapshot; force the one-time structural rebuild.
+		_erase_chunk_snapshot(chunk_index)
 		_unload_chunk(chunk_index)
 		_load_chunk(chunk_index)
+		if _impact_stamps_by_chunk.has(chunk_index):
+			_queue_chunk_snapshot_refresh(chunk_index)
 
 
 ## Reports whether every authored mask touching a chunk has immutable row runs.
@@ -1663,7 +2041,7 @@ func _load_chunk(chunk_index: int) -> void:
 	_active_chunks[chunk_index] = chunk
 	var chunk_contains_chamber := _chunk_contains_chamber(chunk_index)
 	# A sculpted room may sit in a chunk the encounter schedule alone would call
-	# ordinary rock, so streaming has to ask about rooms as well as chambers.
+	# ordinary rock, so streaming asks about rooms and chambers.
 	var chunk_contains_sculpt := _chunk_contains_sculpt(chunk_index)
 	if _is_chunk_intact_rock(
 		chunk_index,
@@ -1679,8 +2057,8 @@ func _load_chunk(chunk_index: int) -> void:
 			chunk_contains_chamber,
 			chunk_contains_sculpt
 		)
-	# The authored reveal band belongs to the foreground alone, so a chunk whose
-	# only departure from intact rock is that band keeps three shared strata.
+	# Structural terrain is deterministic and cheap to rebuild from immutable
+	# room runs. The snapshot stores only final player-damage regions over it.
 	if not _get_chunk_floor_reveal_rects(chunk_index).is_empty():
 		_make_layer_writable(chunk, 0)
 		_clear_chamber_foreground_floor_bands(
@@ -1699,9 +2077,14 @@ func _load_chunk(chunk_index: int) -> void:
 		chunk_index,
 		[]
 	)
-	for saved_stamp: ImpactStamp in saved_stamps:
-		_apply_impact_stamp(chunk, chunk_index, saved_stamp)
-	_clear_temporary_stamp_cache()
+	if not _restore_chunk_snapshot(chunk, chunk_index):
+		for saved_stamp: ImpactStamp in saved_stamps:
+			_apply_impact_stamp(chunk, chunk_index, saved_stamp)
+		_clear_temporary_stamp_cache()
+		# If the original active window left before background capture settled,
+		# make this one replay pay for the next upward review.
+		if not saved_stamps.is_empty():
+			_queue_chunk_snapshot_refresh(chunk_index)
 	# The first window must be complete before it is shown. Later structural
 	# chunks enter below the viewport margin and publish through the frame
 	# scheduler so a sharp multi-layer room cannot monopolize one traversal.
@@ -1729,6 +2112,8 @@ func _acquire_chunk_visual(
 			candidate.root.free()
 	if chunk == null:
 		chunk = _create_chunk_visual(layer_count)
+	chunk.stream_generation = _next_chunk_stream_generation
+	_next_chunk_stream_generation += 1
 	chunk.root.name = "LayeredTerrainChunk_%d" % chunk_index
 	chunk.root.visible = true
 	var world_origin := Vector2(

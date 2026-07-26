@@ -4,7 +4,7 @@
 [ext_resource type="Resource" path="res://resources/encounters/rutini_character_appearance.tres" id="2_appearance"]
 [ext_resource type="Resource" path="res://resources/dialogue/rutini_second_conversation.tres" id="3_dialogue"]
 [ext_resource type="Resource" path="res://resources/cinematics/sequences/rutini_second_sequence.tres" id="4_kvger"]
-[ext_resource type="PackedScene" path="res://Scenes/cinematics/rat_colony_encounter_stage.tscn" id="5_stage"]
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/rotini_colony_encounter_stage.tscn" id="5_stage"]
 [ext_resource type="Resource" path="res://resources/cinematics/sculpts/rutini_second_room.tres" id="6_kvger"]
 
 [resource]
@@ -16,6 +16,7 @@ appearance = ExtResource("2_appearance")
 conversation = ExtResource("3_dialogue")
 stage_scene = ExtResource("5_stage")
 sequence = ExtResource("4_kvger")
+plays_authored_timeline = true
 speaker_slot = &"rutini"
 starts_rat_colony_support = true
 terrain_sculpt = ExtResource("6_kvger")

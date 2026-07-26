@@ -13,6 +13,12 @@ enum SpecialEffect {
 	BRANCHING_LIGHTNING,
 }
 
+enum VisualTier {
+	WOOD,
+	SILVER,
+	GOLD,
+}
+
 @export_category("Identity")
 ## Unique ownership key. Use snake_case and normally match the .tres filename.
 @export var id: StringName = &"basic_pickaxe"
@@ -56,7 +62,9 @@ enum SpecialEffect {
 @export_range(0, 8, 1) var lightning_max_crack_depth_cells: int = 4
 
 @export_category("Appearance")
-## The newest granted definition applies this color to the visible tool.
+## Selects the authored full-frame miner poses used while this tool is newest.
+@export var visual_tier: VisualTier = VisualTier.WOOD
+## Applies to the layered preview rig and remains a fallback for future art.
 @export var hammer_head_color: Color = Color(0.94, 0.94, 0.94, 1.0)
 
 @export_category("Timing Targets")

@@ -28,7 +28,7 @@ kind = 3
 actor = &"treasure_hunter"
 duration_seconds = 0.9
 bounce_count = 4
-notes = "The whooping the reference puts before the room even opens - Zephan slides Yippee and wahoo! in beside the miner while he is still falling. Nothing can present a line the miner is not there for, so the celebration lands as the frame opens instead: he is still jumping about it when the ceiling comes in."
+notes = "The whooping the reference puts before the room even opens - Zephan slides Yippee and wahoo! in beside the miner while he is still falling, and the audio under those two cards is five seconds of it. Nothing here can present a line the miner is not there for, so it lands as the frame opens instead: this bounce plays him celebrating for the first 0.9s and the conversation then opens on Yippee! Wahoo!, so the ceiling comes in on a man already mid-celebration rather than on a man waiting to be spoken to. Left sequential rather than overlapped because DialogueDirector bounces the speaker again on each presented line, and two bounces on one beat is a jitter nobody asked for."
 
 [sub_resource type="Resource" id="Resource_dialogue"]
 script = ExtResource("1_g737l")
@@ -36,7 +36,7 @@ kind = 5
 start_seconds = 0.9
 duration_seconds = 6.0
 conversation = ExtResource("2_31prq")
-notes = "Blocks, so the clock holds here for as long as the player takes to read. Six seconds is the nominal length only. After giving away the pickaxe he leaves for the later cafe gathering in his no-pickaxe pose."
+notes = "Blocks, so the clock holds here for as long as the player takes to read. Six seconds is the nominal length only. He remains at the hoard for the whole exchange, then leaves in the no-pickaxe pose so his later cafe appearance has a visible departure."
 
 [sub_resource type="Resource" id="Resource_leave"]
 script = ExtResource("1_g737l")
@@ -46,7 +46,7 @@ start_seconds = 6.9
 duration_seconds = 1.6
 target_marker = &"Exit"
 pose = &"no_pickaxe"
-notes = "He has handed off the pickaxe and must leave the hoard to reach the later cafe gathering."
+notes = "He has handed off the pickaxe and leaves the hoard before his later cafe appearance."
 
 [sub_resource type="Resource" id="Resource_hide"]
 script = ExtResource("1_g737l")

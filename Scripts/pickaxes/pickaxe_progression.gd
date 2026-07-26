@@ -5,7 +5,7 @@ extends Node
 ## - NPC rewards are appended to one cumulative run stack.
 ## - EncounterProgression owns production mining and timing difficulty.
 ## - Definition modifiers remain available to isolated legacy previews.
-## - The newest reward controls only the visible tool appearance.
+## - The newest reward controls only the visible authored tool appearance.
 ## - The invariant is that granting an upgrade never disables an older one.
 ## Authoring source of truth: res://resources/pickaxes/pickaxe_authoring.md
 
@@ -69,6 +69,7 @@ func _apply_visible_pickaxe(definition: PickaxeDefinition) -> void:
 	if definition == null:
 		return
 	print("applying: ", definition.display_name)
+	miner_rig.set_pickaxe_visual_tier(definition.visual_tier)
 	miner_rig.set_hammer_head_color(definition.hammer_head_color)
 	mining_controller.config.use_secondary_recovery = definition.secondary_recovery
 	

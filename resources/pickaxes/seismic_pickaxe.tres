@@ -13,6 +13,7 @@ swing_speed_multiplier = 1.0
 debris_multiplier = 1.1
 special_effect = 1
 aftershock_depth_rows = 2
+visual_tier = 2
 hammer_head_color = Color(1, 0.7, 0.2, 1)
 target_unlock_combo = 70
 target_scenes = Array[PackedScene]([ExtResource("3_shrinking")])

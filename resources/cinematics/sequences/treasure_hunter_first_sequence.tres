@@ -26,8 +26,8 @@ pose = &"hit"
 [sub_resource type="Resource" id="Resource_strike_one"]
 script = ExtResource("1_al5fl")
 kind = 8
-cue = &"WallStrike"
-notes = "The shared presentation strike: real dirt, smoke and shake at the bore mouth. He is still off frame, so the first thing the shot shows is the wall coming apart."
+cue = &"WallStrikeHigh"
+notes = "The first swing, head height. This opens real rock, not just dirt and smoke: the bore is authored sealed and the stage's Strike Breaks Rock Radius Cells is 6, so the disc under this marker is genuinely removed from the terrain. He is still off frame, so the first thing the shot shows is the wall coming apart on its own."
 
 [sub_resource type="Resource" id="Resource_recoil_one"]
 script = ExtResource("1_al5fl")
@@ -47,7 +47,8 @@ pose = &"hit"
 script = ExtResource("1_al5fl")
 kind = 8
 start_seconds = 0.6
-cue = &"WallStrike"
+cue = &"WallStrikeMid"
+notes = "Chest height. The three marks step down the plug so the hole he opens is person-shaped."
 
 [sub_resource type="Resource" id="Resource_recoil_two"]
 script = ExtResource("1_al5fl")
@@ -67,8 +68,10 @@ pose = &"hit"
 script = ExtResource("1_al5fl")
 kind = 8
 start_seconds = 1.2
-cue = &"WallStrike"
-notes = "The breakthrough. Three contacts rather than one, because a single thud reads as a noise and three read as somebody working."
+cue = &"WallStrikeLow"
+notes = "The breakthrough: this one takes out the bottom of the hole and leaves him something to step through. Three contacts rather than one, because a single thud reads as a noise and three read as somebody working.
+
+The walk starts 0.15s after this, which is the whole margin the shot has. Retime these and the walk together, or he sets off into rock that is still standing."
 
 [sub_resource type="Resource" id="Resource_walk_in"]
 script = ExtResource("1_al5fl")

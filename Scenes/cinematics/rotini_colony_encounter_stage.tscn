@@ -1,0 +1,80 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/rat_colony_encounter_stage.tscn" id="1_stage"]
+[ext_resource type="Script" uid="uid://7qy8qeox17tk" path="res://Scripts/cinematics/cutscene_actor_preview.gd" id="2_preview"]
+[ext_resource type="Resource" uid="uid://ckltv12x6klri" path="res://resources/encounters/rutini_character_appearance.tres" id="3_rutini"]
+[ext_resource type="Script" uid="uid://bpg6fvsw6y7ai" path="res://resources/encounters/character_appearance.gd" id="4_appearance"]
+[ext_resource type="Texture2D" uid="uid://bq8qwl3xn5qny" path="res://Assets/Characters/miner_idle-Pickaxe.png" id="5_miner"]
+[ext_resource type="Script" path="res://Scripts/cinematics/cinematic_rat_appearance.gd" id="6_rat_appearance"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_clump.tres" id="7_clump"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_brown.tres" id="8_brown"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_grey.tres" id="9_grey"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_white.tres" id="10_white"]
+
+[sub_resource type="Resource" id="Resource_miner"]
+script = ExtResource("4_appearance")
+texture = ExtResource("5_miner")
+sprite_scale = Vector2(0.203, 0.203)
+sprite_offset = Vector2(0, -88)
+
+[node name="RotiniColonyEncounterStage" instance=ExtResource("1_stage")]
+editor_description = "Encounter 8, Rotini and the Colony, depth 11,200. The mirror of his introduction: Zephan's clip says \"you're gonna come from this side this time\", so he arrives from the LEFT and holds the conversation on the miner's LEFT, where at 2,500 he came from the right and stood on the right. The room is the same level tunnel open at both ends, because these are the colony's own tunnels and they are lost in them. Nothing is moving when the frame opens - that is the difference from the introduction, where the traffic was the first thing on screen. The tunnel stays empty for three lines and then, on \"Come on boys! Dig!\", the colony floods through and starts swinging: Procession Cue holds the stream until that line's own Stage Cue lets it in. Spacing follows the house rule - his body measures 62.7px and the miner's 52.8px, so 110px root to root leaves one miner-width of daylight. Arrival facing and the approach belong to rutini_second_sequence; only the closing walk is authored here, because play_closing runs either way. The rutini_* resource names refer to Rotini until a coordinated rename is approved."
+closing_move_seconds = 1.6
+entrance_facing = 1
+closing_facing = 1
+conversation_tracks_miner = true
+conversation_root_offset_from_miner_x = -110.0
+hide_actor_after_closing = true
+procession_cue = &"begin_colony_mining"
+rat_appearances = Array[ExtResource("6_rat_appearance")]([ExtResource("7_clump"), ExtResource("8_brown"), ExtResource("7_clump"), ExtResource("9_grey"), ExtResource("7_clump"), ExtResource("10_white")])
+clump_scale_multiplier = 3.0
+single_scale_multiplier = 1.35
+max_live_followers = 10
+web_max_live_followers = 6
+spawn_interval_seconds = 0.2
+run_seconds = 1.6
+exit_seconds = 0.9
+strikes_per_rat = 3
+
+[node name="Entrance" parent="ActorMarkers" index="0"]
+editor_description = "600px LEFT of Conversation, which puts Rotini and every mouse past the frame edge at any landing column: the frame is 1152 wide and centred on the miner, so anything closer than 480px would have them appear out of nothing in open shot. The colony spawns here too, so the flood comes in behind him rather than past him."
+position = Vector2(-504, 0)
+
+[node name="Conversation" parent="ActorMarkers" index="1"]
+editor_description = "110px LEFT of the miner, root to root, so one miner-width of daylight sits between their facing edges. He is on the miner's left this time, and his art rests mirrored, so the timeline turns him to face RIGHT to look at the man he is talking to. Tracking slides the whole marker set here, so the shot is the same whichever column the descent arrived down."
+position = Vector2(96, 0)
+
+[node name="Work" parent="ActorMarkers" index="2"]
+editor_description = "174px past the miner on his far side, so the swinging happens beyond both speakers instead of between them. Procession Mines is on for this encounter - unlike the introduction, where the mice were commuting - because the colony joining the dig is the whole beat."
+position = Vector2(380, 0)
+
+[node name="Rest" parent="ActorMarkers" index="3"]
+editor_description = "Unused: hide_actor_after_closing sends him to Exit instead. Kept on the conversation stop so that turning that flag off for a test leaves him where he was standing rather than somewhere arbitrary."
+position = Vector2(96, 0)
+
+[node name="Exit" parent="ActorMarkers" index="4"]
+editor_description = "RIGHT, 700px clear of Conversation. Both the mice and Rotini leave this way - onward and down, the direction he has just been told the Cafe is - rather than back where they came from. The colony reads its travel direction off Entrance and Exit, so putting the exit on this side is all that reverses the procession from his introduction."
+position = Vector2(796, 0)
+
+[node name="EditorTerrainPreview" parent="." index="5"]
+editor_description = "Previews rutini_second at its authored depth."
+encounter_id = &"rutini_second"
+preview_depth_rows = 11200
+
+[node name="rutini" type="Node2D" parent="." index="6"]
+z_index = 1
+position = Vector2(-110, 0)
+script = ExtResource("2_preview")
+actor_id = &"rutini"
+appearance = ExtResource("3_rutini")
+pose = &"idle"
+metadata/_edit_group_ = true
+
+[node name="Miner" type="Node2D" parent="." index="7"]
+z_index = 1
+script = ExtResource("2_preview")
+actor_id = &"miner"
+appearance = SubResource("Resource_miner")
+metadata/_edit_group_ = true
+
+[editable path="ActorMarkers"]

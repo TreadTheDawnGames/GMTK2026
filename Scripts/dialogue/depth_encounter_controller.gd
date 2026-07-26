@@ -7,6 +7,8 @@ extends Node
 ## - Dialogue begins only after the presentation miner lands on that floor.
 ## - A blocked reservation retries when the previous cinematic releases.
 ## - Stable actor IDs reuse presenters across visits and the cafe gathering.
+## - The gathering stands on stage marks named for each actor when they exist,
+##   and on the even terrain spread when they do not.
 ## - Optional encounter stages own reversible movement and named line cues.
 ## - MiningCinematicFlow gates input while this controller owns an interaction.
 ## - Adding a cutscene means adding its resource to the ordered config array.
@@ -18,6 +20,11 @@ signal encounter_completed(encounter_index: int)
 signal coffee_speed_boost_requested
 signal rat_colony_support_requested
 signal character_stage_strike_requested(screen_position: Vector2)
+## Relays a stage's request to open real rock where a strike landed.
+signal character_stage_rock_break_requested(
+	screen_position: Vector2,
+	radius_cells: int
+)
 
 const FLOW_OWNER: StringName = &"depth_encounter"
 const MINER_SPEAKER_SLOT: StringName = &"miner"
@@ -52,7 +59,24 @@ const LANDING_FLOOR_TOLERANCE_ROWS: int = 4
 ## own origin, and she reads as low anyway. Both the miner's seating and the
 ## stage's walking sampler go through this, so the cast cannot drift apart from
 ## the man they are talking to.
-const CUTSCENE_FLOOR_LIFT_PIXELS: float = 7.0
+##
+## Fourteen rather than the original seven. Seven cleared the stroked outline on
+## a flat floor and no more, so the cast read as standing level with the ground
+## rather than on top of it - and once the rooms carried the shared floor bumps,
+## a character standing on the near side of a three-cell lump had that lump drawn
+## over their soles. The intent is that everyone stands visibly on the floor,
+## which costs a few pixels of gap on perfectly flat rock and is the cheaper of
+## the two mistakes: a character floating slightly reads as a character, and a
+## character sunk slightly reads as a bug.
+const CUTSCENE_FLOOR_LIFT_PIXELS: float = 14.0
+## How still the sampled floor has to be, and for how many readings, before the
+## room counts as having arrived. Half a pixel is under the sub-cell resolution
+## the mask is written at, so it cannot be met by a room still travelling.
+const SETTLE_TOLERANCE_PIXELS: float = 0.5
+const SETTLE_STABLE_READINGS: int = 3
+## Roughly two seconds at sixty frames. Long enough for any authored focus move,
+## short enough that a room which never resolves does not hang the run.
+const SETTLE_TIMEOUT_FRAMES: int = 120
 
 @export_category("Schedule")
 @export var encounter_config: DepthEncounterConfig
@@ -237,6 +261,44 @@ func _activate_pending_encounter() -> void:
 	_begin_active_encounter.call_deferred()
 
 
+## Holds until the encounter camera has stopped travelling, so the cast are
+## placed against a room that has arrived rather than one still on its way.
+##
+## The floor sampler is itself the settle signal. It is the exact value every
+## placement depends on, so waiting on it cannot disagree with what is about to
+## be measured - and it needs no reference to the camera, which this controller
+## does not hold. Two readings the same to within half a pixel, three times over,
+## is the room having stopped.
+##
+## The cap matters as much as the test. A room whose floor never resolves - an
+## encounter whose chunks have not streamed, or one authored with no ground under
+## the landing column - would otherwise hold the whole cutscene here forever with
+## the cinematic gate already claimed, which in game looks like mining that simply
+## stopped working. Timing out and placing the cast anyway degrades to exactly the
+## behaviour this replaced.
+func _await_room_settled(floor_sampler: Callable) -> void:
+	var previous_floor_y := NAN
+	var stable_readings := 0
+	for _frame in range(SETTLE_TIMEOUT_FRAMES):
+		await get_tree().process_frame
+		if _active_encounter_index < 0:
+			return
+		var sampled_y: float = floor_sampler.call(
+			miner_rig.get_landing_foot_screen_x()
+		)
+		if (
+			not is_nan(sampled_y)
+			and not is_nan(previous_floor_y)
+			and absf(sampled_y - previous_floor_y) < SETTLE_TOLERANCE_PIXELS
+		):
+			stable_readings += 1
+			if stable_readings >= SETTLE_STABLE_READINGS:
+				return
+		else:
+			stable_readings = 0
+		previous_floor_y = sampled_y
+
+
 ## Returns the screen height a cutscene actor's soles rest at for one column.
 ##
 ## Everyone standing in a cutscene room resolves their footing through here - the
@@ -328,6 +390,10 @@ func _on_dialogue_line_presented(
 		_active_stage != null
 		and active_line != null
 	):
+		# Every line, not only the cued ones. A stage that runs an idle routine
+		# of its own has no other way to know somebody is mid-sentence, and a
+		# routine that keeps playing over a line fights the line.
+		_active_stage.on_dialogue_line_presented(speaker_slot, line_index)
 		if not active_line.stage_cue.is_empty():
 			_active_stage.play_cue(active_line.stage_cue, line_index)
 	_reset_speech_reactions()
@@ -364,10 +430,12 @@ func _begin_active_encounter() -> void:
 	var encounter := encounter_config.encounters[_active_encounter_index]
 	var presenter := _presenters[_active_encounter_index]
 	_reset_speech_reactions()
-	if _is_gathering_encounter(_active_encounter_index):
-		_gather_cafe_characters()
 	_active_stage = _stages[_active_encounter_index]
 	if _active_stage == null:
+		# No stage means no authored marks and no floor sampler, so the roster
+		# falls back to the even spread on the bare dig line. Same as before.
+		if _is_gathering_encounter(_active_encounter_index):
+			_gather_cafe_characters(Callable())
 		# Revealing a presenter is the stage's job, through prepare(). An
 		# encounter authored without one still has to be seen to speak.
 		presenter.show()
@@ -391,6 +459,23 @@ func _begin_active_encounter() -> void:
 		var floor_sampler := _sample_cutscene_floor.bind(
 			_game_state.mining_y
 		)
+		# Nobody is placed until the room has stopped moving under them.
+		#
+		# focus() re-aims the camera at the encounter as it activates, so for a
+		# short while after the frame opens the whole room is still sliding. Every
+		# placement below resolves a SCREEN position from the floor, and a screen
+		# position sampled mid-slide is correct for a frame that no longer exists
+		# by the time the tween lands: the room settles hundreds of pixels away and
+		# the actor stays behind, standing below the room and off the bottom of the
+		# screen.
+		#
+		# This was only ever obvious on encounters whose opening walk starts
+		# immediately. One driven by a timeline whose first MOVE is a second in had
+		# the camera settle during its own wall strikes and looked fine, which is
+		# what made this read as a rat-colony problem rather than a shared one.
+		await _await_room_settled(floor_sampler)
+		if _active_encounter_index < 0:
+			return
 		# Stand the miner on the rock rather than on the row underneath it.
 		#
 		# Mining seats him against the intact floor line, which is right for a
@@ -411,6 +496,13 @@ func _begin_active_encounter() -> void:
 			)
 			_fail_active_encounter()
 			return
+		# After prepare, not before it. prepare() stands the stage's own visitor
+		# on the entrance mark at that marker's authored y, which is the dig line
+		# - and a visitor who is already in place and never walks is never
+		# grounded by anything else. Running the gathering last puts the whole
+		# roster, that visitor included, on the surface the sampler reports.
+		if _is_gathering_encounter(_active_encounter_index):
+			_gather_cafe_characters(floor_sampler)
 		await _active_stage.play_opening()
 		if _active_encounter_index < 0:
 			return
@@ -464,7 +556,25 @@ func _is_gathering_encounter(encounter_index: int) -> bool:
 
 
 ## Places the authored stable identities together for the cafe celebration.
-func _gather_cafe_characters() -> void:
+##
+## Two ways, and the stage decides which. If it authors a marker under
+## `ActorMarkers` named for a gathered actor, that mark is where they stand and
+## the injected sampler decides how high; otherwise the whole roster falls back to
+## the even spread across the terrain this has always used.
+##
+## The marks exist because the spread cannot compose a shot. It puts five
+## characters at a fixed 128px pitch centred on the room while the camera centres
+## on whatever column the miner's snaking fall arrived down - up to 192px away -
+## so he regularly lands standing inside one of them, and the storefront, the
+## furniture and the cast can never hold a relationship to each other. A marker
+## set slides with him, so the gathering keeps its shape at every landing column.
+##
+## An actor the stage already draws into its own artwork is placed but left
+## hidden. Cheese Girl is painted into the cafe's serving window, so showing her
+## presenter as well would put two of her in the same frame; `actors_drawn_into_set`
+## is the stage saying so, and this is the runtime honouring it. She is still
+## placed, because the schedule still needs somewhere to say she is.
+func _gather_cafe_characters(floor_sampler: Callable) -> void:
 	var gathering_y := _presenters[_active_encounter_index].position.y
 	var actor_count := encounter_config.gathering_actor_ids.size()
 	var edge_margin_cells := clampi(
@@ -500,12 +610,67 @@ func _gather_cafe_characters() -> void:
 		if not _presenters_by_actor_id.has(actor_id):
 			continue
 		var presenter := _presenters_by_actor_id[actor_id]
-		presenter.position = Vector2(
-			(group_start_cell_x + float(actor_index) * spacing_cells)
-				* float(mining_config.terrain_cell_world_size),
-			gathering_y
-		)
+		var authored_mark := _get_gathering_marker(actor_id)
+		if authored_mark == null:
+			presenter.position = Vector2(
+				(group_start_cell_x + float(actor_index) * spacing_cells)
+					* float(mining_config.terrain_cell_world_size),
+				gathering_y
+			)
+		else:
+			presenter.global_position = Vector2(
+				authored_mark.global_position.x,
+				_resolve_gathering_floor_y(
+					floor_sampler,
+					authored_mark.global_position
+				)
+			)
+		if _stage_draws_actor_into_its_set(actor_id):
+			presenter.hide()
+			continue
 		presenter.show()
+
+
+## Returns the active stage's authored mark for one gathered actor, or null when
+## it has not authored one.
+##
+## Looked up by the actor's own id, so the scene says who stands where in the same
+## words the schedule and the timeline use, and an ordinary text search for an
+## actor id finds their mark along with everything else about them.
+func _get_gathering_marker(actor_id: StringName) -> Marker2D:
+	if (
+		_active_stage == null
+		or not is_instance_valid(_active_stage.actor_markers_root)
+	):
+		return null
+	return _active_stage.actor_markers_root.get_node_or_null(
+		NodePath(String(actor_id))
+	) as Marker2D
+
+
+## Returns the height a gathered actor's soles rest at, preferring the sampled
+## surface and falling back to the mark's own authored y.
+##
+## The fallback is not decoration. The sampler answers NAN for a column whose rock
+## has not resolved, and a NAN position puts an actor nowhere at all - so a room
+## that has not fully settled costs a few pixels of sink rather than losing a
+## character out of the shot.
+func _resolve_gathering_floor_y(
+	floor_sampler: Callable,
+	mark_global_position: Vector2
+) -> float:
+	if not floor_sampler.is_valid():
+		return mark_global_position.y
+	var sampled_y := float(floor_sampler.call(mark_global_position.x))
+	return mark_global_position.y if is_nan(sampled_y) else sampled_y
+
+
+## Reports whether the active stage's own artwork already draws this character.
+func _stage_draws_actor_into_its_set(actor_id: StringName) -> bool:
+	return (
+		_active_stage != null
+		and _active_stage.actors_drawn_into_set.has(actor_id)
+	)
 
 
 ## Grants the authored reward and advances to the next listed encounter.
@@ -736,6 +901,24 @@ func _prepare_authored_characters() -> bool:
 				stage.presentation_strike_requested,
 				_on_character_stage_strike_requested
 			)
+			_connect_once(
+				stage.presentation_rock_break_requested,
+				_on_character_stage_rock_break_requested
+			)
+			# A stampede floors the miner for as long as it runs. The stage owns
+			# the horde and knows when the last of them is gone; it does not own
+			# the miner, so it says what happened and this decides what that
+			# means for him.
+			if stage is RatColonyEncounterStage:
+				var colony_stage := stage as RatColonyEncounterStage
+				_connect_once(
+					colony_stage.stampede_started,
+					_on_stampede_started
+				)
+				_connect_once(
+					colony_stage.stampede_finished,
+					_on_stampede_finished
+				)
 			if encounter.starts_rat_colony_support:
 				if not stage is RatColonyEncounterStage:
 					push_error(
@@ -774,6 +957,10 @@ func has_pending_or_active_interaction() -> bool:
 ## Releases only this encounter's named ownership of mining and camera state.
 func _finish_cinematic_flow() -> void:
 	_reset_speech_reactions()
+	# Nobody is left face down when the shot releases him, whatever ended it. A
+	# stampede that was cancelled mid-run never reaches its own finished signal,
+	# and the miner would go back to mining lying on his face.
+	miner_rig.release_cutscene_landing()
 	miner_rig.exit_cutscene_draw_order()
 	# Back to the mining grounding, so the shot's seating never follows him into
 	# the rest of the run.
@@ -882,11 +1069,30 @@ func _on_sequence_dialogue_requested(
 			_active_stage.notify_dialogue_finished()
 
 
+## Puts the miner on the floor while a horde runs over him.
+func _on_stampede_started() -> void:
+	miner_rig.hold_cutscene_landing()
+
+
+## Picks him back up once the last of them has left the frame.
+func _on_stampede_finished() -> void:
+	miner_rig.release_cutscene_landing()
+
+
 ## Relays a stage-local action through the cross-system wiring boundary.
 func _on_character_stage_strike_requested(
 	screen_position: Vector2
 ) -> void:
 	character_stage_strike_requested.emit(screen_position)
+
+
+## Relays a stage's rock-breaking request the same way, so terrain stays owned by
+## the mining wiring rather than being reached into from a cutscene stage.
+func _on_character_stage_rock_break_requested(
+	screen_position: Vector2,
+	radius_cells: int
+) -> void:
+	character_stage_rock_break_requested.emit(screen_position, radius_cells)
 
 
 ## Relays the clean stage transition through the cross-system wiring boundary.

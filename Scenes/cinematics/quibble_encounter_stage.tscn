@@ -1,14 +1,86 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
 [ext_resource type="Script" path="res://Scripts/cinematics/quibble_encounter_stage.gd" id="2_quibble"]
+[ext_resource type="Script" uid="uid://7qy8qeox17tk" path="res://Scripts/cinematics/cutscene_actor_preview.gd" id="3_preview"]
+[ext_resource type="Resource" path="res://resources/encounters/coffee_cat_character_appearance.tres" id="4_quibble"]
+[ext_resource type="Script" uid="uid://bpg6fvsw6y7ai" path="res://resources/encounters/character_appearance.gd" id="5_appearance"]
+[ext_resource type="Texture2D" uid="uid://bq8qwl3xn5qny" path="res://Assets/Characters/miner_idle-Pickaxe.png" id="6_miner"]
+
+[sub_resource type="Resource" id="Resource_miner"]
+script = ExtResource("5_appearance")
+texture = ExtResource("6_miner")
+sprite_scale = Vector2(0.203, 0.203)
+sprite_offset = Vector2(0, -88)
 
 [node name="QuibbleEncounterStage" instance=ExtResource("1_stage")]
-editor_description = "Quibble's caffeine routine: a fast fixed vibration plus repeated rapid coffee gulps. He is a runtime CharacterPresenter, so this scene authors only the stage; the terrain behind it is the editor preview."
+editor_description = "Encounter 7, depth 9,200: Quibble is looking for the Cafe, finds a man instead, asks him, and hands over the travel coffee. He is the fastest thing in the game and the shot is built around that - he covers the approach in a sixth of the time Cheese Girl takes, he never stops vibrating, and he is gone before the frame closes.
+
+Zephan's clip stages him on the miner's RIGHT with the miner already beside him, and the direction on the tape is 'you should land right next to him'. He is not standing there when the frame opens, though: prepare() reveals an actor after the letterbox has finished opening, so a character on his mark pops into a static shot. The 0.35s dart from Entrance buys that back. It is short enough to read as a cat who was already pacing the tunnel rather than as an entrance, and it still puts him right next to the miner exactly where the reference does.
+
+The right is not a free choice. His art holds the mug out to screen left, so on the miner's LEFT he would offer the travel coffee off into the empty tunnel behind him. Art Faces Left is on for that reason - he is the only cast member whose facing is decided by which side his hand is on rather than by where his eyes point.
+
+This is driven by its authored timeline. Plays Authored Timeline is on for coffee_cat_first, so coffee_cat_first_sequence owns everything from the dart to the end of the conversation, and Opening Move Seconds, Opening Step Height, the opening pose and Conversation Facing below are dead. The CLOSING is not: play_closing() runs whether or not a timeline drove the opening, so the exit is authored here and the timeline deliberately stops at the dialogue rather than walking him to Exit as well.
+
+The caffeine loop belongs to quibble_encounter_stage.gd, not to the timeline. It jitters his sprite and cycles hold_cup/drink/idle on its own clock for the whole encounter, moves only the sprite and never the actor root, and puts the sprite back on closing or cancellation. It overrides a pose beat within about a second, which is intended: the drinking is the character, not a line reading."
 script = ExtResource("2_quibble")
+opening_move_seconds = 0.35
+closing_move_seconds = 0.45
+opening_step_height = 12.0
+opening_pose = &"idle"
+conversation_pose = &"idle"
+closing_pose = &"idle"
+rest_pose = &"idle"
 hide_actor_after_closing = true
+conversation_facing = -1
+closing_facing = 1
+conversation_tracks_miner = true
+conversation_root_offset_from_miner_x = 110.0
+
+[node name="Entrance" parent="ActorMarkers" index="0"]
+editor_description = "600px right of Conversation, which is what keeps him past the frame edge at every landing column: the frame is 1152 wide and centred on the miner, so anything under 480px would have him appear from nothing in open shot. He is 62px wide, so even his own left edge is still 679px clear of the miner here.
+
+The timeline stages its dart from this marker rather than chaining off wherever he was left, so the approach starts on its exact mark however the beats above it are retimed."
+position = Vector2(710, 0)
+
+[node name="Conversation" parent="ActorMarkers" index="1"]
+editor_description = "110px right of the miner, root to root. His measured body is 61.6px and the miner's 52.8px, so this is the house rule - (61.6 + 52.8) / 2 + 52.8 - and leaves exactly one miner-width of daylight between them. It lands on the same number as Rotini, who measures about the same across.
+
+Measure the widest opaque row of the IMPORTED texture, never the artwork on disk and never the bounding box. His widest row is mug rim to tail tip. The mug reaches about 31px back toward the miner from this root, so the travel coffee is held out into the gap rather than tucked against his own body.
+
+This number is derived from his sprite scale. Change the scale and this has to move with it, or the daylight between them changes without anyone having decided to change it."
+position = Vector2(110, 0)
+
+[node name="Rest" parent="ActorMarkers" index="3"]
+editor_description = "The conversation stop. Unused while Hide Actor After Closing is on - he leaves - but kept on the mark so turning that flag off for a test leaves him standing where he was talking rather than somewhere else."
+position = Vector2(110, 0)
+
+[node name="Exit" parent="ActorMarkers" index="4"]
+editor_description = "700px right of Conversation, back up the tunnel he came down, so he is out of shot well before he is hidden.
+
+He leaves the way he arrived on purpose: he asked where the Cafe was and nobody answered, so he has no more idea which way to go than he did coming in. Walking him past the miner to the left would read as him having been given directions."
+position = Vector2(810, 0)
 
 [node name="EditorTerrainPreview" parent="." index="4"]
-editor_description = "Previews coffee_cat_first at its authored depth."
+editor_description = "Previews coffee_cat_first at its authored depth, with the right-hand tunnel he arrives down."
 encounter_id = &"coffee_cat_first"
 preview_depth_rows = 9200
+
+[node name="coffee_cat" type="Node2D" parent="." index="5"]
+editor_description = "Editor stand-in only; it frees itself before a running game can pay for it. Placed at the conversation offset from the Miner stand-in rather than on the Conversation marker, because at runtime the whole marker set slides to wherever the miner landed and it is that spacing, not the authored mark, that survives."
+z_index = 1
+position = Vector2(110, 0)
+script = ExtResource("3_preview")
+actor_id = &"coffee_cat"
+appearance = ExtResource("4_quibble")
+pose = &"idle"
+metadata/_edit_group_ = true
+
+[node name="Miner" type="Node2D" parent="." index="6"]
+z_index = 1
+script = ExtResource("3_preview")
+actor_id = &"miner"
+appearance = SubResource("Resource_miner")
+metadata/_edit_group_ = true
+
+[editable path="ActorMarkers"]

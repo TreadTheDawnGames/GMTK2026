@@ -5,24 +5,47 @@
 [ext_resource type="Resource" path="res://resources/encounters/rutini_character_appearance.tres" id="4_f2wmh"]
 [ext_resource type="Script" uid="uid://bpg6fvsw6y7ai" path="res://resources/encounters/character_appearance.gd" id="6_ytped"]
 [ext_resource type="Texture2D" uid="uid://bq8qwl3xn5qny" path="res://Assets/Characters/miner_idle-Pickaxe.png" id="7_wh1q7"]
+[ext_resource type="Script" path="res://Scripts/cinematics/cinematic_rat_appearance.gd" id="8_rat_appearance"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_clump.tres" id="9_clump"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_brown.tres" id="10_brown"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_grey.tres" id="11_grey"]
+[ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_white.tres" id="12_white"]
 
 [sub_resource type="Resource" id="Resource_c8jes"]
 script = ExtResource("6_ytped")
 texture = ExtResource("7_wh1q7")
-sprite_scale = Vector2(0.44, 0.44)
-sprite_offset = Vector2(0, -68)
+sprite_scale = Vector2(0.203, 0.203)
+sprite_offset = Vector2(0, -88)
 
 [node name="RotiniFirstEncounterStage" unique_id=1625704577 instance=ExtResource("1_stage")]
-editor_description = "Story beat 4, depth 2,500: Rotini stops the miner on the cave path. The room is a level tunnel OPEN AT BOTH ENDS - no wall on either side - because the whole beat is traffic passing through it. The colony starts with the opening, so the mice are already streaming right to left when the frame opens and Rotini walks up out of them; he then tells the miner the path is taken and leaves with them to the LEFT. Inherits the rat colony stage rather than repeating it, with Procession Mines off: these mice are commuting, not digging. Spacing follows the house rule - his body measures 62.7px and the miner's 52.8px, so 110px root to root leaves one miner-width of daylight. The rutini_* resource names refer to Rotini until a coordinated rename is approved."
+editor_description = "Story beat 4, depth 2,500: Rotini stops the miner on the cave path. The room is a level tunnel OPEN AT BOTH ENDS - no wall on either side - because the whole beat is traffic passing through it.
+
+The shot is a STAMPEDE, and the order is the point. The tunnel is EMPTY when the frame opens. Rotini walks up out of nothing, says his piece, and only on \"Come on, boys!\" does the horde pour through, right to left, while the miner is knocked flat and stays down until the last of them has gone. Stampede Cue is what holds it back: with it set the colony does not start at the opening, it starts on the DialogueLine carrying the same name. Clear it and this reverts to the old shape, where the mice are already running when the frame opens and the line is answered by nothing. Inherits the rat colony stage rather than repeating it, with Procession Mines off: these mice are commuting, not digging. Spacing follows the house rule, remeasured after the miner's art changed: his body is 62.7px and the miner's is now 97.7px, not the 52.8px the guide's table was built on, so root to root is (62.7 + 97.7) / 2 + 97.7 = 178px. At the old 110 they overlapped. Anything quoting 52.8 predates the new sheet and is stale. The rutini_* resource names refer to Rotini until a coordinated rename is approved.
+
+Conversation Facing is -1 so he turns to the miner on his left after the walk, rather than inheriting whatever direction the approach happened to end on. It is declared here because the walk's direction is a side effect: move the entrance to the other side and an undeclared facing silently turns his back on the man he is talking to.
+
+His appearance also had to be corrected for this to render. mouse_red.png is drawn facing LEFT, and the resource used to say art_faces_left was false and mirror it with flip_h instead. That inverts CharacterPresenter's facing entirely - asking for -1 produced flip_h true, which mirrors left-drawn art into facing RIGHT - so he could never look at the miner at all. It is art_faces_left = true now, with no flip_h. Declare the art's true orientation; do not compensate with flip_h."
 opening_move_seconds = 1.5
 closing_move_seconds = 2.0
 opening_step_height = 3.0
+conversation_facing = -1
 hide_actor_after_closing = true
 conversation_tracks_miner = true
-conversation_root_offset_from_miner_x = 110.0
+conversation_root_offset_from_miner_x = 178.0
 procession_mines = false
-spawn_interval_seconds = 0.3
-exit_seconds = 2.0
+max_live_followers = 12
+web_max_live_followers = 8
+spawn_interval_seconds = 0.24
+exit_seconds = 3.0
+floor_offset_y = 0.0
+procession_cue = &"stampede"
+clump_scale_multiplier = 3.0
+single_scale_multiplier = 1.35
+procession_rows = 3
+procession_row_rise_pixels = 26.0
+procession_row_scale_falloff = 0.86
+procession_hop_pixels = 20.0
+rat_appearances = Array[ExtResource("8_rat_appearance")]([ExtResource("9_clump"), ExtResource("10_brown"), ExtResource("9_clump"), ExtResource("11_grey"), ExtResource("9_clump"), ExtResource("12_white")])
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
 editor_description = "600px right of Conversation, which puts both Rotini and every mouse past the frame edge at any landing column: the frame is 1152 wide and centred on the miner, so anything closer than 480px would have them appear from nothing in open shot. The colony spawns here too."
@@ -42,13 +65,19 @@ position = Vector2(-96, 0)
 editor_description = "LEFT, 700px clear of Conversation. Both the mice and Rotini leave this way - on toward the Cafe - rather than back where they came from. The colony reads the travel direction off Entrance and Exit, so putting the exit on this side is all that reverses the procession."
 position = Vector2(-796, 0)
 
+[node name="RatContainer" parent="." index="3"]
+editor_description = "Zero rather than the base scene's 7, so the colony lands on the SECOND layer with the rest of the cast instead of on top of every stratum.
+
+The number is relative and the chain matters: DepthEncounterController puts CharacterLayer on cutscene_draw_order (1) for the shot, this container adds its own, and each mouse adds a row offset on top. At 7 the whole colony came out around 8 - in front of all four strata and of the miner - which is the first layer, not the second. At 0 the front row sits exactly where MinerRig.buried_draw_order stands him while he digs, and the rows behind recede from there."
+z_index = 0
+
 [node name="EditorTerrainPreview" parent="." index="5"]
 editor_description = "Previews rutini_first at its authored depth."
 encounter_id = &"rutini_first"
 preview_depth_rows = 2500
 
 [node name="rutini" type="Node2D" parent="." index="6" unique_id=860305613]
-z_index = 3
+z_index = 1
 position = Vector2(110, 0)
 script = ExtResource("3_breov")
 actor_id = &"rutini"
@@ -57,7 +86,7 @@ pose = &"idle"
 metadata/_edit_group_ = true
 
 [node name="Miner" type="Node2D" parent="." index="7" unique_id=1652212560]
-z_index = 3
+z_index = 1
 script = ExtResource("3_breov")
 actor_id = &"miner"
 appearance = SubResource("Resource_c8jes")
