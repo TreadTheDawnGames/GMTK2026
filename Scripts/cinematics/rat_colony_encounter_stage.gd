@@ -43,33 +43,47 @@ signal stampede_finished
 @export var procession_mines: bool = true
 ## The cue that lets the colony in, instead of it arriving with the opening.
 ##
-## Empty, and the procession runs from the moment the shot opens. That is
-## Rotini's introduction: the tunnel is already somebody's road, the traffic is
-## the first thing the player sees, and his line explains something already on
-## screen. Named, and the tunnel stays empty until that cue arrives, which is the
-## colony beat: nothing is coming until he calls them, and then everything does.
+## Empty, and the procession runs from the moment the shot opens. Named, and the
+## tunnel stays empty until that cue arrives: nothing is coming until somebody
+## calls them, and then everything does.
+##
+## Both of the shipped colony beats now use the named form. Rotini's introduction
+## was the empty one until Zefin's direction changed it to a stampede - the room
+## is empty, he walks up out of nothing, and the horde only pours through on
+## "Come on, boys!", so the flood is the answer to the line rather than scenery
+## that was already running behind it.
 ##
 ## The cue is whatever carries that name - a DialogueLine's Stage Cue, or a
 ## timeline STAGE_CUE beat - so moving the flood means moving the cue rather than
 ## editing this stage. It is a lower-case verb phrase and not an animation name;
 ## an AnimationPlayer clip of the same name still plays if a stage authors one.
 @export var procession_cue: StringName
-## The dialogue line cue that releases the horde, or empty to run it from the
-## opening as before.
-##
-## Empty is the default and preserves the old shape, where the colony is already
-## streaming when the frame opens. Rotini's introduction needs the other one: the
-## tunnel is EMPTY, he walks up out of nothing and says his piece, and the horde
-## only pours through on "Come on, boys!" - so the stampede is the answer to the
-## line rather than scenery that happened to be running behind it.
-##
-## This alias keeps Rotini's first encounter explicit while procession_cue
-## remains the shared colony contract used by later encounters.
-@export var stampede_cue: StringName = &""
 ## How long the closing waits for the last of them to leave before it gives up
 ## and frees them where they stand. Only reached if a follower is stuck, which
 ## would otherwise hold the encounter open indefinitely.
 @export_range(0.5, 12.0, 0.5) var stampede_drain_timeout_seconds: float = 6.0
+## Draw order within the rat container for a drawn crowd, and for a single mouse.
+##
+## Relative to the container, so these order the colony against itself and leave
+## its place in the scene alone. The defaults put clumps one layer behind, which
+## is the only arrangement that reads: a clump is a still drawing of two dozen
+## mice, and anything running in front of it is what makes the whole mass look
+## like it is moving.
+@export_range(-8, 8, 1) var clump_draw_order: int = -1
+@export_range(-8, 8, 1) var single_draw_order: int = 0
+## Size multipliers on the rat scene's own appearance scale, for a drawn crowd
+## and for a single mouse.
+##
+## One at both, the default, leaves every follower exactly the size the rat scene
+## authored. A stampede wants the clumps much larger than that: the drawing is
+## padded to the same registration as a single mouse, so at parity it renders as
+## one mouse-high strip of very small mice and the floor shows through between
+## the gaps. Scaling it up is what turns the same drawing into a wall.
+##
+## Kept as multipliers rather than absolute scales so the rat scene stays the one
+## place a mouse's size is decided, and a stage only says how much bigger.
+@export_range(0.25, 4.0, 0.05) var clump_scale_multiplier: float = 1.0
+@export_range(0.25, 4.0, 0.05) var single_scale_multiplier: float = 1.0
 
 ## Growth is bounded by max_live_followers (or the web cap) and pruned on exit.
 var _followers: Array[CinematicRatMiner] = []
@@ -94,28 +108,19 @@ func prepare(
 ## unless this stage waits for a cue to let them in.
 func play_opening() -> void:
 	await super.play_opening()
-	if (
-		not _is_active
-		or not procession_cue.is_empty()
-		or not stampede_cue.is_empty()
-	):
+	if not _is_active or not procession_cue.is_empty():
 		return
 	_begin_procession()
 
 
-## Releases the horde on its authored line.
-##
-## Checked before the shared implementation rather than after, because that one
-## resolves a cue to an AnimationPlayer clip and answers false for a name it has
-## no animation for. A stampede is not a clip; it is a stream of actors, and it
-## has to be recognised here or the line passes with nothing happening.
+## Starts the colony on its authored cue, and otherwise defers to the shared
+## stage. A procession is a recognized stage action even though it is not an
+## AnimationPlayer clip, so the cue reports that it was handled.
 func play_cue(cue_id: StringName, line_index: int) -> bool:
 	if (
 		_is_active
-		and (
-			(not procession_cue.is_empty() and cue_id == procession_cue)
-			or (not stampede_cue.is_empty() and cue_id == stampede_cue)
-		)
+		and not procession_cue.is_empty()
+		and cue_id == procession_cue
 	):
 		_begin_procession()
 		return true
@@ -138,15 +143,6 @@ func play_closing() -> void:
 		_has_requested_persistent_colony = true
 		persistent_colony_requested.emit()
 	await super.play_closing()
-
-
-func _begin_procession() -> void:
-	if not _is_active or _is_spawning:
-		return
-	_is_spawning = true
-	_spawn_generation += 1
-	stampede_started.emit()
-	_spawn_next_follower(_spawn_generation)
 
 
 ## Stops new arrivals and waits for the ones already running to leave the frame.
@@ -191,6 +187,17 @@ func validate_stage() -> String:
 	return ""
 
 
+## Opens the stream. Idempotent, because a cue can be re-presented when a player
+## walks the dialogue back over the line that carries it.
+func _begin_procession() -> void:
+	if not _is_active or _is_spawning:
+		return
+	_is_spawning = true
+	_spawn_generation += 1
+	stampede_started.emit()
+	_spawn_next_follower(_spawn_generation)
+
+
 ## Reuses one timer at a time; the generation rejects stale callbacks.
 func _spawn_next_follower(expected_generation: int) -> void:
 	if (
@@ -220,9 +227,28 @@ func _spawn_follower() -> void:
 		_is_spawning = false
 		return
 	rat_container.add_child(rat)
-	rat.set_appearance(
-		rat_appearances[_appearance_index % rat_appearances.size()]
+	var appearance := rat_appearances[
+		_appearance_index % rat_appearances.size()
+	]
+	var is_clump := (
+		appearance != null and appearance.depicted_rat_count > 1
 	)
+	# Size before appearance, because set_appearance is what applies the scale to
+	# the sprite. Setting it afterwards leaves the actor drawn at the old size
+	# until something else reassigns the art.
+	rat.appearance_scale *= (
+		clump_scale_multiplier if is_clump else single_scale_multiplier
+	)
+	rat.set_appearance(appearance)
+	# A drawn crowd goes behind the individuals running over it. The clump is a
+	# backdrop - it holds two dozen mice but only ever moves as one thing - and
+	# the single mice are what sells the motion, so they have to be the layer in
+	# front or the stampede reads as one sliding picture.
+	#
+	# Taken from depicted_rat_count rather than authored per slot, because "is
+	# this a crowd" is already recorded there and saying it twice is one more
+	# place to disagree.
+	rat.z_index = clump_draw_order if is_clump else single_draw_order
 	_appearance_index += 1
 	rat.prepare_for_sequence(
 		_resolve_grounded_marker(entrance_marker),
