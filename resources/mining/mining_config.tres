@@ -23,30 +23,30 @@
 script = ExtResource("12_combo_group")
 target_scenes = Array[PackedScene]([ExtResource("13_green")])
 
-[sub_resource type="Resource" id="ComboTargetGroup_green_yellow"]
+[sub_resource type="Resource" id="ComboTargetGroup_yellow"]
 script = ExtResource("12_combo_group")
 minimum_combo = 4
-target_scenes = Array[PackedScene]([ExtResource("13_green"), ExtResource("14_yellow")])
+target_scenes = Array[PackedScene]([ExtResource("14_yellow")])
 
-[sub_resource type="Resource" id="ComboTargetGroup_green_yellow_stationary_blue"]
+[sub_resource type="Resource" id="ComboTargetGroup_stationary_blue"]
 script = ExtResource("12_combo_group")
 minimum_combo = 8
-target_scenes = Array[PackedScene]([ExtResource("13_green"), ExtResource("14_yellow"), ExtResource("15_stationary_blue")])
+target_scenes = Array[PackedScene]([ExtResource("15_stationary_blue")])
 
-[sub_resource type="Resource" id="ComboTargetGroup_yellow_blue"]
+[sub_resource type="Resource" id="ComboTargetGroup_moving_blue"]
 script = ExtResource("12_combo_group")
 minimum_combo = 15
-target_scenes = Array[PackedScene]([ExtResource("14_yellow"), ExtResource("15_stationary_blue"), ExtResource("16_moving_blue")])
+target_scenes = Array[PackedScene]([ExtResource("16_moving_blue")])
 
-[sub_resource type="Resource" id="ComboTargetGroup_yellow_moving_blue_purple"]
+[sub_resource type="Resource" id="ComboTargetGroup_purple"]
 script = ExtResource("12_combo_group")
 minimum_combo = 20
-target_scenes = Array[PackedScene]([ExtResource("14_yellow"), ExtResource("16_moving_blue"), ExtResource("17_purple")])
+target_scenes = Array[PackedScene]([ExtResource("17_purple")])
 
 [resource]
 script = ExtResource("1_config")
 base_mine_depth_rows = 12
 combo_mine_depth_rows_per_step = 2
 progression_levels = Array[ExtResource("1_csmot")]([ExtResource("2_level_0"), ExtResource("3_level_1"), ExtResource("4_level_2"), ExtResource("5_level_3"), ExtResource("6_level_4"), ExtResource("7_level_5"), ExtResource("8_level_6"), ExtResource("9_level_7"), ExtResource("10_level_8"), ExtResource("11_level_9")])
-combo_target_groups = Array[ExtResource("12_combo_group")]([SubResource("ComboTargetGroup_green"), SubResource("ComboTargetGroup_green_yellow"), SubResource("ComboTargetGroup_green_yellow_stationary_blue"), SubResource("ComboTargetGroup_yellow_blue"), SubResource("ComboTargetGroup_yellow_moving_blue_purple")])
+combo_target_groups = Array[ExtResource("12_combo_group")]([SubResource("ComboTargetGroup_green"), SubResource("ComboTargetGroup_yellow"), SubResource("ComboTargetGroup_stationary_blue"), SubResource("ComboTargetGroup_moving_blue"), SubResource("ComboTargetGroup_purple")])
 combo_tier_thresholds = Array[int]([1, 5, 10, 16, 20])

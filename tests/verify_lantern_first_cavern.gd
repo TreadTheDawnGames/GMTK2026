@@ -71,6 +71,7 @@ func _verify_sculpt(sculpt: CutsceneTerrainSculpt) -> void:
 	) as MiningConfig
 	var half_span := mining_config.snake_half_span_cells
 	var landing_rows := sculpt.get_landing_local_rows(half_span)
+	var first_landing_x := sculpt.get_landing_first_local_x(half_span)
 	_expect(landing_rows.size() == 49, "All 49 landing columns must resolve.")
 	for index in range(landing_rows.size()):
 		var landing_row := landing_rows[index]
@@ -80,6 +81,14 @@ func _verify_sculpt(sculpt: CutsceneTerrainSculpt) -> void:
 				and landing_row <= FLOOR_ROW,
 			"Landing column %d is outside the controller tolerance."
 			% index
+		)
+		# The raised cavern used to leave intact rock capping the room above
+		# its ceiling, which caught the falling miner short of the floor and
+		# stopped the encounter from ever promoting.
+		_expect(
+			_get_capping_row(sculpt, first_landing_x + index) < 0,
+			"Arrival column %d is capped by rock above the cavern."
+			% (first_landing_x + index)
 		)
 
 	for local_x in [168, 192, 216]:
@@ -122,9 +131,17 @@ func _verify_stage(stage: CharacterEncounterStage) -> void:
 		"Encounter 2 stage exports and named nodes must validate."
 	)
 	_expect(
-		stage.entrance_marker.position == Vector2(-648, -64)
-			and stage.conversation_marker.position == Vector2(-592, -64),
+		stage.entrance_marker.position == Vector2(-472, -64)
+			and stage.conversation_marker.position == Vector2(-416, -64),
 		"The Keeper must approach 56px toward the miner on his ledge."
+	)
+	# Both marks must sit on the ledge the authoring tool actually supports,
+	# columns 132 to 145. Off its tip he stands over open shaft at the very
+	# edge of frame, which is where he was before.
+	_expect(
+		stage.entrance_marker.position.x >= -480.0
+			and stage.conversation_marker.position.x >= -480.0,
+		"The Keeper's marks must stay on the authored ledge, not past its tip."
 	)
 	_expect(
 		is_equal_approx(stage.opening_move_seconds, 1.8),
@@ -145,7 +162,7 @@ func _verify_stage(stage: CharacterEncounterStage) -> void:
 	_expect(bench != null, "The Keeper's approved bench must remain composed.")
 	if bench != null:
 		_expect(
-			bench.position == Vector2(-474, -64),
+			bench.position == Vector2(-298, -64),
 			"The bench must keep its measured clearance and layer-one footing."
 		)
 		_expect(
@@ -208,6 +225,18 @@ func _get_first_support(
 				return local_y
 		else:
 			reached_opening = true
+	return -1
+
+
+## Returns the first solid row above the room's floor at one column, or -1 when
+## the whole fall from the room's top edge to its floor is open.
+func _get_capping_row(
+	sculpt: CutsceneTerrainSculpt,
+	local_x: int
+) -> int:
+	for local_y in range(FLOOR_ROW):
+		if sculpt.is_solid_local(Vector2i(local_x, local_y)):
+			return local_y
 	return -1
 
 

@@ -61,10 +61,11 @@ not inherit from an earlier resource.
 
 Target-group definitions are shared instead of duplicated per encounter. Edit
 `MiningConfig.combo_target_groups` in `res://resources/mining/mining_config.tres`
-to tune the ordered, inclusive combo thresholds and each threshold's complete
-target pool. The first group must begin at combo zero. Encounter progression
-unlocks those groups in order; the current combo selects a group only up to the
-active level's authored maximum.
+to tune the ordered, inclusive combo thresholds and the new target types each
+threshold adds. The first group must begin at combo zero. Encounter progression
+unlocks those groups in order; the current combo accumulates every reached
+group only up to the active level's authored maximum. Higher combo never removes
+an earlier target type from the random pool.
 
 ## Production reward contract
 

@@ -2100,25 +2100,10 @@ func _verify_combo_target_groups(
 	var expected_minimums := PackedInt32Array([0, 4, 8, 15, 20])
 	var expected_paths: Array[Array] = [
 		["res://Scenes/targets/shrinking_target.tscn"],
-		[
-			"res://Scenes/targets/shrinking_target.tscn",
-			"res://Scenes/targets/reverse_target.tscn",
-		],
-		[
-			"res://Scenes/targets/shrinking_target.tscn",
-			"res://Scenes/targets/reverse_target.tscn",
-			"res://Scenes/targets/multi-hit_target.tscn",
-		],
-		[
-			"res://Scenes/targets/reverse_target.tscn",
-			"res://Scenes/targets/multi-hit_target.tscn",
-			"res://Scenes/targets/moving_target.tscn",
-		],
-		[
-			"res://Scenes/targets/reverse_target.tscn",
-			"res://Scenes/targets/moving_target.tscn",
-			"res://Scenes/targets/fade_target.tscn",
-		],
+		["res://Scenes/targets/reverse_target.tscn"],
+		["res://Scenes/targets/multi-hit_target.tscn"],
+		["res://Scenes/targets/moving_target.tscn"],
+		["res://Scenes/targets/fade_target.tscn"],
 	]
 	_expect(
 		config != null
@@ -2145,7 +2130,7 @@ func _verify_combo_target_groups(
 				and config.get_combo_target_group_index(
 					group.minimum_combo
 				) == group_index,
-			"Combo target group %d must match the authored ladder."
+			"Combo target unlock %d must match the authored ladder."
 				% group_index
 		)
 	var expected_unlocked_group_indices := PackedInt32Array([
