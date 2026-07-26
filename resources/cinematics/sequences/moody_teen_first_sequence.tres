@@ -1,0 +1,37 @@
+[gd_resource type="Resource" script_class="CutsceneSequence" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://resources/cinematics/cutscene_beat.gd" id="1_beat"]
+[ext_resource type="Resource" path="res://resources/dialogue/moody_teen_first_conversation.tres" id="2_dialogue"]
+[ext_resource type="Script" path="res://resources/cinematics/cutscene_sequence.gd" id="3_sequence"]
+
+[sub_resource type="Resource" id="Beat_show"]
+script = ExtResource("1_beat")
+kind = 9
+actor = &"moody_teen"
+notes = "The Teen is already standing in the cavern. Prestage Before Landing makes this reveal readable during the fall rather than popping him in after the miner settles."
+
+[sub_resource type="Resource" id="Beat_face"]
+script = ExtResource("1_beat")
+kind = 2
+actor = &"moody_teen"
+facing = -1
+notes = "He looks left toward the miner and never changes direction."
+
+[sub_resource type="Resource" id="Beat_stare"]
+script = ExtResource("1_beat")
+kind = 4
+duration_seconds = 0.75
+notes = "A short silent discovery hold after landing. The remaining awkward pauses are the dialogue advances themselves."
+
+[sub_resource type="Resource" id="Beat_dialogue"]
+script = ExtResource("1_beat")
+kind = 5
+start_seconds = 0.75
+duration_seconds = 8.0
+conversation = ExtResource("2_dialogue")
+notes = "The complete seven-line exchange. It blocks for the player's reading pace, then the same-place closing handoff returns mining control."
+
+[resource]
+script = ExtResource("3_sequence")
+sequence_id = &"moody_teen_first_sequence"
+beats = Array[ExtResource("1_beat")]([SubResource("Beat_show"), SubResource("Beat_face"), SubResource("Beat_stare"), SubResource("Beat_dialogue")])
