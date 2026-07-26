@@ -24,11 +24,12 @@ atlas = ExtResource("2_gems")
 region = Rect2(290, 0, 73, 124)
 
 [node name="TreasureHunterHoardEncounterStage" instance=ExtResource("1_stage")]
-editor_description = "Encounter 6, The Treasure. The Treasure Hunter is already standing at the hoard he spent years looking for when the miner breaks through, so nobody walks in and nobody walks out: he is found here and he stays here. Reading left to right the shot is miner, then him, then the treasure heaped up behind him and running on past the frame edge - he is between the two, turned back to the miner, gloating over riches that are at his shoulder rather than across the room. His art is drawn facing left, which is why he holds the whole conversation on the miner's right. Every marker and the hoard itself are authored relative to Conversation and slide to the miner's landing column together, so this composition is identical whichever of the 49 columns the descent arrived down."
+editor_description = "Encounter 6, The Treasure. The Treasure Hunter is already standing at the hoard he spent years looking for when the miner breaks through, so he does not walk in: he is found here, gives away his pickaxe, then leaves for the later cafe gathering. Reading left to right the shot is miner, then him, then the treasure heaped up behind him and running on past the frame edge - he is between the two, turned back to the miner, gloating over riches that are at his shoulder rather than across the room. His art is drawn facing left, which is why he holds the whole conversation on the miner's right. Every marker and the hoard itself are authored relative to Conversation and slide to the miner's landing column together, so this composition is identical whichever of the 49 columns the descent arrived down."
 opening_move_seconds = 0.6
 closing_move_seconds = 0.6
 closing_pose = &"no_pickaxe"
 rest_pose = &"no_pickaxe"
+hide_actor_after_closing = true
 conversation_facing = -1
 closing_facing = -1
 conversation_tracks_miner = true
@@ -44,11 +45,11 @@ editor_description = "150px right of the miner, root to root, a little over the 
 position = Vector2(150, 0)
 
 [node name="Rest" parent="ActorMarkers" index="3"]
-editor_description = "The conversation stop. He gives the pickaxe away and stays with the treasure, so the closing move has nowhere to take him."
+editor_description = "The conversation stop. He gives the pickaxe away here before leaving for the later cafe gathering."
 position = Vector2(150, 0)
 
 [node name="Exit" parent="ActorMarkers" index="4"]
-editor_description = "Unused. Nothing in this encounter sends him here - hide_actor_after_closing is off - but it is kept past the frame edge so that turning that flag on for a test cannot strand him in shot."
+editor_description = "Past the frame edge. The authored sequence sends him here in his no-pickaxe pose before hiding him."
 position = Vector2(840, 0)
 
 [node name="GemPile" type="Node2D" parent="PropMarkers" index="0"]

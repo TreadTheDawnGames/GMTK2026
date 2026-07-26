@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bq8qwl3xn5qny"
-path="res://.godot/imported/miner_idle-Pickaxe.png-40c8bce6ecab5d14fb87e30e616dfd03.ctex"
+uid="uid://pnfmdo4t8rpl"
+path="res://.godot/imported/miner_idle_gold.png-4349699e8a2f804677f3412d80e69a25.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Assets/Characters/miner_idle-Pickaxe.png"
-dest_files=["res://.godot/imported/miner_idle-Pickaxe.png-40c8bce6ecab5d14fb87e30e616dfd03.ctex"]
+source_file="res://Assets/Characters/miner_idle_gold.png"
+dest_files=["res://.godot/imported/miner_idle_gold.png-4349699e8a2f804677f3412d80e69a25.ctex"]
 
 [params]
 
