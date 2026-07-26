@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://b2fx8ce2tb7na"
+path="res://.godot/imported/FillTrack 4_A.mp3-8f16d59b6e2df6a36c6a93f04309e681.mp3str"
+
+[deps]
+
+source_file="res://Assets/Audio/Music/Fill Tracks/FillTrack 4_A.mp3"
+dest_files=["res://.godot/imported/FillTrack 4_A.mp3-8f16d59b6e2df6a36c6a93f04309e681.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4
