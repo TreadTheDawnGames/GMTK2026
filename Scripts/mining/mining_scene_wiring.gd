@@ -350,6 +350,8 @@ func _ready() -> void:
 		encounter_controller._on_credits_completed
 	)
 	_connect_once(
+		# Fractional high-precision wheel steps stay intact across the UI/view
+		# composition boundary; ViewController owns their pixel conversion.
 		depth_review_control.review_scroll_requested,
 		view_controller.scroll_review
 	)

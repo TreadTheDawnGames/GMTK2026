@@ -6,6 +6,7 @@ extends SceneTree
 ## - Verifies the composition root's required gameplay dependencies.
 ## - Resolves one real terrain dig through the production TerrainManager.
 ## - Confirms damaged terrain restores byte-exactly without replaying history.
+## - Checks fractional review travel, encounter stops, and upward preloading.
 ## - Exits nonzero on any failed contract so agents get a fast merge gate.
 ## - This intentionally stays small; detailed behavior remains in local_tests.
 ## - The invariant is that a parseable game can complete one mining mutation.
@@ -96,6 +97,9 @@ func _verify_mining_scene() -> void:
 	var mining_controller := game_root.get_node_or_null(
 		"MiningScene/Systems/MiningController"
 	) as MiningController
+	var view_controller := game_root.get_node_or_null(
+		"MiningScene/Systems/ViewController"
+	) as ViewController
 	var encounter_controller := game_root.get_node_or_null(
 		"MiningScene/Systems/UpgradeEncounterController"
 	) as DepthEncounterController
@@ -124,11 +128,13 @@ func _verify_mining_scene() -> void:
 	_expect(terrain_renderer != null, "TerrainLayerRenderer must exist.")
 	_expect(scene_wiring != null, "MiningSceneWiring must exist.")
 	_expect(mining_controller != null, "MiningController must exist.")
+	_expect(view_controller != null, "ViewController must exist.")
 	if (
 		terrain_manager == null
 		or terrain_renderer == null
 		or scene_wiring == null
 		or mining_controller == null
+		or view_controller == null
 	):
 		game_root.queue_free()
 		await process_frame
@@ -384,8 +390,136 @@ func _verify_mining_scene() -> void:
 				) % layer_index
 			)
 
+	_verify_review_camera(
+		view_controller,
+		terrain_manager,
+		terrain_renderer
+	)
 	game_root.queue_free()
 	await process_frame
+
+
+## Exercises the review contracts through the production config and renderer.
+func _verify_review_camera(
+	view_controller: ViewController,
+	terrain_manager: TerrainManager,
+	terrain_renderer: TerrainLayerRenderer
+) -> void:
+	var config := terrain_manager.config
+	var original_target := Vector2i(view_controller.target_view_position)
+	var review_depth := (
+		config.initial_surface_row
+		+ terrain_manager.encounter_config.encounters[0].resolve_depth(
+			config.total_run_depth
+		)
+		+ 120
+	)
+	view_controller.follow_mining_position(
+		Vector2i(original_target.x, review_depth)
+	)
+	view_controller.snap_follow_to_target()
+	var view_before_scroll := view_controller.current_view_y
+	view_controller.scroll_review(-0.5)
+	var expected_fractional_target := (
+		view_before_scroll
+		- config.review_scroll_pixels_per_step
+			* 0.5 / float(config.terrain_cell_world_size)
+	)
+	_expect(
+		is_equal_approx(
+			view_controller._review_target_y,
+			expected_fractional_target
+		),
+		"Review input must preserve fractional wheel travel in viewport pixels."
+	)
+	view_controller._move_review_view(1.0 / 60.0)
+	var moved_pixels := (
+		(view_before_scroll - view_controller.current_view_y)
+		* float(config.terrain_cell_world_size)
+	)
+	_expect(
+		moved_pixels > 0.0
+		and moved_pixels
+			< config.review_scroll_pixels_per_step * 0.5,
+		"One review frame must move smoothly instead of snapping to its target."
+	)
+
+	var encounter_floor_y := float(
+		config.initial_surface_row
+		+ terrain_manager.encounter_config.encounters[0].resolve_depth(
+			config.total_run_depth
+		)
+	)
+	var encounter_view_y := (
+		encounter_floor_y
+		- (
+			root.get_visible_rect().size.y
+				* view_controller.encounter_focus_viewport_y_ratio
+			- config.mining_face_screen_y
+		) / float(config.terrain_cell_world_size)
+	)
+	var near_encounter_y := (
+		encounter_view_y
+		+ config.review_cutscene_snap_distance_pixels
+			* 0.5 / float(config.terrain_cell_world_size)
+	)
+	view_controller.current_view_y = near_encounter_y
+	view_controller._review_target_y = near_encounter_y
+	view_controller._review_snap_target_y = NAN
+	view_controller._review_idle_seconds = (
+		config.review_cutscene_snap_delay_seconds
+	)
+	view_controller._last_review_scroll_direction = -1.0
+	view_controller._move_review_view(0.0)
+	_expect(
+		is_equal_approx(
+			view_controller._review_target_y,
+			encounter_view_y
+		),
+		"Idle upward review must settle onto a visited encounter framing."
+	)
+	view_controller.current_view_y = encounter_view_y
+	view_controller._review_snap_target_y = encounter_view_y
+	view_controller.scroll_review(-0.25)
+	_expect(
+		is_nan(view_controller._review_snap_target_y)
+		and view_controller._review_target_y < encounter_view_y,
+		"Fresh review input must release an encounter stop immediately."
+	)
+
+	var deep_view_y := 5_000.0
+	terrain_manager.set_view_position(
+		Vector2(view_controller.current_view_x, deep_view_y)
+	)
+	var viewport_height := root.get_visible_rect().size.y
+	var visible_world_top := 0.0
+	var active_camera := root.get_camera_2d()
+	if active_camera != null and not is_zero_approx(active_camera.zoom.y):
+		visible_world_top = (
+			active_camera.get_screen_center_position().y
+			- viewport_height * 0.5 / absf(active_camera.zoom.y)
+		)
+	var top_world_y := (
+		deep_view_y
+		+ (
+			visible_world_top - config.mining_face_screen_y
+		) / float(config.terrain_cell_world_size)
+	)
+	var first_visible_chunk := maxi(
+		floori(top_world_y / float(config.chunk_height_cells)),
+		0
+	)
+	_expect(
+		terrain_renderer._loaded_first_chunk
+			== maxi(
+				first_visible_chunk - config.preload_chunks_above,
+				0
+			),
+		"Upward review must preload terrain before it reaches the top edge."
+	)
+
+	view_controller.follow_mining_position(original_target)
+	view_controller.snap_follow_to_target()
 
 
 func _expect(condition: bool, failure_message: String) -> void:

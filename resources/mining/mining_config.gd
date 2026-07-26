@@ -53,6 +53,8 @@ const MAX_PLAYABLE_DEPTH: int = 2_000_000_000
 @export_category("View")
 @export var terrain_screen_center_x: float = 576.0
 @export var mining_face_screen_y: float = 260.0
+## Keeps upward review from exposing a chunk while its masks are still queued.
+@export_range(0, 4, 1) var preload_chunks_above: int = 1
 @export_range(0, 4, 1) var preload_chunks_below: int = 1
 ## Accelerates the miner through newly opened terrain, in rows per second squared.
 @export_range(10.0, 1_000.0, 10.0) var mining_fall_gravity: float = 300.0
@@ -68,13 +70,15 @@ const MAX_PLAYABLE_DEPTH: int = 2_000_000_000
 @export_range(1.0, 64.0, 1.0) var mining_camera_max_lag_rows: float = 12.0
 ## Recenters the view after landing, in terrain rows per second.
 @export_range(10.0, 2_000.0, 10.0) var landing_recenter_speed: float = 60.0
-## Terrain rows added to the review target by one mouse-wheel step.
-@export_range(10, 10_000, 10) var review_scroll_rows_per_step: int = 1_000
-## Keeps a single wheel step readable before long-distance review accelerates.
-@export_range(100.0, 6_000.0, 100.0) var review_scroll_close_speed: float = 600.0
-## Reaches full review speed only when several wheel steps are queued.
-@export_range(1_000.0, 50_000.0, 1_000.0) var review_scroll_acceleration_distance: float = 10_000.0
-@export_range(100.0, 20_000.0, 100.0) var review_scroll_speed: float = 6_000.0
+## Viewport pixels queued by one mouse-wheel step. Fractional wheel factors keep
+## high-precision devices sub-pixel accurate instead of rounding to terrain rows.
+@export_range(8.0, 256.0, 1.0) var review_scroll_pixels_per_step: float = 96.0
+## Maximum presentation speed after wheel input, measured in viewport pixels.
+@export_range(120.0, 4_000.0, 10.0) var review_scroll_speed_pixels_per_second: float = 1_200.0
+## An idle upward review may settle onto an already-visited encounter this close.
+@export_range(0.0, 512.0, 1.0) var review_cutscene_snap_distance_pixels: float = 144.0
+## Continuous input always wins; the magnetic encounter stop waits for this gap.
+@export_range(0.0, 1.0, 0.01) var review_cutscene_snap_delay_seconds: float = 0.14
 @export_range(100.0, 50_000.0, 100.0) var return_fall_gravity: float = 8_000.0
 @export_range(100.0, 50_000.0, 100.0) var return_max_fall_speed: float = 20_000.0
 

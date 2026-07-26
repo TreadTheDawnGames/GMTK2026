@@ -177,10 +177,10 @@ const FRACTURE_SUPPORT_HALF_WIDTH_MASK_PIXELS: int = 2
 const FRACTURE_SUPPORT_VALUE_THRESHOLD: float = 0.9
 # Retired chunk nodes are kept so streaming reuses their sprites and fully
 # configured materials instead of rebuilding both per crossed chunk boundary.
-# Gameplay holds at most five chunks. Matching that bound prevents a deep jump
-# from rebuilding one five-layer material hierarchy every time; menu-only extra
-# coverage does not traverse, and every retired mask/texture is still released.
-const CHUNK_VISUAL_POOL_LIMIT: int = 5
+# Gameplay holds at most six chunks after the one-chunk upward review margin.
+# Matching that bound prevents a deep jump from rebuilding one five-layer
+# material hierarchy every time; every retired mask/texture is still released.
+const CHUNK_VISUAL_POOL_LIMIT: int = 6
 # A structural chunk needs at most two distinct base masks and six tiled
 # textures. One spare chunk's storage is retained so adjacent streaming updates
 # existing buffers instead of allocating multi-megabyte images at the boundary.
@@ -2008,7 +2008,7 @@ func _on_viewport_size_changed() -> void:
 	_position_active_chunks()
 
 
-## Loads visible chunks plus the configured below-view margin.
+## Loads visible chunks plus the configured margins above and below the view.
 func _refresh_active_chunks() -> void:
 	# Coverage is measured against the viewport, which only exists once this is
 	# in the tree. The editor instantiates a scene before parenting it, so an
@@ -2045,8 +2045,12 @@ func _refresh_active_chunks() -> void:
 		_current_view_y
 		+ (visible_world_bottom - config.mining_face_screen_y) / cell_size
 	)
-	var first_chunk := maxi(
+	var first_visible_chunk := maxi(
 		floori(top_world_y / float(config.chunk_height_cells)),
+		0
+	)
+	var first_chunk := maxi(
+		first_visible_chunk - config.preload_chunks_above,
 		0
 	)
 	var last_visible_chunk := maxi(
@@ -2054,7 +2058,7 @@ func _refresh_active_chunks() -> void:
 			(bottom_world_y - 0.001)
 			/ float(config.chunk_height_cells)
 		),
-		first_chunk
+		first_visible_chunk
 	)
 	var last_chunk := mini(
 		last_visible_chunk + config.preload_chunks_below,
