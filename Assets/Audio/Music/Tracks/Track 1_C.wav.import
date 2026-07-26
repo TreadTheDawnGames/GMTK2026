@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://ccgj86e6x5a1r"
+path="res://.godot/imported/Track 1_C.wav-2c2cea5428f5ef7af943b186207e1588.sample"
+
+[deps]
+
+source_file="res://Assets/Audio/Music/Tracks/Track 1_C.wav"
+dest_files=["res://.godot/imported/Track 1_C.wav-2c2cea5428f5ef7af943b186207e1588.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2

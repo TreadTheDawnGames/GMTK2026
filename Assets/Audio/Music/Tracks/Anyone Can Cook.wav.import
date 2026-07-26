@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://djx1pjd8fh726"
+path="res://.godot/imported/Anyone Can Cook.wav-fbe5328b1d03ee71d0a1699efdc99799.sample"
+
+[deps]
+
+source_file="res://Assets/Audio/Music/Tracks/Anyone Can Cook.wav"
+dest_files=["res://.godot/imported/Anyone Can Cook.wav-fbe5328b1d03ee71d0a1699efdc99799.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2

@@ -9,8 +9,6 @@ signal pressed(success: bool, hit_direction: int, combo : int)
 
 @onready var slider: Panel = %Slider
 @onready var backing: Control = %Backing
-@onready var bounce_sound: AudioStreamPlayer2D = %BounceSound
-
 
 @export var speed: float = 500.0
 @export var speed_multiplier: float = 1.0
@@ -237,7 +235,8 @@ func _process(delta: float) -> void:
 		play_bounce_sound()
 		if one_shot:
 			pressed.emit(false, 0, consecutive_hits)
-			stop()
+			if stop_one_shot_when_done:
+				stop()
 	
 	#slider.position.x = slider_position
 	#queue_redraw()
@@ -253,7 +252,7 @@ func set_bounce_muted(is_muted: bool) -> void:
 ## Plays the bar's authored bounce sound unless the saved preference mutes it.
 func play_bounce_sound() -> void:
 	if not _bounce_muted:
-		bounce_sound.play()
+		AudioHandler.play_sound(AudioLibrary.BOUNCE)
 
 #func _draw():
 	#draw_line(backing.position + Vector2(slider_position, 0), (backing.position + Vector2(slider_position, 0)) + Vector2.UP * 50, Color.RED, 1.0)

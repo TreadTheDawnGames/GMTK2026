@@ -36,6 +36,7 @@ grow_vertical = 0
 theme = ExtResource("2_s3nbr")
 max_value = 20.0
 step = 1.0
+value = 8.0
 show_percentage = false
 script = ExtResource("3_ww2cc")
 tick_sprite = ExtResource("4_k32d5")

@@ -1,4 +1,4 @@
-﻿@tool
+@tool
 class_name MiningConfig
 extends Resource
 
@@ -89,6 +89,8 @@ const MAX_PLAYABLE_DEPTH: int = 2_000_000_000
 @export_range(1.0, 5_000.0, 1.0) var mining_bar_speed: float = 500.0
 ## Sets the recovery slider's unmodified horizontal speed.
 @export_range(1.0, 5_000.0, 1.0) var recovery_bar_speed: float = 1_250.0
+## Sets the secondary recovery slider's unmodified horizontal speed.
+@export_range(1.0, 5_000.0, 1.0) var second_recovery_bar_speed: float = 1_500.0
 ## Applies a fixed speed multiplier while the mining combo is active.
 @export_range(0.1, 5.0, 0.05) var combo_speed_multiplier: float = 1.5
 ## Multiplies recovery speed after each successfully saved streak.
@@ -114,7 +116,7 @@ const MAX_PLAYABLE_DEPTH: int = 2_000_000_000
 @export_range(1.0, 10.0, 0.1) var maximum_stack_width_multiplier: float = 2.0
 @export_range(1.0, 10.0, 0.1) var maximum_stack_swing_speed_multiplier: float = 2.5
 @export_range(1.0, 10.0, 0.1) var maximum_stack_debris_multiplier: float = 3.0
-
+@export var use_secondary_recovery : bool = false
 
 ## Returns the practical coordinate ceiling for the otherwise endless mine.
 func get_bottom_surface_row() -> int:

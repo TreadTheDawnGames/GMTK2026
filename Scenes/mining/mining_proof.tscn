@@ -11,7 +11,7 @@
 [ext_resource type="PackedScene" path="res://Scenes/mining/mining_hit_particles.tscn" id="10_hit_particles"]
 [ext_resource type="PackedScene" uid="uid://bwnqpopl5iayr" path="res://Scenes/dialogue/dialogue_overlay.tscn" id="11_dialogue_overlay"]
 [ext_resource type="Script" uid="uid://bmv66cgstojt0" path="res://Scripts/dialogue/depth_encounter_controller.gd" id="13_depth_encounter"]
-[ext_resource type="Resource" path="res://resources/encounters/depth_encounter_config.tres" id="14_encounter_config"]
+[ext_resource type="Resource" uid="uid://2g3sn8h0mk7t" path="res://resources/encounters/depth_encounter_config.tres" id="14_encounter_config"]
 [ext_resource type="Script" uid="uid://cwq85ldnfasbo" path="res://Scripts/pickaxes/pickaxe_progression.gd" id="19_pickaxe_progression"]
 [ext_resource type="Resource" uid="uid://bm7au74mrcaij" path="res://resources/pickaxes/basic_pickaxe.tres" id="20_basic_pickaxe"]
 [ext_resource type="Script" uid="uid://c4nd03mddc2vw" path="res://Scripts/mining/impact_shake.gd" id="21_impact_shake"]
@@ -33,7 +33,7 @@
 [ext_resource type="Script" uid="uid://3d6grhip1htq" path="res://Scripts/mining/surface_presentation.gd" id="52_surface_presentation"]
 [ext_resource type="Shader" uid="uid://dwpswe2x8kjye" path="res://Shaders/surface_sky.gdshader" id="53_surface_sky"]
 [ext_resource type="Shader" uid="uid://6u22qy01ne0" path="res://Shaders/sunlight_wash.gdshader" id="55_sunlight_wash"]
-[ext_resource type="PackedScene" path="res://Scenes/cinematics/arrival_intro.tscn" id="56_arrival_intro"]
+[ext_resource type="PackedScene" uid="uid://b4cudxpsminnk" path="res://Scenes/cinematics/arrival_intro.tscn" id="56_arrival_intro"]
 [ext_resource type="Script" uid="uid://c7imq1ddw5h5m" path="res://Scripts/mining/run_timeline.gd" id="57_run_timeline"]
 [ext_resource type="Script" uid="uid://vm58e0gjcupp" path="res://Scripts/mining/gem_outcrop_field.gd" id="58_gem_field"]
 [ext_resource type="Texture2D" uid="uid://ding6yepfwaw4" path="res://Assets/Props/gem_crystals.png" id="59_gem_crystals"]
@@ -46,8 +46,8 @@
 [ext_resource type="Script" uid="uid://bxi3n23isgchd" path="res://Scripts/mining/combo_tier_punch.gd" id="68_tier_punch"]
 [ext_resource type="Script" uid="uid://tux2aybei38t" path="res://Scripts/cinematics/opening_shot_camera.gd" id="76_opening_camera"]
 [ext_resource type="PackedScene" uid="uid://2pjknhxlb7ux" path="res://Scenes/menu/main_menu.tscn" id="77_main_menu"]
-[ext_resource type="Script" path="res://Scripts/mining/encounter_progression.gd" id="78_encounter_progression"]
-[ext_resource type="Resource" path="res://resources/dialogue/opening_surface_conversation.tres" id="79_opening_conversation"]
+[ext_resource type="Script" uid="uid://btbtknnj12de6" path="res://Scripts/mining/encounter_progression.gd" id="78_encounter_progression"]
+[ext_resource type="Resource" uid="uid://cd8vkhcsxuokv" path="res://resources/dialogue/opening_surface_conversation.tres" id="79_opening_conversation"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_surface_sky"]
 resource_local_to_scene = true
@@ -57,6 +57,7 @@ shader_parameter/sky_horizon_color = Color(0.95, 0.45, 0.24, 1)
 shader_parameter/underground_color = Color(0.075, 0.095, 0.13, 1)
 shader_parameter/sun_color = Color(1, 0.74, 0.4, 1)
 shader_parameter/sun_halo_color = Color(1, 0.47, 0.22, 1)
+shader_parameter/sun_disc_enabled = false
 shader_parameter/sun_screen_position = Vector2(676, 284)
 shader_parameter/sun_radius = 34.0
 shader_parameter/sun_edge_softness = 4.0
@@ -106,6 +107,9 @@ shader_parameter/surface_screen_y = 260.0
 shader_parameter/viewport_size = Vector2(1152, 648)
 shader_parameter/backdrop_screen_size = Vector2(1152, 648)
 
+[sub_resource type="LabelSettings" id="LabelSettings_6ko1l"]
+font_size = 91
+
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_return_normal"]
 bg_color = Color(0.075, 0.055, 0.047, 0.9)
 border_width_left = 2
@@ -120,6 +124,18 @@ corner_radius_bottom_left = 8
 shadow_color = Color(0, 0, 0, 0.48)
 shadow_size = 8
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_return_pressed"]
+bg_color = Color(0.62, 0.37, 0.18, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.74, 0.4, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_return_hover"]
 bg_color = Color(0.14, 0.1, 0.078, 0.95)
 border_width_left = 2
@@ -133,18 +149,6 @@ corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
 shadow_color = Color(0, 0, 0, 0.55)
 shadow_size = 10
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_return_pressed"]
-bg_color = Color(0.62, 0.37, 0.18, 0.95)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(1, 0.74, 0.4, 1)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_return_disabled"]
 bg_color = Color(0.075, 0.055, 0.047, 0.6)
@@ -292,7 +296,7 @@ config = ExtResource("1_config")
 terrain_manager = NodePath("../../TerrainManager")
 view_controller = NodePath("../ViewController")
 
-[node name="EncounterProgression" type="Node" parent="MiningScene/Systems" node_paths=PackedStringArray("mining_controller", "timing_window")]
+[node name="EncounterProgression" type="Node" parent="MiningScene/Systems" unique_id=1021475373 node_paths=PackedStringArray("mining_controller", "timing_window")]
 script = ExtResource("78_encounter_progression")
 config = ExtResource("1_config")
 mining_controller = NodePath("../MiningController")
@@ -303,6 +307,24 @@ script = ExtResource("19_pickaxe_progression")
 miner_rig = NodePath("../../MinerRig")
 mining_controller = NodePath("../MiningController")
 starter_pickaxe = ExtResource("20_basic_pickaxe")
+
+[node name="DebugLabel" type="Label" parent="MiningScene/Systems/PickaxeProgression" unique_id=978076157]
+unique_name_in_owner = true
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -578.0
+offset_top = -646.0
+offset_right = 575.0
+offset_bottom = -393.0
+grow_horizontal = 2
+grow_vertical = 0
+text = "pickaxeprogression
+is in debug mode"
+label_settings = SubResource("LabelSettings_6ko1l")
+uppercase = true
 
 [node name="CinematicFlow" type="Node" parent="MiningScene/Systems" unique_id=1252243757 node_paths=PackedStringArray("timing_window", "mining_controller", "gameplay_hud", "impact_feedback_layer")]
 script = ExtResource("45_cinematic_flow")
@@ -405,16 +427,16 @@ grow_vertical = 0
 tooltip_text = "Return to the miner"
 mouse_default_cursor_shape = 2
 theme_override_colors/font_color = Color(0.95, 0.88, 0.78, 1)
-theme_override_colors/font_hover_color = Color(1, 0.95, 0.86, 1)
 theme_override_colors/font_pressed_color = Color(0.075, 0.055, 0.047, 1)
+theme_override_colors/font_hover_color = Color(1, 0.95, 0.86, 1)
 theme_override_colors/font_disabled_color = Color(0.72, 0.72, 0.76, 0.5)
 theme_override_constants/outline_size = 0
 theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBoxFlat_return_normal")
-theme_override_styles/hover = SubResource("StyleBoxFlat_return_hover")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_return_pressed")
-theme_override_styles/focus = SubResource("StyleBoxFlat_return_hover")
+theme_override_styles/hover = SubResource("StyleBoxFlat_return_hover")
 theme_override_styles/disabled = SubResource("StyleBoxFlat_return_disabled")
+theme_override_styles/focus = SubResource("StyleBoxFlat_return_hover")
 text = "↓  RETURN"
 
 [node name="Layout" type="MarginContainer" parent="MiningScene/HUD" unique_id=1832449878]

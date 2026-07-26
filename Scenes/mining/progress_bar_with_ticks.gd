@@ -7,7 +7,6 @@ signal reached_tick(tick_value : int)
 
 func _ready():
 	max_value = ceil(size.x / (get_theme_stylebox("background") as StyleBoxTexture).texture.get_width())
-	print("max val", max_value)
 	value_changed.connect(_on_value_changed)
 	draw_ticks()
 

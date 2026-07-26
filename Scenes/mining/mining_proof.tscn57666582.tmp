@@ -1,0 +1,496 @@
+[gd_scene format=3 uid="uid://cd2mp7bpcdx5l"]
+
+[ext_resource type="Resource" uid="uid://dhlm43rg16rkw" path="res://resources/mining/mining_config.tres" id="1_config"]
+[ext_resource type="Script" uid="uid://b38bkkdjcto5g" path="res://Scripts/mining/terrain_manager.gd" id="3_terrain"]
+[ext_resource type="Script" uid="uid://dhyir0je03ka3" path="res://Scripts/mining/timing_bridge.gd" id="4_timing_bridge"]
+[ext_resource type="Script" uid="uid://bwr8gfyga4tkf" path="res://Scripts/mining/mining_controller.gd" id="5_controller"]
+[ext_resource type="Script" uid="uid://t03gc6i8a4yb" path="res://Scripts/ui/mining_hud.gd" id="6_hud"]
+[ext_resource type="PackedScene" uid="uid://021ecdl5prdm" path="res://Scenes/mining/miner_rig.tscn" id="7_miner_rig"]
+[ext_resource type="PackedScene" uid="uid://bwq8rrtdf55gq" path="res://Scenes/TimingWindow.tscn" id="8_timing_window"]
+[ext_resource type="Script" uid="uid://cl8v0x0ammlnj" path="res://Scripts/mining/view_controller.gd" id="9_view_controller"]
+[ext_resource type="PackedScene" path="res://Scenes/mining/mining_hit_particles.tscn" id="10_hit_particles"]
+[ext_resource type="PackedScene" uid="uid://bwnqpopl5iayr" path="res://Scenes/dialogue/dialogue_overlay.tscn" id="11_dialogue_overlay"]
+[ext_resource type="Script" uid="uid://bmv66cgstojt0" path="res://Scripts/dialogue/depth_encounter_controller.gd" id="13_depth_encounter"]
+[ext_resource type="Resource" uid="uid://2g3sn8h0mk7t" path="res://resources/encounters/depth_encounter_config.tres" id="14_encounter_config"]
+[ext_resource type="Script" uid="uid://cwq85ldnfasbo" path="res://Scripts/pickaxes/pickaxe_progression.gd" id="19_pickaxe_progression"]
+[ext_resource type="Resource" uid="uid://bm7au74mrcaij" path="res://resources/pickaxes/basic_pickaxe.tres" id="20_basic_pickaxe"]
+[ext_resource type="Script" uid="uid://c4nd03mddc2vw" path="res://Scripts/mining/impact_shake.gd" id="21_impact_shake"]
+[ext_resource type="PackedScene" uid="uid://ce2kgb3fjtjut" path="res://Scenes/Options.tscn" id="22_a0hll"]
+[ext_resource type="Script" uid="uid://boq33gsihoh51" path="res://Scripts/ui/playtime_reveal.gd" id="22_playtime_reveal"]
+[ext_resource type="Script" uid="uid://b54eqv80difeg" path="res://Scripts/mining/mining_scene_wiring.gd" id="25_wiring"]
+[ext_resource type="Script" uid="uid://7cxed37q80pf" path="res://Scripts/mining/dig_number_presenter.gd" id="30_dig_number_presenter"]
+[ext_resource type="PackedScene" uid="uid://faai1irb202y" path="res://Scenes/mining/dig_number.tscn" id="31_dig_number"]
+[ext_resource type="Script" uid="uid://d3fjog3we4ugh" path="res://Scripts/mining/terrain_layer_renderer.gd" id="32_layer_renderer"]
+[ext_resource type="Resource" uid="uid://rsxn5lxga40a" path="res://resources/mining/default_terrain_layer_profile.tres" id="33_layer_profile"]
+[ext_resource type="PackedScene" path="res://Scenes/dialogue/character_presenter.tscn" id="34_character_presenter"]
+[ext_resource type="PackedScene" uid="uid://cskhmu30pdsc0" path="res://Scenes/mining/timing_bar_feedback.tscn" id="38_nh27f"]
+[ext_resource type="Script" uid="uid://cxysje4e2miht" path="res://Scripts/ui/depth_review_control.gd" id="39_depth_review"]
+[ext_resource type="PackedScene" path="res://Scenes/mining/mining_impact_smoke.tscn" id="40_impact_smoke"]
+[ext_resource type="Script" uid="uid://vrpny10f1lau" path="res://Scripts/dialogue/run_intro_controller.gd" id="42_intro_controller"]
+[ext_resource type="Resource" path="res://resources/encounters/newspaper_reader_character_appearance.tres" id="44_intro_appearance"]
+[ext_resource type="Script" uid="uid://chh4kyqjtsvyq" path="res://Scripts/mining/mining_cinematic_flow.gd" id="45_cinematic_flow"]
+[ext_resource type="PackedScene" path="res://Scenes/dialogue/final_encounter.tscn" id="50_final_encounter"]
+[ext_resource type="Script" uid="uid://3d6grhip1htq" path="res://Scripts/mining/surface_presentation.gd" id="52_surface_presentation"]
+[ext_resource type="Shader" uid="uid://dwpswe2x8kjye" path="res://Shaders/surface_sky.gdshader" id="53_surface_sky"]
+[ext_resource type="Shader" uid="uid://6u22qy01ne0" path="res://Shaders/sunlight_wash.gdshader" id="55_sunlight_wash"]
+[ext_resource type="PackedScene" uid="uid://b4cudxpsminnk" path="res://Scenes/cinematics/arrival_intro.tscn" id="56_arrival_intro"]
+[ext_resource type="Script" uid="uid://c7imq1ddw5h5m" path="res://Scripts/mining/run_timeline.gd" id="57_run_timeline"]
+[ext_resource type="Script" uid="uid://vm58e0gjcupp" path="res://Scripts/mining/gem_outcrop_field.gd" id="58_gem_field"]
+[ext_resource type="Texture2D" uid="uid://ding6yepfwaw4" path="res://Assets/Props/gem_crystals.png" id="59_gem_crystals"]
+[ext_resource type="PackedScene" path="res://Scenes/mining/credits_overlay.tscn" id="60_credits"]
+[ext_resource type="Script" uid="uid://cfobwqly775g2" path="res://Scripts/mining/coffee_speed_boost.gd" id="61_coffee"]
+[ext_resource type="PackedScene" path="res://Scenes/cinematics/rat_colony_followers.tscn" id="62_rat_followers"]
+[ext_resource type="PackedScene" path="res://Scenes/mining/impact_spark.tscn" id="63_impact_spark"]
+[ext_resource type="PackedScene" path="res://Scenes/mining/combo_impact_vignette.tscn" id="64_combo_vignette"]
+[ext_resource type="Script" uid="uid://cs0c0hu8nwb2k" path="res://Scripts/mining/combo_director.gd" id="66_combo_director"]
+[ext_resource type="Script" uid="uid://bxi3n23isgchd" path="res://Scripts/mining/combo_tier_punch.gd" id="68_tier_punch"]
+[ext_resource type="Script" uid="uid://tux2aybei38t" path="res://Scripts/cinematics/opening_shot_camera.gd" id="76_opening_camera"]
+[ext_resource type="PackedScene" uid="uid://2pjknhxlb7ux" path="res://Scenes/menu/main_menu.tscn" id="77_main_menu"]
+[ext_resource type="Script" uid="uid://btbtknnj12de6" path="res://Scripts/mining/encounter_progression.gd" id="78_encounter_progression"]
+[ext_resource type="Resource" uid="uid://cd8vkhcsxuokv" path="res://resources/dialogue/opening_surface_conversation.tres" id="79_opening_conversation"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_surface_sky"]
+resource_local_to_scene = true
+shader = ExtResource("53_surface_sky")
+shader_parameter/sky_zenith_color = Color(0.16, 0.13, 0.31, 1)
+shader_parameter/sky_horizon_color = Color(0.95, 0.45, 0.24, 1)
+shader_parameter/underground_color = Color(0.075, 0.095, 0.13, 1)
+shader_parameter/sun_color = Color(1, 0.74, 0.4, 1)
+shader_parameter/sun_halo_color = Color(1, 0.47, 0.22, 1)
+shader_parameter/sun_disc_enabled = false
+shader_parameter/sun_screen_position = Vector2(676, 284)
+shader_parameter/sun_radius = 34.0
+shader_parameter/sun_edge_softness = 4.0
+shader_parameter/sun_halo_radius = 360.0
+shader_parameter/sun_halo_strength = 0.8
+shader_parameter/horizon_band_pixels = 235.0
+shader_parameter/horizon_glow_color = Color(1, 0.72, 0.36, 1)
+shader_parameter/horizon_glow_pixels = 54.0
+shader_parameter/horizon_glow_strength = 0.55
+shader_parameter/ridges_enabled = true
+shader_parameter/ridge_far_color = Color(0.47, 0.26, 0.3, 1)
+shader_parameter/ridge_near_color = Color(0.25, 0.14, 0.21, 1)
+shader_parameter/ridge_far_height_px = 52.0
+shader_parameter/ridge_near_height_px = 27.0
+shader_parameter/ridge_far_period_px = 690.0
+shader_parameter/ridge_near_period_px = 415.0
+shader_parameter/ridge_far_offset_px = 0.0
+shader_parameter/ridge_near_offset_px = 240.0
+shader_parameter/ridge_far_haze = 0.62
+shader_parameter/ridge_near_haze = 0.24
+shader_parameter/ridge_rim_pixels = 3.0
+shader_parameter/ridge_rim_strength = 0.85
+shader_parameter/clouds_enabled = true
+shader_parameter/cloud_shade_color = Color(0.35, 0.21, 0.34, 1)
+shader_parameter/cloud_light_color = Color(1, 0.7, 0.42, 1)
+shader_parameter/cloud_world_size = Vector2(760, 68)
+shader_parameter/cloud_coverage = 0.42
+shader_parameter/cloud_softness = 0.3
+shader_parameter/cloud_strength = 0.62
+shader_parameter/cloud_horizon_fade_px = 130.0
+shader_parameter/cloud_light_reach_px = 460.0
+shader_parameter/surface_screen_y = 260.0
+shader_parameter/viewport_size = Vector2(1152, 648)
+shader_parameter/backdrop_screen_size = Vector2(1152, 648)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sunlight_wash"]
+resource_local_to_scene = true
+shader = ExtResource("55_sunlight_wash")
+shader_parameter/sunlight_color = Color(1, 0.63, 0.38, 1)
+shader_parameter/sky_haze_strength = 0.1
+shader_parameter/ground_light_strength = 0.24
+shader_parameter/ground_falloff_pixels = 190.0
+shader_parameter/lateral_falloff_pixels = 760.0
+shader_parameter/lateral_falloff_strength = 0.65
+shader_parameter/sun_screen_position = Vector2(676, 284)
+shader_parameter/surface_screen_y = 260.0
+shader_parameter/viewport_size = Vector2(1152, 648)
+shader_parameter/backdrop_screen_size = Vector2(1152, 648)
+
+[sub_resource type="LabelSettings" id="LabelSettings_6ko1l"]
+font_size = 91
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_return_normal"]
+bg_color = Color(0.075, 0.055, 0.047, 0.9)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.62, 0.37, 0.18, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+shadow_color = Color(0, 0, 0, 0.48)
+shadow_size = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_return_pressed"]
+bg_color = Color(0.62, 0.37, 0.18, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.74, 0.4, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_return_hover"]
+bg_color = Color(0.14, 0.1, 0.078, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.93, 0.62, 0.29, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+shadow_color = Color(0, 0, 0, 0.55)
+shadow_size = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_return_disabled"]
+bg_color = Color(0.075, 0.055, 0.047, 0.6)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.4, 0.28, 0.17, 0.7)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="GameRoot" type="Node" unique_id=1769413368]
+
+[node name="MiningScene" type="Node2D" parent="." unique_id=165087963]
+
+[node name="ImpactCamera" type="Camera2D" parent="MiningScene" unique_id=1747921436]
+position = Vector2(576, 324)
+
+[node name="SurfaceSky" type="ColorRect" parent="MiningScene" unique_id=1093987671]
+editor_description = "Daylight sky and sun behind everything. Below the ground line it collapses to the underground void color, so descending looks unchanged. SurfacePresentation drives its horizon."
+z_index = -10
+material = SubResource("ShaderMaterial_surface_sky")
+offset_right = 1152.0
+offset_bottom = 648.0
+mouse_filter = 2
+
+[node name="TerrainManager" type="Node" parent="MiningScene" unique_id=381932075]
+script = ExtResource("3_terrain")
+config = ExtResource("1_config")
+encounter_config = ExtResource("14_encounter_config")
+
+[node name="TerrainLayerRenderer" type="Node2D" parent="MiningScene" unique_id=41254192 node_paths=PackedStringArray("terrain_manager")]
+script = ExtResource("32_layer_renderer")
+terrain_manager = NodePath("../TerrainManager")
+profile = ExtResource("33_layer_profile")
+
+[node name="ArrivalIntro" parent="MiningScene" unique_id=2041484894 node_paths=PackedStringArray("miner_rig", "surface_presentation", "terrain_renderer") instance=ExtResource("56_arrival_intro")]
+miner_rig = NodePath("../MinerRig")
+surface_presentation = NodePath("../Systems/SurfacePresentation")
+terrain_renderer = NodePath("../TerrainLayerRenderer")
+
+[node name="MinerRig" parent="MiningScene" unique_id=726963260 instance=ExtResource("7_miner_rig")]
+editor_description = "No z_index override on purpose. MinerRig owns its draw order through its surface_draw_order and buried_draw_order exports: he starts in front of terrain layer one (z_index 2) while standing on the untouched surface, and the first landing below it hands him back to the buried order the rest of the run plays at."
+
+[node name="RatColonyFollowers" parent="MiningScene" unique_id=1715886738 node_paths=PackedStringArray("follow_target") instance=ExtResource("62_rat_followers")]
+follow_target = NodePath("../MinerRig")
+
+[node name="CharacterLayer" type="Node2D" parent="MiningScene" unique_id=1096715694]
+z_index = 1
+
+[node name="MiningHitParticles" parent="MiningScene" unique_id=1668060940 node_paths=PackedStringArray("terrain_manager") instance=ExtResource("10_hit_particles")]
+z_index = 3
+terrain_manager = NodePath("../TerrainManager")
+terrain_profile = ExtResource("33_layer_profile")
+
+[node name="MiningImpactSmoke" parent="MiningScene" unique_id=221205333 node_paths=PackedStringArray("terrain_manager", "terrain_renderer", "view_controller") instance=ExtResource("40_impact_smoke")]
+z_index = -2
+terrain_manager = NodePath("../TerrainManager")
+terrain_renderer = NodePath("../TerrainLayerRenderer")
+view_controller = NodePath("../Systems/ViewController")
+
+[node name="ImpactSpark" parent="MiningScene" unique_id=1650615824 node_paths=PackedStringArray("terrain_manager") instance=ExtResource("63_impact_spark")]
+z_index = 4
+terrain_manager = NodePath("../TerrainManager")
+
+[node name="GemOutcropField" type="Node2D" parent="MiningScene" unique_id=398064516 node_paths=PackedStringArray("terrain_manager", "terrain_renderer")]
+editor_description = "Rarely leaves a drawn crystal jutting out of a stratum a hit just cut through, and stands authored ones for cutscenes. It builds one drawing shelf per stratum and sits after the terrain renderer, so each crystal is covered by the layers still standing in front of it."
+script = ExtResource("58_gem_field")
+terrain_manager = NodePath("../TerrainManager")
+terrain_profile = ExtResource("33_layer_profile")
+terrain_renderer = NodePath("../TerrainLayerRenderer")
+gem_texture = ExtResource("59_gem_crystals")
+
+[node name="SunlightWash" type="ColorRect" parent="MiningScene" unique_id=788445143]
+editor_description = "Additive daylight pool under the sun. It draws over the terrain, which it shares a z_index with and is listed after, and under the miner at z_index 3. It used to draw over him as well, on the grounds that sunlight should touch the cast: but its underground half starts at full strength exactly on the ground line, and he is the one character who stands astride that line for the whole run, so it laid a hard warm band across him at the knees that read as the terrain showing through his legs. SurfacePresentation drives its horizon."
+z_index = 2
+material = SubResource("ShaderMaterial_sunlight_wash")
+offset_right = 1152.0
+offset_bottom = 648.0
+mouse_filter = 2
+
+[node name="ComboImpactVignette" parent="MiningScene" unique_id=866955790 instance=ExtResource("64_combo_vignette")]
+
+[node name="Systems" type="Node" parent="MiningScene" unique_id=1573949011]
+
+[node name="SceneWiring" type="Node" parent="MiningScene/Systems" unique_id=1434760342 node_paths=PackedStringArray("mining_controller", "timing_bridge", "view_controller", "terrain_manager", "terrain_renderer", "miner_rig", "hit_particles", "gem_outcrop_field", "impact_smoke", "impact_spark", "combo_vignette", "dig_number_presenter", "impact_shake", "pickaxe_progression", "encounter_progression", "cinematic_flow", "run_timeline", "coffee_speed_boost", "rat_colony_followers", "main_menu", "run_intro_controller", "combo_director", "combo_tier_punch", "hud", "playtime_reveal", "timing_window", "timing_bar_feedback", "depth_review_control", "encounter_controller", "dialogue_director", "final_encounter_controller", "credits_overlay")]
+script = ExtResource("25_wiring")
+mining_controller = NodePath("../MiningController")
+timing_bridge = NodePath("../TimingBridge")
+view_controller = NodePath("../ViewController")
+terrain_manager = NodePath("../../TerrainManager")
+terrain_renderer = NodePath("../../TerrainLayerRenderer")
+miner_rig = NodePath("../../MinerRig")
+hit_particles = NodePath("../../MiningHitParticles")
+gem_outcrop_field = NodePath("../../GemOutcropField")
+impact_smoke = NodePath("../../MiningImpactSmoke")
+impact_spark = NodePath("../../ImpactSpark")
+combo_vignette = NodePath("../../ComboImpactVignette")
+dig_number_presenter = NodePath("../../../DigNumberPresenter")
+impact_shake = NodePath("../ImpactShake")
+pickaxe_progression = NodePath("../PickaxeProgression")
+encounter_progression = NodePath("../EncounterProgression")
+cinematic_flow = NodePath("../CinematicFlow")
+run_timeline = NodePath("../RunTimeline")
+coffee_speed_boost = NodePath("../CoffeeSpeedBoost")
+rat_colony_followers = NodePath("../../RatColonyFollowers")
+main_menu = NodePath("../../../MainMenuLayer/MainMenu")
+run_intro_controller = NodePath("../RunIntroController")
+combo_director = NodePath("../ComboDirector")
+combo_tier_punch = NodePath("../ComboTierPunch")
+hud = NodePath("../../HUD")
+playtime_reveal = NodePath("../../HUD/PlaytimeReveal")
+timing_window = NodePath("../../HUD/TimingWindow")
+timing_bar_feedback = NodePath("../../HUD/TimingBarFeedback")
+depth_review_control = NodePath("../../HUD/DepthReviewControl")
+encounter_controller = NodePath("../UpgradeEncounterController")
+dialogue_director = NodePath("../../../DialogueDirector")
+final_encounter_controller = NodePath("../../../FinalEncounter")
+credits_overlay = NodePath("../../../CreditsOverlay")
+
+[node name="TimingBridge" type="Node" parent="MiningScene/Systems" unique_id=1886677998 node_paths=PackedStringArray("timing_window")]
+script = ExtResource("4_timing_bridge")
+timing_window = NodePath("../../HUD/TimingWindow")
+
+[node name="ViewController" type="Node" parent="MiningScene/Systems" unique_id=844951694 node_paths=PackedStringArray("terrain_manager")]
+script = ExtResource("9_view_controller")
+config = ExtResource("1_config")
+terrain_manager = NodePath("../../TerrainManager")
+
+[node name="ImpactShake" type="Node" parent="MiningScene/Systems" unique_id=1191832147 node_paths=PackedStringArray("camera")]
+script = ExtResource("21_impact_shake")
+camera = NodePath("../../ImpactCamera")
+
+[node name="OpeningShotCamera" type="Node" parent="MiningScene/Systems" unique_id=1376521597 node_paths=PackedStringArray("camera", "arrival_sequence")]
+editor_description = "Owns the shared camera's zoom for the title shot only. It holds the wide menu framing, then closes onto the arriving bus and hands the camera back at exactly zoom 1, which is the framing every authored gameplay coordinate is measured against. menu_zoom cannot go far below 0.75: terrain is 1536 px wide against a 1152 px viewport, so a wider shot pulls the world's own left and right edges into frame."
+script = ExtResource("76_opening_camera")
+camera = NodePath("../../ImpactCamera")
+arrival_sequence = NodePath("../../ArrivalIntro")
+
+[node name="MiningController" type="Node" parent="MiningScene/Systems" unique_id=1389910536 node_paths=PackedStringArray("terrain_manager", "view_controller")]
+script = ExtResource("5_controller")
+config = ExtResource("1_config")
+terrain_manager = NodePath("../../TerrainManager")
+view_controller = NodePath("../ViewController")
+
+[node name="EncounterProgression" type="Node" parent="MiningScene/Systems" unique_id=1021475373 node_paths=PackedStringArray("mining_controller", "timing_window")]
+script = ExtResource("78_encounter_progression")
+config = ExtResource("1_config")
+mining_controller = NodePath("../MiningController")
+timing_window = NodePath("../../HUD/TimingWindow")
+
+[node name="PickaxeProgression" type="Node" parent="MiningScene/Systems" unique_id=905831664 node_paths=PackedStringArray("miner_rig", "mining_controller")]
+script = ExtResource("19_pickaxe_progression")
+miner_rig = NodePath("../../MinerRig")
+mining_controller = NodePath("../MiningController")
+starter_pickaxe = ExtResource("20_basic_pickaxe")
+
+[node name="DebugLabel" type="Label" parent="MiningScene/Systems/PickaxeProgression" unique_id=978076157]
+unique_name_in_owner = true
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -578.0
+offset_top = -646.0
+offset_right = 575.0
+offset_bottom = -393.0
+grow_horizontal = 2
+grow_vertical = 0
+text = "pickaxeprogression
+is in debug mode"
+label_settings = SubResource("LabelSettings_6ko1l")
+uppercase = true
+
+[node name="CinematicFlow" type="Node" parent="MiningScene/Systems" unique_id=1252243757 node_paths=PackedStringArray("timing_window", "mining_controller", "gameplay_hud", "impact_feedback_layer")]
+script = ExtResource("45_cinematic_flow")
+timing_window = NodePath("../../HUD/TimingWindow")
+mining_controller = NodePath("../MiningController")
+gameplay_hud = NodePath("../../HUD")
+impact_feedback_layer = NodePath("../../../DigNumberPresenter")
+
+[node name="RunTimeline" type="Node" parent="MiningScene/Systems" unique_id=77041180 node_paths=PackedStringArray("cinematic_flow")]
+process_mode = 3
+script = ExtResource("57_run_timeline")
+cinematic_flow = NodePath("../CinematicFlow")
+
+[node name="ComboDirector" type="Node" parent="MiningScene/Systems" unique_id=863030000]
+script = ExtResource("66_combo_director")
+config = ExtResource("1_config")
+
+[node name="ComboTierPunch" type="Node" parent="MiningScene/Systems" unique_id=2123469026 node_paths=PackedStringArray("camera", "combo_director")]
+script = ExtResource("68_tier_punch")
+camera = NodePath("../../ImpactCamera")
+combo_director = NodePath("../ComboDirector")
+
+[node name="CoffeeSpeedBoost" type="Node" parent="MiningScene/Systems" unique_id=526386712 node_paths=PackedStringArray("miner_rig")]
+script = ExtResource("61_coffee")
+miner_rig = NodePath("../../MinerRig")
+
+[node name="UpgradeEncounterController" type="Node" parent="MiningScene/Systems" unique_id=797816739 node_paths=PackedStringArray("dialogue_director", "character_parent", "pickaxe_progression", "miner_rig", "cinematic_flow", "terrain_renderer")]
+script = ExtResource("13_depth_encounter")
+encounter_config = ExtResource("14_encounter_config")
+mining_config = ExtResource("1_config")
+dialogue_director = NodePath("../../../DialogueDirector")
+character_scene = ExtResource("34_character_presenter")
+character_parent = NodePath("../../CharacterLayer")
+pickaxe_progression = NodePath("../PickaxeProgression")
+miner_rig = NodePath("../../MinerRig")
+cinematic_flow = NodePath("../CinematicFlow")
+terrain_renderer = NodePath("../../TerrainLayerRenderer")
+
+[node name="SurfacePresentation" type="Node" parent="MiningScene/Systems" unique_id=1666193167 node_paths=PackedStringArray("terrain_manager", "sky_rect", "sunlight_wash_rect", "camera")]
+script = ExtResource("52_surface_presentation")
+terrain_manager = NodePath("../../TerrainManager")
+config = ExtResource("1_config")
+sky_rect = NodePath("../../SurfaceSky")
+sunlight_wash_rect = NodePath("../../SunlightWash")
+camera = NodePath("../../ImpactCamera")
+
+[node name="RunIntroController" type="Node" parent="MiningScene/Systems" unique_id=1174017012 node_paths=PackedStringArray("dialogue_director", "arrival_sequence", "attendant_presenter", "miner_rig", "cinematic_flow", "opening_camera")]
+process_mode = 3
+editor_description = "Stages the surface at boot and holds it as the menu's background. Nothing plays until MainMenu asks, so the world behind the title is the game itself rather than a separate scene."
+script = ExtResource("42_intro_controller")
+attendant_appearance = ExtResource("44_intro_appearance")
+opening_conversation = ExtResource("79_opening_conversation")
+dialogue_director = NodePath("../../../DialogueDirector")
+arrival_sequence = NodePath("../../ArrivalIntro")
+attendant_presenter = NodePath("../../ArrivalIntro/Attendant")
+miner_rig = NodePath("../../MinerRig")
+cinematic_flow = NodePath("../CinematicFlow")
+opening_camera = NodePath("../OpeningShotCamera")
+
+[node name="HUD" type="CanvasLayer" parent="MiningScene" unique_id=557922213 node_paths=PackedStringArray("depth_label", "bottom_eta_label", "fps_label")]
+script = ExtResource("6_hud")
+depth_label = NodePath("Layout/Content/DepthLabel")
+bottom_eta_label = NodePath("Layout/Content/BottomEtaLabel")
+fps_label = NodePath("Layout/Content/FPS")
+options_scene = ExtResource("22_a0hll")
+
+[node name="TimingWindow" parent="MiningScene/HUD" unique_id=1764051259 instance=ExtResource("8_timing_window")]
+
+[node name="TimingBarFeedback" parent="MiningScene/HUD" unique_id=73798020 node_paths=PackedStringArray("timing_window") instance=ExtResource("38_nh27f")]
+timing_window = NodePath("../TimingWindow")
+
+[node name="DepthReviewControl" type="Control" parent="MiningScene/HUD" unique_id=1329828240 node_paths=PackedStringArray("return_button", "timing_window", "mining_controller")]
+process_mode = 3
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("39_depth_review")
+return_button = NodePath("ReturnButton")
+timing_window = NodePath("../TimingWindow")
+mining_controller = NodePath("../../Systems/MiningController")
+
+[node name="ReturnButton" type="Button" parent="MiningScene/HUD/DepthReviewControl" unique_id=1380694620]
+visible = false
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -84.0
+offset_top = -74.0
+offset_right = 84.0
+offset_bottom = -28.0
+grow_horizontal = 2
+grow_vertical = 0
+tooltip_text = "Return to the miner"
+mouse_default_cursor_shape = 2
+theme_override_colors/font_color = Color(0.95, 0.88, 0.78, 1)
+theme_override_colors/font_pressed_color = Color(0.075, 0.055, 0.047, 1)
+theme_override_colors/font_hover_color = Color(1, 0.95, 0.86, 1)
+theme_override_colors/font_disabled_color = Color(0.72, 0.72, 0.76, 0.5)
+theme_override_constants/outline_size = 0
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBoxFlat_return_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_return_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_return_hover")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_return_disabled")
+theme_override_styles/focus = SubResource("StyleBoxFlat_return_hover")
+text = "↓  RETURN"
+
+[node name="Layout" type="MarginContainer" parent="MiningScene/HUD" unique_id=1832449878]
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 518.0
+offset_bottom = 184.0
+
+[node name="Content" type="VBoxContainer" parent="MiningScene/HUD/Layout" unique_id=1070302529]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="DepthLabel" type="Label" parent="MiningScene/HUD/Layout/Content" unique_id=677929986]
+layout_mode = 2
+text = "REMAINING TO THE THIEF  100,000"
+
+[node name="BottomEtaLabel" type="Label" parent="MiningScene/HUD/Layout/Content" unique_id=728776188]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.72, 0.72, 0.76, 1)
+theme_override_font_sizes/font_size = 14
+text = "THIEF ETA  --:--"
+
+[node name="FPS" type="Label" parent="MiningScene/HUD/Layout/Content" unique_id=1876008124]
+layout_mode = 2
+text = "FPS: --"
+
+[node name="PlaytimeReveal" type="Label" parent="MiningScene/HUD" unique_id=637629585]
+visible = false
+offset_left = 892.0
+offset_top = 20.0
+offset_right = 1088.0
+offset_bottom = 48.0
+text = "TIME  00:00"
+horizontal_alignment = 2
+script = ExtResource("22_playtime_reveal")
+
+[node name="DialogueDirector" parent="." unique_id=1751798570 instance=ExtResource("11_dialogue_overlay")]
+
+[node name="CreditsOverlay" parent="." unique_id=419086479 instance=ExtResource("60_credits")]
+
+[node name="FinalEncounter" parent="." unique_id=2106132469 node_paths=PackedStringArray("dialogue_director") instance=ExtResource("50_final_encounter")]
+dialogue_director = NodePath("../DialogueDirector")
+
+[node name="MainMenuLayer" type="CanvasLayer" parent="." unique_id=379660600]
+process_mode = 3
+editor_description = "Holds the title interface over the live shot. Layer 25 puts it above DialogueDirector's letterbox at 20, so the menu is never clipped by the bars it sits inside. The menu frees itself once it hands the run over, so nothing here survives into gameplay."
+layer = 25
+
+[node name="MainMenu" parent="MainMenuLayer" unique_id=100438498 instance=ExtResource("77_main_menu")]
+
+[node name="DigNumberPresenter" type="CanvasLayer" parent="." unique_id=483995659 node_paths=PackedStringArray("timing_window", "player_visual") groups=["dig_number_presenter"]]
+process_mode = 3
+layer = 12
+script = ExtResource("30_dig_number_presenter")
+dig_number_scene = ExtResource("31_dig_number")
+timing_window = NodePath("../MiningScene/HUD/TimingWindow")
+player_visual = NodePath("../MiningScene/MinerRig/VisualRoot/DrawnMinerSprite")

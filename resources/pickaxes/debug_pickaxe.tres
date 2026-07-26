@@ -11,6 +11,7 @@ description = "The Dev Tool"
 power_multiplier = 5.0
 swing_speed_multiplier = 5.0
 debris_multiplier = 5.0
+secondary_recovery = true
 special_effect = 2
 follow_up_power_scale = 2.0
 follow_up_speed_scale = 3.0
