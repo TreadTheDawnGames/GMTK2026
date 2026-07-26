@@ -1,45 +1,28 @@
 extends TimingTarget
-class_name ChaseTarget
+class_name MultiHitTarget
 
 @onready var times_hit_label: Label = %TimesHitLabel
 
 @export var required_hits:int = 3
-var times_hit : int = 0:
-	set(value):
-		times_hit = value
-		times_hit_label.text = str(required_hits-times_hit)
-		
-
-var slider_position : float = 0.0
-var slider_direction : float = 0.0
-var distance : float = 150.0
+var times_hit : int = 0
 
 func initialize():
 	super.initialize()
-	times_hit_label = %TimesHitLabel
-	times_hit_label.text = str(required_hits)
+	if not times_hit_label:
+		times_hit_label = %TimesHitLabel
+	_reset_hit_progress()
+	Utils.set_control_width(self, my_width)
 
 func hit(_timing_window : SliderTimingWindow = null) -> void:
-
 	times_hit += 1
-	slider_position = _timing_window.slider.position.x
-	slider_direction = _timing_window.direction
-	target_position = place(_timing_window.backing.size.x)
-	position.x = target_position
 	if times_hit == required_hits:
-		super.hit(_timing_window)
 		times_hit = 0
-	pass
+		super.hit(_timing_window)
+	times_hit_label.text = str(required_hits-times_hit)
 
-func unhit():
-	super.unhit()
+func reset():
+	_reset_hit_progress()
+
+func _reset_hit_progress() -> void:
 	times_hit = 0
-
-func place(placement_width : float) -> float:
-	var placement : float = slider_position + (distance * slider_direction)
-	if placement > placement_width:
-		placement = placement_width - distance
-	if placement < 0.0:
-		placement = distance
-		
-	return placement
+	times_hit_label.text = str(required_hits)

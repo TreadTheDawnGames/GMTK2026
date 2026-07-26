@@ -16,6 +16,7 @@ rat_container = NodePath("RatContainer")
 rat_appearances = Array[ExtResource("4_appearance")]([ExtResource("5_brown"), ExtResource("6_grey"), ExtResource("7_white")])
 
 [node name="RatContainer" type="Node2D" parent="." index="3"]
-z_index = 7
+editor_description = "Zero, so inheriting colonies draw on the second stratum with the rest of the cast rather than above every terrain layer."
+z_index = 0
 
 [editable path="ActorMarkers"]

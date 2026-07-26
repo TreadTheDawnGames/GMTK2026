@@ -31,6 +31,12 @@ uniform vec2 chunk_world_size = vec2(1024.0, 512.0);
 uniform sampler2D mask_tile_0 : filter_linear;
 uniform sampler2D mask_tile_1 : filter_linear;
 uniform sampler2D mask_tile_2 : filter_linear;
+// A successful predicted impact binds its small exact patch here while the
+// authoritative full-width tile uploads behind it. Five target candidates are
+// prepared offscreen, but only the winning patch is ever sampled by a layer.
+uniform sampler2D impact_patch_texture : filter_linear;
+uniform bool use_impact_patch = false;
+uniform vec4 impact_patch_uv_rect = vec4(0.0);
 
 // World-space period of optional fill art, independent of the mask resolution.
 uniform vec2 fill_texture_world_size = vec2(256.0);
@@ -67,7 +73,10 @@ uniform float stratum_depth = 0.0;
 // sampled without reaching its neighbor. The art is grayscale: its inked outline
 // becomes rock_outline_color and its gray body picks a tone around
 // rock_body_color, so a rock still belongs to this stratum's palette.
-uniform sampler2D rock_texture : source_color, filter_linear;
+// Mip sampling keeps the atlas' black ink continuous when the far and mid
+// passes minify it heavily, especially on the dense fourth stratum. This does
+// not soften the terrain mask or add a texture read.
+uniform sampler2D rock_texture : source_color, filter_linear_mipmap;
 uniform bool use_rock_texture = false;
 uniform int rock_atlas_count = 13;
 uniform vec4 rock_body_color : source_color = vec4(0.44, 0.37, 0.31, 1.0);
@@ -196,6 +205,25 @@ uniform float ground_contact_strength = 0.42;
 
 vec4 sample_terrain_mask(vec2 chunk_uv) {
 	vec2 safe_uv = clamp(chunk_uv, vec2(0.0), vec2(1.0));
+	if (use_impact_patch) {
+		vec2 patch_position = impact_patch_uv_rect.xy;
+		vec2 patch_size = max(
+			impact_patch_uv_rect.zw,
+			vec2(0.000001)
+		);
+		vec2 patch_uv = (safe_uv - patch_position) / patch_size;
+		vec2 inside_low = step(vec2(0.0), patch_uv);
+		vec2 inside_high = step(patch_uv, vec2(1.0));
+		if (
+			inside_low.x * inside_low.y
+			* inside_high.x * inside_high.y > 0.5
+		) {
+			return texture(
+				impact_patch_texture,
+				clamp(patch_uv, vec2(0.0), vec2(1.0))
+			);
+		}
+	}
 	vec2 tile_size = vec2(textureSize(mask_tile_0, 0));
 	float tile_content_width = max(tile_size.x - 2.0, 1.0);
 	float full_mask_width = tile_content_width * 3.0;

@@ -17,8 +17,8 @@ func unhit() -> void:
 	modulate.a = 1.0
 	t.kill()
 	_fade()
-	
 	super.unhit()
+	
 
 func place(_placement_width : float) -> float:
 	return super.place(_placement_width)
@@ -29,6 +29,4 @@ func _fade():
 	else:
 		t = create_tween()
 	super.initialize()
-	t.tween_property(self, "modulate:a", 0.0, fade_time)
-	await t.finished
-	hit()
+	t.tween_property(self, "modulate:a", 0.1, fade_time)

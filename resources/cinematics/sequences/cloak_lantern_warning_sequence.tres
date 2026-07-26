@@ -33,7 +33,6 @@ The 0.6s of held silence before he speaks is deliberate: the miner has just come
 
 [sub_resource type="Resource" id="Beat_wait"]
 script = ExtResource("1_beat")
-kind = 4
 start_seconds = 6.6
 duration_seconds = 0.9
 notes = "A held beat on the two of them after the last line, before the timeline ends and play_closing takes him. Without it the shot cuts straight from the dialogue box closing to him fading, and the line does not get to land.

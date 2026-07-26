@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="PickaxeDefinition" format=3 uid="uid://bktf56q4v503t"]
 
 [ext_resource type="Script" uid="uid://bvbd25ebtqkh8" path="res://resources/pickaxes/pickaxe_definition.gd" id="1_vg1jj"]
-[ext_resource type="PackedScene" uid="uid://ct5832k6hpwck" path="res://Scenes/targets/chase_target.tscn" id="2_lqo8p"]
+[ext_resource type="PackedScene" uid="uid://ct5832k6hpwck" path="res://Scenes/targets/multi-hit_target.tscn" id="2_lqo8p"]
 
 [resource]
 script = ExtResource("1_vg1jj")

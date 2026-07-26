@@ -3,7 +3,7 @@ extends Control
 
 ## Pauses mining while the player reviews previously visited terrain.
 
-signal review_scroll_requested(direction: int)
+signal review_scroll_requested(scroll_steps: float)
 signal return_requested
 
 @export_category("References")
@@ -31,7 +31,7 @@ func _ready() -> void:
 		return_button.pressed.connect(_on_return_button_pressed)
 
 
-## Converts mouse-wheel movement into camera review requests.
+## Converts mouse-wheel movement into fractional camera review steps.
 func _unhandled_input(event: InputEvent) -> void:
 	if not event is InputEventMouseButton:
 		return
@@ -39,11 +39,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not mouse_event.pressed:
 		return
 
-	var direction := 0
+	var direction := 0.0
 	if mouse_event.button_index == MOUSE_BUTTON_WHEEL_UP:
-		direction = -1
+		direction = -1.0
 	elif mouse_event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-		direction = 1
+		direction = 1.0
 	else:
 		return
 
@@ -58,7 +58,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		)
 	):
 		return
-	review_scroll_requested.emit(direction)
+	var scroll_factor := absf(mouse_event.factor)
+	if is_zero_approx(scroll_factor):
+		scroll_factor = 1.0
+	review_scroll_requested.emit(direction * scroll_factor)
 	get_viewport().set_input_as_handled()
 
 

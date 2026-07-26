@@ -61,20 +61,21 @@ func _ready() -> void:
 	if one_shot:
 		stop()
 	else:
-		set_process(true)
-
+		_set_timing_process(true)
 
 ## Returns the slider edge area including input grace.
 func slider_half_width() -> float:
 	return slider.size.x * 0.5
 
-
 ## Shows the bar and prepares a fresh target for one-shot recovery.
 func start() -> void:
-	backing.size.x = size.x
+	# Reassigning an unchanged size still emits `resized`, which rerolls every
+	# target and loses a partially completed multi-target set after a pause.
+	if not is_equal_approx(backing.size.x, size.x):
+		backing.size.x = size.x
 	reset_one_shot()
 	show()
-	set_process(true)
+	_set_timing_process(true)
 
 func reset_one_shot():
 	if one_shot:
@@ -85,7 +86,7 @@ func reset_one_shot():
 
 ## Freezes the slider and optionally flashes its recovery warning.
 func pause(animate: bool) -> void:
-	set_process(false)
+	_set_timing_process(false)
 	if not animate:
 		return
 	await play_animation(animation_color, animation_repeats, 0.1)
@@ -102,8 +103,7 @@ func play_animation(color : Color, repetitions : int = 1,  duration : float = 0.
 ## Hides the timing bar and stops its slider.
 func stop() -> void:
 	hide()
-	set_process(false)
-
+	_set_timing_process(false)
 
 ## Adds and positions one valid hit target.
 func add_target() -> void:
@@ -118,22 +118,23 @@ func add_target() -> void:
 	new_target.initialize()
 	new_target.set_bounce_muted(_bounce_muted)
 	new_target.freeze.connect(on_freeze)
+	if not new_target.bounce_requested.is_connected(play_bounce_sound):
+		new_target.bounce_requested.connect(play_bounce_sound)
 	backing.add_child(new_target)
 	backing.move_child(new_target, desired_target_heirarchy_index)
 	targets.append(new_target)
+	new_target.set_process(is_processing())
 	
 	if is_node_ready():
 		#randomize_all_targets
 		#randomize_target(new_target)
-		new_target.position.x = clamp_within_bounds(new_target.position.x, new_target.size.x)
-
+		new_target.set_target_position(clamp_within_bounds(new_target.position.x, new_target.size.x))
 
 ## Sets the target baseline restored whenever a streak ends.
 func set_starting_target_count(target_count: int) -> void:
 	_starting_target_count = maxi(target_count, 1)
 	if is_node_ready():
 		remove_all_extra_targets()
-
 
 ## Rebuilds the active targets from a cumulative pickaxe scene pool.
 func set_target_pool(new_target_scenes: Array[PackedScene]) -> void:
@@ -150,7 +151,6 @@ func set_target_pool(new_target_scenes: Array[PackedScene]) -> void:
 		add_target()
 	randomize_all_targets()
 
-
 ## Adds one earned target from a specific pickaxe's authored collection.
 func add_target_from_pool(new_target_scenes: Array[PackedScene]) -> void:
 	if new_target_scenes.is_empty():
@@ -158,7 +158,6 @@ func add_target_from_pool(new_target_scenes: Array[PackedScene]) -> void:
 	target_packed_scenes = new_target_scenes.duplicate()
 	add_target()
 	randomize_all_targets()
-
 
 ## Restores the timing bar to its configured starting target count.
 func remove_all_extra_targets() -> void:
@@ -180,33 +179,49 @@ func remove_target(specific_target : TimingTarget = null) -> void:
 		else:
 			targets.pop_back().queue_free()
 
-
 ## Shows and rerolls every target after a completed set or lost streak.
-func reset_all_targets() -> void:
+func reset_all_targets(full_reset : bool = true) -> void:
+	# make an array of targets that need to be removed (one shots)
 	var targets_to_remove : Array[TimingTarget] = []
 	for target : TimingTarget in targets:
 		target.unhit()
 		#randomize_target(target)
 		if target.single_use:
 			targets_to_remove.append(target)
-	randomize_all_targets()
+	
+	if full_reset:
+		#then make sure we have no extra targets
+		remove_all_extra_targets()
+		for target in targets:
+			target.reset()
+			
+	#then replace any targets we removed
 	for target in targets_to_remove:
 		remove_target(target)
 		## Replace teh target we just removed since it was a single_use
 		add_target.call_deferred()
-		randomize_all_targets.call_deferred()
-	#remove_all_extra_targets()
+	
+	# finally, randomize the targets.
+	randomize_all_targets.call_deferred()
 
 ## Moves the slider and resolves one press against every visible target.
 func _process(delta: float) -> void:
+	if get_tree().paused:
+		return
+	#Detect a button press (Space, enter, left-click, etc.)
 	if Input.is_action_just_pressed(&"primary_action"):
+		#assemble an array of targets that we are within bounds of.
+		# Also detect if they are already hit, because we can't hit the same one twice.
 		var hit_targets: Array = targets.filter(
 			func(target: TimingTarget) -> bool:
-				return target.is_point_within_bounds(slider_position, grace))
-
+				return target.is_point_within_bounds(slider_position, grace) and not target.is_hit) 
+		
+		#For each target we validly hit, tell the target we hit it.
 		for target: TimingTarget in hit_targets:
-			target.hit(self)
+				target.hit(self)
 
+		# check if we hit anything. if we did, update how many consecutive hits we've gotten.
+		# (And update the hit direction for the mining visual)
 		var success: bool = not hit_targets.is_empty()
 		var hit_direction: int = 0
 		if success:
@@ -214,16 +229,24 @@ func _process(delta: float) -> void:
 			consecutive_hits += 1
 		else:
 			consecutive_hits = 0
+		
+		#Regardless of whether we hit or not, report that we were pressed.
 		pressed.emit(success, hit_direction, consecutive_hits)
+		
+		#If all of our targets have been hit and we are not a one-shot, reset all our targets.
 		if is_all_targets_hit() and not one_shot:
-			reset_all_targets()
+			reset_all_targets(false)
+		
+		# Handle one-shot ending
 		if stop_one_shot_when_done:
 			if one_shot:
 				await pause(true)
 				stop()
 
+	#update our slider position. (This is what is actually used to detect if we hit a target)
 	slider_position += speed * direction * speed_multiplier  * delta
 
+	# Detect if we need to bounce
 	var left_edge := slider_half_width()
 	var right_edge := backing.size.x - slider_half_width()
 	var hit_left_edge := slider_position <= left_edge and direction < 0.0
@@ -231,9 +254,12 @@ func _process(delta: float) -> void:
 		slider_position >= right_edge
 		and direction > 0.0
 	)
+	#if we do need to bounce
 	if hit_left_edge or hit_right_edge:
+		#reverse our direction and play the sound
 		direction *= -1
 		play_bounce_sound()
+		# and handle the one-shot stuff
 		if one_shot:
 			pressed.emit(false, 0, consecutive_hits)
 			if stop_one_shot_when_done:
@@ -242,18 +268,15 @@ func _process(delta: float) -> void:
 	#slider.position.x = slider_position
 	#queue_redraw()
 
-
 ## Applies the saved preference to this bar and every dynamic target it owns.
 func set_bounce_muted(is_muted: bool) -> void:
 	_bounce_muted = is_muted
 	for target: TimingTarget in targets:
 		target.set_bounce_muted(is_muted)
 
-
 ## Plays the bar's authored bounce sound unless the saved preference mutes it.
 func set_audio_handler(audio_handler: PlayerAudioHandler) -> void:
 	_audio_handler = audio_handler
-
 
 ## Plays the bar's authored bounce sound unless the saved preference mutes it.
 func play_bounce_sound() -> void:
@@ -261,9 +284,16 @@ func play_bounce_sound() -> void:
 		return
 	_audio_handler.play_sound(AudioLibrary.BOUNCE)
 
+## Keeps dynamic target motion in lockstep with its owning slider.
+func _set_timing_process(is_active: bool) -> void:
+	set_process(is_active)
+	for target: TimingTarget in targets:
+		target.set_process(is_active)
+
 #func _draw():
 	#draw_line(backing.position + Vector2(slider_position, 0), (backing.position + Vector2(slider_position, 0)) + Vector2.UP * 50, Color.RED, 1.0)
 	#pass
+
 ## Maps a successful slider position to left, center-neutral, or right.
 func _get_slider_hit_direction() -> int:
 	var hit_offset_from_center: float = (
@@ -310,6 +340,7 @@ func _get_slider_hit_direction() -> int:
 			#maximum_center_x
 		#)
 		#rerolls_remaining -= 1
+
 func randomize_all_targets():
 	var need_reroll : bool = true
 	var total_rerolls : int = 0
@@ -339,7 +370,6 @@ func randomize_all_targets():
 				backing.size.x - minimum_center_x,
 				minimum_center_x
 			)
-		
 
 			target.set_target_position(clampf(
 				extents[2],
@@ -374,6 +404,13 @@ func clamp_within_bounds(to_clamp : float, width : float) -> float:
 		width * 0.5,
 		backing.size.x - width * 0.5
 	)
+
+func is_all_targets_hit() -> bool:
+	var all_targets_hit := targets.all(
+	func(target: TimingTarget) -> bool:
+		return target.is_hit)
+	return all_targets_hit
+
 func clamp_target_within_bounds(target : TimingTarget) -> float:
 	var return_me = clampf(
 		target.target_position,
@@ -382,12 +419,6 @@ func clamp_target_within_bounds(target : TimingTarget) -> float:
 	)
 	target.set_target_position(return_me, true)
 	return return_me
-
-func is_all_targets_hit() -> bool:
-	var all_targets_hit := targets.all(
-	func(target: TimingTarget) -> bool:
-		return target.is_hit)
-	return all_targets_hit
 
 func clamp_all_targets():
 	for target in targets:

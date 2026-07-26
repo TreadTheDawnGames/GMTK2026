@@ -10,5 +10,4 @@ texture = ExtResource("2_texture")
 horizontal_frames = 3
 frame = 0
 sprite_scale = Vector2(0.15, 0.15)
-sprite_offset = Vector2(0, -89.5)
 pose_set = ExtResource("3_pose_set")

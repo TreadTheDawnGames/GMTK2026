@@ -19,6 +19,8 @@ var successful_hits: int = 0
 var failed_hits: int = 0
 var has_reached_thief: bool = false
 
+var times_pressed : int = 0
+
 # Backward-compatible name for callers that still treat reaching the thief as
 # reaching the run bottom. Keep both names backed by the same state.
 var has_reached_bottom: bool:

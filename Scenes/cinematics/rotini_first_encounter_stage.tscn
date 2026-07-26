@@ -17,7 +17,7 @@ texture = ExtResource("7_wh1q7")
 sprite_scale = Vector2(0.203, 0.203)
 sprite_offset = Vector2(0, -88)
 
-[node name="RotiniFirstEncounterStage" unique_id=1625704577 instance=ExtResource("1_stage")]
+[node name="RotiniFirstEncounterStage" unique_id=1625704577 node_paths=PackedStringArray("stampede_audio") instance=ExtResource("1_stage")]
 editor_description = "Story beat 4, depth 2,500: Rotini stops the miner on the cave path. The room is a level tunnel OPEN AT BOTH ENDS - no wall on either side - because the whole beat is traffic passing through it.
 
 The shot is a STAMPEDE, and the order is the point. The tunnel is EMPTY when the frame opens. Rotini walks up out of nothing, says his piece, and only on \"Come on, boys!\" does the horde pour through, right to left, while the miner is knocked flat and stays down until the last of them has gone. Stampede Cue is what holds it back: with it set the colony does not start at the opening, it starts on the DialogueLine carrying the same name. Clear it and this reverts to the old shape, where the mice are already running when the frame opens and the line is answered by nothing. Inherits the rat colony stage rather than repeating it, with Procession Mines off: these mice are commuting, not digging. Spacing follows the house rule, remeasured after the miner's art changed: his body is 62.7px and the miner's is now 97.7px, not the 52.8px the guide's table was built on, so root to root is (62.7 + 97.7) / 2 + 97.7 = 178px. At the old 110 they overlapped. Anything quoting 52.8 predates the new sheet and is stale. The rutini_* resource names refer to Rotini until a coordinated rename is approved.
@@ -39,6 +39,10 @@ spawn_interval_seconds = 0.24
 exit_seconds = 3.0
 floor_offset_y = 0.0
 procession_cue = &"stampede"
+stampede_warning_seconds = 3.0
+stampede_rumble_strength_px = 6.0
+stampede_minimum_run_seconds = 3.0
+stampede_audio = NodePath("StampedeAudio")
 clump_scale_multiplier = 3.0
 single_scale_multiplier = 1.35
 procession_rows = 3
@@ -71,12 +75,16 @@ editor_description = "Zero rather than the base scene's 7, so the colony lands o
 The number is relative and the chain matters: DepthEncounterController puts CharacterLayer on cutscene_draw_order (1) for the shot, this container adds its own, and each mouse adds a row offset on top. At 7 the whole colony came out around 8 - in front of all four strata and of the miner - which is the first layer, not the second. At 0 the front row sits exactly where MinerRig.buried_draw_order stands him while he digs, and the rows behind recede from there."
 z_index = 0
 
-[node name="EditorTerrainPreview" parent="." index="5"]
+[node name="StampedeAudio" type="AudioStreamPlayer" parent="." index="4"]
+editor_description = "Assign the authored stampede sound here. The warning still supplies camera rumble when no stream has been assigned."
+bus = &"SFX"
+
+[node name="EditorTerrainPreview" parent="." index="6"]
 editor_description = "Previews rutini_first at its authored depth."
 encounter_id = &"rutini_first"
 preview_depth_rows = 2500
 
-[node name="rutini" type="Node2D" parent="." index="6" unique_id=860305613]
+[node name="rutini" type="Node2D" parent="." index="7" unique_id=860305613]
 z_index = 1
 position = Vector2(110, 0)
 script = ExtResource("3_breov")
@@ -85,7 +93,7 @@ appearance = ExtResource("4_f2wmh")
 pose = &"idle"
 metadata/_edit_group_ = true
 
-[node name="Miner" type="Node2D" parent="." index="7" unique_id=1652212560]
+[node name="Miner" type="Node2D" parent="." index="8" unique_id=1652212560]
 z_index = 1
 script = ExtResource("3_breov")
 actor_id = &"miner"

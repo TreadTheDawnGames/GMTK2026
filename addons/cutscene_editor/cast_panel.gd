@@ -511,9 +511,8 @@ func show_miner() -> bool:
 	miner.actor_id = &"miner"
 	miner.appearance = miner_appearance
 	miner.position = Vector2.ZERO
-	# MinerRig's cutscene order is z 3 while terrain stratum one is z 2, so the
-	# editor shows him standing clear of the foreground rock, which is what the
-	# encounter itself will draw.
+	# Read the rig's current order so the editor previews the same second-stratum
+	# placement as the encounter instead of carrying a stale literal.
 	miner.z_index = miner_z_index
 	_commit_actor_additions([miner], "Show cutscene miner")
 	_set_status("Added the miner.")
@@ -645,13 +644,14 @@ func _read_miner_rig() -> Dictionary:
 	var unresolved := {"appearance": null, "draw_order": -1}
 	var rig_root := _MINER_RIG_SCENE.instantiate()
 	var rig := rig_root as MinerRig
-	var miner_sprite := rig_root.get_node_or_null(
-		"VisualRoot/DrawnMinerSprite"
-	) as Sprite2D
-	var landing_foot_anchor := rig_root.get_node_or_null(
-		"VisualRoot/LandingFootAnchor"
-	) as Marker2D
-	if rig == null or miner_sprite == null or landing_foot_anchor == null:
+	if rig == null:
+		rig_root.free()
+		return unresolved
+	# Exported references survive internal scene reparenting such as PoseRoot;
+	# literal child paths do not.
+	var miner_sprite := rig.drawn_miner_sprite
+	var landing_foot_anchor := rig.landing_foot_anchor
+	if miner_sprite == null or landing_foot_anchor == null:
 		rig_root.free()
 		return unresolved
 

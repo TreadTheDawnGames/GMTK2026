@@ -121,7 +121,9 @@ encounter_id = &"thief_finale"
 preview_depth_rows = 100000
 
 [node name="thief" type="Node2D" parent="." index="5"]
-editor_description = "Editor stand-in only. It sits on the same x as the organ because Zephan drew the two on one canvas with their opaque centres five pixels apart, so this is the drawing rather than a placement decision."
+editor_description = "Editor stand-in only. It sits on the same x as the organ because Zephan drew the two on one canvas with their opaque centres five pixels apart, so this is the drawing rather than a placement decision.
+
+HIS HEIGHT IS NOT AUTHORED AND SHOULD NOT BE. In the drawing his feet are 252 canvas pixels above the base of the organ - 38px at this scale - as though he were on a bench the plinth hides. That lift was authored into sprite_offset.y and then deleted, because ActorSoleMeasure now seats every actor's lowest drawn row on its origin and both the runtime presenter and this stand-in go through it, so the field was doing nothing while looking like it was. He therefore stands on the same floor as everything else, 38px lower than drawn, and his hands land on the keyboard rather than above it. That is better than the drawing and it is also the only behaviour available; if the lift is ever wanted back it has to come from a taller node or from art with the gap baked in, not from sprite_offset."
 z_index = 1
 position = Vector2(784, 0)
 script = ExtResource("2_preview")
