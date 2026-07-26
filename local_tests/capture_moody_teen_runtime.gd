@@ -148,10 +148,10 @@ func _run() -> void:
 	) as TerrainLayerRenderer
 	renderer.set("_show_logical_overlay", true)
 	renderer.queue_redraw()
-	await _capture("10_f3_runtime_parity.png")
+	await _capture("10_runtime_parity.png")
 	_expect(
 		renderer.get("_show_logical_overlay") == true,
-		"The runtime F3 logical overlay did not enable."
+		"The runtime logical overlay did not enable."
 	)
 	renderer.set("_show_logical_overlay", false)
 	renderer.queue_redraw()

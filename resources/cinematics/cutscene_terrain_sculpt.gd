@@ -79,7 +79,7 @@ const MAXIMUM_GRID_SIZE := Vector2i(512, 512)
 ## Zero preserves every existing room. The value is the maximum cell-scale
 ## reach used to remove the visible eight-pixel staircase without changing the
 ## logical mask used by collision. The visual rim may move by at most that many
-## cells; TerrainLayerRenderer's F3 overlay exposes the exact logical cells.
+## cells; terrain parity tooling exposes the exact logical cells.
 @export_range(0.0, 2.0, 0.05) var contour_rounding_cells: float = 0.0:
 	set(value):
 		contour_rounding_cells = clampf(value, 0.0, 2.0)

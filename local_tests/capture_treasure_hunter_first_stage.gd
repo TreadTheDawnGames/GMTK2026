@@ -190,16 +190,14 @@ func _capture_aspect_variants(
 	await process_frame
 
 
-## THE F3 PARITY OVERLAY CANNOT BE CAPTURED HERE, AND THIS NOTE IS WHY.
+## THE LOGICAL PARITY OVERLAY CANNOT BE CAPTURED HERE, AND THIS NOTE IS WHY.
 ##
 ## Three things were tried and all three produce a frame that looks like a pass:
-## SubViewport.push_input never reaches _unhandled_key_input without a
-## SubViewportContainer above it; Input.parse_input_event does not reach it
-## either in a --script harness; and calling the renderer's handler directly does
-## flip the flag but still draws nothing, because TerrainLayerRenderer._draw()
-## paints at the renderer node's own transform and EditorTerrainPreview holds it
-## at z_index -100 - so the green wash lands behind every chunk sprite it is
-## meant to be over. F3 works in a real run; it cannot work through this preview.
+## enabling the renderer flag directly still draws nothing, because
+## TerrainLayerRenderer._draw() paints at the renderer node's own transform and
+## EditorTerrainPreview holds it at z_index -100 - so the green wash lands behind
+## every chunk sprite it is meant to be over. The overlay cannot work through
+## this preview.
 ##
 ## The parity question this pass actually raises is answered instead where it can
 ## be proven: carve_treasure_hunter_first_room.gd asserts that stratum zero is

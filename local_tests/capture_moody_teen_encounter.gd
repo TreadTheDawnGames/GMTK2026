@@ -4,7 +4,7 @@ extends SceneTree
 ## - Instantiates the real inherited stage and keeps editor previews alive.
 ## - Inserts Moody Teen only into an in-memory copy of the shipped schedule.
 ## - The production terrain manager, four-stratum renderer, and floor shader draw.
-## - Captures fall discovery, settled two-shot, first impact, and F3 parity.
+## - Captures fall discovery, settled two-shot, first impact, and terrain parity.
 ## - The invariant is that capture setup never writes the shared schedule.
 ##
 ## Run with:
@@ -95,14 +95,14 @@ func _run() -> void:
 	preview.terrain_renderer.set("_show_logical_overlay", true)
 	preview.terrain_renderer.queue_redraw()
 	print(
-		"MOODY_TEEN_CAPTURE: F3 overlay=%s"
+		"MOODY_TEEN_CAPTURE: logical overlay=%s"
 		% preview.terrain_renderer.get("_show_logical_overlay")
 	)
 	captured += 1 if await _capture(
 		viewport,
 		camera,
 		Vector2(MINER_STAGE_X, 0.0),
-		"04_f3_logical_parity.png"
+		"04_logical_parity.png"
 	) else 0
 	preview.terrain_renderer.set("_show_logical_overlay", false)
 	preview.terrain_renderer.queue_redraw()

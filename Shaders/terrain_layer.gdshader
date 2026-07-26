@@ -1257,7 +1257,7 @@ void fragment() {
 		// line downward while the cinematic owns it, so filtered chamber-mask
 		// alpha can never expose the lower stratum above the 2.5D plane. This is
 		// a presentation-only mismatch of at most one world pixel; collision
-		// remains on the logical floor and F3 still renders that truth directly.
+		// remains on the logical floor and parity tooling renders that truth.
 		float floor_backdrop_occlusion = step(
 			-1.0,
 			world_position.y - trodden_floor_world_y

@@ -4,7 +4,7 @@ extends SceneTree
 ## - Instantiates the real Encounter 7.5 stage and keeps previews alive.
 ## - Inserts both Ayden encounters into an in-memory schedule only.
 ## - The production terrain renderer and four baked strata draw the bell.
-## - Captures fall discovery, framing, a real impact, F3, and aspect extremes.
+## - Captures fall discovery, framing, a real impact, parity, and aspect extremes.
 ## - The invariant is that capture setup never writes the shared schedule.
 
 const STAGE_SCENE: PackedScene = preload(

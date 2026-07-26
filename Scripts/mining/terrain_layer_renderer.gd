@@ -12,7 +12,7 @@ extends Node2D
 ## Chamber antialiasing may differ by less than one logical cell at a side edge;
 ## layer one may sit up to the profile's authored reveal distance below a room's
 ## logical floor while layer two stays aligned to support. Neither mismatch
-## affects collision. Press F3 to compare the logical opening.
+## affects collision. Verification tools can overlay the logical opening.
 
 class TerrainChunkVisual:
 	var root: Node2D
@@ -315,8 +315,7 @@ const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 128
 @export var preview_in_editor: bool = false
 
 @export_category("Debug")
-## Toggles the logical opening overlay without affecting terrain presentation.
-@export var logical_overlay_key: Key = KEY_F3
+## Logical opening overlay color used by terrain parity verification tools.
 @export var logical_overlay_color := Color(0.2, 1.0, 0.35, 0.45)
 
 ## Whether a cutscene has asked for its floor to be dressed, and where that floor
@@ -440,9 +439,8 @@ func _ready() -> void:
 	# Initialize the fixed decode table before either lifecycle path can publish.
 	_prepare_sculpt_byte_expansion_words()
 	if Engine.is_editor_hint():
-		# Streaming, input, and signal routes belong to a running game. An
-		# editor instance only draws, and only when its scene asked it to.
-		set_process_unhandled_key_input(false)
+		# Streaming and signal routes belong to a running game. An editor
+		# instance only draws, and only when its scene asked it to.
 		if not preview_in_editor:
 			return
 		if terrain_manager == null or profile == null:
@@ -3281,7 +3279,7 @@ func _build_chunk_base_mask(
 			# Visual terrain may retain a solid deepest-layer backdrop behind
 			# the logical chamber. A departure room clears exactly the normal
 			# right side-wall width so the authored logical exit reads by eye;
-			# F3 still overlays logical cells for parity inspection.
+			# parity tooling can overlay logical cells for inspection.
 			var retained_backdrop_right := (
 				backdrop_right_cell
 				if chamber_right_cell == config.terrain_width_cells
@@ -4016,7 +4014,7 @@ func _rasterize_sculpt_mask(
 ##
 ## Filtering the one-sample-per-cell image keeps this native resize small; the
 ## existing strip preparation still performs the large expansion incrementally.
-## Collision and the F3 logical overlay retain the untouched binary cell mask.
+## Collision and parity verification retain the untouched binary cell mask.
 func _round_sculpt_cell_contours(
 	cell_image: Image,
 	sculpt: CutsceneTerrainSculpt
@@ -5188,20 +5186,6 @@ func get_layer_opening_floor_support_screen_y(
 	return NAN
 
 
-## Toggles a visual audit of logical openings with one debug keypress.
-func _unhandled_key_input(event: InputEvent) -> void:
-	if (
-		not event is InputEventKey
-		or not event.pressed
-		or event.echo
-		or event.keycode != logical_overlay_key
-	):
-		return
-	_show_logical_overlay = not _show_logical_overlay
-	queue_redraw()
-	get_viewport().set_input_as_handled()
-
-
 ## Draws visible non-solid cells over whichever decorative backdrop remains.
 func _draw() -> void:
 	if not _show_logical_overlay:
@@ -5261,9 +5245,10 @@ func _draw() -> void:
 ## Stretches the miner's organic mask through each mouse's complete dug interval.
 ##
 ## The foreground opening may soften beyond the exact logical lane by less than
-## one cell. F3 overlays those logical cells so the accepted mismatch can be
-## checked directly; deeper strata remain intact to preserve the 2.5D rim. One
-## side-wide rect keeps work and retained state bounded at two tunnels.
+## one cell. Verification tools overlay those logical cells so the accepted
+## mismatch can be checked directly; deeper strata remain intact to preserve the
+## 2.5D rim. One side-wide rect keeps work and retained state bounded at two
+## tunnels.
 func _punch_parallel_tunnels(
 	destination: Image,
 	chunk_index: int,

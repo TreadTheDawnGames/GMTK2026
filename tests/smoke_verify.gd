@@ -292,6 +292,17 @@ func _verify_mining_scene() -> void:
 	_expect(mining_scene != null, "MiningScene root must exist.")
 	_expect(terrain_manager != null, "TerrainManager must exist.")
 	_expect(terrain_renderer != null, "TerrainLayerRenderer must exist.")
+	var terrain_renderer_source := FileAccess.get_file_as_string(
+		"res://Scripts/mining/terrain_layer_renderer.gd"
+	)
+	_expect(
+		not terrain_renderer_source.contains("KEY_F3")
+			and not terrain_renderer_source.contains("logical_overlay_key")
+			and not terrain_renderer_source.contains(
+				"func _unhandled_key_input"
+			),
+		"TerrainLayerRenderer still exposes the removed F3 debug shortcut."
+	)
 	_expect(scene_wiring != null, "MiningSceneWiring must exist.")
 	_expect(
 		cutscene_action_presenter != null,

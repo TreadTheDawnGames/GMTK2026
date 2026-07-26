@@ -599,10 +599,11 @@ func _verify_cast_headroom(sculpt: CutsceneTerrainSculpt) -> void:
 ## being the same wall, and no amount of looking at the room will tell you - the
 ## rock still looks like rock.
 ##
-## Checked here rather than through the F3 overlay because the overlay cannot be
-## rendered through the editor preview at all; capture_treasure_hunter_first_stage.gd
-## carries the full explanation. Cell for cell over the whole grid is stronger
-## evidence than a screenshot would have been anyway.
+## Checked here rather than through the logical overlay because the overlay
+## cannot be rendered through the editor preview at all;
+## capture_treasure_hunter_first_stage.gd carries the full explanation. Cell for
+## cell over the whole grid is stronger evidence than a screenshot would have
+## been anyway.
 func _verify_front_stratum_matches_collision(
 	sculpt: CutsceneTerrainSculpt
 ) -> void:
