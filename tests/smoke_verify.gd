@@ -213,6 +213,9 @@ func _verify_mining_scene() -> void:
 	var timing_window := game_root.get_node_or_null(
 		"MiningScene/HUD/TimingWindow"
 	) as TimingWindowTask
+	var timing_bar_feedback := game_root.get_node_or_null(
+		"MiningScene/HUD/TimingBarFeedback"
+	) as TimingBarFeedback
 	var main_menu := game_root.get_node_or_null(
 		"MainMenuLayer/MainMenu"
 	) as GameMainMenu
@@ -231,6 +234,34 @@ func _verify_mining_scene() -> void:
 	)
 	_expect(mining_controller != null, "MiningController must exist.")
 	_expect(view_controller != null, "ViewController must exist.")
+	_expect(
+		timing_bar_feedback != null,
+		"TimingBarFeedback must exist under the mining HUD."
+	)
+	if timing_bar_feedback != null:
+		timing_bar_feedback.combo_bar.value = 4.0
+		timing_bar_feedback._on_timing_pressed(false, 4, 0)
+		timing_bar_feedback._process(
+			timing_bar_feedback.combo_loss_step_seconds * 0.5
+		)
+		_expect(
+			is_equal_approx(timing_bar_feedback.combo_bar.value, 4.0),
+			"Lost combo bar must hold until its first decay step."
+		)
+		timing_bar_feedback._process(
+			timing_bar_feedback.combo_loss_step_seconds * 0.5
+		)
+		_expect(
+			is_equal_approx(timing_bar_feedback.combo_bar.value, 3.0),
+			"Lost combo bar must turn off exactly one segment per step."
+		)
+		timing_bar_feedback._process(
+			timing_bar_feedback.combo_loss_step_seconds * 3.0
+		)
+		_expect(
+			is_zero_approx(timing_bar_feedback.combo_bar.value),
+			"Lost combo bar must finish its stepped decay at zero."
+		)
 	if (
 		terrain_manager == null
 		or terrain_renderer == null
