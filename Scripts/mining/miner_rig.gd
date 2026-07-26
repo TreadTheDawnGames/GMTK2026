@@ -68,12 +68,20 @@ signal swing_finished
 ## verify_cutscene_cast_draw_order.gd asserts that relationship, because this
 ## number and the terrain profile live in different files.
 @export_range(0, 16, 1) var buried_draw_order: int = 1
-## Standing in an authored cutscene room, in front of terrain layer one
-## (z_index 2) again. A cutscene frames the whole cast standing on the room's
-## floor and holds on it, so the foreground stratum cutting him off at the shins
-## reads as a bug there even though it is exactly right while mining the same
-## depth. Ordinary mining is untouched: only an active encounter asks for this.
-@export_range(0, 16, 1) var cutscene_draw_order: int = 3
+## Standing in an authored cutscene room: the same stratum he mines on, behind
+## the foreground layer, with his feet covered by the ground he is standing in.
+##
+## This was 3 for a long time, which lifted him clear of every stratum so a held
+## shot showed a whole man. Zephan's direction is the opposite: the cast belong in
+## the ground the way the player does rather than being cut out in front of it, so
+## a cutscene no longer lifts anybody. The foreground stratum cutting him off at
+## the ankles is the read, not a bug.
+##
+## DepthEncounterController lifts the whole CharacterLayer to this same number, so
+## changing it moves every visitor as well as the miner. That is deliberate - one
+## number is what keeps a conversation's two halves on the same layer as each
+## other.
+@export_range(0, 16, 1) var cutscene_draw_order: int = 1
 
 @export_category("References")
 @export var animation_player: AnimationPlayer

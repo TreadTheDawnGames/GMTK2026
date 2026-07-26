@@ -1,21 +1,23 @@
 extends SceneTree
 
-## Proves a cutscene's cast is drawn in front of the rock they are standing in.
+## Proves a cutscene's cast is drawn in the rock they are standing in, on the
+## same stratum the miner occupies while he is digging.
 ##
-## During ordinary mining the cast layer sits behind the foreground stratum,
-## which is what makes the miner read as being down in his dig rather than pasted
-## on top of it. A cutscene lifts the whole cast in front of that stratum instead,
-## because a shot that holds on two characters has to let you see them.
+## Cutscenes used to lift the whole cast clear of every stratum so a held shot
+## showed whole characters. Zephan's direction reversed that: the cast belong in
+## the ground the way the player does, with their feet covered, rather than being
+## cut out in front of it. So the cutscene order and the mining order now name the
+## same stratum, and this check tests that they still do.
 ##
-## The lift is a single number, MinerRig.cutscene_draw_order, and the thing it
-## has to beat is whatever the terrain profile's frontmost stratum draws at. Those
-## two live in different files and nothing has ever tied them together: add a
-## stratum, or renumber the existing ones, and every cutscene quietly starts
-## playing behind the wall with no error anywhere. That is exactly how it looks
-## when it goes wrong - the characters are simply gone behind the dirt.
+## Both are compared against whatever the terrain profile's strata actually draw
+## at. Those numbers live in a different file and nothing else ties them together:
+## add a stratum, or renumber the existing ones, and the cast quietly ends up on
+## the wrong side of the rock with no error anywhere. Too far forward and they are
+## pasted on top of the ground; too far back and they are simply gone behind the
+## dirt.
 ##
-## The invariant is that the cutscene cast order is strictly in front of every
-## terrain stratum, and that the resting order is still behind the foreground one.
+## The invariant is that both orders sit strictly between the two frontmost
+## strata: behind the foreground layer, in front of the one it stands on.
 
 const MINER_SCENE := preload("res://Scenes/mining/miner_rig.tscn")
 const PROFILE_PATH := "res://resources/mining/default_terrain_layer_profile.tres"
@@ -52,17 +54,24 @@ func _run() -> void:
 		buried_order,
 	])
 
-	if cutscene_order <= frontmost_terrain_z:
+	var second_stratum_z := _get_second_stratum_z(profile)
+	# Mining and cutscenes deliberately stand the cast on the SAME stratum now, so
+	# both orders get the same pair of assertions rather than opposite ones.
+	if cutscene_order >= frontmost_terrain_z:
 		_failures.append(
 			(
-				"Cutscene cast order %d does not clear the frontmost terrain "
-				+ "stratum at %d, so every cutscene would play behind the rock."
+				"Cutscene cast order %d is not behind the foreground stratum at "
+				+ "%d, so the cast would be pasted on top of the ground instead "
+				+ "of standing in it."
 			) % [cutscene_order, frontmost_terrain_z]
 		)
-	# Mining and cutscenes deliberately stand him on different strata: down in the
-	# dig while he works, lifted clear of it while a shot holds on him. Both ends
-	# of that are asserted, because a single number satisfying one and not the
-	# other is exactly how this goes wrong.
+	if cutscene_order <= second_stratum_z:
+		_failures.append(
+			(
+				"Cutscene cast order %d is not in front of the second stratum at "
+				+ "%d, so every cutscene would play behind the rock."
+			) % [cutscene_order, second_stratum_z]
+		)
 	if buried_order >= frontmost_terrain_z:
 		_failures.append(
 			(
@@ -70,7 +79,6 @@ func _run() -> void:
 				+ "the miner would stop reading as being down in his dig."
 			) % [buried_order, frontmost_terrain_z]
 		)
-	var second_stratum_z := _get_second_stratum_z(profile)
 	if buried_order <= second_stratum_z:
 		_failures.append(
 			(
