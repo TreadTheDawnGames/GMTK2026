@@ -6,6 +6,7 @@ extends Node2D
 ## - AnimationPlayer owns transform choreography and strike-contact timing.
 ## - ActorSpriteView optionally supplies named visible art for each action.
 ## - The strike clip emits its contact point for shared terrain-hit effects.
+## - Shared shader depth and a floor-stationary shadow provide 2.5D grounding.
 ## - Mining repeats, then remains visible until the rat mines offstage right.
 ## - This node never changes terrain or gameplay state.
 
@@ -56,6 +57,7 @@ enum Action {
 @export var actor_sprite: Sprite2D
 @export var actor_sprite_view: ActorSpriteView
 @export var speech_reaction: SpeechReactionType
+@export var ground_shadow: ActorGroundShadow
 @export var default_appearance: RatAppearanceType
 
 @export_category("Appearance")
@@ -169,16 +171,47 @@ func set_appearance(appearance: RatAppearanceType) -> bool:
 	return true
 
 
+## Sets the generalized cutscene-light shader's recession without tinting art.
+##
+## Both transient encounter rows and the persistent mining formation call this
+## same contract, so a mouse cannot use one depth language in the cutscene and
+## another after it joins the player.
+func set_visual_depth_ratio(depth_ratio: float) -> void:
+	if not is_instance_valid(actor_sprite):
+		return
+	var depth_material := actor_sprite.material as ShaderMaterial
+	if depth_material == null:
+		return
+	depth_material.set_shader_parameter(
+		&"depth_amount",
+		clampf(depth_ratio, 0.0, 1.0)
+	)
+
+
+## Mirrors the production miner's grounded travel without taking motion ownership.
+func set_ground_travel_active(is_walking: bool) -> void:
+	if (
+		_action != Action.IDLE
+		or not visible
+		or not is_instance_valid(animation_player)
+	):
+		return
+	var requested_animation := &"run" if is_walking else &"idle"
+	if animation_player.current_animation != requested_animation:
+		animation_player.play(requested_animation)
+
+
 ## Runs left-to-right until the actor reaches the authored mining wall.
 func start_run_to_wall(
 	wall_screen_x: float,
 	duration: float,
-	floor_sampler: Callable = Callable()
+	floor_sampler: Callable = Callable(),
+	arc_height: float = 0.0
 ) -> bool:
 	var started := start_run_to_target(
 		Vector2(wall_screen_x, global_position.y),
 		duration,
-		0.0,
+		arc_height,
 		NAN,
 		floor_sampler
 	)
@@ -207,6 +240,7 @@ func start_run_to_target(
 		if _reduce_motion_enabled
 		else maxf(arc_height, 0.0)
 	)
+	_set_ground_shadow_arc(0.0, resolved_height)
 	var horizontal_direction := bounded_target.x - start_position.x
 	set_facing_direction(
 		0
@@ -281,6 +315,7 @@ func start_wall_emergence(
 	var start_position := global_position
 	var landing_target := _clamp_to_motion_bounds(landing_position)
 	var resolved_duration := maxf(duration, 0.01)
+	_set_ground_shadow_arc(0.0, wall_pop_rise)
 	var horizontal_direction := landing_target.x - start_position.x
 	set_facing_direction(
 		0
@@ -313,6 +348,7 @@ func start_mining_then_exit(
 ) -> bool:
 	if _action != Action.IDLE:
 		return false
+	_set_ground_shadow_arc(0.0, 0.0)
 	_remaining_strikes = maxi(strike_count, 1)
 	_exit_target = exit_screen_position
 	_exit_duration = maxf(exit_time, 0.01)
@@ -323,7 +359,10 @@ func start_mining_then_exit(
 
 
 ## Plays one entry strike before the coordinator opens the authored breach.
-func start_entry_breach(contact_screen_position: Vector2) -> bool:
+func start_entry_breach(
+	contact_screen_position: Vector2,
+	playback_speed: float = 1.0
+) -> bool:
 	if (
 		_action != Action.IDLE
 		or not is_instance_valid(animation_player)
@@ -331,10 +370,15 @@ func start_entry_breach(contact_screen_position: Vector2) -> bool:
 		or is_nan(contact_screen_position.y)
 	):
 		return false
+	_set_ground_shadow_arc(0.0, 0.0)
 	_entry_breach_contact = contact_screen_position
 	_action = Action.BREACHING
 	_play_strike_pose()
-	animation_player.play(&"strike")
+	animation_player.play(
+		&"strike",
+		-1.0,
+		maxf(playback_speed, 0.1)
+	)
 	return true
 
 
@@ -434,6 +478,7 @@ func cancel_action() -> void:
 	_emit_reached_wall_on_target = false
 	_emit_jump_finished_on_target = false
 	_land_on_target = false
+	_set_ground_shadow_arc(0.0, 0.0)
 	restore_visual_depth()
 	_show_idle_appearance()
 	if is_instance_valid(animation_player):
@@ -602,6 +647,7 @@ func _set_run_progress(
 	var next_position := start_position.lerp(target_position, progress)
 	next_position.y -= arc_offset
 	global_position = _clamp_to_motion_bounds(next_position)
+	_set_ground_shadow_arc(arc_offset, arc_height)
 
 
 ## Traces one true parabola: horizontal speed is constant and the vertical term
@@ -613,13 +659,18 @@ func _set_emergence_progress(
 	landing_position: Vector2
 ) -> void:
 	var next_position := start_position.lerp(landing_position, progress)
-	next_position.y -= (
-		(0.0 if _reduce_motion_enabled else wall_pop_rise)
+	var resolved_wall_pop_rise := (
+		0.0 if _reduce_motion_enabled else wall_pop_rise
+	)
+	var arc_offset := (
+		resolved_wall_pop_rise
 		* 4.0
 		* progress
 		* (1.0 - progress)
 	)
+	next_position.y -= arc_offset
 	global_position = _clamp_to_motion_bounds(next_position)
+	_set_ground_shadow_arc(arc_offset, resolved_wall_pop_rise)
 
 
 func _finish_run_to_target() -> void:
@@ -629,6 +680,7 @@ func _finish_run_to_target() -> void:
 	_emit_reached_wall_on_target = false
 	_emit_jump_finished_on_target = false
 	_land_on_target = false
+	_set_ground_shadow_arc(0.0, 0.0)
 	_action_tween = null
 	_action = Action.IDLE
 	_show_idle_appearance()
@@ -690,6 +742,24 @@ func _calculate_arc_offset(
 		(progress - peak_progress) / (1.0 - peak_progress)
 	)
 	return arc_height * cos(falling_progress * PI * 0.5)
+
+
+## Keeps the shadow on the interpolated floor while the actor root takes an arc.
+func _set_ground_shadow_arc(
+	arc_offset: float,
+	maximum_arc_height: float
+) -> void:
+	if not is_instance_valid(ground_shadow):
+		return
+	ground_shadow.position.y = maxf(arc_offset, 0.0)
+	var contact_strength := 1.0
+	if maximum_arc_height > 0.0:
+		contact_strength = lerpf(
+			1.0,
+			0.22,
+			clampf(arc_offset / maximum_arc_height, 0.0, 1.0)
+		)
+	ground_shadow.set_contact_strength(contact_strength)
 
 
 ## Releases the actor only after its visible strike clip has fully recovered.
