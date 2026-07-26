@@ -214,7 +214,7 @@ func _mining_window_pressed(
 			)
 
 		# Defer until SliderTimingWindow finishes iterating the hit target set.
-		# Pool replacement must precede any bonus spawn at the same combo.
+		# Pool expansion must precede any bonus spawn at the same combo.
 		_apply_success_target_rules.call_deferred(
 			combo,
 			mining_window.is_all_targets_hit()
@@ -377,8 +377,9 @@ func _apply_success_target_rules(
 					mining_window.target_packed_scenes.duplicate()
 				)
 				mining_window.target_packed_scenes = (
-					mining_config.combo_target_groups[group_index]
-						.target_scenes.duplicate()
+					mining_config.get_combo_target_pool_through_group(
+						group_index
+					)
 				)
 				mining_window.add_target()
 				mining_window.target_packed_scenes = retained_pool
@@ -408,7 +409,7 @@ func _apply_success_target_rules(
 		mining_window.add_target()
 
 
-## Rebuilds the active target pool while optionally retaining earned count.
+## Expands the active target pool while optionally retaining earned count.
 func _apply_combo_target_group(
 	reached_combo: int,
 	preserve_target_count: bool
@@ -429,8 +430,10 @@ func _apply_combo_target_group(
 		if preserve_target_count
 		else 0
 	)
-	var group := mining_config.combo_target_groups[group_index]
-	mining_window.set_target_pool(group.target_scenes)
+	var target_pool := (
+		mining_config.get_combo_target_pool_through_group(group_index)
+	)
+	mining_window.set_target_pool(target_pool)
 	while mining_window.targets.size() < retained_target_count:
 		mining_window.add_target()
 	if retained_target_count > 0:

@@ -2,15 +2,15 @@ class_name ComboTargetGroup
 extends Resource
 
 ## How it works:
-## - One group owns the timing-target pool starting at minimum_combo.
-## - MiningConfig keeps groups ordered and selects the last reached group.
-## - TimingWindow replaces its pool after the current target set is completed.
+## - One group adds target types starting at minimum_combo.
+## - MiningConfig accumulates every group reached up to progression's cap.
+## - TimingWindow expands its pool after the current target set is completed.
 ## - Target count remains owned by encounter progression and combo bonuses.
 ## - The invariant is that every group has at least one valid target scene.
 
-## Inclusive combo at which this group replaces the previous target pool.
+## Inclusive combo at which this group's target types become available.
 @export_range(0, 100, 1) var minimum_combo: int = 0
-## Complete target pool while this group is active.
+## New target types added to the cumulative pool at this threshold.
 @export var target_scenes: Array[PackedScene] = []
 
 
