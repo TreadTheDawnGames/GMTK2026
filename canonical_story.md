@@ -6,6 +6,14 @@ Status: Canonical story order and approved dialogue supplied by Jared on
 July 25, 2026. This supersedes the earlier July 25 numbering that counted the
 opening as an encounter.
 
+Later on July 25, Jared ruled that Zephan's reference videos post-date this
+document and should lead where the two disagree. That ruling is currently
+applied to **Encounter 6 only**, as a split rather than a reversal: the video
+leads on beats, staging, order, and anything missing here, while this document
+keeps the wording of lines both sources have. Encounter 6's "Yippee! Wahoo!" is
+the first change made under it. Every other encounter still follows this
+document as written; do not extend the ruling without asking Jared.
+
 This document is the source of truth for narrative order, dialogue, and intended
 first-run pacing. Do not reorder, remove, replace, paraphrase, or silently correct
 these beats without Jared or Zephan approving the narrative change.
@@ -116,7 +124,11 @@ leaving the Miner at the excavation site.*
 
 ### Encounter 6 — The Treasure, 7,400 depth
 
-*The Treasure Hunter has finally reached the treasure he spent years seeking.*
+*The Treasure Hunter has finally reached the treasure he spent years seeking.
+The Miner hears him celebrating through the rock before he breaks into the
+chamber.*
+
+**TREASURE HUNTER: Yippee! Wahoo!**
 
 **TREASURE HUNTER: I found it. More treasure than I could ever carry.**
 
