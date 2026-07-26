@@ -9,33 +9,13 @@
 [ext_resource type="Resource" path="res://resources/cinematics/rat_appearance_white.tres" id="7_white"]
 
 [node name="RatColonyEncounterStage" node_paths=PackedStringArray("rat_container") instance=ExtResource("1_base")]
-editor_description = "Rotini waits beside the miner while a bounded colony runs, mines, and exits through the normal four-layer encounter tunnel."
+editor_description = "Shared facade, not an encounter. Rotini waits beside the miner while a bounded colony runs, mines, and exits through the normal four-layer encounter tunnel. Both of his encounters inherit this - rotini_first_encounter_stage at 2,500 and rotini_colony_encounter_stage at 11,200 - so its markers stay at the base defaults and it names no encounter of its own. Author in the inheriting scene."
 script = ExtResource("2_stage")
 rat_scene = ExtResource("3_rat")
 rat_container = NodePath("RatContainer")
 rat_appearances = Array[ExtResource("4_appearance")]([ExtResource("5_brown"), ExtResource("6_grey"), ExtResource("7_white")])
 
-[node name="Entrance" parent="ActorMarkers" index="0"]
-position = Vector2(-420, 0)
-
-[node name="Conversation" parent="ActorMarkers" index="1"]
-position = Vector2(120, 0)
-
-[node name="Work" parent="ActorMarkers" index="2"]
-position = Vector2(390, 0)
-
-[node name="Rest" parent="ActorMarkers" index="3"]
-position = Vector2(120, 0)
-
-[node name="Exit" parent="ActorMarkers" index="4"]
-position = Vector2(700, 0)
-
 [node name="RatContainer" type="Node2D" parent="." index="3"]
 z_index = 7
-
-[node name="EditorTerrainPreview" parent="." index="5"]
-editor_description = "Previews rutini_second at its authored depth."
-encounter_id = &"rutini_second"
-preview_depth_rows = 11200
 
 [editable path="ActorMarkers"]

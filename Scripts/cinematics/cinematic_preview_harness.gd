@@ -312,14 +312,47 @@ func _land_at(depth_rows: int) -> void:
 		# actor stayed behind - standing well below the room, off the bottom of
 		# the screen. A real run only activates an encounter once the fall is
 		# over, so waiting for it is what matches the game rather than racing it.
-		await _wait_until(
-			func() -> bool:
-				return view.target_view_position.is_equal_approx(
-					view.get_current_view_position()
-				),
-			8.0
-		)
+		#
+		# What has to have stopped is the presented view - the thing that moves
+		# the cast layer - not the miner. This used to compare the target against
+		# get_current_view_position(), which returns the miner's presentation
+		# position, and that converges within a frame or two of the teleport
+		# however far the view still has to travel. At 300 rows the two are the
+		# same answer, which is why every shallow encounter looked right; at
+		# 11,200 the view was still 70,000px away when the shot began and the
+		# visitor was left that far below the room, off screen, with no error
+		# anywhere. Watching the presented row settle is depth-independent.
+		await _wait_until_view_settles(view)
 	encounter._on_landing_reached(_run_state.mining_y)
+
+
+## Waits until the presented view row stops moving for several frames running.
+##
+## Stability rather than arrival, because the view reaches its destination in
+## more than one way - streamed rows, a chunk snap, then the encounter framing
+## tween - and only one of those is a target the harness can compare against.
+## What every one of them has in common is that it eventually stops.
+##
+## The count is deliberately generous. Streaming a 11,200-row descent pauses
+## between chunks, and a short window mistakes one of those pauses for the end of
+## the journey - which puts the shot back where it started, only with a smaller
+## error that is harder to recognise. This costs a third of a second on a preview
+## that already teleports through eleven thousand rows.
+func _wait_until_view_settles(view: ViewController) -> void:
+	const REQUIRED_STILL_FRAMES: int = 20
+	var still_frames := 0
+	var previous_row := INF
+	await _wait_until(
+		func() -> bool:
+			var current_row := view.current_view_y
+			if is_equal_approx(current_row, previous_row):
+				still_frames += 1
+			else:
+				still_frames = 0
+			previous_row = current_row
+			return still_frames >= REQUIRED_STILL_FRAMES,
+		8.0
+	)
 
 
 func _get_view_controller() -> ViewController:
