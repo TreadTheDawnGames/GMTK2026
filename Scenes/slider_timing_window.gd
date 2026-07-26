@@ -61,7 +61,7 @@ func _ready() -> void:
 	if one_shot:
 		stop()
 	else:
-		set_process(true)
+		_set_timing_process(true)
 
 ## Returns the slider edge area including input grace.
 func slider_half_width() -> float:
@@ -75,7 +75,7 @@ func start() -> void:
 		backing.size.x = size.x
 	reset_one_shot()
 	show()
-	set_process(true)
+	_set_timing_process(true)
 
 func reset_one_shot():
 	if one_shot:
@@ -86,7 +86,7 @@ func reset_one_shot():
 
 ## Freezes the slider and optionally flashes its recovery warning.
 func pause(animate: bool) -> void:
-	set_process(false)
+	_set_timing_process(false)
 	if not animate:
 		return
 	await play_animation(animation_color, animation_repeats, 0.1)
@@ -103,7 +103,7 @@ func play_animation(color : Color, repetitions : int = 1,  duration : float = 0.
 ## Hides the timing bar and stops its slider.
 func stop() -> void:
 	hide()
-	set_process(false)
+	_set_timing_process(false)
 
 ## Adds and positions one valid hit target.
 func add_target() -> void:
@@ -123,6 +123,7 @@ func add_target() -> void:
 	backing.add_child(new_target)
 	backing.move_child(new_target, desired_target_heirarchy_index)
 	targets.append(new_target)
+	new_target.set_process(is_processing())
 	
 	if is_node_ready():
 		#randomize_all_targets
@@ -165,7 +166,6 @@ func remove_all_extra_targets() -> void:
 	while targets.size() < _starting_target_count:
 		add_target()
 	for baseline_target in targets:
-		print("initing from baseline")
 		baseline_target.initialize()
 		baseline_target.position.x = clamp_within_bounds(baseline_target.position.x, baseline_target.size.x)
 	randomize_all_targets()
@@ -283,6 +283,12 @@ func play_bounce_sound() -> void:
 	if _bounce_muted or _audio_handler == null:
 		return
 	_audio_handler.play_sound(AudioLibrary.BOUNCE)
+
+## Keeps dynamic target motion in lockstep with its owning slider.
+func _set_timing_process(is_active: bool) -> void:
+	set_process(is_active)
+	for target: TimingTarget in targets:
+		target.set_process(is_active)
 
 #func _draw():
 	#draw_line(backing.position + Vector2(slider_position, 0), (backing.position + Vector2(slider_position, 0)) + Vector2.UP * 50, Color.RED, 1.0)

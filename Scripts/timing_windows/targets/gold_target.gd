@@ -9,14 +9,11 @@ var direction : float = 1.0
 
 func initialize():
 	super.initialize()
-	direction = clamp((randf()-randf())*2.0, -1.5, 1.5)
-	if abs(direction) < 0.5:
-		direction *= (1.5 / direction )
-		print(direction)
+	direction = _random_direction()
 
 func hit(_timing_window : SliderTimingWindow = null) -> void:
 	super.hit(_timing_window)
-	direction = (randf()-randf())*2.0
+	direction = _random_direction()
 
 
 func place(_placement_width : float) -> float:
@@ -42,3 +39,11 @@ func _process(delta: float) -> void:
 
 func slider_half_width() -> float:
 	return size.x * 0.5
+
+func _random_direction() -> float:
+	var random_direction := randf_range(-1.5, 1.5)
+	if absf(random_direction) >= 0.5:
+		return random_direction
+	if is_zero_approx(random_direction):
+		return -0.5 if randf() < 0.5 else 0.5
+	return signf(random_direction) * 0.5

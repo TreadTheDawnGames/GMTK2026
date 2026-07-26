@@ -8,10 +8,9 @@ var times_hit : int = 0
 
 func initialize():
 	super.initialize()
-	times_hit = 0
 	if not times_hit_label:
 		times_hit_label = %TimesHitLabel
-	times_hit_label.text = str(required_hits)
+	_reset_hit_progress()
 	Utils.set_control_width(self, my_width)
 
 func hit(_timing_window : SliderTimingWindow = null) -> void:
@@ -22,4 +21,8 @@ func hit(_timing_window : SliderTimingWindow = null) -> void:
 	times_hit_label.text = str(required_hits-times_hit)
 
 func reset():
+	_reset_hit_progress()
+
+func _reset_hit_progress() -> void:
 	times_hit = 0
+	times_hit_label.text = str(required_hits)

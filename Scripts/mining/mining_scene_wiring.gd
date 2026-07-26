@@ -101,6 +101,10 @@ func _ready() -> void:
 	)
 	_connect_once(
 		_game_state.run_reset,
+		timing_window._on_run_reset
+	)
+	_connect_once(
+		_game_state.run_reset,
 		run_timeline._on_run_reset
 	)
 	_connect_once(
