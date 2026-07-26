@@ -49,4 +49,4 @@ base_mine_depth_rows = 12
 combo_mine_depth_rows_per_step = 2
 progression_levels = Array[ExtResource("1_csmot")]([ExtResource("2_level_0"), ExtResource("3_level_1"), ExtResource("4_level_2"), ExtResource("5_level_3"), ExtResource("6_level_4"), ExtResource("7_level_5"), ExtResource("8_level_6"), ExtResource("9_level_7"), ExtResource("10_level_8"), ExtResource("11_level_9")])
 combo_target_groups = Array[ExtResource("12_combo_group")]([SubResource("ComboTargetGroup_green"), SubResource("ComboTargetGroup_yellow"), SubResource("ComboTargetGroup_stationary_blue"), SubResource("ComboTargetGroup_moving_blue"), SubResource("ComboTargetGroup_purple")])
-combo_tier_thresholds = Array[int]([1, 5, 10, 16, 20])
+combo_tier_thresholds = Array[int]([1, 5, 9, 13, 17, 20])

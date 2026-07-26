@@ -21,8 +21,8 @@ GameState="*res://Scenes/globals/game_state.tscn"
 AudioHandler="*res://Scenes/globals/audio_handler.tscn"
 MusicManager="*uid://qi6w5ueftd0u"
 Conductor="*uid://cetf3kqgdyqbm"
-WebAudioFocusGuard="*res://Scripts/Global/web_audio_focus_guard.gd"
 PlayerHistory="*res://Scripts/Global/player_history.gd"
+WebAudioFocusGuard="*res://Scripts/Global/web_audio_focus_guard.gd"
 
 [display]
 

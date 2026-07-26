@@ -2,23 +2,26 @@
 
 [ext_resource type="Script" uid="uid://8lrsitody4v4" path="res://Scripts/Global/music_manager.gd" id="1_a0ngj"]
 [ext_resource type="Script" uid="uid://s4frj7oy6eh" path="res://resources/music/intensity.gd" id="2_q3b56"]
-[ext_resource type="AudioStream" uid="uid://chhsdowl4uikj" path="res://Assets/Audio/Music/Tracks/Track 0_A.wav" id="3_j7o0d"]
-[ext_resource type="AudioStream" uid="uid://b65hvbkhrokt0" path="res://Assets/Audio/Music/Tracks/Track 1_A.wav" id="4_t3xlo"]
-[ext_resource type="AudioStream" uid="uid://dxgkdgbyrag1f" path="res://Assets/Audio/Music/Tracks/Track 1_B.wav" id="5_l6m5y"]
-[ext_resource type="AudioStream" uid="uid://ccgj86e6x5a1r" path="res://Assets/Audio/Music/Tracks/Track 1_C.wav" id="6_hc7r0"]
-[ext_resource type="AudioStream" uid="uid://ddcsk5epb2xpu" path="res://Assets/Audio/Music/Tracks/Track 2_A.wav" id="7_bo57w"]
-[ext_resource type="AudioStream" uid="uid://bf0f27joim14q" path="res://Assets/Audio/Music/Tracks/Track 2_B.wav" id="8_c4rao"]
-[ext_resource type="AudioStream" uid="uid://cc5qcx2fbc38y" path="res://Assets/Audio/Music/Tracks/Track 3_A.wav" id="9_knyyj"]
-[ext_resource type="AudioStream" uid="uid://cch53t88rosm1" path="res://Assets/Audio/Music/Tracks/Track 3_B.wav" id="10_4e8v3"]
-[ext_resource type="AudioStream" uid="uid://dpux8n4chc4j7" path="res://Assets/Audio/Music/Tracks/Track 3_C.wav" id="11_md4lg"]
-[ext_resource type="AudioStream" uid="uid://dr3tn2l7ok45g" path="res://Assets/Audio/Music/Tracks/Track 3_D.wav" id="12_ccwyb"]
-[ext_resource type="AudioStream" uid="uid://bafg84pi387x2" path="res://Assets/Audio/Music/Tracks/Track 4_A.wav" id="13_3clkn"]
-[ext_resource type="AudioStream" uid="uid://d15qdd2u7norw" path="res://Assets/Audio/Music/Tracks/Track 4_B.wav" id="14_hpsl2"]
-[ext_resource type="AudioStream" uid="uid://sb84n3ygkn3w" path="res://Assets/Audio/Music/Tracks/Track 4_C.wav" id="15_clf6b"]
-[ext_resource type="AudioStream" uid="uid://cp00cgjcbl4un" path="res://Assets/Audio/Music/Tracks/Track 4_D.wav" id="16_tso0d"]
+[ext_resource type="AudioStream" uid="uid://1jvjfuqmnnty" path="res://Assets/Audio/Music/Tracks with Fills/FillTrack 0_A.mp3" id="3_ccwyb"]
+[ext_resource type="AudioStream" uid="uid://bfbbjb5087aif" path="res://Assets/Audio/Music/Tracks with Fills/FillTrack 1_A.mp3" id="4_3clkn"]
+[ext_resource type="AudioStream" uid="uid://cjcham7b8dcuy" path="res://Assets/Audio/Music/Tracks with Fills/FillTrack 1_B.mp3" id="5_hpsl2"]
+[ext_resource type="AudioStream" uid="uid://dd1j7hyq8s2yg" path="res://Assets/Audio/Music/Tracks with Fills/FillTrack 1_C.mp3" id="6_clf6b"]
+[ext_resource type="AudioStream" uid="uid://bes66ey0w45q2" path="res://Assets/Audio/Music/Tracks with Fills/FillTrack 2_A.mp3" id="7_tso0d"]
+[ext_resource type="AudioStream" uid="uid://gttrkf67ierh" path="res://Assets/Audio/Music/Tracks with Fills/FillTrack 2_B.mp3" id="8_hva2u"]
+[ext_resource type="AudioStream" uid="uid://3j10vn4imxsi" path="res://Assets/Audio/Music/Tracks with Fills/FillTrack 3_A.mp3" id="9_462tb"]
+[ext_resource type="AudioStream" uid="uid://bjlvura74clwt" path="res://Assets/Audio/Music/Tracks with Fills/FillTrack 3_B.mp3" id="10_hemms"]
+[ext_resource type="AudioStream" uid="uid://c6oqxxuwu7yxo" path="res://Assets/Audio/Music/Tracks with Fills/FillTrack 3_C.mp3" id="11_76vlu"]
+[ext_resource type="AudioStream" uid="uid://b2fx8ce2tb7na" path="res://Assets/Audio/Music/Tracks with Fills/FillTrack 4_A.mp3" id="12_iel4v"]
+[ext_resource type="AudioStream" uid="uid://doeb1yln7wld4" path="res://Assets/Audio/Music/Tracks with Fills/FillTrack 4_B.mp3" id="13_1vwqh"]
+[ext_resource type="AudioStream" uid="uid://d2jxoq1irrye" path="res://Assets/Audio/Music/Tracks with Fills/FillTrack 4_C.mp3" id="14_s3hea"]
+[ext_resource type="AudioStream" uid="uid://raehw7daos4i" path="res://Assets/Audio/Music/Tracks with Fills/FillTrack 4_D.mp3" id="15_gab6v"]
+[ext_resource type="AudioStream" uid="uid://bch0o433qugjf" path="res://Assets/Audio/Music/Tracks with Fills/FillTrack 5_A.mp3" id="16_uk2l4"]
+[ext_resource type="AudioStream" uid="uid://dwxmyp2ds4c03" path="res://Assets/Audio/Music/Tracks with Fills/FillTrack 5_B.mp3" id="17_i3qdj"]
 [ext_resource type="AudioStream" uid="uid://cscee8nxpmatj" path="res://Assets/Audio/Music/Fills/Fill 1.wav" id="17_knyyj"]
 [ext_resource type="AudioStream" uid="uid://cyqiofo2rxlqj" path="res://Assets/Audio/Music/Fills/Fill 2.wav" id="18_4e8v3"]
+[ext_resource type="AudioStream" uid="uid://cl77k0apkgqek" path="res://Assets/Audio/Music/Tracks with Fills/FillTrack 5_C.mp3" id="18_brern"]
 [ext_resource type="AudioStream" uid="uid://uyffheadki3i" path="res://Assets/Audio/Music/Fills/Fill 3.wav" id="19_md4lg"]
+[ext_resource type="AudioStream" uid="uid://jxsj3t7yuw42" path="res://Assets/Audio/Music/Tracks with Fills/FillTrack 5_D.mp3" id="19_ynokk"]
 [ext_resource type="AudioStream" uid="uid://bndigfegx8cfd" path="res://Assets/Audio/Music/Fills/Fill 4.wav" id="20_ccwyb"]
 [ext_resource type="AudioStream" uid="uid://q654521kyu7h" path="res://Assets/Audio/Music/Fills/Fill 5.wav" id="21_3clkn"]
 [ext_resource type="AudioStream" uid="uid://bo5sy6yuoip68" path="res://Assets/Audio/Music/Fills/Fill 6.wav" id="22_hpsl2"]
@@ -30,37 +33,43 @@
 [sub_resource type="Resource" id="Resource_ikl7l"]
 resource_name = "Intensity 0"
 script = ExtResource("2_q3b56")
-tracks = Array[AudioStream]([ExtResource("3_j7o0d")])
+tracks = Array[AudioStream]([ExtResource("3_ccwyb")])
 metadata/_custom_type_script = "uid://s4frj7oy6eh"
 
 [sub_resource type="Resource" id="Resource_hmpdo"]
 resource_name = "Intensity 1"
 script = ExtResource("2_q3b56")
-tracks = Array[AudioStream]([ExtResource("4_t3xlo"), ExtResource("5_l6m5y"), ExtResource("6_hc7r0")])
+tracks = Array[AudioStream]([ExtResource("4_3clkn"), ExtResource("5_hpsl2"), ExtResource("6_clf6b")])
 metadata/_custom_type_script = "uid://s4frj7oy6eh"
 
 [sub_resource type="Resource" id="Resource_65g0b"]
 resource_name = "Intensity 2"
 script = ExtResource("2_q3b56")
-tracks = Array[AudioStream]([ExtResource("7_bo57w"), ExtResource("8_c4rao")])
+tracks = Array[AudioStream]([ExtResource("7_tso0d"), ExtResource("8_hva2u")])
 metadata/_custom_type_script = "uid://s4frj7oy6eh"
 
 [sub_resource type="Resource" id="Resource_nmsjp"]
 resource_name = "Intensity 3"
 script = ExtResource("2_q3b56")
-tracks = Array[AudioStream]([ExtResource("9_knyyj"), ExtResource("10_4e8v3"), ExtResource("11_md4lg"), ExtResource("12_ccwyb")])
+tracks = Array[AudioStream]([ExtResource("9_462tb"), ExtResource("10_hemms"), ExtResource("11_76vlu")])
 metadata/_custom_type_script = "uid://s4frj7oy6eh"
 
 [sub_resource type="Resource" id="Resource_libwa"]
 resource_name = "Intensity 4"
 script = ExtResource("2_q3b56")
-tracks = Array[AudioStream]([ExtResource("13_3clkn"), ExtResource("14_hpsl2"), ExtResource("15_clf6b"), ExtResource("16_tso0d")])
+tracks = Array[AudioStream]([ExtResource("12_iel4v"), ExtResource("13_1vwqh"), ExtResource("14_s3hea"), ExtResource("15_gab6v")])
+metadata/_custom_type_script = "uid://s4frj7oy6eh"
+
+[sub_resource type="Resource" id="Resource_8ytv7"]
+resource_name = "Intensity 5"
+script = ExtResource("2_q3b56")
+tracks = Array[AudioStream]([ExtResource("16_uk2l4"), ExtResource("17_i3qdj"), ExtResource("18_brern"), ExtResource("19_ynokk")])
 metadata/_custom_type_script = "uid://s4frj7oy6eh"
 
 [node name="MusicManager" type="Node" unique_id=1863380187]
 process_mode = 3
 script = ExtResource("1_a0ngj")
-tracks = Array[ExtResource("2_q3b56")]([SubResource("Resource_ikl7l"), SubResource("Resource_hmpdo"), SubResource("Resource_65g0b"), SubResource("Resource_nmsjp"), SubResource("Resource_libwa")])
+tracks = Array[ExtResource("2_q3b56")]([SubResource("Resource_ikl7l"), SubResource("Resource_hmpdo"), SubResource("Resource_65g0b"), SubResource("Resource_nmsjp"), SubResource("Resource_libwa"), SubResource("Resource_8ytv7")])
 fills = Array[AudioStream]([ExtResource("17_knyyj"), ExtResource("18_4e8v3"), ExtResource("19_md4lg"), ExtResource("20_ccwyb"), ExtResource("21_3clkn"), ExtResource("22_hpsl2"), ExtResource("23_clf6b"), ExtResource("24_tso0d"), ExtResource("25_hva2u"), ExtResource("26_462tb")])
 
 [node name="Track1" type="AudioStreamPlayer" parent="." unique_id=1408430976]
