@@ -61,7 +61,7 @@ func _run() -> void:
 	camera.make_current()
 	preview.build_preview()
 	preview.terrain_renderer.set_trodden_floor(true, FLOOR_WORLD_Y)
-	_add_letterbox(viewport)
+	var letterbox := _add_letterbox(viewport)
 
 	for _settle_frame in range(SETTLE_FRAMES):
 		await process_frame
@@ -116,6 +116,25 @@ func _run() -> void:
 		"05_closing_handoff.png"
 	) else 0
 
+	_resize_capture(viewport, letterbox, Vector2i(960, 720))
+	for _resize_frame in range(10):
+		await process_frame
+	captured += 1 if await _capture(
+		viewport,
+		camera,
+		Vector2(MINER_STAGE_X, 0.0),
+		"11_4x3_settled.png"
+	) else 0
+	_resize_capture(viewport, letterbox, Vector2i(1680, 720))
+	for _resize_frame in range(10):
+		await process_frame
+	captured += 1 if await _capture(
+		viewport,
+		camera,
+		Vector2(MINER_STAGE_X, 0.0),
+		"12_21x9_settled.png"
+	) else 0
+
 	var preview_error: String = preview.get_preview_error()
 	if not preview_error.is_empty():
 		push_error("Preview reported: %s" % preview_error)
@@ -123,7 +142,7 @@ func _run() -> void:
 		"MOODY_TEEN_CAPTURE: %d frames in %s"
 		% [captured, ProjectSettings.globalize_path(OUTPUT_DIRECTORY)]
 	)
-	quit(0 if captured == 5 and preview_error.is_empty() else 1)
+	quit(0 if captured == 7 and preview_error.is_empty() else 1)
 
 
 func _make_capture_schedule() -> DepthEncounterConfig:
@@ -156,17 +175,30 @@ func _capture(
 	return true
 
 
-func _add_letterbox(viewport: SubViewport) -> void:
+func _add_letterbox(viewport: SubViewport) -> CanvasLayer:
 	var overlay := CanvasLayer.new()
 	overlay.layer = 100
 	viewport.add_child(overlay)
-	var bar_height := float(VIEWPORT_SIZE.y) * 0.14
 	for is_top in [true, false]:
 		var bar := ColorRect.new()
 		bar.color = Color.BLACK
-		bar.size = Vector2(float(VIEWPORT_SIZE.x), bar_height)
+		overlay.add_child(bar)
+	_resize_capture(viewport, overlay, viewport.size)
+	return overlay
+
+
+func _resize_capture(
+	viewport: SubViewport,
+	letterbox: CanvasLayer,
+	size: Vector2i
+) -> void:
+	viewport.size = size
+	var bar_height := float(size.y) * 0.14
+	var bars := letterbox.get_children()
+	for index in range(bars.size()):
+		var bar := bars[index] as ColorRect
+		bar.size = Vector2(float(size.x), bar_height)
 		bar.position = Vector2(
 			0.0,
-			0.0 if is_top else float(VIEWPORT_SIZE.y) - bar_height
+			0.0 if index == 0 else float(size.y) - bar_height
 		)
-		overlay.add_child(bar)
