@@ -1,6 +1,11 @@
 extends Node
 
-
+## How it works:
+## - Conductor owns the authoritative song and beat position.
+## - Transition fills use separate players but share Conductor's beat phase.
+## - Intensity changes choose the next track; fills anticipate its final beats.
+## - WebAudioFocusGuard pauses these players with every other active sound.
+## - The invariant is that fills and track transitions use Conductor's beat.
 
 @export var tracks : Array[Intensity] = []
 @export var fills : Array[AudioStream] = []
@@ -20,7 +25,7 @@ var music_intensity : int = 0 :
 var current_intensity : int = 0
 var fill_playing : bool = false
 
-func _ready():
+func _ready() -> void:
 	Conductor.set_song(tracks[0].first(), bpm, beats_per_measure)
 	Conductor.play()
 	Conductor.finished.connect(_transition_to)
@@ -36,7 +41,6 @@ func get_beats_remaining() -> int:
 	return floor(get_total_beats() - Conductor.current_beat)
 
 func _transition_to():
-	Conductor.last_reported_beat = -1
 	Conductor.set_song(tracks[music_intensity].pick_random(), bpm, beats_per_measure)
 	Conductor.play()
 	current_intensity = music_intensity
@@ -104,7 +108,6 @@ func set_intensity_after_measure(intensity : int):
 		await Conductor.beat
 	#force_play_fill(fail_riffs.pick_random() if fail_riffs.size() > 0 else null)
 	
-	Conductor.last_reported_beat = -1
 	Conductor.set_song(tracks[music_intensity].pick_random(), bpm, beats_per_measure)
 	Conductor.play()
 	current_intensity = music_intensity

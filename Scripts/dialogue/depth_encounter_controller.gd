@@ -988,6 +988,7 @@ func _complete_encounter_after_dialogue(
 		)
 	if encounter.grants_coffee_speed_boost:
 		coffee_speed_boost_requested.emit()
+	_lock_speaker_pose_if_requested(encounter)
 	encounter_completed.emit(_active_encounter_index)
 	_reset_speech_reactions()
 	_active_conversation = null
@@ -1342,6 +1343,38 @@ func _reset_speech_reactions() -> void:
 	for presenter in _presenters_by_actor_id.values():
 		presenter.reset_speech_motion()
 	miner_rig.reset_speech_motion()
+
+
+## Applies an encounter's permanent pose change to its speaker.
+##
+## Run as the shot's rewards are granted, because it is one of them: the
+## Treasure Hunter handing his pickaxe over is the same event as the player
+## receiving it. Locking here rather than from a closing beat is what makes it
+## survive into every later encounter, including the cafe gathering, where
+## re-staging him would otherwise re-arm his idle art and give the pickaxe back.
+func _lock_speaker_pose_if_requested(
+	encounter: DepthCharacterEncounter
+) -> void:
+	if encounter.locks_speaker_pose_after.is_empty():
+		return
+	var presenter: CharacterPresenter = _presenters_by_actor_id.get(
+		encounter.actor_id
+	)
+	if presenter == null:
+		push_error(
+			"Encounter '%s' has no presenter for actor '%s' to lock."
+			% [encounter.encounter_id, encounter.actor_id]
+		)
+		return
+	if not presenter.lock_pose(encounter.locks_speaker_pose_after):
+		push_error(
+			"Actor '%s' has no pose '%s' to lock after encounter '%s'."
+			% [
+				encounter.actor_id,
+				encounter.locks_speaker_pose_after,
+				encounter.encounter_id,
+			]
+		)
 
 
 ## Returns any cast member by their stable actor id, for a timeline that names

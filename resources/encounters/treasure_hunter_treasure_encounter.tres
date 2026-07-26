@@ -22,4 +22,5 @@ plays_authored_timeline = true
 prestage_before_landing = true
 speaker_slot = &"treasure_hunter"
 pickaxe_reward = ExtResource("4_pickaxe")
+locks_speaker_pose_after = &"no_pickaxe"
 terrain_sculpt = ExtResource("7_uctft")

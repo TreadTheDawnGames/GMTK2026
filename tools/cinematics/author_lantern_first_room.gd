@@ -35,8 +35,25 @@ const LEDGE_TIP_X: int = 132
 const LEDGE_ROOT_X: int = 145
 const LEDGE_TOP_ROW: int = 102
 const LEDGE_WALL_X: int = 160
-const KEEPER_ENTRANCE_X: int = 133
-const KEEPER_CONVERSATION_X: int = 140
+## The Keeper's marks stand on the ledge ROOT, not on its tip.
+##
+## The runtime seats a cast member by scanning up from the miner's landing row
+## for the first opening and then back down for the first rock. On the thin tip
+## the row under the overhang is open, so that scan falls straight past the
+## ledge and finds the shaft floor ninety rows below. Only the root, where the
+## rock is continuous from the ledge top down to the room floor, actually holds
+## him. Columns 145 through 158 are that root.
+##
+## A stage marker's x reaches these columns as 214 + x/8, not 192 + x/8: the
+## stage is anchored at terrain centre plus the config's 22-cell
+## encounter_horizontal_offset_cells. Reading a marker against the room without
+## that offset shifts every mark 22 cells and walks the cast off this ledge.
+const KEEPER_ENTRANCE_X: int = 145
+const KEEPER_CONVERSATION_X: int = 153
+## A column out on the tip, used only to prove the overhang is still an
+## overhang. It cannot be a Keeper column any more: those stand on the root,
+## where rock reaching the floor row is exactly what holds them up.
+const LEDGE_VOID_AUDIT_X: int = 140
 ## How far past the snaking band the throat walls are allowed to wander. The
 ## band itself is what has to be open; the chips only stop the break-in reading
 ## as a bored rectangle, so they are kept small enough never to reach the
@@ -400,11 +417,15 @@ func _verify_room(
 			"Landing cavern headroom fell to %d rows." % minimum_headroom
 		)
 
+	# Checked the way the runtime checks it. Scanning down from the top of the
+	# grid finds the ledge from either column, which is why the tip read as
+	# solid footing for so long; the renderer scans up from the miner's landing
+	# row instead, and on the tip that scan drops through to the shaft.
 	for keeper_x in [KEEPER_ENTRANCE_X, KEEPER_CONVERSATION_X]:
-		var support_row := _get_first_support_below_opening(sculpt, keeper_x)
+		var support_row := _get_runtime_support_row(sculpt, keeper_x)
 		if support_row != LEDGE_TOP_ROW:
 			_failures.append(
-				"Keeper column %d supports at row %d instead of %d."
+				"Keeper column %d seats at row %d instead of %d."
 				% [keeper_x, support_row, LEDGE_TOP_ROW]
 			)
 
@@ -441,7 +462,7 @@ func _verify_room(
 		)
 	if not sculpt.is_solid_local(Vector2i(LEDGE_ROOT_X, LEDGE_TOP_ROW + 6)):
 		_failures.append("The Keeper ledge is detached from its cavern wall.")
-	if sculpt.is_solid_local(Vector2i(KEEPER_CONVERSATION_X, 110)):
+	if sculpt.is_solid_local(Vector2i(LEDGE_VOID_AUDIT_X, 110)):
 		_failures.append("Rock filled the void beneath the ledge overhang.")
 
 	print(
@@ -458,6 +479,30 @@ func _verify_room(
 			SHAFT_BOTTOM_ROW - floor_row,
 		]
 	)
+
+
+## Returns the row the runtime would actually seat a cast member on at one
+## column, mirroring TerrainLayerRenderer's opening-floor support scan: up from
+## the room floor to the first opening, then back down to the first rock.
+##
+## This is not the same answer as scanning from the top of the grid. Over a thin
+## overhang the two disagree by the whole depth of whatever is underneath it.
+func _get_runtime_support_row(
+	sculpt: CutsceneTerrainSculpt,
+	local_x: int
+) -> int:
+	var floor_row := sculpt.get_floor_local_row()
+	var opening_row := -1
+	for local_y in range(floor_row, -1, -1):
+		if not sculpt.is_solid_local(Vector2i(local_x, local_y)):
+			opening_row = local_y
+			break
+	if opening_row < 0:
+		return -1
+	for local_y in range(opening_row, sculpt.grid_size.y):
+		if sculpt.is_solid_local(Vector2i(local_x, local_y)):
+			return local_y
+	return -1
 
 
 func _get_first_support_below_opening(

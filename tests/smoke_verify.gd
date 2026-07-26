@@ -682,6 +682,20 @@ func _verify_mining_scene() -> void:
 			&"moody_teen": dialogue_director.ayden_textbox_texture,
 			&"newspaper_reader": dialogue_director.mr_sitts_textbox_texture,
 		}
+		var expected_voices: Dictionary[StringName, AudioStream] = {
+			&"treasure_hunter": dialogue_director.zeb_voice,
+			&"rutini": dialogue_director.rotini_voice,
+			&"coffee_cat": dialogue_director.quibble_voice,
+			&"cheese_girl": dialogue_director.coco_voice,
+			&"newspaper_reader": dialogue_director.mr_sitts_voice,
+		}
+		var expected_voice_pitches: Dictionary[StringName, float] = {
+			&"treasure_hunter": 0.94,
+			&"rutini": 1.12,
+			&"coffee_cat": 1.32,
+			&"cheese_girl": 1.18,
+			&"newspaper_reader": 0.84,
+		}
 		for speaker_slot: StringName in expected_textures:
 			var participant := DialogueParticipant.new()
 			participant.slot = speaker_slot
@@ -691,6 +705,11 @@ func _verify_mining_scene() -> void:
 		opening_participant.slot = &"opening_voice"
 		opening_participant.display_name = "..."
 		art_conversation.participants.append(opening_participant)
+		for lantern_slot: StringName in [&"cloak_lantern", &"thief"]:
+			var lantern_participant := DialogueParticipant.new()
+			lantern_participant.slot = lantern_slot
+			lantern_participant.display_name = "..."
+			art_conversation.participants.append(lantern_participant)
 		var art_line := DialogueLine.new()
 		art_line.speaker_slot = &"miner"
 		art_line.text = "Textbox art smoke check."
@@ -749,8 +768,24 @@ func _verify_mining_scene() -> void:
 				and (
 					dialogue_director.textbox_art.texture
 					== expected_textures[speaker_slot]
+				)
+				and (
+					(
+						dialogue_director.voice_player.playing
+						and dialogue_director.voice_player.stream
+							== expected_voices[speaker_slot]
+						and is_equal_approx(
+							dialogue_director.voice_player.pitch_scale,
+							expected_voice_pitches[speaker_slot]
+						)
+					)
+					if expected_voices.has(speaker_slot)
+					else not dialogue_director.voice_player.playing
 				),
-				"Dialogue slot '%s' must use its authored textbox art."
+				(
+					"Dialogue slot '%s' must use its authored textbox art "
+					+ "and character voice."
+				)
 				% speaker_slot
 			)
 			if art_started:
@@ -764,6 +799,13 @@ func _verify_mining_scene() -> void:
 			and not dialogue_director.textbox_art.visible
 			and dialogue_director.fallback_panel.visible
 			and dialogue_director.speaker_label.visible
+			and dialogue_director.voice_player.playing
+			and dialogue_director.voice_player.stream
+				== dialogue_director.mr_sitts_voice
+			and is_equal_approx(
+				dialogue_director.voice_player.pitch_scale,
+				0.84
+			)
 			and is_equal_approx(
 				dialogue_director.body_label.custom_minimum_size.y,
 				dialogue_director.fallback_body_minimum_height
@@ -783,6 +825,25 @@ func _verify_mining_scene() -> void:
 		)
 		if fallback_started:
 			dialogue_director.finish_conversation()
+		for lantern_slot: StringName in [&"cloak_lantern", &"thief"]:
+			art_line.speaker_slot = lantern_slot
+			var lantern_started := dialogue_director.start_conversation(
+				art_conversation
+			)
+			_expect(
+				lantern_started
+					and dialogue_director.voice_player.playing
+					and dialogue_director.voice_player.stream
+						== dialogue_director.lantern_keeper_voice
+					and is_equal_approx(
+						dialogue_director.voice_player.pitch_scale,
+						0.72
+					),
+				"Lantern speaker slot '%s' lost its low character voice."
+					% lantern_slot
+			)
+			if lantern_started:
+				dialogue_director.finish_conversation()
 		dialogue_director.pause_gameplay = previous_pause_gameplay
 		dialogue_director.auto_frame_conversations = previous_auto_frame
 		_verify_dialogue_line_ranges(dialogue_director)

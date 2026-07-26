@@ -97,10 +97,14 @@ func _verify_sculpt(sculpt: CutsceneTerrainSculpt) -> void:
 			"Cavern headroom at column %d must be at least 28 rows."
 			% local_x
 		)
-	for keeper_x in [133, 140]:
+	# Sampled the way the runtime samples: up from the room floor to the first
+	# opening, then back down to rock. Scanning from the top of the grid finds
+	# the ledge from the tip too, which is exactly how the tip passed for a
+	# standable mark while dropping him into the shaft at runtime.
+	for keeper_x in [145, 153]:
 		_expect(
-			_get_first_support(sculpt, keeper_x) == LEDGE_TOP_ROW,
-			"Keeper ledge support at column %d moved off row 102."
+			_get_runtime_support(sculpt, keeper_x) == LEDGE_TOP_ROW,
+			"Keeper column %d does not seat on the ledge root at row 102."
 			% keeper_x
 		)
 	_expect(
@@ -131,18 +135,33 @@ func _verify_stage(stage: CharacterEncounterStage) -> void:
 		"Encounter 2 stage exports and named nodes must validate."
 	)
 	_expect(
-		stage.entrance_marker.position == Vector2(-472, -64)
-			and stage.conversation_marker.position == Vector2(-416, -64),
+		stage.entrance_marker.position == Vector2(-552, -64)
+			and stage.conversation_marker.position == Vector2(-488, -64),
 		"The Keeper must approach 56px toward the miner on his ledge."
 	)
-	# Both marks must sit on the ledge the authoring tool actually supports,
-	# columns 132 to 145. Off its tip he stands over open shaft at the very
-	# edge of frame, which is where he was before.
-	_expect(
-		stage.entrance_marker.position.x >= -480.0
-			and stage.conversation_marker.position.x >= -480.0,
-		"The Keeper's marks must stay on the authored ledge, not past its tip."
-	)
+	# Both marks must sit on the ledge ROOT, columns 145 to 158, which is the
+	# only span the runtime can seat him on. Over the drawn tip the sampler
+	# falls through to the shaft floor ninety rows below.
+	#
+	# Checked as columns, not as raw x. A marker's column is 214 + x/8: the
+	# stage anchors at terrain centre plus the config's 22-cell
+	# encounter_horizontal_offset_cells, and reading x without it moves every
+	# mark 22 cells off this ledge.
+	var room := load(
+		"res://resources/cinematics/sculpts/cloak_lantern_first_room.tres"
+	) as CutsceneTerrainSculpt
+	for mark: Marker2D in [stage.entrance_marker, stage.conversation_marker]:
+		var mark_column := _get_marker_column(mark)
+		_expect(
+			mark_column >= 145 and mark_column <= 158,
+			"Keeper mark '%s' is on column %d, off the ledge root."
+			% [mark.name, mark_column]
+		)
+		_expect(
+			_get_runtime_support(room, mark_column) == LEDGE_TOP_ROW,
+			"Keeper mark '%s' does not seat on the ledge at row 102."
+			% mark.name
+		)
 	_expect(
 		is_equal_approx(stage.opening_move_seconds, 1.8),
 		"The Keeper's canonical slow approach must last 1.8 seconds."
@@ -162,8 +181,17 @@ func _verify_stage(stage: CharacterEncounterStage) -> void:
 	_expect(bench != null, "The Keeper's approved bench must remain composed.")
 	if bench != null:
 		_expect(
-			bench.position == Vector2(-298, -64),
+			bench.position == Vector2(-600, -64),
 			"The bench must keep its measured clearance and layer-one footing."
+		)
+		# The drawn ledge top runs columns 132 to 158. A prop is never floor
+		# sampled, so the bench only needs that surface under its own feet -
+		# but off the end of it there is nothing to draw it standing on.
+		var bench_column := _get_marker_column(bench)
+		_expect(
+			bench_column >= 138 and bench_column <= 152,
+			"The bench is on column %d; its feet leave the drawn ledge top."
+			% bench_column
 		)
 		_expect(
 			is_equal_approx(bench.modulate.a, 1.0),
@@ -235,6 +263,40 @@ func _get_capping_row(
 	local_x: int
 ) -> int:
 	for local_y in range(FLOOR_ROW):
+		if sculpt.is_solid_local(Vector2i(local_x, local_y)):
+			return local_y
+	return -1
+
+
+## Mirrors TerrainLayerRenderer's opening-floor support scan, which is what
+## actually decides where a cast member's feet land.
+## Converts a stage marker's authored x into the room column it lands on.
+func _get_marker_column(node: Node2D) -> int:
+	var config := load(
+		"res://resources/encounters/depth_encounter_config.tres"
+	) as DepthEncounterConfig
+	var mining_config := load(
+		"res://resources/mining/mining_config.tres"
+	) as MiningConfig
+	return (
+		roundi(float(mining_config.terrain_width_cells) * 0.5)
+		+ config.encounter_horizontal_offset_cells
+		+ roundi(node.position.x / float(mining_config.terrain_cell_world_size))
+	)
+
+
+func _get_runtime_support(
+	sculpt: CutsceneTerrainSculpt,
+	local_x: int
+) -> int:
+	var opening_row := -1
+	for local_y in range(FLOOR_ROW, -1, -1):
+		if not sculpt.is_solid_local(Vector2i(local_x, local_y)):
+			opening_row = local_y
+			break
+	if opening_row < 0:
+		return -1
+	for local_y in range(opening_row, sculpt.grid_size.y):
 		if sculpt.is_solid_local(Vector2i(local_x, local_y)):
 			return local_y
 	return -1
