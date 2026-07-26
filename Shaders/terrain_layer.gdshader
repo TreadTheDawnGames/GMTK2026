@@ -1274,6 +1274,9 @@ void fragment() {
 		);
 	}
 	if (use_trodden_floor) {
+		float depth_below_floor = (
+			world_position.y - trodden_floor_world_y
+		);
 		surface_color = apply_ground_plane(
 			surface_color,
 			world_position.y,
@@ -1285,16 +1288,13 @@ void fragment() {
 			trodden_face_shade_depth_world_px,
 			trodden_face_shade_strength,
 			1.0,
-			vec3(0.0),
+			trodden_color.rgb,
 			0.0,
 			trodden_contact_depth_world_px,
 			trodden_contact_strength,
-			0.0,
+			1.0,
 			vec3(0.0),
 			0.0
-		);
-		float depth_below_floor = (
-			world_position.y - trodden_floor_world_y
 		);
 		float trodden_end_depth = max(
 			trodden_depth_world_px

@@ -311,13 +311,13 @@ const MAX_IMPACT_RASTER_BAND_HEIGHT: int = 128
 ## running, not to the scene.
 var _trodden_floor_is_enabled: bool = false
 var _trodden_floor_world_y: float = 0.0
+var _cutscene_floor_plane_is_enabled: bool = false
+var _cutscene_floor_plane_world_y: float = 0.0
 ## Prevents filtered foreground alpha from exposing the rear stratum before the
 ## player enters and completes the cutscene. The first real mining contact drops
 ## this seal before damage is written, so the retained treatment bends and
 ## cracks with the authoritative terrain mask rather than covering it.
 var _trodden_floor_seals_mask: bool = false
-var _cutscene_floor_plane_is_enabled: bool = false
-var _cutscene_floor_plane_world_y: float = 0.0
 
 var _active_chunks: Dictionary[int, TerrainChunkVisual] = {}
 # Nodes, sprites, and materials of chunks the view has left, waiting to be
@@ -1913,16 +1913,16 @@ func _publish_cutscene_floor_to_chunk(chunk: TerrainChunkVisual) -> void:
 			_trodden_floor_world_y
 		)
 		material.set_shader_parameter(
-			&"trodden_floor_seals_mask",
-			_trodden_floor_seals_mask
-		)
-		material.set_shader_parameter(
 			&"use_cutscene_floor_plane",
 			_cutscene_floor_plane_is_enabled and layer_index == 0
 		)
 		material.set_shader_parameter(
 			&"cutscene_floor_world_y",
 			_cutscene_floor_plane_world_y
+		)
+		material.set_shader_parameter(
+			&"trodden_floor_seals_mask",
+			_trodden_floor_seals_mask
 		)
 
 
@@ -6106,16 +6106,16 @@ func _create_layer_material(
 		_trodden_floor_world_y
 	)
 	material.set_shader_parameter(
-		&"trodden_floor_seals_mask",
-		_trodden_floor_seals_mask
-	)
-	material.set_shader_parameter(
 		&"use_cutscene_floor_plane",
 		_cutscene_floor_plane_is_enabled and layer_index == 0
 	)
 	material.set_shader_parameter(
 		&"cutscene_floor_world_y",
 		_cutscene_floor_plane_world_y
+	)
+	material.set_shader_parameter(
+		&"trodden_floor_seals_mask",
+		_trodden_floor_seals_mask
 	)
 	material.set_shader_parameter(
 		&"trodden_depth_world_px",
