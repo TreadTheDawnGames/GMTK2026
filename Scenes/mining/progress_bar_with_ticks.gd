@@ -31,23 +31,24 @@ func remove_tick(tick : int):
 func draw_ticks():
 	for child in get_children():
 		child.queue_free()
+	active_ticks.clear()
 	for tick in ticks:
 		var sprite : TextureRect = TextureRect.new()
 		sprite.pivot_offset_ratio = Vector2(0.5,0.5)
 		sprite.texture = tick_sprite
 		sprite.position.x = size.x * float(float(tick)/max_value) - (tick_sprite.get_width()*0.5)
 		add_child(sprite)
-		active_ticks.get_or_add(tick, sprite)
+		active_ticks[tick] = sprite
 		pass
 
 func _on_value_changed(new_value : float):
 	var val : int = int(new_value)
 	if ticks.has(val):
-		if active_ticks.keys().has(new_value):
+		if active_ticks.has(val) and is_instance_valid(active_ticks[val]):
 			var t : Tween = create_tween()
 			t.tween_property(active_ticks[val], "scale", Vector2(1.5,1.5), 0.1)
 			t.tween_property(active_ticks[val], "scale", Vector2.ONE, 0.1)
-		reached_tick.emit(new_value)
+		reached_tick.emit(val)
 		pass
 
 func set_maximum(new_max : int):
