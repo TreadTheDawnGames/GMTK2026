@@ -4,7 +4,8 @@ extends Resource
 
 ## How it works:
 ## - depth_from_surface places this encounter's mineable tunnel floor.
-## - Terrain generation opens the chamber above that floor.
+## - An optional chamber-height override enlarges this encounter's arrival fall.
+## - Terrain generation opens the resolved chamber above that floor.
 ## - Crossing the tunnel ceiling starts the authored conversation and stage.
 ## - stage_scene optionally adds actor movement, props, and line-driven cues.
 ## - occurs_at_run_bottom pins the final encounter to any configured run length.
@@ -16,6 +17,9 @@ extends Resource
 ## Stable story identity; repeated visits reuse the same presenter.
 @export var actor_id: StringName
 @export_range(1, 1_000_000, 1) var depth_from_surface: int = 1_000
+## Zero uses the schedule's shared chamber height. A positive value enlarges
+## only this arrival, so one tall discovery does not move every cutscene ceiling.
+@export_range(0, 2_000, 1) var chamber_height_rows_override: int = 0
 ## Gathers the stable cast roster when this depth-authored chamber is entered.
 @export var gathers_cast: bool = false
 ## Resolves this encounter to zero remaining depth for any run length.
@@ -79,3 +83,10 @@ func resolve_depth(total_run_depth: int) -> int:
 	if occurs_at_run_bottom:
 		return total_run_depth
 	return depth_from_surface
+
+
+## Returns this arrival's authored height or the schedule default.
+func resolve_chamber_height_rows(default_height_rows: int) -> int:
+	if chamber_height_rows_override > 0:
+		return chamber_height_rows_override
+	return maxi(default_height_rows, 1)

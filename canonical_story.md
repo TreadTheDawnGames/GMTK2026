@@ -51,21 +51,21 @@ these beats without Jared or Zephan approving the narrative change.
 
 ## Approved Dialogue and Action
 
-Spelling, capitalization, punctuation, repeated words, and the unattributed
-opening voice below are intentional source text.
+Spelling, capitalization, punctuation, repeated words, and Mr. Sitts as the
+opening speaker below are intentional source text.
 
 ### Opening — Surface, 0 depth
 
 *A bus arrives at a roadside stop. The Miner disembarks. The bus departs,
 leaving the Miner at the excavation site.*
 
-**You’re back?**
+**MR. SITTS: You’re back?**
 
-**You already know the Thief lies below.**
+**MR. SITTS: You already know the Thief lies below.**
 
-**Only fools find him.**
+**MR. SITTS: Only fools find him.**
 
-**Only fools.**
+**MR. SITTS: Only fools.**
 
 ### Encounter 1 — Cheese Girl, 300 depth
 
