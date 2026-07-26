@@ -2357,6 +2357,9 @@ func _acquire_chunk_visual(
 		0.0,
 		float(chunk_index) * _get_chunk_world_size().y
 	)
+	var authored_contour_aa_scale := (
+		_get_chunk_sculpt_contour_aa_scale(chunk_index)
+	)
 	for layer_index in range(layer_count):
 		var sprite := chunk.layer_sprites[layer_index]
 		# The rock the shader draws is placed in world space, so moving a reused
@@ -2364,6 +2367,10 @@ func _acquire_chunk_visual(
 		(sprite.material as ShaderMaterial).set_shader_parameter(
 			&"world_origin",
 			world_origin
+		)
+		(sprite.material as ShaderMaterial).set_shader_parameter(
+			&"authored_contour_aa_scale",
+			authored_contour_aa_scale
 		)
 		# Editor stratum isolation. Nothing at runtime sets an override, so this
 		# reads 1.0 during play and the sprite is untouched. Applying it on every
@@ -3373,6 +3380,24 @@ func _chunk_contains_sculpt(chunk_index: int) -> bool:
 	return false
 
 
+## Returns an opted-in room's wider AA band for this streamed chunk.
+func _get_chunk_sculpt_contour_aa_scale(chunk_index: int) -> float:
+	var config: MiningConfig = terrain_manager.config
+	var chunk_start_row := chunk_index * config.chunk_height_cells
+	var chunk_end_row := chunk_start_row + config.chunk_height_cells
+	var contour_rounding_cells := 0.0
+	for placement in terrain_manager.get_sculpt_placements():
+		if (
+			placement.world_rect.position.y < chunk_end_row
+			and placement.world_rect.end.y > chunk_start_row
+		):
+			contour_rounding_cells = maxf(
+				contour_rounding_cells,
+				placement.sculpt.contour_rounding_cells
+			)
+	return 1.0 + contour_rounding_cells * 1.25
+
+
 ## Reports whether a chunk holds a room whose strata were sculpted apart, which
 ## is the only case that costs one mask build per stratum instead of one shared.
 func _chunk_has_per_layer_sculpt(chunk_index: int) -> bool:
@@ -3774,6 +3799,10 @@ func _advance_sculpt_run_preparation(
 		_sculpt_logical_mask_images[
 			preparation.sculpt
 		] = logical_layers
+		_round_sculpt_cell_contours(
+			preparation.cell_image,
+			preparation.sculpt
+		)
 		preparation.cell_bytes = PackedByteArray()
 		preparation.phase = 1
 		return false
@@ -3962,6 +3991,7 @@ func _rasterize_sculpt_mask(
 		Image.FORMAT_LA8,
 		cell_bytes
 	)
+	_round_sculpt_cell_contours(cell_image, sculpt)
 	cell_image.resize(
 		padded_size.x * mask_cell_size,
 		padded_size.y * mask_cell_size,
@@ -3980,6 +4010,41 @@ func _rasterize_sculpt_mask(
 	if sculpt.edge_smoothing > 0.0 and sculpt.edge_smoothing < 1.0:
 		_harden_sculpt_mask_rims(room_mask, sculpt, sculpt_layer_index)
 	return room_mask
+
+
+## Rounds only an opted-in authored room before its bounded mask expansion.
+##
+## Filtering the one-sample-per-cell image keeps this native resize small; the
+## existing strip preparation still performs the large expansion incrementally.
+## Collision and the F3 logical overlay retain the untouched binary cell mask.
+func _round_sculpt_cell_contours(
+	cell_image: Image,
+	sculpt: CutsceneTerrainSculpt
+) -> void:
+	if (
+		cell_image == null
+		or sculpt == null
+		or sculpt.contour_rounding_cells <= 0.0
+	):
+		return
+	var original_size := cell_image.get_size()
+	var filter_scale := 1.0 + sculpt.contour_rounding_cells * 2.5
+	var filtered_size := Vector2i(
+		maxi(roundi(float(original_size.x) / filter_scale), 1),
+		maxi(roundi(float(original_size.y) / filter_scale), 1)
+	)
+	cell_image.generate_mipmaps()
+	cell_image.resize(
+		filtered_size.x,
+		filtered_size.y,
+		Image.INTERPOLATE_TRILINEAR
+	)
+	cell_image.clear_mipmaps()
+	cell_image.resize(
+		original_size.x,
+		original_size.y,
+		Image.INTERPOLATE_CUBIC
+	)
 
 
 ## Chooses the highest bounded sculpt density that divides the shipped mask.
@@ -6351,6 +6416,7 @@ func _create_layer_material(
 		&"sharpen_mask_edges",
 		profile.sharpen_mask_edges
 	)
+	material.set_shader_parameter(&"authored_contour_aa_scale", 1.0)
 	material.set_shader_parameter(
 		&"use_layer_edge_shading",
 		profile.layer_edge_shading_enabled
