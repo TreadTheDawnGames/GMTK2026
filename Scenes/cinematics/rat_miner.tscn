@@ -270,7 +270,7 @@ actor_sprite_view = NodePath("ActorSpriteView")
 speech_reaction = NodePath("SpeechReaction")
 ground_shadow = NodePath("GroundShadow")
 default_appearance = ExtResource("4_default")
-appearance_scale = 0.22
+appearance_scale = 0.11
 
 [node name="SpeechRoot" type="Node2D" parent="."]
 editor_description = "Presentation-only speech bounce. Motion here composes with the actor animation below."
@@ -286,7 +286,7 @@ editor_description = "Editor preview for the default brown appearance. Runtime a
 texture_filter = 4
 material = SubResource("ShaderMaterial_depth_light")
 position = Vector2(8.4, -19.5)
-scale = Vector2(0.22, 0.22)
+scale = Vector2(0.11, 0.11)
 texture = ExtResource("3_idle")
 flip_h = true
 
