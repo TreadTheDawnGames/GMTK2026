@@ -342,6 +342,10 @@ func _ready() -> void:
 		timing_bar_feedback._on_timing_pressed
 	)
 	_connect_once(
+		timing_window.streak_ended,
+		timing_bar_feedback._on_streak_ended
+	)
+	_connect_once(
 		mining_controller.dig_number_requested,
 		dig_number_presenter.show_dig_number_at_impact
 	)

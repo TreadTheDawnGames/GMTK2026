@@ -156,9 +156,6 @@ func _on_timing_pressed(
 		_is_combo_loss_animating = false
 		_combo_loss_elapsed_seconds = 0.0
 		combo_bar.value = float(_current_combo())
-	elif combo_bar.value > 0.0:
-		_is_combo_loss_animating = true
-		_combo_loss_elapsed_seconds = 0.0
 
 	var bar := _get_active_bar()
 	if bar == null or not bar.is_visible_in_tree():
@@ -188,6 +185,14 @@ func _on_timing_pressed(
 	)
 	_marks.append(mark)
 	queue_redraw()
+
+
+## Starts the stepped presentation reset only after recovery is exhausted.
+func _on_streak_ended(_previous_combo: int) -> void:
+	if combo_bar.value <= 0.0:
+		return
+	_is_combo_loss_animating = true
+	_combo_loss_elapsed_seconds = 0.0
 
 
 ## Ages the marks, and redraws whenever anything visible actually changed.
