@@ -1386,6 +1386,12 @@ func _verify_mining_scene() -> void:
 		not terrain_manager.is_solid_cell(impact_cell),
 		"Removed terrain must become logically open."
 	)
+	# Everything this dig queued shares one presentation group, so the checks
+	# below can wait for exactly this hit instead of the first crush any older
+	# queued work happens to start.
+	var dig_presentation_group := (
+		terrain_renderer._next_impact_presentation_group - 1
+	)
 	var impact_chunk_index := terrain_renderer._world_row_to_chunk(
 		impact_cell.y
 	)
@@ -1423,6 +1429,50 @@ func _verify_mining_scene() -> void:
 		impact_crush_is_active
 		and terrain_renderer._active_impact_crush_count > 0,
 		"A visible prepared patch must start one bounded crush transition."
+	)
+	# One resolved hit is one thing the player sees happen. Every stratum the hit
+	# cut must be covered by its own overlay on the frame its group presents; a
+	# stratum still waiting is one the player watches arrive on its own frame,
+	# which is the stratum-by-stratum reveal the presentation group replaced.
+	for _group_frame in range(32):
+		if not terrain_renderer._unrastered_impact_group_counts.has(
+			dig_presentation_group
+		):
+			break
+		terrain_renderer._process(1.0 / 60.0)
+	terrain_renderer._apply_ready_impact_presentations()
+	var cut_strata_count := 0
+	var presented_strata_count := 0
+	if impact_chunk != null:
+		var presented_stamp := terrain_renderer._latest_impact_stamp
+		for layer_index in range(
+			terrain_renderer.profile.get_gameplay_layer_count()
+		):
+			if not terrain_renderer._can_apply_impact_stamp_layer(
+				presented_stamp,
+				layer_index
+			):
+				continue
+			if not terrain_renderer._get_stamp_layer_chunk_mask_rect(
+				presented_stamp,
+				layer_index,
+				impact_chunk_index
+			).has_area():
+				continue
+			cut_strata_count += 1
+			var layer_material := (
+				impact_chunk.layer_sprites[layer_index].material
+				as ShaderMaterial
+			)
+			if (
+				layer_material.get_shader_parameter(&"use_impact_patch")
+				== true
+			):
+				presented_strata_count += 1
+	_expect(
+		cut_strata_count > 0
+		and presented_strata_count == cut_strata_count,
+		"Every stratum of one impact must become visible on the same frame."
 	)
 	# Fold every prepared patch into its base tile first. Active overlays must
 	# survive this upload work until their own reveal deadline, otherwise the
