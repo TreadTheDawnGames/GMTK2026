@@ -8,6 +8,10 @@ extends Node2D
 ## One lobe is one drawn dust puff: mining_smoke.gdshader gives each quad a
 ## hard inked silhouette and flat tone bands, so a cloud reads as overlapping
 ## drawn puffs in the terrain palette rather than as stacked soft blobs.
+## That shader measures its noise in world pixels taken from each instance
+## transform, so the half-extents written here are a contract, not just a size:
+## a quad scaled by anything other than the puff's real half-extents will draw
+## wisps of the wrong scale.
 ## Every lobe carries its own countdown and thins out faster once it stops
 ## moving, so dust always leaves the shaft instead of parking under an overhang.
 ## The invariant is that the lobe count never exceeds the active platform cap.
@@ -25,10 +29,20 @@ class SmokeLobe:
 	var current_radius: float
 	var target_radius: float
 	var display_radius: float
+	## What the open-space scan last answered, and the eased widths actually
+	## drawn. The scan answers in whole cells and only re-runs once a puff has
+	## drifted far enough, so its raw answer steps; drawing the step made the
+	## whole volume jump sideways mid-rise.
+	var target_left_radius: float
+	var target_right_radius: float
 	var display_left_radius: float
 	var display_right_radius: float
+	## How hard the rock is squeezing this puff, from 0 when it has all the room
+	## it wants to 1 when the walls have taken nearly all of it. The shader
+	## flattens a squeezed puff against the wall it is touching, which is what
+	## makes dust fill an opening rather than float inside it as a ball.
+	var wall_confinement: float
 	var shape_seed: float
-	var shape_phase: float
 	## Own countdown: a fresh strike never revives dust already hanging around.
 	var total_lifetime: float
 	var remaining_lifetime: float
@@ -75,6 +89,18 @@ class SmokeCloud:
 ## the remaining life drops inside this share, so a cloud thins out once rather
 ## than dimming from the instant it is born.
 @export_range(0.05, 1.0, 0.05) var fade_portion: float = 0.45
+## Share of a puff's own lifetime that a strike landing at the lobe cap gives
+## back to it. Bounded so a topped-up puff's fade stays continuous.
+@export_range(0.0, 1.0, 0.05) var lobe_refresh_share: float = 0.25
+## How much of a puff's growth is spent billowing upward rather than swelling
+## evenly around its centre. Dust boiling off a strike climbs away from the rock
+## it came from; a puff that swells evenly instead pushes its lower edge down
+## the screen faster than its centre rises, so fresh dust read as sinking.
+## At 1.0 a growing puff's lower edge holds still and all of the growth goes up.
+## This offsets the drawn quad only: the simulated point, its collisions and its
+## open-space scan all still use the puff's real centre, and the two disagree by
+## at most the growth so far, which is bounded by maximum_radius.
+@export_range(0.0, 1.0, 0.05) var growth_upward_bias: float = 0.8
 
 @export_category("Bonding")
 @export_range(1.0, 300.0, 1.0) var minimum_bond_spacing: float = 96.0
@@ -84,6 +110,10 @@ class SmokeCloud:
 @export_category("Motion")
 @export_range(0.0, 1_000.0, 5.0) var minimum_launch_speed: float = 100.0
 @export_range(0.0, 1_000.0, 5.0) var maximum_launch_speed: float = 140.0
+## Upward speed a puff is born with. Buoyancy alone takes about half a second to
+## overcome a fresh puff's own growth, and for that half second the dust spread
+## downward off the strike instead of lifting away from it.
+@export_range(0.0, 500.0, 5.0) var initial_rise_speed: float = 70.0
 @export_range(0.0, 500.0, 5.0) var upward_buoyancy: float = 110.0
 @export_range(0.0, 500.0, 5.0) var maximum_rise_speed: float = 180.0
 @export_range(0.0, 10.0, 0.05) var air_drag: float = 0.45
@@ -163,7 +193,7 @@ func play_at_impact(
 			minimum_launch_speed,
 			maximum_launch_speed
 		),
-		0.0
+		-initial_rise_speed
 	)
 
 	var lobe_budget := maximum_lobes
@@ -178,6 +208,8 @@ func play_at_impact(
 		lobe.display_radius = starting_radius
 		lobe.display_left_radius = starting_radius
 		lobe.display_right_radius = starting_radius
+		lobe.target_left_radius = starting_radius
+		lobe.target_right_radius = starting_radius
 		lobe.shape_seed = _random.randf_range(0.0, TAU)
 		lobe.total_lifetime = lobe_lifetime_seconds * _random.randf_range(
 			0.75,
@@ -197,8 +229,15 @@ func play_at_impact(
 			maximum_radius
 		)
 		nearest_lobe.velocity += launch_velocity * 0.45
-		# Only the puff that actually received this strike's dust is refreshed.
-		nearest_lobe.remaining_lifetime = nearest_lobe.total_lifetime
+		# Only the puff that actually received this strike's dust is refreshed,
+		# and it is topped up rather than reset. Resetting snapped a half-faded
+		# puff back to full opacity, so mining held at the cap read as the dust
+		# flickering brighter on every strike instead of thickening.
+		nearest_lobe.remaining_lifetime = minf(
+			nearest_lobe.remaining_lifetime
+				+ nearest_lobe.total_lifetime * lobe_refresh_share,
+			nearest_lobe.total_lifetime
+		)
 		nearest_lobe.stuck_seconds = 0.0
 
 	# This strike just cut rock away, so every cached open-space answer is stale.
@@ -307,22 +346,47 @@ func _advance_lobe(
 			lobe.sampled_position
 		) >= resample_distance * resample_distance
 	):
+		var desired_horizontal_radius := minf(
+			lobe.current_radius * horizontal_fill_scale,
+			maximum_horizontal_radius
+		)
 		var open_horizontal_radii := _get_open_horizontal_radii(
 			lobe.terrain_position,
-			minf(
-				lobe.current_radius * horizontal_fill_scale,
-				maximum_horizontal_radius
-			)
+			desired_horizontal_radius
 		)
-		lobe.display_left_radius = open_horizontal_radii.x
-		lobe.display_right_radius = open_horizontal_radii.y
-		lobe.display_radius = minf(
-			lobe.display_left_radius,
-			lobe.display_right_radius
+		lobe.target_left_radius = open_horizontal_radii.x
+		lobe.target_right_radius = open_horizontal_radii.y
+		# How much of the room this puff wanted the rock took away. The scan has
+		# already paid for this answer, so reading confinement off it is free.
+		lobe.wall_confinement = clampf(
+			1.0
+				- (open_horizontal_radii.x + open_horizontal_radii.y)
+				* 0.5
+				/ maxf(desired_horizontal_radius, 1.0),
+			0.0,
+			1.0
 		)
 		lobe.sampled_position = lobe.terrain_position
 		lobe.needs_open_space_sample = false
-	lobe.shape_phase += delta * (0.45 + _cloud.pressure * 0.8)
+	# Chase the scan's stepped answer at the same rate the puff already swells,
+	# which closes a one-cell step in about a tenth of a second: fast enough
+	# that a puff never visibly overhangs the rock it just measured, slow enough
+	# that the width no longer pops.
+	var width_ease := growth_speed * delta
+	lobe.display_left_radius = move_toward(
+		lobe.display_left_radius,
+		lobe.target_left_radius,
+		width_ease
+	)
+	lobe.display_right_radius = move_toward(
+		lobe.display_right_radius,
+		lobe.target_right_radius,
+		width_ease
+	)
+	lobe.display_radius = minf(
+		lobe.display_left_radius,
+		lobe.display_right_radius
+	)
 	lobe.velocity *= drag_multiplier
 	lobe.velocity.y = minf(lobe.velocity.y, 0.0)
 	lobe.velocity.y -= upward_buoyancy * delta
@@ -378,6 +442,14 @@ func _sync_render_instances() -> void:
 		smoke_multimesh.instance_count
 	)
 	smoke_multimesh.visible_instance_count = visible_count
+	# Pressure is one value for the whole cloud, so the shader takes it as a
+	# uniform rather than as a copy on every instance.
+	var smoke_material := smoke_mesh.material as ShaderMaterial
+	if smoke_material != null:
+		smoke_material.set_shader_parameter(
+			"cloud_pressure",
+			_cloud.pressure
+		)
 	for lobe_index in range(visible_count):
 		var lobe := _cloud.lobes[lobe_index]
 		var life_ratio := clampf(
@@ -385,10 +457,16 @@ func _sync_render_instances() -> void:
 			0.0,
 			1.0
 		)
-		var body_alpha := body_opacity * clampf(
-			life_ratio / maxf(fade_portion, 0.05),
-			0.0,
-			1.0
+		# The shader tears the volume apart over the same window, so the tone
+		# only has to carry the last of the fade. Easing it keeps a dying puff
+		# readable while its silhouette breaks up, instead of dimming the whole
+		# shape evenly the way a ghost switches off.
+		var body_alpha := body_opacity * sqrt(
+			clampf(
+				life_ratio / maxf(fade_portion, 0.05),
+				0.0,
+				1.0
+			)
 		)
 		var screen_position := (
 			terrain_manager.terrain_to_screen_position(
@@ -404,6 +482,13 @@ func _sync_render_instances() -> void:
 			- lobe.display_left_radius
 		) * 0.5
 		var vertical_half_size := lobe.current_radius * 1.2
+		# Spend the growth upward. Without this the quad swells evenly, so its
+		# lower edge descends at half the growth rate while the centre is still
+		# only just starting to lift, and fresh dust reads as sinking.
+		var growth_lift := maxf(
+			vertical_half_size - starting_radius * 1.2,
+			0.0
+		) * growth_upward_bias
 		smoke_multimesh.set_instance_transform_2d(
 			lobe_index,
 			Transform2D(
@@ -415,6 +500,7 @@ func _sync_render_instances() -> void:
 				0.0,
 				screen_position
 					+ Vector2.RIGHT * horizontal_center_shift
+					+ Vector2.UP * growth_lift
 			)
 		)
 		var rock_color := smoke_color
@@ -423,23 +509,18 @@ func _sync_render_instances() -> void:
 			lobe_index,
 			rock_color
 		)
-		# The shader needs the quad's real proportions to keep the drawn edge
-		# scallops evenly sized on a lobe stretched wide across a tunnel. Custom
-		# data is normalised into 0..1 here and expanded back in the shader, so
-		# a lobe that fills an unusually wide opening can never hand the noise a
-		# runaway value.
-		var packed_aspect := clampf(
-			horizontal_half_size / maxf(vertical_half_size, 1.0),
-			0.0,
-			8.0
-		) / 8.0
+		# The shader recovers the quad's real half-extents from its instance
+		# transform, so custom data only has to carry what the transform cannot
+		# say: which noise the puff draws, how far through dying it is, and
+		# whether it is pressed against rock. All stay normalised into 0..1, and
+		# the last channel is spare.
 		smoke_multimesh.set_instance_custom_data(
 			lobe_index,
 			Color(
 				fposmod(lobe.shape_seed / TAU, 1.0),
-				lobe.shape_phase,
-				_cloud.pressure,
-				packed_aspect
+				life_ratio,
+				lobe.wall_confinement,
+				0.0
 			)
 		)
 
