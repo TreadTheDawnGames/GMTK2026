@@ -29,6 +29,9 @@ const TREASURE_HUNTER_TREASURE_SEQUENCE: CutsceneSequence = preload(
 const TREASURE_HUNTER_TREASURE_CONVERSATION: DialogueConversation = preload(
 	"res://resources/dialogue/treasure_hunter_treasure_conversation.tres"
 )
+const THIEF_ENCRYPTED_DIALOGUE: EncryptedDialogueConversation = preload(
+	"res://resources/dialogue/thief_encrypted_dialogue.tres"
+)
 
 var _failures: Array[String] = []
 var _presented_line_indices: PackedInt32Array = PackedInt32Array()
@@ -43,6 +46,7 @@ func _run() -> void:
 	await process_frame
 	_verify_entry_scene()
 	await _verify_mining_scene()
+	_verify_finale_text_resolves()
 	if _failures.is_empty():
 		print("SMOKE_VERIFY_PASS")
 		quit(0)
@@ -477,6 +481,32 @@ func _verify_mining_scene() -> void:
 	)
 	game_root.queue_free()
 	await process_frame
+
+
+## Proves the finale's lines still finish themselves.
+##
+## The Thief's conversation is the only text in the game that is incomplete on
+## disk: it carries {tokens} resolved against the player's lifetime record when
+## each line is presented. Break that and nothing errors - the game's last scene
+## simply shows literal braces to somebody eight hours in. This is the cheap
+## check that it still resolves; local_tests/verify_thief_finale.gd is the
+## thorough one.
+func _verify_finale_text_resolves() -> void:
+	var conversation := THIEF_ENCRYPTED_DIALOGUE.decrypt_conversation()
+	_expect(
+		conversation != null,
+		"The Thief finale conversation must decrypt."
+	)
+	if conversation == null:
+		return
+	var empty_history := PlayerHistoryRecord.new()
+	for line_index in range(conversation.lines.size()):
+		var line: DialogueLine = conversation.lines[line_index]
+		_expect(
+			DialogueTokens.resolve(line.text, empty_history).find("{") < 0,
+			"Finale line %d leaves an unresolved token." % line_index
+		)
+	empty_history.free()
 
 
 ## Exercises the review contracts through the production config and renderer.

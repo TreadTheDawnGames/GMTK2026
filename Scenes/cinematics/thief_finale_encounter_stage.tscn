@@ -1,32 +1,145 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
+[ext_resource type="Script" uid="uid://7qy8qeox17tk" path="res://Scripts/cinematics/cutscene_actor_preview.gd" id="2_preview"]
+[ext_resource type="Resource" path="res://resources/encounters/thief_appearance.tres" id="3_thief"]
+[ext_resource type="Script" uid="uid://bpg6fvsw6y7ai" path="res://resources/encounters/character_appearance.gd" id="4_appearance"]
+[ext_resource type="Texture2D" uid="uid://bq8qwl3xn5qny" path="res://Assets/Characters/miner_idle-Pickaxe.png" id="5_miner"]
+[ext_resource type="PackedScene" path="res://Scenes/props/organ.tscn" id="6_organ"]
+[ext_resource type="Resource" path="res://resources/cinematics/sequences/thief_finale_sequence.tres" id="7_sequence"]
+
+[sub_resource type="Resource" id="Resource_miner_preview"]
+script = ExtResource("4_appearance")
+texture = ExtResource("5_miner")
+sprite_scale = Vector2(0.203, 0.203)
+sprite_offset = Vector2(0, -88)
+
+[sub_resource type="Animation" id="Animation_reset"]
+resource_name = "RESET"
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:camera_pan_offset_cells")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [0.0]
+}
+
+[sub_resource type="Animation" id="Animation_opening"]
+resource_name = "opening"
+length = 0.01
+
+[sub_resource type="Animation" id="Animation_closing"]
+resource_name = "closing"
+length = 0.01
+
+[sub_resource type="Animation" id="Animation_pan_to_organ"]
+resource_name = "pan_to_organ"
+length = 7.0
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:camera_pan_offset_cells")
+tracks/0/interp = 2
+tracks/0/loop_wrap = false
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 1, 7),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [0.0, 0.0, 120.0]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_finale"]
+_data = {
+&"RESET": SubResource("Animation_reset"),
+&"closing": SubResource("Animation_closing"),
+&"opening": SubResource("Animation_opening"),
+&"pan_to_organ": SubResource("Animation_pan_to_organ")
+}
 
 [node name="ThiefFinaleEncounterStage" instance=ExtResource("1_stage")]
-editor_description = "Story beat 13: the player finally reaches the Thief. The canonical story leaves the reveal and its dialogue intentionally unspecified and marks this a long-term objective, so this stage is deliberately a blank shot: markers placed, room cut, no beats authored. Do not invent the Thief's language here without narrative approval. Note the schedule currently carries depth 1,000 for this encounter while the story places it at 100,000 - that gap is unresolved, not a value to copy. His art is drawn looking left, so he stays on the miner's right."
-opening_move_seconds = 2.4
-closing_move_seconds = 2.4
-opening_step_height = 4.0
+editor_description = "Story beat 12, depth 100,000: the Thief. The player breaks through the ceiling and lands in what looks like every other tunnel in the game, and then the camera pans nearly a thousand pixels to the right and finds a pipe organ being played in a vault nobody dug.
+
+THE REVEAL IS THAT THERE IS NO THIEF TO MEET. The figure at the keys is the Lantern Keeper - the same cloak the player met at 1,400, at 5,600 and after the credits - and what he tells them, at length, is that the time they came down here to recover was spent by them, on this. The conversation is encrypted in thief_encrypted_dialogue.tres and is deliberately not readable in the repository.
+
+THE SPEAKER IS '...' AND MUST STAY THAT WAY. The box carries the same unattributed name the voice at depth 0 uses, and that is the bookend: the thing that told the miner only fools find the Thief is the thing at the organ. It is not 'The Thief', which would spoil the line the whole scene is built to reach, and it is not 'Lantern Keeper' either.
+
+SOME OF HIS LINES ARE NOT FINISHED UNTIL THEY ARE PLAYED. They carry {tokens} that DialogueDirector resolves against PlayerHistory at the moment each line is presented: hours and minutes and seconds actually played, the real count of space bar presses, the clock time and weekday when the player crossed a particular hour, and phone-or-computer wording. Nothing here reads the current run - the Thief is not talking about this descent, he is talking about all of them. See Scripts/dialogue/dialogue_tokens.gd for the whole set.
+
+TRACKING IS OFF, WHICH IS THE OPPOSITE OF EVERY RECENT ROOM. Conversation Tracks Miner slides the actor marks to whatever column the fall left the miner in, and that is right when a character has walked over to talk to him. It is wrong here: this one is at an instrument that is part of the room, and an organ cannot slide sideways to meet a landing column. The documented cost applies in full - the miner's 49-column band is 392px wide, so his distance from the organ varies by that much and the pan lands the instrument up to 192px off centre either way. The vault is carved wide enough that it still reads at both extremes. Narrowing the band, or measuring the pan at runtime instead of animating a fixed one, are the two real fixes and both are above this room.
+
+THE PAN IS AN ANIMATION, NOT A BEAT. camera_pan_offset_cells is animated by the pan_to_organ clip, and every change is relayed out to the view controller, which slides the framed view that many terrain cells off the miner. A STAGE_CUE beat plays that clip and blocks the timeline until it ends, so the timeline owns when the pan happens and the clip owns how it moves - which is the only way to author an eased curve rather than describe one. Nothing has to pan back: release_encounter_focus already tweens the view home when the shot ends.
+
+He does not walk, and Entrance, Conversation, Rest and Exit are all one mark. That is this character's whole grammar, set at 1,400 and kept at 5,600 and after the credits: he does not travel, he is somewhere and then he is not. Here he is not even that - Hide Actor After Closing is off, so when control is handed back and the player keeps digging, the organ is still being played behind them."
+opening_move_seconds = 0.2
+closing_move_seconds = 0.2
+opening_step_height = 0.0
 hide_actor_after_closing = false
-conversation_tracks_miner = true
-conversation_root_offset_from_miner_x = 110.9
+conversation_tracks_miner = false
+sequence = ExtResource("7_sequence")
 
 [node name="Entrance" parent="ActorMarkers" index="0"]
-editor_description = "Far out to the right. The approach is long on purpose: this is the arrival the whole run points at."
-position = Vector2(504, 0)
+editor_description = "The same mark as Conversation. He is already at the keys when the ceiling comes in - the music has been playing for two minutes by then - so there is no approach to walk, and Opening Move Seconds is only long enough to keep the tween honest."
+position = Vector2(784, 0)
 
 [node name="Conversation" parent="ActorMarkers" index="1"]
-position = Vector2(-96, 0)
+editor_description = "784 is measured, not chosen for looks. The stage origin sits 22 cells right of the terrain centre, so the sculpt's organ column - 120 cells right of the room anchor, at grid x 312 - is (312 - 214) * 8 = 784px in this scene's own coordinates. From there a dead-centre landing puts the miner 960px away.
+
+That distance is what keeps the organ a secret. The frame is 1152px wide and centred on the miner, so he sees 576px either side. Even when the fall lands him at the far right of his band the organ's near edge is still about 698px out, 122px past the edge of the shot. Bring this mark any closer and the instrument is already on screen when the player arrives, and the pan has nothing left to reveal."
+position = Vector2(784, 0)
+
+[node name="Work" parent="ActorMarkers" index="2"]
+editor_description = "Unused. Nothing in this shot walks anywhere; the mark is left on the organ so that any later beat wanting to aim at the keyboard has somewhere honest to aim."
+position = Vector2(784, 0)
 
 [node name="Rest" parent="ActorMarkers" index="3"]
-position = Vector2(-96, 0)
+position = Vector2(784, 0)
 
 [node name="Exit" parent="ActorMarkers" index="4"]
-position = Vector2(604, 0)
+editor_description = "His own mark, because he does not leave. play_closing walks him to Exit and Exit is where he already is, so the shot ends with him still playing. Hide Actor After Closing is off for the same reason: the player mines down past a man at an organ."
+position = Vector2(784, 0)
+
+[node name="Organ" parent="PropMarkers" index="0" instance=ExtResource("6_organ")]
+editor_description = "Y IS ZERO HERE, AND THAT IS NOT THE MISTAKE IT LOOKS LIKE. Every other prop in the game has to be lifted off the dig line, because the level tunnel lays up to three cells of loose rock along the floor and a prop is not floor-sampled the way the cast are; the bench at 5,600 authors at -23 for exactly that reason.
+
+This room is different because the vault sweep that cuts the ceiling also opens every row beneath it down to the floor, which takes the loose rock with it across the whole span. local_tests/carve_thief_finale_room.gd measures and prints that: the ground across all 25 columns this organ covers is the floor row itself, with no spread at all. So the prop rests on y = 0 and the cast floor-sample onto that same row, and for once a prop and the figure standing at it cannot disagree by even a pixel.
+
+If the vault carve is ever changed to leave rubble under the organ, that script will start printing a non-zero range and this number has to move with it."
+position = Vector2(784, 0)
+
+[node name="AnimationPlayer" parent="." index="3"]
+libraries/ = SubResource("AnimationLibrary_finale")
 
 [node name="EditorTerrainPreview" parent="." index="4"]
-editor_description = "Previews thief_finale at its scheduled depth."
+editor_description = "Previews thief_finale at its real depth. This used to say 1000, left from when the schedule and the story disagreed about where this encounter lived. The encounter resolves at the run bottom and mining_config.tres puts that at 100,000, so that is what the preview has to draw or the rock is the wrong colour."
 encounter_id = &"thief_finale"
-preview_depth_rows = 1000
+preview_depth_rows = 100000
+
+[node name="thief" type="Node2D" parent="." index="5"]
+editor_description = "Editor stand-in only. It sits on the same x as the organ because Zephan drew the two on one canvas with their opaque centres five pixels apart, so this is the drawing rather than a placement decision.
+
+HIS HEIGHT IS NOT AUTHORED AND SHOULD NOT BE. In the drawing his feet are 252 canvas pixels above the base of the organ - 38px at this scale - as though he were on a bench the plinth hides. That lift was authored into sprite_offset.y and then deleted, because ActorSoleMeasure now seats every actor's lowest drawn row on its origin and both the runtime presenter and this stand-in go through it, so the field was doing nothing while looking like it was. He therefore stands on the same floor as everything else, 38px lower than drawn, and his hands land on the keyboard rather than above it. That is better than the drawing and it is also the only behaviour available; if the lift is ever wanted back it has to come from a taller node or from art with the gap baked in, not from sprite_offset."
+z_index = 1
+position = Vector2(784, 0)
+script = ExtResource("2_preview")
+actor_id = &"thief"
+appearance = ExtResource("3_thief")
+pose = &"idle"
+metadata/_edit_group_ = true
+
+[node name="Miner" type="Node2D" parent="." index="6"]
+editor_description = "Where the miner stands for a dead-centre landing: the stage sits 22 cells right of the terrain centre, so he is 176px left of this stage's own origin. The gap between this node and the organ is the pan."
+z_index = 1
+position = Vector2(-176, 0)
+script = ExtResource("2_preview")
+actor_id = &"miner"
+appearance = SubResource("Resource_miner_preview")
+metadata/_edit_group_ = true
 
 [editable path="ActorMarkers"]
+[editable path="PropMarkers"]

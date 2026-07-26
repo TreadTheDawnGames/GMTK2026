@@ -21,6 +21,7 @@ GameState="*res://Scenes/globals/game_state.tscn"
 AudioHandler="*res://Scenes/globals/audio_handler.tscn"
 MusicManager="*uid://qi6w5ueftd0u"
 Conductor="*uid://cetf3kqgdyqbm"
+PlayerHistory="*res://Scripts/Global/player_history.gd"
 
 [display]
 
