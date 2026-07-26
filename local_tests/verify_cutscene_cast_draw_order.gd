@@ -52,17 +52,30 @@ func _run() -> void:
 		buried_order,
 	])
 
-	if cutscene_order <= frontmost_terrain_z:
+	var second_stratum_z := _get_second_stratum_z(profile)
+	# Mining and cutscenes now stand the cast on the SAME stratum, the second one,
+	# which is Zephan's direction: the foreground rock closes over a cutscene cast
+	# exactly as it closes over the miner while he digs. This used to assert the
+	# opposite - that a cutscene cleared every stratum - so the rule reversing is
+	# the change, not a check going soft.
+	if cutscene_order >= frontmost_terrain_z:
 		_failures.append(
 			(
-				"Cutscene cast order %d does not clear the frontmost terrain "
-				+ "stratum at %d, so every cutscene would play behind the rock."
+				"Cutscene cast order %d is not behind the foreground stratum at "
+				+ "%d, so the cast would be pasted on top of the rock the rest of "
+				+ "the game sits inside."
 			) % [cutscene_order, frontmost_terrain_z]
 		)
-	# Mining and cutscenes deliberately stand him on different strata: down in the
-	# dig while he works, lifted clear of it while a shot holds on him. Both ends
-	# of that are asserted, because a single number satisfying one and not the
-	# other is exactly how this goes wrong.
+	if cutscene_order <= second_stratum_z:
+		_failures.append(
+			(
+				"Cutscene cast order %d is not in front of the second stratum at "
+				+ "%d, so the cast would be buried behind the layer they stand on."
+			) % [cutscene_order, second_stratum_z]
+		)
+	# Both ends of the miner's own mining order are still asserted, because a
+	# single number satisfying one and not the other is exactly how this goes
+	# wrong.
 	if buried_order >= frontmost_terrain_z:
 		_failures.append(
 			(
@@ -70,7 +83,6 @@ func _run() -> void:
 				+ "the miner would stop reading as being down in his dig."
 			) % [buried_order, frontmost_terrain_z]
 		)
-	var second_stratum_z := _get_second_stratum_z(profile)
 	if buried_order <= second_stratum_z:
 		_failures.append(
 			(
