@@ -4118,6 +4118,11 @@ func _advance_sculpt_run_preparation(
 			preparation.cell_image,
 			preparation.sculpt
 		)
+		_clamp_sculpt_rounding_to_authored_cells(
+			preparation.cell_image,
+			preparation.sculpt,
+			preparation.cell_bytes
+		)
 		preparation.cell_bytes = PackedByteArray()
 		preparation.phase = 1
 		return false
@@ -4307,6 +4312,7 @@ func _rasterize_sculpt_mask(
 		cell_bytes
 	)
 	_round_sculpt_cell_contours(cell_image, sculpt)
+	_clamp_sculpt_rounding_to_authored_cells(cell_image, sculpt, cell_bytes)
 	cell_image.resize(
 		padded_size.x * mask_cell_size,
 		padded_size.y * mask_cell_size,
@@ -4359,6 +4365,87 @@ func _round_sculpt_cell_contours(
 		original_size.x,
 		original_size.y,
 		Image.INTERPOLATE_CUBIC
+	)
+
+
+## Holds the rounded contour to the cells the room actually authored.
+##
+## contour_rounding_cells promises the drawn rim may move by at most that many
+## cells. The filter that produces it is a downsample and a cubic upsample, and
+## both spread far past that: on the shipped 2.0-cell room, a third of the
+## authored open cells came back carrying alpha - invisible on their own,
+## because every consumer reads solidity at the 0.5 boundary, but not zero.
+##
+## Image.blend_rect_mask treats "not exactly transparent" as solid, so those
+## cells let an impact's authored crack strokes blend into a room's open air and
+## come back fully opaque, which is black cracks hanging in the middle of a
+## cutscene room the moment mining resumes under it. Snapping every cell outside
+## the authored rounding band back to its authored value restores the documented
+## bound and leaves the rim itself untouched.
+func _clamp_sculpt_rounding_to_authored_cells(
+	cell_image: Image,
+	sculpt: CutsceneTerrainSculpt,
+	authored_cell_bytes: PackedByteArray
+) -> void:
+	if cell_image == null or sculpt == null:
+		return
+	var rounding_cells := maxi(ceili(sculpt.contour_rounding_cells), 0)
+	if rounding_cells <= 0:
+		return
+	var grid := sculpt.grid_size
+	var padded_width := grid.x + 2
+	if authored_cell_bytes.size() < padded_width * (grid.y + 2) * 2:
+		return
+	# Byte reads against the pre-rounding raster, never resource queries: the
+	# authored image is already the binary truth this has to snap back to, and
+	# only the contour pays the (2r+1)^2 mark, so the cost is the room's
+	# perimeter rather than its area.
+	var near_contour := PackedByteArray()
+	near_contour.resize(grid.x * grid.y)
+	for local_y in range(grid.y):
+		var padded_row_start := (local_y + 1) * padded_width
+		for local_x in range(grid.x):
+			var authored_index := (padded_row_start + local_x + 1) * 2 + 1
+			var authored_value := authored_cell_bytes[authored_index]
+			if (
+				authored_cell_bytes[authored_index - 2] == authored_value
+				and authored_cell_bytes[authored_index + 2] == authored_value
+				and authored_cell_bytes[
+					authored_index - padded_width * 2
+				] == authored_value
+				and authored_cell_bytes[
+					authored_index + padded_width * 2
+				] == authored_value
+			):
+				continue
+			for mark_y in range(
+				maxi(local_y - rounding_cells, 0),
+				mini(local_y + rounding_cells + 1, grid.y)
+			):
+				var mark_row := mark_y * grid.x
+				for mark_x in range(
+					maxi(local_x - rounding_cells, 0),
+					mini(local_x + rounding_cells + 1, grid.x)
+				):
+					near_contour[mark_row + mark_x] = 1
+	var rounded_bytes := cell_image.get_data()
+	for local_y in range(grid.y):
+		var near_row_start := local_y * grid.x
+		var padded_row_start := (local_y + 1) * padded_width
+		for local_x in range(grid.x):
+			if near_contour[near_row_start + local_x] == 1:
+				continue
+			# The padding ring means an authored cell sits one pixel in.
+			var byte_index := (padded_row_start + local_x + 1) * 2
+			var authored_value := authored_cell_bytes[byte_index + 1]
+			rounded_bytes[byte_index] = authored_value
+			rounded_bytes[byte_index + 1] = authored_value
+	cell_image.set_data(
+		padded_width,
+		grid.y + 2,
+		false,
+		Image.FORMAT_LA8,
+		rounded_bytes
 	)
 
 
