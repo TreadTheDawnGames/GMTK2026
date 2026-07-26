@@ -313,16 +313,17 @@ func _land_at(depth_rows: int) -> void:
 		# the screen. A real run only activates an encounter once the fall is
 		# over, so waiting for it is what matches the game rather than racing it.
 		#
-		# What has to have stopped is the presented view - the thing that moves
-		# the cast layer - not the miner. This used to compare the target against
-		# get_current_view_position(), which returns the miner's presentation
-		# position, and that converges within a frame or two of the teleport
-		# however far the view still has to travel. At 300 rows the two are the
-		# same answer, which is why every shallow encounter looked right; at
-		# 11,200 the view was still 70,000px away when the shot began and the
-		# visitor was left that far below the room, off screen, with no error
-		# anywhere. Watching the presented row settle is depth-independent.
-		await _wait_until_view_settles(view)
+		# What has to have stopped is TerrainManager's view row, because that is
+		# the value whose changed signal moves the cast layer. This used to
+		# compare ViewController's target against get_current_view_position(),
+		# which returns the miner's presentation position: it converges within a
+		# frame or two of the teleport however far the world still has to
+		# stream. At 300 rows the two are the same answer, which is why every
+		# shallow encounter previewed correctly; at 11,200 the room was still
+		# 70,000px from its resting place when the shot began, and the visitor
+		# walked a path baked at that height and stayed there - far below the
+		# frame, with no error anywhere.
+		await _wait_until_view_settles()
 	encounter._on_landing_reached(_run_state.mining_y)
 
 
@@ -338,21 +339,33 @@ func _land_at(depth_rows: int) -> void:
 ## the journey - which puts the shot back where it started, only with a smaller
 ## error that is harder to recognise. This costs a third of a second on a preview
 ## that already teleports through eleven thousand rows.
-func _wait_until_view_settles(view: ViewController) -> void:
+func _wait_until_view_settles() -> void:
 	const REQUIRED_STILL_FRAMES: int = 20
+	var terrain := _get_terrain_manager()
+	print("[cutscene playtest] settle wait terrain=%s" % terrain)
+	if terrain == null:
+		return
 	var still_frames := 0
-	var previous_row := INF
+	var previous_position := Vector2(INF, INF)
 	await _wait_until(
 		func() -> bool:
-			var current_row := view.current_view_y
-			if is_equal_approx(current_row, previous_row):
+			var current_position := terrain.get_view_position()
+			if current_position.is_equal_approx(previous_position):
 				still_frames += 1
 			else:
 				still_frames = 0
-			previous_row = current_row
+			previous_position = current_position
 			return still_frames >= REQUIRED_STILL_FRAMES,
 		8.0
 	)
+
+
+func _get_terrain_manager() -> TerrainManager:
+	if not is_instance_valid(_game_root):
+		return null
+	return _game_root.get_node_or_null(
+		"MiningScene/TerrainManager"
+	) as TerrainManager
 
 
 func _get_view_controller() -> ViewController:
