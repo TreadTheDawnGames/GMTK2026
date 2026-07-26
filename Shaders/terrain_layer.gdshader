@@ -38,8 +38,10 @@ uniform sampler2D impact_patch_texture : filter_linear;
 uniform bool use_impact_patch = false;
 uniform vec4 impact_patch_uv_rect = vec4(0.0);
 // Mining reveals the finished mask through a short top-down compression front.
-// The renderer retires this uniform after the bounded transition, so settled
-// terrain pays no extra branch and the final 16 px silhouette remains exact.
+// During that bounded window the already-streamed mask is the source and the
+// prepared patch is the destination. Preserving real prior pixels avoids the
+// rectangular "solid white stamp" that repainted older holes and fracture ink.
+// Settled terrain pays no extra branch and the final 16 px silhouette is exact.
 uniform vec4 impact_crush_uv_rect = vec4(0.0);
 // X is shader-uptime start, Y is duration; zero duration disables the branch.
 // Packing them halves material updates compared with separate start/use values.
@@ -326,6 +328,15 @@ vec4 sample_terrain_mask(vec2 chunk_uv) {
 				(crush_uv.y - 0.04) * 0.58
 			);
 			float crush_distance = length(crush_offset);
+			// Two cheap continuous folds keep the moving edge from reading as
+			// a perfect digital ellipse. They run only inside the tiny active
+			// patch and need no texture, allocation, or settled-frame work.
+			crush_distance += sin(
+				crush_uv.x * 27.0 + crush_uv.y * 11.0
+			) * 0.018;
+			crush_distance += sin(
+				crush_uv.x * 9.0 - crush_uv.y * 23.0
+			) * 0.012;
 			float crush_front = mix(-0.04, 0.80, eased_progress);
 			float crush_softness = max(fwidth(crush_distance), 0.001);
 			float crush_reveal = smoothstep(
@@ -333,7 +344,18 @@ vec4 sample_terrain_mask(vec2 chunk_uv) {
 				crush_distance + crush_softness,
 				crush_front
 			);
-			mask_sample = mix(vec4(1.0), mask_sample, crush_reveal);
+			// The base tiles still contain the exact pre-hit mask while the
+			// prepared patch is held. Blend only changed pixels from that mask
+			// so the patch rectangle itself can never become visible.
+			vec4 previous_mask_sample = mask_sample;
+			if (sampled_patch) {
+				previous_mask_sample = sample_streamed_terrain_mask(safe_uv);
+			}
+			mask_sample = mix(
+				previous_mask_sample,
+				mask_sample,
+				crush_reveal
+			);
 		}
 	}
 	return mask_sample;

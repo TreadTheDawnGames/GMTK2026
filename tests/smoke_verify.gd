@@ -74,9 +74,9 @@ func _run() -> void:
 	_expect(
 		terrain_shader_source.contains("impact_crush_timing")
 		and terrain_shader_source.contains(
-			"mask_sample = mix(vec4(1.0), mask_sample, crush_reveal)"
+			"previous_mask_sample = sample_streamed_terrain_mask(safe_uv)"
 		),
-		"Mining impacts must retain the sample-neutral crushed-mask transition."
+		"Mining impacts must reveal from the prior mask without a white frame."
 	)
 	# Same reasoning for the mining dust: headless cannot judge whether a cloud
 	# shimmers, so protect the three choices that stopped it. The noise domain is
@@ -779,6 +779,23 @@ func _verify_mining_scene() -> void:
 		terrain_manager.config.terrain_width_cells / 2,
 		terrain_manager.config.initial_surface_row
 	)
+	# Exercise the production successful-target path rather than the cold debug
+	# path: the timing window predicts this exact hit during wind-up, including
+	# its bounded GPU patch, before terrain changes at the contact frame.
+	terrain_renderer._on_dig_visuals_preparation_started(false)
+	terrain_renderer._on_dig_visuals_preparation_requested(
+		impact_cell,
+		1,
+		0,
+		impact_cell.x,
+		0
+	)
+	while (
+		terrain_renderer._pending_stamp_preparation_head
+		< terrain_renderer._pending_stamp_preparation.size()
+	):
+		terrain_renderer._prepare_next_pending_stamp_layer()
+	terrain_renderer._compact_pending_stamp_preparation()
 	var was_solid := terrain_manager.is_solid_cell(impact_cell)
 	var dig_result := terrain_manager.dig_tunnel(impact_cell, 1, 0)
 	_expect(was_solid, "Smoke-test impact cell must begin solid.")
@@ -796,39 +813,65 @@ func _verify_mining_scene() -> void:
 	var impact_chunk: TerrainLayerRenderer.TerrainChunkVisual = (
 		terrain_renderer._active_chunks.get(impact_chunk_index)
 	)
-	var impact_crush_is_active := false
+	# The transition must not start at input time. Web preparation may need more
+	# than one frame, so the production scheduler starts it only when the exact
+	# prepared patch becomes visible and the complete 90 ms reveal can play.
+	var impact_crush_is_active := (
+		terrain_renderer._active_impact_crush_count > 0
+	)
+	_expect(
+		not impact_crush_is_active,
+		"A terrain crush must wait until its prepared patch is visible."
+	)
+	for _presentation_frame in range(16):
+		terrain_renderer._process(1.0 / 60.0)
+		if terrain_renderer._active_impact_crush_count > 0:
+			break
+	impact_crush_is_active = false
 	if impact_chunk != null:
 		for layer_index in range(impact_chunk.layer_sprites.size()):
 			var material := (
 				impact_chunk.layer_sprites[layer_index].material
 				as ShaderMaterial
 			)
-			var crush_timing: Vector2 = material.get_shader_parameter(
+			var crush_timing: Variant = material.get_shader_parameter(
 				&"impact_crush_timing"
 			)
-			if crush_timing.y > 0.0:
+			if crush_timing is Vector2 and crush_timing.y > 0.0:
 				impact_crush_is_active = true
 				break
 	_expect(
 		impact_crush_is_active
 		and terrain_renderer._active_impact_crush_count > 0,
-		"A production dig must start one bounded terrain crush transition."
+		"A visible prepared patch must start one bounded crush transition."
 	)
+	# Fold every prepared patch into its base tile first. Active overlays must
+	# survive this upload work until their own reveal deadline, otherwise the
+	# animation would still collapse to a visible final-frame snap.
+	for _fold_frame in range(32):
+		terrain_renderer._process(1.0 / 60.0)
+		if (
+			terrain_renderer._pending_impact_work_head
+			>= terrain_renderer._pending_impact_work.size()
+		):
+			break
 	# Expire the fixed deadlines directly instead of sleeping for the authored
 	# 90 ms. This keeps the branch gate deterministic and proves cleanup cannot
 	# leave a shader transition active without making the suite wait in real time.
-	if impact_chunk != null:
+	for active_chunk: TerrainLayerRenderer.TerrainChunkVisual in (
+		terrain_renderer._active_chunks.values()
+	):
 		for layer_index in range(
-			impact_chunk.impact_crush_deadlines_usec.size()
+			active_chunk.impact_crush_deadlines_usec.size()
 		):
 			if (
-				impact_chunk.impact_crush_deadlines_usec[layer_index]
+				active_chunk.impact_crush_deadlines_usec[layer_index]
 				> 0
 			):
-				impact_chunk.impact_crush_deadlines_usec[layer_index] = (
+				active_chunk.impact_crush_deadlines_usec[layer_index] = (
 					Time.get_ticks_usec() - 1
 				)
-	terrain_renderer._process(0.0)
+	terrain_renderer._retire_completed_impact_crushes()
 	var impact_crush_retired := (
 		terrain_renderer._active_impact_crush_count == 0
 	)
