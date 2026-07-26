@@ -4,7 +4,7 @@ extends SceneTree
 ## - Loads encounter 2's committed resource, sculpt, and real stage.
 ## - Proves the higher cavern, safe landing band, ledge, and 95-row shaft.
 ## - Exercises the authored opening/closing camera animations and RESET.
-## - Checks the scene-local staff adjustment and normal layered terrain contract.
+## - Checks the staff, restored vanishing bench, and layered terrain contract.
 ## The invariant is that the shaft cannot replace any legal landing support.
 
 const ENCOUNTER_PATH := (
@@ -141,6 +141,17 @@ func _verify_stage(stage: CharacterEncounterStage) -> void:
 			staff.texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST,
 			"The small staff must use sharp nearest filtering."
 		)
+	var bench := stage.get_node_or_null(^"PropMarkers/Bench") as Sprite2D
+	_expect(bench != null, "The Keeper's approved bench must remain composed.")
+	if bench != null:
+		_expect(
+			bench.position == Vector2(-474, -64),
+			"The bench must keep its measured clearance and layer-one footing."
+		)
+		_expect(
+			is_equal_approx(bench.modulate.a, 1.0),
+			"The bench must be visible through the meeting."
+		)
 
 	var player := stage.animation_player
 	_expect(
@@ -166,6 +177,11 @@ func _verify_stage(stage: CharacterEncounterStage) -> void:
 			stage.camera_pan_offset_cells == Vector2.ZERO,
 			"Closing must restore gameplay framing."
 		)
+		if bench != null:
+			_expect(
+				is_zero_approx(bench.modulate.a),
+				"The bench must disappear with the Keeper during closing."
+			)
 		player.play(&"opening")
 		player.advance(1.8)
 		player.play(&"RESET")
@@ -174,6 +190,11 @@ func _verify_stage(stage: CharacterEncounterStage) -> void:
 			stage.camera_pan_offset_cells == Vector2.ZERO,
 			"RESET must clear an interrupted camera displacement."
 		)
+		if bench != null:
+			_expect(
+				is_equal_approx(bench.modulate.a, 1.0),
+				"RESET must restore the bench after cancellation or replay."
+			)
 
 
 func _get_first_support(

@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3 uid="uid://dq1edo6hktxtb"]
+[gd_scene load_steps=13 format=3 uid="uid://dq1edo6hktxtb"]
 
 [ext_resource type="PackedScene" path="res://Scenes/cinematics/character_encounter_stage.tscn" id="1_stage"]
 [ext_resource type="Script" uid="uid://7qy8qeox17tk" path="res://Scripts/cinematics/cutscene_actor_preview.gd" id="2_hbiw8"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" uid="uid://bpg6fvsw6y7ai" path="res://resources/encounters/character_appearance.gd" id="4_ml811"]
 [ext_resource type="Texture2D" uid="uid://bq8qwl3xn5qny" path="res://Assets/Characters/miner_idle-Pickaxe.png" id="5_thcas"]
 [ext_resource type="PackedScene" path="res://Scenes/props/lantern_staff.tscn" id="6_staff"]
+[ext_resource type="PackedScene" path="res://Scenes/props/bench.tscn" id="7_bench"]
 
 [sub_resource type="Resource" id="Resource_psbsn"]
 script = ExtResource("4_ml811")
@@ -27,6 +28,18 @@ tracks/0/keys = {
 "transitions": PackedFloat32Array(1),
 "update": 0,
 "values": [Vector2(0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("PropMarkers/Bench:modulate:a")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [1.0]
 }
 
 [sub_resource type="Animation" id="Animation_opening"]
@@ -60,6 +73,18 @@ tracks/0/keys = {
 "update": 0,
 "values": [Vector2(-12, 0), Vector2(0, 0)]
 }
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("PropMarkers/Bench:modulate:a")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.9),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [1.0, 0.0]
+}
 
 [sub_resource type="AnimationLibrary" id="AnimationLibrary_lantern_first"]
 _data = {
@@ -69,7 +94,7 @@ _data = {
 }
 
 [node name="LanternFirstEncounterStage" unique_id=211847311 instance=ExtResource("1_stage")]
-editor_description = "Story beat 3, depth 1,400: the player first meets the Lantern Keeper on an authored ledge over the shaft that holds his abandoned staff. Canon gives him a slow approach, so Entrance begins 56px farther out on the same supported overhang and opening walks him toward the miner before he judges them. The camera holds on the fall for 0.35s, eases 12 cells left to discover the Keeper and cavern volume, and returns during his single-hop fade. Conversation Tracks Miner stays off because this ledge and shaft are fixed terrain, not a cluster that can slide to meet the landing column. Jared rejected the encounter-specific lit/trodden floor treatment after seeing it in the dialogue frame, so this room uses the standard cave layers only; this stage owns only its camera displacement and scene-local staging."
+editor_description = "Story beat 3, depth 1,400: the player first meets the Lantern Keeper on an authored ledge over the shaft that holds his abandoned staff. Canon gives him a slow approach, so Entrance begins 56px farther out on the same supported overhang and opening walks him toward the miner before he judges them. The camera holds on the fall for 0.35s, eases 12 cells left to discover the Keeper and cavern volume, and returns during his single-hop fade. Conversation Tracks Miner stays off because this ledge and shaft are fixed terrain, not a cluster that can slide to meet the landing column. Jared restored the approved bench beside the Keeper; it stays through the meeting and fades with him during closing, while RESET restores it after cancellation or replay. Jared rejected the encounter-specific lit/trodden floor treatment after seeing it in the dialogue frame, so this room uses the standard cave layers only; this stage owns only its camera displacement and scene-local staging."
 opening_move_seconds = 1.8
 closing_move_seconds = 0.9
 opening_step_height = 4.0
@@ -103,6 +128,10 @@ texture_filter = 1
 editor_description = "Standing in the floor at the shaft centre, 95 rows below the room and far under the dialogue frame. The scene-local nearest filter keeps its linework sharp at this scale. Jared's requested 15px rightward adjustment moves the approved whole-sprite staff from x=-704 to x=-689; the shared source art has no separable lantern head and is not modified."
 position = Vector2(-689, 764)
 scale = Vector2(0.2462, 0.2462)
+
+[node name="Bench" parent="PropMarkers" index="1" instance=ExtResource("7_bench")]
+editor_description = "The approved Lantern Keeper bench composition, restored for the first meeting. It remains 118px right of his conversation mark, matching the measured character/bench clearance used by his later warning scene. This room's ledge is directly authored rather than loose tunnel dressing, so the bench uses the ledge's exact -64px reference; visual capture confirms its feet are flush with the top of layer one. Closing fades its alpha with the Keeper over 0.9s, and RESET restores it for cancellation or replay."
+position = Vector2(-474, -64)
 
 [node name="AnimationPlayer" parent="." index="3"]
 libraries/ = SubResource("AnimationLibrary_lantern_first")
