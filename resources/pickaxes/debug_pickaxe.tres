@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="PickaxeDefinition" format=3 uid="uid://bktf56q4v503t"]
 
 [ext_resource type="Script" uid="uid://bvbd25ebtqkh8" path="res://resources/pickaxes/pickaxe_definition.gd" id="1_vg1jj"]
-[ext_resource type="PackedScene" uid="uid://bcoaf8y2mxx7" path="res://Scenes/targets/shrinking_target.tscn" id="3_yfitg"]
+[ext_resource type="PackedScene" uid="uid://ct5832k6hpwck" path="res://Scenes/targets/chase_target.tscn" id="2_lqo8p"]
 
 [resource]
 script = ExtResource("1_vg1jj")
@@ -17,5 +17,5 @@ follow_up_power_scale = 2.0
 follow_up_speed_scale = 3.0
 follow_up_debris_scale = 2.0
 target_unlock_combo = 1
-target_scenes = Array[PackedScene]([ExtResource("3_yfitg")])
+target_scenes = Array[PackedScene]([ExtResource("2_lqo8p")])
 metadata/_custom_type_script = "uid://bvbd25ebtqkh8"
