@@ -14,9 +14,9 @@ text = "I'M QUIB-QUIB-QUIB-QUIB-QUIBBLE!"
 script = ExtResource("3_line")
 speaker_slot = &"coffee_cat"
 speaker_pose = &"idle"
+text = "HAVE YOU SEEN SEEN SEEN THE CAFE? CAFE? COFFEE? COFFEE CAFE?"
 typing_pause_after_word_counts = PackedInt32Array(3, 4, 7, 8, 9)
 typing_pause_seconds = 0.35
-text = "HAVE YOU SEEN SEEN SEEN THE CAFE? CAFE? COFFEE? COFFEE CAFE?"
 
 [sub_resource type="Resource" id="Line_miner"]
 script = ExtResource("3_line")

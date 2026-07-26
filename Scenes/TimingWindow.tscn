@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://bcafu266b27ml" path="res://Scripts/timing_windows/timing_window.gd" id="1_6wfpp"]
 [ext_resource type="PackedScene" uid="uid://cf8q7ylnplo6c" path="res://Scenes/slider_timing_window.tscn" id="2_73j0v"]
 [ext_resource type="Texture2D" uid="uid://bj0rfeubljbhx" path="res://Assets/UI/TimeBar/BarBack.png" id="4_1aeyh"]
+[ext_resource type="PackedScene" uid="uid://bcoaf8y2mxx7" path="res://Scenes/targets/shrinking_target.tscn" id="4_ndmun"]
 [ext_resource type="FontFile" uid="uid://yn3pahibw5ow" path="res://Assets/UI/ComicRelief-Bold.ttf" id="5_8bo8b"]
 [ext_resource type="Texture2D" uid="uid://cq6t4hddbfb7m" path="res://Assets/UI/TimeBar/BarBack_Short.png" id="7_1aeyh"]
 [ext_resource type="PackedScene" uid="uid://16edwc1adi0x" path="res://Scenes/targets/target_base.tscn" id="13_sgvbc"]
@@ -33,6 +34,7 @@ offset_left = -351.0
 offset_top = -128.0
 offset_right = 349.0
 offset_bottom = -47.0
+target_packed_scenes = Array[PackedScene]([ExtResource("4_ndmun")])
 
 [node name="Control" type="Control" parent="MiningWindow" unique_id=1770024605]
 show_behind_parent = true

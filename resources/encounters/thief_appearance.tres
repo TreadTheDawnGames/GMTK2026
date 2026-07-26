@@ -9,5 +9,5 @@ script = ExtResource("1_appearance")
 texture = ExtResource("2_texture")
 horizontal_frames = 3
 frame = 0
-sprite_scale = Vector2(0.15, 0.15)
+sprite_scale = Vector2(0.195, 0.195)
 pose_set = ExtResource("3_pose_set")

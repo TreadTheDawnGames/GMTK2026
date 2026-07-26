@@ -31,7 +31,7 @@ kind = 6
 start_seconds = 2.2
 duration_seconds = 7.0
 cue = &"pan_to_organ"
-notes = "The pan. It plays the stage's pan_to_organ clip, which animates camera_pan_offset_cells from 0 to 120 and is relayed out to the view controller as a sideways displacement of the framed view, in terrain cells off the miner's own column.
+notes = "The pan. It plays the stage's pan_to_organ clip, which animates camera_pan_offset_cells from Vector2.ZERO to Vector2(120, 0) and is relayed out to the view controller as a displacement from the framing where encounter focus settled.
 
 WHY THIS IS A CUE AND NOT A BEAT KIND. There is no PAN beat and one shot does not justify adding it. A camera move is a continuous motion that wants an eased curve, and an AnimationPlayer track is the one place in this project where a curve can be drawn rather than described. So the timeline owns WHEN the pan happens and how long everything after it waits, and the clip owns HOW it moves - it holds still for a second, then eases out over six.
 

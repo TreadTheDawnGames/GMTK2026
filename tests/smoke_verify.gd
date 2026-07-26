@@ -252,10 +252,31 @@ func _verify_mining_scene() -> void:
 					173.0
 				)
 				and dialogue_director.textbox_art.stretch_mode
-					== TextureRect.STRETCH_SCALE
+					== TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				and absf(
+					(
+						dialogue_director.bottom_panel.size.x
+						/ dialogue_director.bottom_panel.size.y
+					)
+					-
+					(
+						float(
+							expected_textures[speaker_slot].get_width()
+						)
+						/ float(
+							expected_textures[speaker_slot].get_height()
+						)
+					)
+				) < 0.01
 				and is_equal_approx(
 					dialogue_director.body_label.custom_minimum_size.y,
 					dialogue_director.art_body_minimum_height
+				)
+				and (
+					dialogue_director.body_label.get_theme_font_size(
+						"normal_font_size"
+					)
+					== dialogue_director.art_body_font_size
 				)
 				and (
 					dialogue_director.textbox_art.texture
@@ -278,6 +299,17 @@ func _verify_mining_scene() -> void:
 			and is_equal_approx(
 				dialogue_director.body_label.custom_minimum_size.y,
 				dialogue_director.fallback_body_minimum_height
+			)
+			and (
+				dialogue_director.body_label.get_theme_font_size(
+					"normal_font_size"
+				)
+				== dialogue_director.fallback_body_font_size
+			)
+			and is_equal_approx(
+				dialogue_director.bottom_panel.size.x,
+				dialogue_director.dialogue_root.size.x
+					- dialogue_director.fallback_panel_horizontal_margin * 2.0
 			),
 			"Speakers without supplied art must retain the readable fallback."
 		)

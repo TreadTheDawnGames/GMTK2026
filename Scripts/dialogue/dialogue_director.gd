@@ -40,16 +40,19 @@ signal cinematic_frame_closed
 @export var zeb_textbox_texture: Texture2D
 @export var ayden_textbox_texture: Texture2D
 @export var coco_textbox_texture: Texture2D
-@export var art_margin_left: int = 218
+@export var art_margin_left: int = 147
 @export var art_margin_top: int = 44
-@export var art_margin_right: int = 24
+@export var art_margin_right: int = 16
 @export var art_margin_bottom: int = 34
 @export var art_body_minimum_height: float = 64.0
+@export var art_body_font_size: int = 14
+@export var fallback_panel_horizontal_margin: float = 90.0
 @export var fallback_margin_left: int = 22
 @export var fallback_margin_top: int = 16
 @export var fallback_margin_right: int = 22
 @export var fallback_margin_bottom: int = 14
 @export var fallback_body_minimum_height: float = 72.0
+@export var fallback_body_font_size: int = 20
 
 @export_category("Typewriter")
 @export_range(0.001, 0.2, 0.001) var character_display_speed: float = 0.03
@@ -386,6 +389,21 @@ func _present_current_line() -> void:
 	textbox_art.visible = uses_authored_textbox
 	fallback_panel.visible = not uses_authored_textbox
 	speaker_label.visible = not uses_authored_textbox
+	if uses_authored_textbox:
+		var texture_size := textbox_texture.get_size()
+		if texture_size.y > 0.0:
+			var art_width := (
+				bottom_panel.size.y * texture_size.x / texture_size.y
+			)
+			var art_horizontal_margin := maxf(
+				(dialogue_root.size.x - art_width) * 0.5,
+				0.0
+			)
+			bottom_panel.offset_left = art_horizontal_margin
+			bottom_panel.offset_right = -art_horizontal_margin
+	else:
+		bottom_panel.offset_left = fallback_panel_horizontal_margin
+		bottom_panel.offset_right = -fallback_panel_horizontal_margin
 	dialogue_margin.add_theme_constant_override(
 		"margin_left",
 		art_margin_left if uses_authored_textbox else fallback_margin_left
@@ -406,6 +424,12 @@ func _present_current_line() -> void:
 		art_body_minimum_height
 		if uses_authored_textbox
 		else fallback_body_minimum_height
+	)
+	body_label.add_theme_font_size_override(
+		"normal_font_size",
+		art_body_font_size
+		if uses_authored_textbox
+		else fallback_body_font_size
 	)
 	var continue_text := (
 		"Continuing..."
