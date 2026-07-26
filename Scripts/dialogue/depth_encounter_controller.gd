@@ -58,6 +58,14 @@ const LANDING_FLOOR_TOLERANCE_ROWS: int = 4
 ## stage's walking sampler go through this, so the cast cannot drift apart from
 ## the man they are talking to.
 const CUTSCENE_FLOOR_LIFT_PIXELS: float = 7.0
+## How still the sampled floor has to be, and for how many readings, before the
+## room counts as having arrived. Half a pixel is under the sub-cell resolution
+## the mask is written at, so it cannot be met by a room still travelling.
+const SETTLE_TOLERANCE_PIXELS: float = 0.5
+const SETTLE_STABLE_READINGS: int = 3
+## Roughly two seconds at sixty frames. Long enough for any authored focus move,
+## short enough that a room which never resolves does not hang the run.
+const SETTLE_TIMEOUT_FRAMES: int = 120
 
 @export_category("Schedule")
 @export var encounter_config: DepthEncounterConfig
@@ -242,6 +250,44 @@ func _activate_pending_encounter() -> void:
 	_begin_active_encounter.call_deferred()
 
 
+## Holds until the encounter camera has stopped travelling, so the cast are
+## placed against a room that has arrived rather than one still on its way.
+##
+## The floor sampler is itself the settle signal. It is the exact value every
+## placement depends on, so waiting on it cannot disagree with what is about to
+## be measured - and it needs no reference to the camera, which this controller
+## does not hold. Two readings the same to within half a pixel, three times over,
+## is the room having stopped.
+##
+## The cap matters as much as the test. A room whose floor never resolves - an
+## encounter whose chunks have not streamed, or one authored with no ground under
+## the landing column - would otherwise hold the whole cutscene here forever with
+## the cinematic gate already claimed, which in game looks like mining that simply
+## stopped working. Timing out and placing the cast anyway degrades to exactly the
+## behaviour this replaced.
+func _await_room_settled(floor_sampler: Callable) -> void:
+	var previous_floor_y := NAN
+	var stable_readings := 0
+	for _frame in range(SETTLE_TIMEOUT_FRAMES):
+		await get_tree().process_frame
+		if _active_encounter_index < 0:
+			return
+		var sampled_y: float = floor_sampler.call(
+			miner_rig.get_landing_foot_screen_x()
+		)
+		if (
+			not is_nan(sampled_y)
+			and not is_nan(previous_floor_y)
+			and absf(sampled_y - previous_floor_y) < SETTLE_TOLERANCE_PIXELS
+		):
+			stable_readings += 1
+			if stable_readings >= SETTLE_STABLE_READINGS:
+				return
+		else:
+			stable_readings = 0
+		previous_floor_y = sampled_y
+
+
 ## Returns the screen height a cutscene actor's soles rest at for one column.
 ##
 ## Everyone standing in a cutscene room resolves their footing through here - the
@@ -400,6 +446,23 @@ func _begin_active_encounter() -> void:
 		var floor_sampler := _sample_cutscene_floor.bind(
 			_game_state.mining_y
 		)
+		# Nobody is placed until the room has stopped moving under them.
+		#
+		# focus() re-aims the camera at the encounter as it activates, so for a
+		# short while after the frame opens the whole room is still sliding. Every
+		# placement below resolves a SCREEN position from the floor, and a screen
+		# position sampled mid-slide is correct for a frame that no longer exists
+		# by the time the tween lands: the room settles hundreds of pixels away and
+		# the actor stays behind, standing below the room and off the bottom of the
+		# screen.
+		#
+		# This was only ever obvious on encounters whose opening walk starts
+		# immediately. One driven by a timeline whose first MOVE is a second in had
+		# the camera settle during its own wall strikes and looked fine, which is
+		# what made this read as a rat-colony problem rather than a shared one.
+		await _await_room_settled(floor_sampler)
+		if _active_encounter_index < 0:
+			return
 		# Stand the miner on the rock rather than on the row underneath it.
 		#
 		# Mining seats him against the intact floor line, which is right for a
@@ -749,6 +812,20 @@ func _prepare_authored_characters() -> bool:
 				stage.presentation_rock_break_requested,
 				_on_character_stage_rock_break_requested
 			)
+			# A stampede floors the miner for as long as it runs. The stage owns
+			# the horde and knows when the last of them is gone; it does not own
+			# the miner, so it says what happened and this decides what that
+			# means for him.
+			if stage is RatColonyEncounterStage:
+				var colony_stage := stage as RatColonyEncounterStage
+				_connect_once(
+					colony_stage.stampede_started,
+					_on_stampede_started
+				)
+				_connect_once(
+					colony_stage.stampede_finished,
+					_on_stampede_finished
+				)
 			if encounter.starts_rat_colony_support:
 				if not stage is RatColonyEncounterStage:
 					push_error(
@@ -787,6 +864,10 @@ func has_pending_or_active_interaction() -> bool:
 ## Releases only this encounter's named ownership of mining and camera state.
 func _finish_cinematic_flow() -> void:
 	_reset_speech_reactions()
+	# Nobody is left face down when the shot releases him, whatever ended it. A
+	# stampede that was cancelled mid-run never reaches its own finished signal,
+	# and the miner would go back to mining lying on his face.
+	miner_rig.release_cutscene_landing()
 	miner_rig.exit_cutscene_draw_order()
 	# Back to the mining grounding, so the shot's seating never follows him into
 	# the rest of the run.
@@ -893,6 +974,16 @@ func _on_sequence_dialogue_requested(
 		# conversation that is never going to arrive.
 		if _active_stage != null:
 			_active_stage.notify_dialogue_finished()
+
+
+## Puts the miner on the floor while a horde runs over him.
+func _on_stampede_started() -> void:
+	miner_rig.hold_cutscene_landing()
+
+
+## Picks him back up once the last of them has left the frame.
+func _on_stampede_finished() -> void:
+	miner_rig.release_cutscene_landing()
 
 
 ## Relays a stage-local action through the cross-system wiring boundary.

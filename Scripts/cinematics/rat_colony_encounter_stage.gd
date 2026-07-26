@@ -17,6 +17,10 @@ const RatAppearanceType = preload(
 
 ## Requests the separate gameplay colony only after the encounter closes cleanly.
 signal persistent_colony_requested
+## The horde has started pouring through. Whoever owns the miner floors him.
+signal stampede_started
+## The last of them is off screen. The miner can get up.
+signal stampede_finished
 
 @export_category("Rat Colony")
 @export var rat_scene: PackedScene
@@ -50,6 +54,22 @@ signal persistent_colony_requested
 ## editing this stage. It is a lower-case verb phrase and not an animation name;
 ## an AnimationPlayer clip of the same name still plays if a stage authors one.
 @export var procession_cue: StringName
+## The dialogue line cue that releases the horde, or empty to run it from the
+## opening as before.
+##
+## Empty is the default and preserves the old shape, where the colony is already
+## streaming when the frame opens. Rotini's introduction needs the other one: the
+## tunnel is EMPTY, he walks up out of nothing and says his piece, and the horde
+## only pours through on "Come on, boys!" - so the stampede is the answer to the
+## line rather than scenery that happened to be running behind it.
+##
+## This alias keeps Rotini's first encounter explicit while procession_cue
+## remains the shared colony contract used by later encounters.
+@export var stampede_cue: StringName = &""
+## How long the closing waits for the last of them to leave before it gives up
+## and frees them where they stand. Only reached if a follower is stuck, which
+## would otherwise hold the encounter open indefinitely.
+@export_range(0.5, 12.0, 0.5) var stampede_drain_timeout_seconds: float = 6.0
 
 ## Growth is bounded by max_live_followers (or the web cap) and pruned on exit.
 var _followers: Array[CinematicRatMiner] = []
@@ -74,30 +94,81 @@ func prepare(
 ## unless this stage waits for a cue to let them in.
 func play_opening() -> void:
 	await super.play_opening()
-	if not procession_cue.is_empty():
+	if (
+		not _is_active
+		or not procession_cue.is_empty()
+		or not stampede_cue.is_empty()
+	):
 		return
 	_begin_procession()
 
 
-## Starts the colony on its authored cue, and otherwise defers to the shared
-## stage. Returning what the base returned keeps a caller's "did an animation
-## play" answer honest: starting rats is not playing a clip.
+## Releases the horde on its authored line.
+##
+## Checked before the shared implementation rather than after, because that one
+## resolves a cue to an AnimationPlayer clip and answers false for a name it has
+## no animation for. A stampede is not a clip; it is a stream of actors, and it
+## has to be recognised here or the line passes with nothing happening.
 func play_cue(cue_id: StringName, line_index: int) -> bool:
-	var played_animation := super.play_cue(cue_id, line_index)
-	if not procession_cue.is_empty() and cue_id == procession_cue:
+	if (
+		_is_active
+		and (
+			(not procession_cue.is_empty() and cue_id == procession_cue)
+			or (not stampede_cue.is_empty() and cue_id == stampede_cue)
+		)
+	):
 		_begin_procession()
-	return played_animation
+		return true
+	return super.play_cue(cue_id, line_index)
 
 
 func play_closing() -> void:
 	var should_request_persistence := (
 		_is_active and not _has_requested_persistent_colony
 	)
+	# Let them finish leaving before anything else closes.
+	#
+	# The conversation ends on the line that started the stampede, so tearing the
+	# procession down here would cut it off at its own first frame - the horde
+	# would appear and vanish on the same beat the player is still reading. They
+	# run off under their own power, and only then does the shot close.
+	await _await_stampede_drained()
 	_stop_procession()
 	if should_request_persistence:
 		_has_requested_persistent_colony = true
 		persistent_colony_requested.emit()
 	await super.play_closing()
+
+
+func _begin_procession() -> void:
+	if not _is_active or _is_spawning:
+		return
+	_is_spawning = true
+	_spawn_generation += 1
+	stampede_started.emit()
+	_spawn_next_follower(_spawn_generation)
+
+
+## Stops new arrivals and waits for the ones already running to leave the frame.
+func _await_stampede_drained() -> void:
+	if not _is_spawning and _followers.is_empty():
+		return
+	# Stop the tap first, then wait for the pipe to empty. Leaving it running
+	# means new followers keep spawning into a shot that is trying to end.
+	_is_spawning = false
+	_spawn_generation += 1
+	var deadline := (
+		Time.get_ticks_msec()
+		+ int(stampede_drain_timeout_seconds * 1000.0)
+	)
+	while Time.get_ticks_msec() < deadline:
+		_prune_followers()
+		if _followers.is_empty():
+			break
+		await get_tree().process_frame
+		if not _is_active:
+			return
+	stampede_finished.emit()
 
 
 func cancel_and_restore() -> void:
@@ -118,16 +189,6 @@ func validate_stage() -> String:
 	if rat_appearances.is_empty():
 		return "Rat colony stage requires at least one rat appearance."
 	return ""
-
-
-## Opens the stream. Idempotent, because a cue can be re-presented when a player
-## walks the dialogue back over the line that carries it.
-func _begin_procession() -> void:
-	if not _is_active or _is_spawning:
-		return
-	_is_spawning = true
-	_spawn_generation += 1
-	_spawn_next_follower(_spawn_generation)
 
 
 ## Reuses one timer at a time; the generation rejects stale callbacks.

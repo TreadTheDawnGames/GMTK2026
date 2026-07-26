@@ -22,6 +22,7 @@ text = "I'm Rotini."
 [sub_resource type="Resource" id="Line_crew"]
 script = ExtResource("3_line")
 speaker_slot = &"rutini"
+stage_cue = &"stampede"
 text = "Come on, boys! We'll find that Cafe eventually!"
 
 [sub_resource type="Resource" id="Participant_miner"]
