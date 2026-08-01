@@ -38,12 +38,16 @@ var _audio_handler: PlayerAudioHandler
 @export_range(-1, 1, 1) var preferred_side : int = 0
 
 @export_category("Debug")
-@export var DEBUG_run_debug : bool = false
+@export var DEBUG_run_debug : bool = false :
+	set(value):
+		DEBUG_run_debug = value
+		queue_redraw()
 @export var DEBUG_bar_height : float = 81.0
 @export var DEBUG_slow_speed : float = 5.0
 @export var DEBUG_debug_bar_offset : Vector2 = Vector2.ZERO
 @export var DEBUG_backing_color : Color = Color(0.0, 0.0, 0.0, 0.25)
 @export var DEBUG_slider_color : Color = Color(1.0, 1.0, 1.0, 1.0)
+@export var DEBUG_grace_color : Color = Color(1.0, 0.647, 0.114, 0.686)
 @export var DEBUG_target_color : Color = Color(0.0, 0.427, 0.0, 0.25)
 
 var slider_position : float = 0.0:
@@ -164,9 +168,14 @@ func _draw():
 	# Draw backing
 	draw_rect(Rect2(DEBUG_debug_bar_offset, Vector2(backing_width, DEBUG_bar_height)), DEBUG_backing_color, true)
 	
+	
 	#Draw targets
 	for target : TimingTarget in targets:
+		draw_rect(Rect2(DEBUG_debug_bar_offset + Vector2(target.target_position - grace, 0), Vector2(target.my_width+(grace*2), DEBUG_bar_height)), DEBUG_grace_color, true)
 		draw_rect(Rect2(DEBUG_debug_bar_offset + Vector2(target.target_position, 0), Vector2(target.my_width, DEBUG_bar_height)), DEBUG_target_color, true)
+		if target.is_hit:
+			draw_rect(Rect2(DEBUG_debug_bar_offset + Vector2(target.target_position, 0), Vector2(target.my_width, 3)), Color.RED, true)
+			
 
 	#Draw slider
 	draw_rect(Rect2(DEBUG_debug_bar_offset + Vector2(slider_position, 0), Vector2(slider_width, DEBUG_bar_height)), DEBUG_slider_color, true)

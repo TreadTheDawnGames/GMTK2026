@@ -4,7 +4,7 @@
 [ext_resource type="Script" uid="uid://cu60ikt2ilbvd" path="res://Scripts/timing_windows/timing_window_panel.gd" id="3_eprdb"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_6ko1l"]
-bg_color = Color(0.19607843, 0.19607843, 0.19607843, 0.5176471)
+bg_color = Color(0.06469653, 0.064696535, 0.0646965, 0.5176471)
 corner_radius_top_left = 7
 corner_radius_top_right = 7
 corner_radius_bottom_right = 7
@@ -19,6 +19,7 @@ corner_radius_bottom_left = 7
 corner_detail = 7
 
 [node name="MiningWindow" type="Control" unique_id=2084390514]
+custom_minimum_size = Vector2(700, 0)
 layout_mode = 3
 anchors_preset = 7
 anchor_left = 0.5
@@ -32,17 +33,20 @@ offset_bottom = -567.0
 grow_horizontal = 2
 grow_vertical = 0
 script = ExtResource("1_iyxre")
-grace = 0.0
+slider_width = 5.0
 DEBUG_run_debug = true
-DEBUG_bar_height = 16.41
-DEBUG_debug_bar_offset = Vector2(0, 81.695)
+DEBUG_bar_height = 5.0
+DEBUG_debug_bar_offset = Vector2(0, -5)
 DEBUG_target_color = Color(0, 0.54901963, 0, 0.80784315)
 
 [node name="Panel" type="Panel" parent="." unique_id=1639049169 node_paths=PackedStringArray("timing_window")]
-custom_minimum_size = Vector2(700, 81)
-layout_mode = 0
-offset_right = 40.0
-offset_bottom = 40.0
+custom_minimum_size = Vector2(700, 0)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_6ko1l")
 script = ExtResource("3_eprdb")
 timing_window = NodePath("..")

@@ -4,12 +4,12 @@ extends Panel
 @onready var slider: Panel = %Slider
 
 func _ready():
-	size = Vector2(timing_window.backing_width, 81)
+	size = Vector2(timing_window.backing_width, size.y)
 	slider.size.x = timing_window.slider_width
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta: float) -> void:
-	slider.global_position.x = timing_window.slider_position
+	slider.position.x = timing_window.slider_position
 	
 	
 	pass

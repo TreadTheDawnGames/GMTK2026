@@ -58,10 +58,10 @@ func _process(_delta: float) -> void:
 func _get_candidate_hit_directions(
 	window: SliderTimingWindow
 ) -> PackedInt32Array:
-	var midpoint := window.backing.size.x * 0.5
-	var travel_left := window.slider_half_width()
+	var midpoint := window.backing_width * 0.5
+	var travel_left := window.slider_width * 0.5
 	var travel_right := maxf(
-		window.backing.size.x - window.slider_half_width(),
+		window.backing_width - window.slider_width * 0.5,
 		travel_left
 	)
 	var slider_position := clampf(
