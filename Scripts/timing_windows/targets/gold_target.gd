@@ -11,7 +11,7 @@ func initialize():
 	super.initialize()
 	direction = _random_direction()
 
-func hit(_timing_window : SliderTimingWindow = null) -> void:
+func hit(_timing_window : TimingWindow = null) -> void:
 	super.hit(_timing_window)
 	direction = _random_direction()
 

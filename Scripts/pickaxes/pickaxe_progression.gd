@@ -71,4 +71,10 @@ func _apply_visible_pickaxe(definition: PickaxeDefinition) -> void:
 	miner_rig.set_pickaxe_visual_tier(definition.visual_tier)
 	miner_rig.set_hammer_head_color(definition.hammer_head_color)
 	mining_controller.config.use_secondary_recovery = definition.secondary_recovery
-	
+
+func check_debug_tool_state():
+	if Input.is_action_pressed("Shift") and OS.has_feature("editor"):
+		#loadout.equip(DEBUG_PICKAXE)
+		#_apply_stack()
+		print("Pickaxe: ", loadout.equipped.display_name)
+	pass

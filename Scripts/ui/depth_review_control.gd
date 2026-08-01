@@ -73,7 +73,7 @@ func _on_review_started() -> void:
 	mining_controller.set_swing_queue_paused(true)
 	timing_window.process_mode = Node.PROCESS_MODE_DISABLED
 	timing_window.hide()
-	timing_window_feedback.hide()
+	#timing_window_feedback.hide()
 	return_button.disabled = false
 	_fade_return_button_in()
 
@@ -86,7 +86,7 @@ func _on_miner_view_reached() -> void:
 	mining_controller.set_swing_queue_paused(false)
 	timing_window.process_mode = Node.PROCESS_MODE_INHERIT
 	timing_window.show()
-	timing_window_feedback.show()
+	#timing_window_feedback.show()
 	
 
 

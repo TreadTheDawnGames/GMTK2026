@@ -1,8 +1,8 @@
 extends TimingTarget
 class_name LaLaLandTarget
-@onready var timing_window: SliderTimingWindow = %TimingWindow
-@onready var timing_window2: SliderTimingWindow = %TimingWindow2
-@onready var timing_window3: SliderTimingWindow = %TimingWindow3
+@onready var timing_window: TimingWindow = %TimingWindow
+@onready var timing_window2: TimingWindow = %TimingWindow2
+@onready var timing_window3: TimingWindow = %TimingWindow3
 
 @export var combo_override : int = 100
 
@@ -27,7 +27,7 @@ func ensure_components():
 	if not timing_window3.pressed.is_connected(timing_hit3):
 		timing_window3.pressed.connect(timing_hit3)
 
-func hit(_timing_window : SliderTimingWindow = null):
+func hit(_timing_window : TimingWindow = null):
 	main_timing_window = weakref(_timing_window)
 	#super.hit(_timing_window)
 	freeze.emit(true)
@@ -86,7 +86,7 @@ func succeed():
 	
 	timing_window.stop()
 	timing_window2.stop()
-	var window : SliderTimingWindow = main_timing_window.get_ref() as SliderTimingWindow
+	var window : TimingWindow = main_timing_window.get_ref() as TimingWindow
 	window.pressed.emit(true, 0, -combo_override)
 	exit()
 	#window.pressed.emit(true, 0, combo_override)

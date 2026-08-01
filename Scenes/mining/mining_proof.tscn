@@ -23,7 +23,6 @@
 [ext_resource type="Script" uid="uid://d3fjog3we4ugh" path="res://Scripts/mining/terrain_layer_renderer.gd" id="32_layer_renderer"]
 [ext_resource type="Resource" uid="uid://rsxn5lxga40a" path="res://resources/mining/default_terrain_layer_profile.tres" id="33_layer_profile"]
 [ext_resource type="PackedScene" path="res://Scenes/dialogue/character_presenter.tscn" id="34_character_presenter"]
-[ext_resource type="PackedScene" uid="uid://cskhmu30pdsc0" path="res://Scenes/mining/timing_bar_feedback.tscn" id="38_nh27f"]
 [ext_resource type="Script" uid="uid://cxysje4e2miht" path="res://Scripts/ui/depth_review_control.gd" id="39_depth_review"]
 [ext_resource type="PackedScene" path="res://Scenes/mining/mining_impact_smoke.tscn" id="40_impact_smoke"]
 [ext_resource type="Script" uid="uid://vrpny10f1lau" path="res://Scripts/dialogue/run_intro_controller.gd" id="42_intro_controller"]
@@ -192,7 +191,7 @@ mouse_filter = 2
 
 [node name="Systems" type="Node" parent="MiningScene" unique_id=1573949011]
 
-[node name="SceneWiring" type="Node" parent="MiningScene/Systems" unique_id=1434760342 node_paths=PackedStringArray("mining_controller", "timing_bridge", "view_controller", "terrain_manager", "terrain_renderer", "miner_rig", "hit_particles", "gem_outcrop_field", "impact_smoke", "impact_spark", "combo_vignette", "dig_number_presenter", "impact_shake", "pickaxe_reward_celebration", "pickaxe_progression", "encounter_progression", "cinematic_flow", "run_timeline", "coffee_speed_boost", "rat_colony_followers", "main_menu", "run_intro_controller", "combo_director", "combo_tier_punch", "hud", "playtime_reveal", "timing_window", "timing_bar_feedback", "depth_review_control", "encounter_controller", "dialogue_director", "credits_overlay")]
+[node name="SceneWiring" type="Node" parent="MiningScene/Systems" unique_id=1434760342 node_paths=PackedStringArray("mining_controller", "timing_bridge", "view_controller", "terrain_manager", "terrain_renderer", "miner_rig", "hit_particles", "gem_outcrop_field", "impact_smoke", "impact_spark", "combo_vignette", "dig_number_presenter", "impact_shake", "pickaxe_reward_celebration", "pickaxe_progression", "encounter_progression", "cinematic_flow", "run_timeline", "coffee_speed_boost", "rat_colony_followers", "main_menu", "run_intro_controller", "combo_director", "combo_tier_punch", "hud", "playtime_reveal", "timing_window", "depth_review_control", "encounter_controller", "dialogue_director", "credits_overlay")]
 script = ExtResource("25_wiring")
 mining_controller = NodePath("../MiningController")
 timing_bridge = NodePath("../TimingBridge")
@@ -221,7 +220,6 @@ combo_tier_punch = NodePath("../ComboTierPunch")
 hud = NodePath("../../HUD")
 playtime_reveal = NodePath("../../HUD/PlaytimeReveal")
 timing_window = NodePath("../../HUD/TimingWindow")
-timing_bar_feedback = NodePath("../../HUD/TimingBarFeedback")
 depth_review_control = NodePath("../../HUD/DepthReviewControl")
 encounter_controller = NodePath("../UpgradeEncounterController")
 dialogue_director = NodePath("../../../DialogueDirector")
@@ -349,10 +347,7 @@ options_scene = ExtResource("22_a0hll")
 
 [node name="TimingWindow" parent="MiningScene/HUD" unique_id=1764051259 instance=ExtResource("8_timing_window")]
 
-[node name="TimingBarFeedback" parent="MiningScene/HUD" unique_id=73798020 node_paths=PackedStringArray("timing_window") instance=ExtResource("38_nh27f")]
-timing_window = NodePath("../TimingWindow")
-
-[node name="DepthReviewControl" type="Control" parent="MiningScene/HUD" unique_id=1329828240 node_paths=PackedStringArray("return_button", "timing_window", "timing_window_feedback", "mining_controller")]
+[node name="DepthReviewControl" type="Control" parent="MiningScene/HUD" unique_id=1329828240 node_paths=PackedStringArray("return_button", "timing_window", "mining_controller")]
 process_mode = 3
 layout_mode = 3
 anchors_preset = 15
@@ -365,7 +360,6 @@ theme = ExtResource("42_mb17i")
 script = ExtResource("39_depth_review")
 return_button = NodePath("ReturnButton")
 timing_window = NodePath("../TimingWindow")
-timing_window_feedback = NodePath("../TimingBarFeedback")
 mining_controller = NodePath("../../Systems/MiningController")
 
 [node name="ReturnButton" type="Button" parent="MiningScene/HUD/DepthReviewControl" unique_id=1380694620]

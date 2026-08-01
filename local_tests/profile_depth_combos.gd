@@ -227,7 +227,7 @@ func _run() -> void:
 func _verify_timing_candidate_priority() -> bool:
 	# Build only the public timing-bar contract used by TimingBridge. Avoiding a
 	# scene boot keeps this rudimentary correctness check effectively constant.
-	var slider_window := SliderTimingWindow.new()
+	var slider_window := TimingWindow.new()
 	var backing := Control.new()
 	backing.size = Vector2(700.0, 80.0)
 	slider_window.backing = backing

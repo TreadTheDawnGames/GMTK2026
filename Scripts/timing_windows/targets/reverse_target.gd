@@ -1,7 +1,7 @@
 extends TimingTarget
 class_name ReverseTarget
 
-func hit(_timing_window: SliderTimingWindow = null) -> void:
+func hit(_timing_window: TimingWindow = null) -> void:
 	super.hit(_timing_window)
 	# Generic target callers may not own a timing window. The target is still
 	# collected in that case, but there is no slider direction to reverse.

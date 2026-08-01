@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" uid="uid://bcoaf8y2mxx7" path="res://Scenes/targets/shrinking_target.tscn" id="4_ndmun"]
 [ext_resource type="FontFile" uid="uid://yn3pahibw5ow" path="res://Assets/UI/ComicRelief-Bold.ttf" id="5_8bo8b"]
 [ext_resource type="Texture2D" uid="uid://cq6t4hddbfb7m" path="res://Assets/UI/TimeBar/BarBack_Short.png" id="7_1aeyh"]
+[ext_resource type="PackedScene" uid="uid://cskhmu30pdsc0" path="res://Scenes/mining/timing_bar_feedback.tscn" id="8_ndmun"]
 [ext_resource type="Resource" uid="uid://dhlm43rg16rkw" path="res://resources/mining/mining_config.tres" id="14_mining_config"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_6ko1l"]
@@ -108,11 +109,11 @@ offset_right = 349.0
 offset_bottom = -167.0
 grace = 3.0
 targets_use_image = false
-one_shot = true
 stop_one_shot_when_done = false
 fixed_window = 0.9
 animation_repeats = 4
 animation_color = Color(0, 1, 1, 1)
+loop_mode = 2
 
 [node name="Control" type="Control" parent="RecoveryWindow" unique_id=153878127]
 show_behind_parent = true
@@ -151,10 +152,10 @@ offset_bottom = -225.0
 speed = 1500.0
 grace = 3.0
 targets_use_image = false
-one_shot = true
 fixed_window = 0.9
 animation_repeats = 4
 animation_color = Color(0, 1, 1, 1)
+loop_mode = 2
 
 [node name="Control" type="Control" parent="RecoveryWindow2" unique_id=2056035615]
 show_behind_parent = true
@@ -182,5 +183,9 @@ texture = ExtResource("7_1aeyh")
 expand_mode = 5
 stretch_mode = 5
 flip_h = true
+
+[node name="TimingBarFeedback" parent="." unique_id=73798020 instance=ExtResource("8_ndmun")]
+unique_name_in_owner = true
+layout_mode = 1
 
 [editable path="MiningWindow"]

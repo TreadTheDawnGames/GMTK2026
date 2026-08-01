@@ -8,7 +8,7 @@ func initialize() -> void:
 	_fade()
 	pass # Replace with function body.
 
-func hit(_timing_window : SliderTimingWindow = null):
+func hit(_timing_window : TimingWindow = null):
 	super.hit(_timing_window)
 	t.kill()
 	modulate.a = 1.0
@@ -19,9 +19,6 @@ func unhit() -> void:
 	_fade()
 	super.unhit()
 	
-
-func place(_placement_width : float) -> float:
-	return super.place(_placement_width)
 
 func _fade():
 	if t != null and t.is_running():

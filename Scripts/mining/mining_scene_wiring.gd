@@ -55,7 +55,6 @@ const MINER_FLOOR_LAYER_INDEX: int = 0
 @export var hud: MiningHud
 @export var playtime_reveal: PlaytimeReveal
 @export var timing_window: TimingWindowTask
-@export var timing_bar_feedback: TimingBarFeedback
 @export var depth_review_control: DepthReviewControl
 @export var encounter_controller: DepthEncounterController
 @export var dialogue_director: DialogueDirector
@@ -103,6 +102,7 @@ func _ready() -> void:
 	hud.set_save_game(_game_state.save_game)
 	miner_rig.set_audio_handler(_audio_handler)
 	timing_window.set_audio_handler(_audio_handler)
+	timing_window.ensure_components()
 	# The opening sequence owns bus playback, while this composition root owns
 	# the one discoverable dependency on the AudioHandler autoload.
 	run_intro_controller.arrival_sequence.set_audio_handler(_audio_handler)
@@ -310,6 +310,10 @@ func _ready() -> void:
 		pickaxe_reward_celebration.play_for_upgrade
 	)
 	_connect_once(
+		main_menu.start_requested,
+		pickaxe_progression.check_debug_tool_state
+	)
+	_connect_once(
 		_game_state.run_reset,
 		combo_director._on_run_reset
 	)
@@ -350,14 +354,6 @@ func _ready() -> void:
 	_connect_once(
 		mining_controller.mine_missed,
 		combo_vignette.release
-	)
-	_connect_once(
-		timing_window.pressed,
-		timing_bar_feedback._on_timing_pressed
-	)
-	_connect_once(
-		timing_window.streak_ended,
-		timing_bar_feedback._on_streak_ended
 	)
 	_connect_once(
 		mining_controller.dig_number_requested,
@@ -511,7 +507,7 @@ func _apply_reduce_motion(enabled: bool) -> void:
 	pickaxe_reward_celebration.set_reduce_motion_enabled(enabled)
 	view_controller.set_reduce_motion_enabled(enabled)
 	combo_tier_punch.set_reduce_motion_enabled(enabled)
-	timing_bar_feedback.set_reduce_motion_enabled(enabled)
+	timing_window.timing_bar_feedback.set_reduce_motion_enabled(enabled)
 	encounter_controller.set_reduce_motion_enabled(enabled)
 	run_intro_controller.attendant_presenter.set_reduce_motion_enabled(enabled)
 	_cutscene_action_presenter.set_reduce_motion_enabled(enabled)

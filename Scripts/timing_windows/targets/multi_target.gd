@@ -13,7 +13,7 @@ func initialize():
 	_reset_hit_progress()
 	Utils.set_control_width(self, my_width)
 
-func hit(_timing_window : SliderTimingWindow = null) -> void:
+func hit(_timing_window : TimingWindow = null) -> void:
 	times_hit += 1
 	if times_hit == required_hits:
 		times_hit = 0

@@ -1,5 +1,5 @@
 extends Control
-class_name SliderTimingWindow
+class_name TimingWindow
 
 ## Moves the timing slider and tracks targets until every target is hit.
 
@@ -13,14 +13,15 @@ signal pressed(success: bool, hit_direction: int, combo : int)
 @export var speed_multiplier: float = 1.0
 @export var grace: float = 7.0
 @export var targets_use_image: bool = true
-@export var slider_width: float = 15.0
-@export var one_shot: bool = false
+@export var slider_width: float = 5.0
+#@export var one_shot: bool = false
 @export var stop_one_shot_when_done: bool = true
 @export var fixed_window: float = -1.0
 @export var space_between_targets : float = 5.0
 @export var animation_repeats: int = 3
 @export var animation_color : Color = Color.RED
-
+enum LoopMode {BOUNCE, LOOP, ONE_SHOT}
+@export var loop_mode : LoopMode = LoopMode.BOUNCE
 
 ## The size of the target spawn area
 @export var backing_width : float = 700
@@ -60,23 +61,16 @@ var slider_position : float = 0.0:
 ## Creates the configured target baseline and prepares one-shot recovery bars.
 func _ready() -> void:
 	set_process(false)
-	#preferred_side = 0
 	while targets.size() < _starting_target_count:
 		add_target()
-	#Utils.set_control_width(slider, slider_width)
-	#if not backing.resized.is_connected(on_backing_resized):
-		#backing.resized.connect(on_backing_resized)
+
 	await get_tree().process_frame
-	#randomize_all_targets()
-	#for target in targets:
-		#randomize_target(target)
 	
-	if not one_shot:
-		randomize_all_targets()
-	reset_one_shot()
-	if one_shot:
+	if loop_mode == LoopMode.ONE_SHOT:
+		reset_one_shot()
 		stop()
 	else:
+		randomize_all_targets()
 		set_process(true)
 	#backing_width = backing.size.x
 	
@@ -86,6 +80,14 @@ func _process(delta: float) -> void:
 	if get_tree().paused:
 		print("paused")
 		return
+	
+	if DEBUG_run_debug:
+		if Input.is_action_pressed("DEBUG_left"):
+			direction = -1
+		if Input.is_action_pressed("DEBUG_right"):
+			direction = 1
+		
+
 	
 	#Detect a button press (Space, enter, left-click, etc.)
 	if Input.is_action_just_pressed(&"primary_action"):
@@ -106,39 +108,44 @@ func _process(delta: float) -> void:
 		if success:
 			hit_direction = _get_slider_hit_direction()
 			consecutive_hits += 1
-			print("success")
-			#AudioHandler.play_sound(AudioLibrary.MINE_SOUNDS.pick_random())
 		else:
-			print("fail")
 			consecutive_hits = 0
 		
 		#Regardless of whether we hit or not, report that we were pressed.
 		pressed.emit(success, hit_direction, consecutive_hits)
 		
 		#If all of our targets have been hit and we are not a one-shot, reset all our targets.
-		if is_all_targets_hit() and not one_shot:
+		if is_all_targets_hit() and loop_mode != LoopMode.ONE_SHOT:
 			reset_all_targets(false)
 		
 		# Handle one-shot ending
 		if stop_one_shot_when_done:
-			if one_shot:
+			if loop_mode == LoopMode.ONE_SHOT:
 				await pause(true)
 				stop()
 	
 	#update our slider position. (This is what is actually used to detect if we hit a target)
-	
-	if DEBUG_run_debug:
-		if Input.is_action_pressed("DEBUG_left"):
-			direction = -1
-		if Input.is_action_pressed("DEBUG_right"):
-			direction = 1
-	
 	var mv_spd : float = DEBUG_slow_speed if Input.is_action_pressed("Shift") and DEBUG_run_debug else speed
 	var movement_amount : float = mv_spd * direction * speed_multiplier * delta
-		
-	slider_position = clamp_within_bounds(slider_position + movement_amount, slider_width)
 	
-	# Detect if we need to bounce
+
+	slider_position = clamp_within_bounds(slider_position + movement_amount, slider_width)
+
+	
+	match loop_mode:
+		LoopMode.BOUNCE, LoopMode.ONE_SHOT:
+			perform_bounce()
+		LoopMode.LOOP:
+			slider_position = wrapf(slider_position, 0.01, backing_width-slider_width-0.01)
+				
+	#slider.position.x = slider_position
+	#queue_redraw()
+	if DEBUG_run_debug:
+		queue_redraw()
+
+	
+func perform_bounce():
+		# Detect if we need to bounce
 	var left_edge : float = 0.0
 	var right_edge : float = backing_width - slider_width
 	var hit_left_edge := slider_position <= left_edge and direction < 0.0
@@ -152,15 +159,11 @@ func _process(delta: float) -> void:
 		direction *= -1
 		play_bounce_sound()
 		# and handle the one-shot stuff
-		if one_shot:
+		if loop_mode == LoopMode.ONE_SHOT:
 			pressed.emit(false, 0, consecutive_hits)
 			if stop_one_shot_when_done:
 				stop()
-	
-	#slider.position.x = slider_position
-	#queue_redraw()
-	if DEBUG_run_debug:
-		queue_redraw()
+
 
 func _draw():
 	if not DEBUG_run_debug:
@@ -192,7 +195,7 @@ func start() -> void:
 
 ## Resets this timing window to the state it is before a one-shot is fired
 func reset_one_shot():
-	if one_shot:
+	if loop_mode == LoopMode.ONE_SHOT:
 		slider_position = 0.0
 		direction = 1.0
 		reset_all_targets()
@@ -201,19 +204,7 @@ func reset_one_shot():
 ## Freezes the slider and optionally flashes its recovery warning.
 func pause(animate: bool) -> void:
 	_set_timing_process(false)
-	if not animate:
-		return
-	await play_animation(animation_color, animation_repeats, 0.1)
 
-## Plays a flashing animation on the slider that happens a number of times equal to [repetitions].
-func play_animation(color : Color, repetitions : int = 1,  duration : float = 0.1):
-	#var tween: Tween = create_tween()
-	#for _repeat_index in range(repetitions):
-		#tween.tween_property(slider, "modulate", color, duration)
-		#tween.tween_property(slider, "modulate", Color.WHITE, duration)
-	#await tween.finished
-
-	pass
 
 ## Hides the timing bar and stops its slider.
 func stop() -> void:
@@ -221,7 +212,7 @@ func stop() -> void:
 	_set_timing_process(false)
 
 ## Adds and positions one valid hit target.
-func add_target() -> void:
+func add_target() -> TimingTarget:
 	if target_packed_scenes.size() == 0:
 		push_error(name, " does not have any target scenes.")
 		return
@@ -246,6 +237,7 @@ func add_target() -> void:
 		#randomize_all_targets
 		#randomize_target(new_target)
 		new_target.set_target_position(clamp_within_bounds(new_target.position.x, new_target.size.x))
+	return new_target
 
 ## Sets the target baseline restored whenever a streak ends.
 func set_starting_target_count(target_count: int) -> void:
@@ -352,15 +344,89 @@ func _get_slider_hit_direction() -> int:
 		return 0
 	return -1 if hit_offset_from_center < 0.0 else 1
 
+class PlacementRequest:
+	func _init(req_pos: float, right_ext : float, req : TimingTarget):
+		requested_pos = req_pos
+		right_extent = right_ext
+		requestee = req
+	
+	var requested_pos : float = -1
+	var right_extent : float = -1
+	var requestee : TimingTarget
+	pass
+
+func randomize_single_target(placing_target : TimingTarget):
+	if placing_target == null:
+		return
+	var placement_requests : Array[PlacementRequest] = []
+	var illegal : bool = true
+	var rerolls : int = 0
+	#Get all target's requested positions
+	for target in targets:
+		var target_position = target.target_position
+		target_position = clamp_within_bounds(target_position, target.my_width)
+			
+		placement_requests.append(PlacementRequest.new(target_position, target_position + target.my_width, target))
+		
+		#sort requests to be left to right so they are iterated left to right in the next part
+	placement_requests.sort_custom(func(a : PlacementRequest, b:PlacementRequest): return a.requested_pos < b.requested_pos)
+	
+	var requested_position : float = remap_to_preferred_side(clamp_within_bounds(placing_target.get_requested_position(backing_width), placing_target.my_width))
+
+	
+	var left_backing : float = 0.0
+	var right_backing : float = backing_width
+	
+	if abs(preferred_side) > 0:
+		var left_bounds : float = 0
+		var right_bounds : float = backing_width
+		if preferred_side < 0:
+			right_bounds = backing_width * 0.66
+		elif preferred_side > 0:
+			left_bounds = backing_width * 0.33
+		requested_position = remap(requested_position, 0, backing_width, left_bounds, right_bounds)
+		
+	var rightmost_seen_so_far : float = -INF
+	# Check if requested positions are legal
+	while illegal:
+		for placement_request in placement_requests:
+			if requested_position <= rightmost_seen_so_far:
+				requested_position = remap_to_preferred_side(clamp_within_bounds(placing_target.get_requested_position(backing_width), placing_target.my_width))
+				illegal = true
+			rightmost_seen_so_far = placement_request.right_extent
+		
+		rerolls += 1
+		if rerolls > 50:
+			illegal = false
+			printerr("NOT AN ERROR: Rerolled target placement ", rerolls, " times.")
+	
+		placing_target.set_target_position(requested_position, true)
+		
+func remap_to_preferred_side(requested_position : float) -> float:
+	if abs(preferred_side) > 0:
+		var left_bounds : float = 0
+		var right_bounds : float = backing_width
+		if preferred_side < 0:
+			right_bounds = backing_width * 0.66
+		elif preferred_side > 0:
+			left_bounds = backing_width * 0.33
+		return remap(requested_position, 0, backing_width, left_bounds, right_bounds)
+	return requested_position
+
+
 func randomize_all_targets():
-	var need_reroll : bool = true
-	var total_rerolls : int = 0
-	while need_reroll:
-		#assume safe until told otherwise
-		need_reroll = false
-		var placed_targs : Array = []
+	var placement_requests : Array[PlacementRequest] = []
+	var illegal : bool = true
+	var rerolls : int = 0
+	while illegal:
+		illegal = false
+		#Get all target's requested positions
 		for target in targets:
-			var requested_position = target.place(backing_width) if fixed_window < 0.0 else fixed_window * backing_width
+			var requested_position = target.get_requested_position(backing_width) if fixed_window < 0.0 else fixed_window * backing_width
+			requested_position = clamp_within_bounds(requested_position, target.my_width)
+			
+			var left_backing : float = 0.0
+			var right_backing : float = backing_width
 			
 			if abs(preferred_side) > 0:
 				var left_bounds : float = 0
@@ -370,38 +436,30 @@ func randomize_all_targets():
 				elif preferred_side > 0:
 					left_bounds = backing_width * 0.33
 				requested_position = remap(requested_position, 0, backing_width, left_bounds, right_bounds)
-			target.set_target_position(requested_position, false  )
-			var extents = [target.get_left_extent() , target.get_right_extent() , requested_position, target]
-		#if extents overlap
-			for pt in placed_targs:
-				if pt[3] == target:
-					continue
-				var left_overlap : bool = (extents[0] - space_between_targets > pt[0] and extents[0] - space_between_targets < pt[1])
-				var right_overlap : bool = (extents[1] + space_between_targets> pt[0] and extents[1] + space_between_targets< pt[1])
-				var center_overlap : bool = (requested_position > pt[0] and requested_position < pt[1])
-
-				if (left_overlap or right_overlap or center_overlap):
-					need_reroll = true
-					break
-		#else
-			placed_targs.append(extents)
-			var minimum_center_x: float = target.my_width
-			var maximum_center_x: float = maxf(
-				backing_width - minimum_center_x,
-				minimum_center_x
-			)
-			target.set_target_position(clampf(
-				extents[2],
-				minimum_center_x,
-				maximum_center_x), true)
-			clamp_target_within_bounds(target)
 				
-		if total_rerolls > 5:
-			printerr("Not an error: Rerolls = ", total_rerolls)
-			break
-		total_rerolls += 1
+			placement_requests.append(PlacementRequest.new(requested_position, requested_position + target.my_width, target))
+		
+		#sort requests to be left to right so they are iterated left to right in the next part
+		placement_requests.sort_custom(func(a : PlacementRequest, b:PlacementRequest): return a.requested_pos < b.requested_pos)
+		
+		var rightmost_seen_so_far : float = -INF
+		# Check if requested positions are legal
+		for placement_request in placement_requests:
+			if placement_request.requested_pos <= rightmost_seen_so_far:
+				illegal = true
+				placement_requests.clear()
+				pass
+			rightmost_seen_so_far = placement_request.right_extent
+		rerolls += 1
+		if rerolls > 50:
+			illegal = false
+			printerr("NOT AN ERROR: Rerolled target placement ", rerolls, " times.")
 	
-	pass
+	for pr in placement_requests:
+		if pr.requestee:
+			pr.requestee.set_target_position(pr.requested_pos, true)
+		else:
+			printerr("No requestee for this placement request. ", placement_requests.size())
 
 ## Targets anchor to the backing's center, so a position placed before the
 ## backing has its real width re-resolves half a bar away once it lays out,
@@ -418,7 +476,7 @@ func on_freeze(stopped:bool):
 		pause(false)
 	else:
 		start()
-		if is_all_targets_hit() and not one_shot:
+		if is_all_targets_hit() and loop_mode != LoopMode.ONE_SHOT:
 			reset_all_targets()
 
 ## Clamps [to_clamp] into a number between zero and [backing_width], and returns the clamped number making sure the width does not extend outside the bounds.

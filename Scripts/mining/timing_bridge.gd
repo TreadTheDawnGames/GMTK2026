@@ -56,7 +56,7 @@ func _process(_delta: float) -> void:
 ## targets use the slider's bounce path; moving targets use relative velocity
 ## until either participant bounces, when the next frame recalculates the path.
 func _get_candidate_hit_directions(
-	window: SliderTimingWindow
+	window: TimingWindow
 ) -> PackedInt32Array:
 	var midpoint := window.backing_width * 0.5
 	var travel_left := window.slider_width * 0.5
@@ -200,7 +200,7 @@ func _get_candidate_hit_directions(
 
 ## Predicts a moving target only through the next constant-velocity segment.
 func _get_moving_target_segment_hit(
-	window: SliderTimingWindow,
+	window: TimingWindow,
 	target: MovingTarget,
 	slider_position: float,
 	travel_left: float,

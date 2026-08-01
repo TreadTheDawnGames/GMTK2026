@@ -20,7 +20,6 @@ var use_image:bool=true:
 		use_image = value
 		$TextureRect.visible = value
 
-
 func set_target_position(pos : float, set_physical_pos : bool = false):
 	target_position = pos
 	if set_physical_pos:
@@ -49,7 +48,7 @@ func is_point_within_bounds(left_extent : float, right_extent : float, grace : f
 	return  (left_extent <= get_right_extent() + grace) and (right_extent >= get_left_extent() - grace)
 
 ## Marks this target collected and hides it until the set resets.
-func hit(_timing_window : SliderTimingWindow = null) -> void:
+func hit(_timing_window : TimingWindow = null) -> void:
 	is_hit = true
 	hide()
 
@@ -64,9 +63,9 @@ func is_overlapping(_input_rect : Rect2) -> bool:
 	return false
 
 ## Chooses the target's desired horizontal center inside the timing bar.
-func place(placement_width : float) -> float:
-	var target_center_x := (randf() * placement_width)
-	return target_center_x
+func get_requested_position(placement_width : float) -> float:
+	var left_position : float = (randf() * placement_width)
+	return left_position
 
 ## Called when the recovery bar successfully saves the streak
 func recovery_action():

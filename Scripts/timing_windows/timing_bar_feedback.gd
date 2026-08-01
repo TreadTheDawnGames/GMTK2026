@@ -38,8 +38,13 @@ class Mark:
 	var color: Color
 	var is_miss: bool
 
-@export_category("References")
-@export var timing_window: TimingWindowTask
+#@export_category("References")
+# This is a circular reference.
+#@export var timing_window: TimingWindowTask
+var timing_window: WeakRef
+@onready var mining_window: TimingWindow = %MiningWindow
+@onready var recovery_window: TimingWindow = %RecoveryWindow
+@onready var recovery_window2: TimingWindow = %RecoveryWindow2
 
 @export_category("Palette")
 @export var hit_color: Color = Color("ffe9a8")
@@ -49,6 +54,7 @@ class Mark:
 ## Owns the whole quick-save moment. Matches TimingWindowTask.combo_saved_color
 ## and the recovery bar's own authored flash, so one colour means "savable".
 @export var recovery_color: Color = Color("26b4ff")
+@export var pulse_stylebox : StyleBoxFlat
 
 @export_category("Charge Gauge")
 @export_range(2.0, 40.0, 1.0) var charge_height_px: float = 7.0
@@ -105,7 +111,7 @@ var _marks: Array[Mark] = []
 var _random := RandomNumberGenerator.new()
 # Both caches are keyed by nodes and resources the timing scene already owns, so
 # each holds at most one entry per bar: two for the mining and recovery bars.
-var _shine_surfaces: Dictionary[SliderTimingWindow, Control] = {}
+var _shine_surfaces: Dictionary[TimingWindow, Control] = {}
 var _tinted_styles: Dictionary[StyleBox, StyleBox] = {}
 # Last drawn gauge state. The gauge is standing UI, so it has to redraw when the
 # streak changes rather than only when a press happens, but redrawing every
@@ -120,11 +126,12 @@ var _is_combo_loss_animating: bool = false
 
 ## Prepares the additive canvas and starts the idle state watch.
 func _ready() -> void:
+	timing_window = weakref(get_parent())
 	combo_bar.value = 0.0
 	combo_bar.set_maximum(_combo_ceiling())
 	#combo_bar.add_tick(_recovery_threshold())
-	timing_window.recovery_window.pressed.connect(_on_timing_pressed)
-	timing_window.recovery_window2.pressed.connect(_on_timing_pressed)
+	recovery_window.pressed.connect(_on_timing_pressed)
+	recovery_window2.pressed.connect(_on_timing_pressed)
 	combo_bar.add_ticks(_tier_thresholds())
 	#print("tiers: ", _tier_thresholds())
 	
@@ -136,8 +143,8 @@ func _ready() -> void:
 	var glow_material := CanvasItemMaterial.new()
 	glow_material.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	material = glow_material
-	if timing_window == null:
-		push_error("TimingBarFeedback requires a TimingWindowTask.")
+	#if timing_window == null:
+		#push_error("TimingBarFeedback requires a TimingWindowTask.")
 
 
 ## Keeps color confirmation while removing the frame's spatial expansion.
@@ -237,7 +244,7 @@ func _draw() -> void:
 	var bar := _get_active_bar()
 	if bar == null or not bar.is_visible_in_tree():
 		return
-	var main_bar := timing_window.mining_window
+	var main_bar := mining_window
 	if main_bar == null:
 		return
 	_drawn_combo = _current_combo()
@@ -381,11 +388,11 @@ func _draw_threshold_notch(
 ## Lends the main bar's drawn frame to the quick-save strip while it is up. The
 ## strip ships as a bare rounded box, and it is both the fastest and the tightest
 ## input in the run, so it should not also be the least legible thing on screen.
-func _draw_recovery_frame(main_bar: SliderTimingWindow) -> void:
+func _draw_recovery_frame(main_bar: TimingWindow) -> void:
 	if not _is_recovering():
 		return
-	var recovery_bar := timing_window.recovery_window
-	var frame_style := _frame_style_of(timing_window.recovery_window)
+	var recovery_bar := recovery_window
+	var frame_style := _frame_style_of(recovery_window)
 	if frame_style == null:
 		return
 	var tint := recovery_color
@@ -411,8 +418,8 @@ func _draw_slash(mark: Mark, bar_rect: Rect2, mark_color: Color) -> void:
 
 ## Redraws the bar's own frame over itself, tinted and swelling with the kick,
 ## so the drawn texture lights up and a later art change carries through here.
-func _draw_frame_flash(mark: Mark, bar: SliderTimingWindow) -> void:
-	var frame_style := _frame_style_of(bar)
+func _draw_frame_flash(mark: Mark, bar: TimingWindow) -> void:
+	var frame_style := pulse_stylebox#_frame_style_of(bar)
 	if frame_style == null:
 		return
 	var tint := mark.color
@@ -436,7 +443,7 @@ func _draw_frame_flash(mark: Mark, bar: SliderTimingWindow) -> void:
 ## The rectangle the frame art actually covers: the Control rect grown by the
 ## StyleBox's expand margins. Placing against this rather than the bare rect is
 ## what keeps the gauge outside the drawn box even if the art's margins change.
-func _drawn_frame_rect(bar: SliderTimingWindow) -> Rect2:
+func _drawn_frame_rect(bar: TimingWindow) -> Rect2:
 	var rect := _to_local_rect(_get_shine_surface(bar).get_global_rect())
 	var textured_style := _frame_style_of(bar) as StyleBoxTexture
 	if textured_style == null:
@@ -456,7 +463,7 @@ func _drawn_frame_rect(bar: SliderTimingWindow) -> Rect2:
 
 
 ## The StyleBox carrying one bar's drawn frame, or null if it has none.
-func _frame_style_of(bar: SliderTimingWindow) -> StyleBox:
+func _frame_style_of(bar: TimingWindow) -> StyleBox:
 	var surface := _get_shine_surface(bar)
 	if surface == null:
 		return null
@@ -467,7 +474,7 @@ func _frame_style_of(bar: SliderTimingWindow) -> StyleBox:
 ## for a textured box rather than by a hard-coded path, so renaming a node
 ## inside the adapt-only timing scene cannot silently drop the flash. Bars with
 ## no drawn frame, like the quick-save strip, fall back to their own plain box.
-func _get_shine_surface(bar: SliderTimingWindow) -> Control:
+func _get_shine_surface(bar: TimingWindow) -> Control:
 	if _shine_surfaces.has(bar):
 		return _shine_surfaces[bar]
 	var surface: Control = bar
@@ -541,52 +548,54 @@ func _to_local_rect(global_rect: Rect2) -> Rect2:
 ## The streak the gauge is showing. It survives a savable miss, because the
 ## quick-save is fought for with the streak still standing.
 func _current_combo() -> int:
-	return 0 if timing_window == null else maxi(timing_window.combo, 0)
+	return 0 if timing_window.get_ref() == null else maxi(timing_window.get_ref().combo, 0)
 
 
 ## Segments in the gauge: the combo past which the controller stops paying.
 func _combo_ceiling() -> int:
-	if timing_window == null or timing_window.mining_config == null:
+	if timing_window.get_ref() == null or timing_window.get_ref().mining_config == null:
 		return 0
-	return maxi(timing_window.mining_config.maximum_effect_combo, 1)
+	return maxi(timing_window.get_ref().mining_config.maximum_effect_combo, 1)
 
 
 ## Combos that promote the run into its next escalation step. Shared with
 ## ComboDirector through the config, so the gauge and the music agree.
 func _tier_thresholds() -> Array[int]:
-	if timing_window == null or timing_window.mining_config == null:
+	if timing_window.get_ref() == null or timing_window.get_ref().mining_config == null:
 		return [] as Array[int]
-	return timing_window.mining_config.combo_tier_thresholds
+	return timing_window.get_ref().mining_config.combo_tier_thresholds
 
 
 ## Combo at which a miss earns a quick-save instead of ending the streak.
 func _recovery_threshold() -> int:
-	if timing_window == null or timing_window.mining_config == null:
+	if timing_window.get_ref() == null or timing_window.get_ref().mining_config == null:
 		return 0
-	return timing_window.mining_config.recovery_combo_threshold
+	return timing_window.get_ref().mining_config.recovery_combo_threshold
 
 
 ## Whether the quick-save strip currently owns the moment.
 func _is_recovering() -> bool:
 	return (
-		timing_window != null
-		and timing_window.recovery_window != null
-		and timing_window.recovery_window.visible
+		#timing_window != null
+		#and 
+		recovery_window != null
+		and recovery_window.visible
 	)
 
 func _is_second_recovering() -> bool:
 	return (
-		timing_window != null
-		and timing_window.recovery_window != null
-		and timing_window.recovery_window2.visible
+		#timing_window != null
+		#and 
+		recovery_window != null
+		and recovery_window2.visible
 	)
 ## Returns whichever of the two bars is on screen. Recovery wins while it is up,
 ## because that is the bar the player is actually reading.
-func _get_active_bar() -> SliderTimingWindow:
-	if timing_window == null:
-		return null
+func _get_active_bar() -> TimingWindow:
+	#if timing_window == null:
+		#return null
 	if _is_second_recovering():
-		return timing_window.recovery_window2
+		return recovery_window2
 	if _is_recovering():
-		return timing_window.recovery_window
-	return timing_window.mining_window
+		return recovery_window
+	return mining_window

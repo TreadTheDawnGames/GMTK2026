@@ -3,11 +3,12 @@ class_name TimingWindowTask
 
 ## Resolves timing attempts through the project's primary input action.
 
-@onready var mining_window: SliderTimingWindow = %MiningWindow
-@onready var recovery_window: SliderTimingWindow = %RecoveryWindow
-@onready var recovery_window2: SliderTimingWindow = %RecoveryWindow2
+@onready var mining_window: TimingWindow = %MiningWindow
+@onready var recovery_window: TimingWindow = %RecoveryWindow
+@onready var recovery_window2: TimingWindow = %RecoveryWindow2
 @onready var combo_label: Label = %ComboLabel
 @onready var depth_label: Label = %DepthLabel
+@onready var timing_bar_feedback: TimingBarFeedback = %TimingBarFeedback
 
 signal pressed(success: bool, combo: int, hit_direction: int)
 ## Reports the combo that actually ended after recovery is exhausted.
@@ -35,6 +36,20 @@ var _active_combo_target_group_index: int = -1
 var _highest_unlocked_combo_target_group_index: int = 0
 var _bounce_muted: bool = false
 var _displayed_distance: int = 0
+
+func ensure_components():
+	if not mining_window:
+		mining_window = %MiningWindow
+	if not recovery_window:
+		recovery_window = %RecoveryWindow
+	if not recovery_window2:
+		recovery_window2 = %RecoveryWindow2
+	if not combo_label:
+		combo_label = %ComboLabel
+	if not depth_label:
+		depth_label = %DepthLabel
+	if not timing_bar_feedback:
+		timing_bar_feedback = %TimingBarFeedback
 
 ## Connects both timing bars to the combo flow.
 func _ready() -> void:
@@ -64,10 +79,12 @@ func _ready() -> void:
 		_additional_recovery_window_pressed
 	):
 		recovery_window2.pressed.connect(_additional_recovery_window_pressed)
-		
-	#_update_depth_label(_game_state.depth)
-	#if not _game_state.depth_changed.is_connected(_update_depth_label):
-		#_game_state.depth_changed.connect(_update_depth_label)
+	if not pressed.is_connected(timing_bar_feedback._on_timing_pressed):
+		pressed.connect(timing_bar_feedback._on_timing_pressed)
+	
+	if not streak_ended.is_connected(timing_bar_feedback._on_streak_ended):
+		streak_ended.connect(timing_bar_feedback._on_streak_ended)
+	
 	if not _target_unlocks.is_empty():
 		_apply_pickaxe_target_unlocks()
 	set_audio_handler(_audio_handler)
@@ -113,7 +130,7 @@ func _on_run_reset() -> void:
 	combo = 0
 	stored_combo = 0
 	failed_recovery = false
-	for window: SliderTimingWindow in [
+	for window: TimingWindow in [
 		mining_window,
 		recovery_window,
 		recovery_window2,
@@ -213,7 +230,7 @@ func _mining_window_pressed(
 				"SFX"
 			)
 
-		# Defer until SliderTimingWindow finishes iterating the hit target set.
+		# Defer until TimingWindow finishes iterating the hit target set.
 		# Pool expansion must precede any bonus spawn at the same combo.
 		_apply_success_target_rules.call_deferred(
 			combo,
@@ -371,12 +388,13 @@ func _apply_success_target_rules(
 		var group_index := _resolve_combo_target_group_index(reached_combo)
 		if target_set_completed:
 			_apply_combo_target_group(reached_combo, true)
+		var added_target : TimingTarget = null
 		if reached_combo in _progression_bonus_target_combos:
 			if (
 				target_set_completed
 				or group_index == _active_combo_target_group_index
 			):
-				mining_window.add_target()
+				added_target = mining_window.add_target()
 			elif group_index >= 0:
 				# This allocation occurs only at the level's bounded authored
 				# bonus thresholds (at most four per streak), not per hit.
@@ -388,9 +406,11 @@ func _apply_success_target_rules(
 						group_index
 					)
 				)
-				mining_window.add_target()
+				added_target = mining_window.add_target()
 				mining_window.target_packed_scenes = retained_pool
-			mining_window.randomize_all_targets()
+			mining_window.randomize_single_target(added_target)
+			print("adding new target")
+
 		return
 	var unlocked_target_scenes: Array[PackedScene] = []
 	for definition in _target_unlocks:

@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://cf8q7ylnplo6c"]
 
-[ext_resource type="Script" uid="uid://yknrp1dp4whn" path="res://Scenes/slider_timing_window.gd" id="1_iyxre"]
+[ext_resource type="Script" uid="uid://dikqyk5tdawrf" path="res://Scripts/timing_windows/animated_timing_window.gd" id="1_mns8t"]
 [ext_resource type="Script" uid="uid://cu60ikt2ilbvd" path="res://Scripts/timing_windows/timing_window_panel.gd" id="3_eprdb"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_6ko1l"]
@@ -10,6 +10,9 @@ corner_radius_top_right = 7
 corner_radius_bottom_right = 7
 corner_radius_bottom_left = 7
 
+[sub_resource type="Theme" id="Theme_mns8t"]
+Panel/styles/panel = SubResource("StyleBoxFlat_6ko1l")
+
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7muo2"]
 bg_color = Color(1, 1, 1, 1)
 corner_radius_top_left = 7
@@ -18,7 +21,7 @@ corner_radius_bottom_right = 7
 corner_radius_bottom_left = 7
 corner_detail = 7
 
-[node name="MiningWindow" type="Control" unique_id=2084390514]
+[node name="MiningWindow" type="Control" unique_id=2084390514 node_paths=PackedStringArray("slider")]
 custom_minimum_size = Vector2(700, 0)
 layout_mode = 3
 anchors_preset = 7
@@ -32,12 +35,13 @@ offset_right = 124.0
 offset_bottom = -567.0
 grow_horizontal = 2
 grow_vertical = 0
-script = ExtResource("1_iyxre")
-slider_width = 5.0
+theme = SubResource("Theme_mns8t")
+script = ExtResource("1_mns8t")
+slider = NodePath("Slider")
 DEBUG_run_debug = true
 DEBUG_bar_height = 5.0
 DEBUG_debug_bar_offset = Vector2(0, -5)
-DEBUG_target_color = Color(0, 0.54901963, 0, 0.80784315)
+DEBUG_target_color = Color(0, 0.53333336, 0, 0.7294118)
 
 [node name="Panel" type="Panel" parent="." unique_id=1639049169 node_paths=PackedStringArray("timing_window")]
 custom_minimum_size = Vector2(700, 0)
@@ -47,7 +51,6 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_6ko1l")
 script = ExtResource("3_eprdb")
 timing_window = NodePath("..")
 
