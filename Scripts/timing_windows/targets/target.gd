@@ -20,6 +20,7 @@ var use_image:bool=true:
 		use_image = value
 		$TextureRect.visible = value
 
+
 func set_target_position(pos : float, set_physical_pos : bool = false):
 	target_position = pos
 	if set_physical_pos:
@@ -27,10 +28,10 @@ func set_target_position(pos : float, set_physical_pos : bool = false):
 	pass
 
 func get_left_extent() -> float:
-	return (target_position - (my_width*0.5))
+	return (target_position)
 	
 func get_right_extent():
-	return target_position + (my_width*0.5)
+	return target_position + my_width
 
 func initialize() :
 	Utils.set_control_width(self, my_width)
@@ -44,8 +45,8 @@ func reset():
 func set_bounce_muted(is_muted: bool) -> void:
 	_bounce_muted = is_muted
 
-func is_point_within_bounds(point : float, grace : float = 0) -> bool:
-	return  get_left_extent() - grace < point and point < get_right_extent() + grace
+func is_point_within_bounds(left_extent : float, right_extent : float, grace : float = 0) -> bool:
+	return  (left_extent <= get_right_extent() + grace) and (right_extent >= get_left_extent() - grace)
 
 ## Marks this target collected and hides it until the set resets.
 func hit(_timing_window : SliderTimingWindow = null) -> void:

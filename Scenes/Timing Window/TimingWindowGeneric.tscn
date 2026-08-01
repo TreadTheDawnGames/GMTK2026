@@ -1,0 +1,30 @@
+[gd_scene format=3 uid="uid://d08q3yoys408q"]
+
+[ext_resource type="Script" uid="uid://yknrp1dp4whn" path="res://Scenes/slider_timing_window.gd" id="1_1a4mt"]
+
+[node name="TimingWindow" type="Control" unique_id=15289468]
+layout_mode = 3
+anchors_preset = 0
+script = ExtResource("1_1a4mt")
+target_packed_scenes = null
+speed = null
+speed_multiplier = null
+grace = null
+targets_use_image = null
+slider_width = null
+one_shot = null
+stop_one_shot_when_done = null
+fixed_window = null
+space_between_targets = null
+animation_repeats = null
+animation_color = null
+backing_width = null
+desired_target_heirarchy_index = null
+preferred_side = null
+DEBUG_run_debug = true
+DEBUG_bar_height = null
+DEBUG_slow_speed = null
+DEBUG_debug_bar_offset = null
+DEBUG_backing_color = null
+DEBUG_slider_color = null
+DEBUG_target_color = null

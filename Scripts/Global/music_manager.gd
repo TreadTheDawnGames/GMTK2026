@@ -27,7 +27,7 @@ var fill_playing : bool = false
 
 func _ready() -> void:
 	Conductor.set_song(tracks[0].first(), bpm, beats_per_measure)
-	Conductor.play()
+	#Conductor.play()
 	Conductor.finished.connect(_transition_to)
 	Conductor.beat.connect(_play_fill)
 	

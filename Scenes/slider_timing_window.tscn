@@ -1,16 +1,14 @@
 [gd_scene format=3 uid="uid://cf8q7ylnplo6c"]
 
 [ext_resource type="Script" uid="uid://yknrp1dp4whn" path="res://Scenes/slider_timing_window.gd" id="1_iyxre"]
-[ext_resource type="PackedScene" uid="uid://ct5832k6hpwck" path="res://Scenes/targets/multi-hit_target.tscn" id="2_mns8t"]
+[ext_resource type="Script" uid="uid://cu60ikt2ilbvd" path="res://Scripts/timing_windows/timing_window_panel.gd" id="3_eprdb"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_eprdb"]
-bg_color = Color(0, 0, 0, 0.57254905)
-border_color = Color(0, 0, 0, 0.77254903)
-border_blend = true
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_6ko1l"]
+bg_color = Color(0.19607843, 0.19607843, 0.19607843, 0.5176471)
+corner_radius_top_left = 7
+corner_radius_top_right = 7
+corner_radius_bottom_right = 7
+corner_radius_bottom_left = 7
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7muo2"]
 bg_color = Color(1, 1, 1, 1)
@@ -20,7 +18,8 @@ corner_radius_bottom_right = 7
 corner_radius_bottom_left = 7
 corner_detail = 7
 
-[node name="MiningWindow" type="PanelContainer" unique_id=888560620]
+[node name="MiningWindow" type="Control" unique_id=2084390514]
+layout_mode = 3
 anchors_preset = 7
 anchor_left = 0.5
 anchor_top = 1.0
@@ -32,16 +31,23 @@ offset_right = 124.0
 offset_bottom = -567.0
 grow_horizontal = 2
 grow_vertical = 0
-theme_override_styles/panel = SubResource("StyleBoxFlat_eprdb")
 script = ExtResource("1_iyxre")
-target_packed_scenes = Array[PackedScene]([ExtResource("2_mns8t")])
-desired_target_heirarchy_index = 0
+grace = 0.0
+DEBUG_run_debug = true
+DEBUG_bar_height = 16.41
+DEBUG_debug_bar_offset = Vector2(0, 81.695)
+DEBUG_target_color = Color(0, 0.54901963, 0, 0.80784315)
 
-[node name="Backing" type="Control" parent="." unique_id=953641845]
-unique_name_in_owner = true
-layout_mode = 2
+[node name="Panel" type="Panel" parent="." unique_id=1639049169 node_paths=PackedStringArray("timing_window")]
+custom_minimum_size = Vector2(700, 81)
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_6ko1l")
+script = ExtResource("3_eprdb")
+timing_window = NodePath("..")
 
-[node name="Slider" type="Panel" parent="Backing" unique_id=1966475259]
+[node name="Slider" type="Panel" parent="." unique_id=1966475259]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 13
@@ -49,9 +55,8 @@ anchor_left = 0.5
 anchor_right = 0.5
 anchor_bottom = 1.0
 offset_left = -75.0
-offset_right = -64.0
+offset_right = -70.0
 grow_horizontal = 2
 grow_vertical = 2
 offset_transform_enabled = true
-offset_transform_position_ratio = Vector2(-0.5, 0)
 theme_override_styles/panel = SubResource("StyleBoxFlat_7muo2")
