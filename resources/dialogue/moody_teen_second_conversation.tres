@@ -1,0 +1,56 @@
+[gd_resource type="Resource" script_class="DialogueConversation" format=3 uid="uid://wb6v8ua6hf7p"]
+
+[ext_resource type="Script" uid="uid://bwwpoalvqb7ni" path="res://resources/dialogue/dialogue_line.gd" id="1_toq3l"]
+[ext_resource type="Script" uid="uid://ivfntthetp0i" path="res://resources/dialogue/dialogue_participant.gd" id="2_0vy8a"]
+[ext_resource type="Script" uid="uid://c55utdbjdwaui" path="res://resources/dialogue/dialogue_conversation.gd" id="3_guydh"]
+
+[sub_resource type="Resource" id="Line_miner_one"]
+script = ExtResource("1_toq3l")
+speaker_slot = &"miner"
+text = "..."
+
+[sub_resource type="Resource" id="Line_teen_one"]
+script = ExtResource("1_toq3l")
+speaker_slot = &"moody_teen"
+text = "..."
+
+[sub_resource type="Resource" id="Line_miner_two"]
+script = ExtResource("1_toq3l")
+speaker_slot = &"miner"
+text = "..."
+
+[sub_resource type="Resource" id="Line_teen_two"]
+script = ExtResource("1_toq3l")
+speaker_slot = &"moody_teen"
+text = "..."
+
+[sub_resource type="Resource" id="Line_miner_three"]
+script = ExtResource("1_toq3l")
+speaker_slot = &"miner"
+text = "..."
+
+[sub_resource type="Resource" id="Line_teen_question"]
+script = ExtResource("1_toq3l")
+speaker_slot = &"moody_teen"
+text = "Didn't we do this already?"
+
+[sub_resource type="Resource" id="Line_miner_four"]
+script = ExtResource("1_toq3l")
+speaker_slot = &"miner"
+text = "..."
+
+[sub_resource type="Resource" id="Participant_miner"]
+script = ExtResource("2_0vy8a")
+slot = &"miner"
+display_name = "Miner"
+
+[sub_resource type="Resource" id="Participant_moody_teen"]
+script = ExtResource("2_0vy8a")
+slot = &"moody_teen"
+display_name = "Moody Teen"
+
+[resource]
+script = ExtResource("3_guydh")
+conversation_id = &"moody_teen_first"
+participants = Array[ExtResource("2_0vy8a")]([SubResource("Participant_miner"), SubResource("Participant_moody_teen")])
+lines = Array[ExtResource("1_toq3l")]([SubResource("Line_miner_one"), SubResource("Line_teen_one"), SubResource("Line_miner_two"), SubResource("Line_teen_two"), SubResource("Line_miner_three"), SubResource("Line_teen_question"), SubResource("Line_miner_four")])

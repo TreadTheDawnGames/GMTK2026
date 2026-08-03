@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="CutsceneSequence" format=3 uid="uid://dvdk2en784gui"]
 
 [ext_resource type="Script" uid="uid://bi4c3xsjbayvj" path="res://resources/cinematics/cutscene_beat.gd" id="1_beat"]
-[ext_resource type="Resource" uid="uid://e5attao08g1g" path="res://resources/dialogue/moody_teen_first_conversation.tres" id="2_dialogue"]
+[ext_resource type="Resource" uid="uid://wb6v8ua6hf7p" path="res://resources/dialogue/moody_teen_second_conversation.tres" id="2_0dqwt"]
 [ext_resource type="Script" uid="uid://2f8ec5yitb0s" path="res://resources/cinematics/cutscene_sequence.gd" id="3_sequence"]
 
 [sub_resource type="Resource" id="Beat_show"]
@@ -36,7 +36,7 @@ script = ExtResource("1_beat")
 kind = 5
 start_seconds = 1.55
 duration_seconds = 8.0
-conversation = ExtResource("2_dialogue")
+conversation = ExtResource("2_0dqwt")
 notes = "Reuses the complete authorized seven-line Ayden exchange without duplicating or paraphrasing its dialogue."
 
 [sub_resource type="Resource" id="Beat_reset_camera"]

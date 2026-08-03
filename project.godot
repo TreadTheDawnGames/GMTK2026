@@ -15,14 +15,18 @@ run/main_scene="res://Scenes/mining/mining_proof.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="uid://vgj0ntopd67h"
 
+[audio]
+
+general/default_playback_type.web=0
+
 [autoload]
 
 GameState="*res://Scenes/globals/game_state.tscn"
 AudioHandler="*res://Scenes/globals/audio_handler.tscn"
 MusicManager="*uid://qi6w5ueftd0u"
-Conductor="*uid://cetf3kqgdyqbm"
 PlayerHistory="*res://Scripts/Global/player_history.gd"
 WebAudioFocusGuard="*res://Scripts/Global/web_audio_focus_guard.gd"
+Conductor="*uid://cetf3kqgdyqbm"
 
 [display]
 
@@ -34,7 +38,7 @@ window/vsync/vsync_mode=0
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://Addons/cutscene_editor/plugin.cfg")
+enabled=PackedStringArray("res://Addons/cutscene_editor/plugin.cfg", "res://addons/conductor/plugin.cfg")
 
 [gui]
 
