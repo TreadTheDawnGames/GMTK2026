@@ -166,6 +166,7 @@ func start_conversation(
 	):
 		return false
 
+	MusicManager.dim_music_for_dialog(true)
 	var validation_errors := conversation.validate()
 	if not validation_errors.is_empty():
 		push_error(
@@ -224,6 +225,8 @@ func advance() -> void:
 func finish_conversation() -> void:
 	if not is_conversation_active():
 		return
+	MusicManager.dim_music_for_dialog(false)
+
 	_stop_voice()
 	var finished_id := _active_conversation.conversation_id
 	var keep_frame_open := _keep_frame_open_after_conversation
@@ -533,7 +536,8 @@ func _start_voice_for_speaker(speaker_slot: StringName) -> void:
 		return
 	voice_player.stream = stream
 	voice_player.pitch_scale = pitch
-	_voice_should_loop = true
+	# Just play the voice once. It sounds weird because of the length of the voices. The voices are supposed to be more like Sans' uh-uh-uh-uh rather than just the one sound, but the one sound is better than one really long sound looping.
+	_voice_should_loop = false
 	voice_player.play()
 
 

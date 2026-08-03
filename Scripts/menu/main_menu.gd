@@ -83,6 +83,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## Fades each menu section in using the archived menu's cadence.
 func _play_intro() -> void:
+	MusicManager.initialize()
+	
 	_intro_tween = create_tween()
 	_intro_tween.set_parallel(true)
 	_intro_tween.tween_property(
@@ -118,6 +120,7 @@ func _finish_intro() -> void:
 	button_group.modulate.a = 1.0
 	start_button.disabled = false
 	start_button.grab_focus()
+	
 
 
 ## Clears the run, takes the interface off the shot, and asks for the opening.

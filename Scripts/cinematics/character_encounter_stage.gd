@@ -291,6 +291,7 @@ func play_opening() -> void:
 	if sequence != null:
 		await _play_sequence_opening()
 		return
+	
 	_play_pose_if_available(opening_pose)
 	var movement := _presenter.move_grounded_to(
 		conversation_marker.global_position,
@@ -582,6 +583,7 @@ func _play_sequence_opening() -> void:
 		self
 	)
 	_sequence_player.play(sequence)
+	
 	while _is_active and _sequence_player.is_playing():
 		await get_tree().process_frame
 	if not _is_active:

@@ -25,14 +25,16 @@ var current_intensity : int = 0
 var fill_playing : bool = false
 
 var started:bool = false
-func _input(_event: InputEvent) -> void:
-	if _event is not InputEventMouseMotion and not started:
-		Conductor.set_song(tracks[0].first(), bpm, beats_per_measure)
-		Conductor.play()
-		Conductor.finished.connect(_transition_to)
-		Conductor.beat.connect(_play_fill)
-		started = true
-		set_process(OS.has_feature("editor"))
+
+func initialize():
+	Conductor.set_song(tracks[0].first(), bpm, beats_per_measure)
+	Conductor.play()
+	dim_music_for_dialog(false, 1.0, 0.8*2)
+	
+	Conductor.finished.connect(_transition_to)
+	Conductor.beat.connect(_play_fill)
+	started = true
+	set_process(OS.has_feature("editor"))
 	
 func get_total_beats() -> float:
 	var beat_count = Conductor.stream.get_length() / Conductor.sec_per_beat
@@ -75,10 +77,11 @@ func _play_fill(_beat_number : int = 0):
 		fill_playing = false
 		
 
-func dim_music_for_dialog(do_dim : bool):
+func dim_music_for_dialog(do_dim : bool, tween_length_dimming : float = 1.0, tween_length_undimming : float = 1.5) -> Tween:
 	var t : Tween = create_tween()
-	t.tween_property(Conductor, "volume_linear", -15.0 if do_dim else 0.0, 0.2)
-	
+	t.tween_property(Conductor, "volume_db", -10.0 if do_dim else 0.0, tween_length_dimming if do_dim else tween_length_undimming)
+	t.tween_property(track_1, "volume_db", -10.0 if do_dim else 0.0, tween_length_dimming if do_dim else tween_length_undimming)
+	return t
 
 func force_play_fill(stream : AudioStream = null):
 	fill_playing = true

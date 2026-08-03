@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://dvhdu1x8j8s3b" path="res://Scripts/menu/main_menu.gd" id="1_menu"]
 [ext_resource type="Theme" uid="uid://cy302o2vx18ng" path="res://resources/themes/Menus.tres" id="1_ufr4i"]
 [ext_resource type="PackedScene" uid="uid://ce2kgb3fjtjut" path="res://Scenes/Options.tscn" id="3_uffod"]
+[ext_resource type="Script" uid="uid://cgdgbsdbllfhy" path="res://Scenes/menu/version_display.gd" id="4_ygw4n"]
 
 [node name="MainMenu" type="Control" unique_id=633825169 node_paths=PackedStringArray("title_group", "subtitle_group", "button_group", "start_button", "options_button", "exit_button", "exit_confirmation", "status_label")]
 editor_description = "Overlay for the live mining scene, not a scene of its own: the world behind it is the game staged at the surface, so there is deliberately no background rect here. Every element sits inside the cinematic letterbox, which is already closed while the menu is up. mouse_filter stays at Stop on this root so the shot underneath cannot be clicked."
@@ -23,7 +24,6 @@ exit_button = NodePath("MenuLayout/ButtonCenter/Buttons/ExitButton")
 exit_confirmation = NodePath("ExitConfirmation")
 status_label = NodePath("MenuLayout/ButtonCenter/Buttons/Status")
 options_scene = ExtResource("3_uffod")
-section_fade_seconds = 0.0
 
 [node name="MenuLayout" type="VBoxContainer" parent="." unique_id=642881323]
 editor_description = "Inset clear of the letterbox. CinematicFrame's bars cover the first and last 0.14 of the viewport (about 91 px each at 648), so the top and bottom offsets keep every element inside the visible band while the menu is up."
@@ -108,6 +108,7 @@ theme_override_colors/font_outline_color = Color(0.06, 0.04, 0.07, 0.85)
 theme_override_constants/outline_size = 6
 text = "JAM BUILD"
 horizontal_alignment = 2
+script = ExtResource("4_ygw4n")
 
 [node name="ExitConfirmation" type="ConfirmationDialog" parent="." unique_id=129160021]
 transparent_bg = true

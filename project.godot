@@ -11,6 +11,7 @@ config_version=5
 [application]
 
 config/name="Miner's Remorse"
+config/version="Post Jam"
 run/main_scene="res://Scenes/mining/mining_proof.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="uid://vgj0ntopd67h"
