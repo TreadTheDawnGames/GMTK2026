@@ -38,7 +38,6 @@ grow_vertical = 0
 theme = SubResource("Theme_mns8t")
 script = ExtResource("1_mns8t")
 slider = NodePath("Slider")
-DEBUG_run_debug = true
 DEBUG_bar_height = 5.0
 DEBUG_debug_bar_offset = Vector2(0, -5)
 DEBUG_target_color = Color(0, 0.53333336, 0, 0.7294118)

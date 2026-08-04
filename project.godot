@@ -27,7 +27,7 @@ AudioHandler="*res://Scenes/globals/audio_handler.tscn"
 MusicManager="*uid://qi6w5ueftd0u"
 PlayerHistory="*res://Scripts/Global/player_history.gd"
 WebAudioFocusGuard="*res://Scripts/Global/web_audio_focus_guard.gd"
-Conductor="*uid://cetf3kqgdyqbm"
+Conductor="*uid://c5rvmkaorxynb"
 
 [display]
 
