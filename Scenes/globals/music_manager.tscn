@@ -2,8 +2,9 @@
 
 [ext_resource type="Script" uid="uid://8lrsitody4v4" path="res://Scripts/Global/music_manager.gd" id="1_a0ngj"]
 [ext_resource type="AudioStream" uid="uid://chhsdowl4uikj" path="res://Assets/Audio/Music/Tracks/Track 0_A.wav" id="2_6m88t"]
-[ext_resource type="Script" uid="uid://s4frj7oy6eh" path="res://resources/music/intensity.gd" id="2_q3b56"]
+[ext_resource type="Script" uid="uid://dr4f54jncm35g" path="res://resources/Trackset.gd" id="2_md4lg"]
 [ext_resource type="AudioStream" uid="uid://b65hvbkhrokt0" path="res://Assets/Audio/Music/Tracks/Track 1_A.wav" id="3_ikl7l"]
+[ext_resource type="Resource" uid="uid://cuwenmlifkv1" path="res://resources/tracksets/default_trackset.tres" id="3_mhghk"]
 [ext_resource type="AudioStream" uid="uid://dxgkdgbyrag1f" path="res://Assets/Audio/Music/Tracks/Track 1_B.wav" id="4_ikl7l"]
 [ext_resource type="AudioStream" uid="uid://ccgj86e6x5a1r" path="res://Assets/Audio/Music/Tracks/Track 1_C.wav" id="5_hmpdo"]
 [ext_resource type="AudioStream" uid="uid://ddcsk5epb2xpu" path="res://Assets/Audio/Music/Tracks/Track 2_A.wav" id="6_hxoep"]
@@ -16,42 +17,6 @@
 [ext_resource type="AudioStream" uid="uid://d15qdd2u7norw" path="res://Assets/Audio/Music/Tracks/Track 4_B.wav" id="13_l6m5y"]
 [ext_resource type="AudioStream" uid="uid://sb84n3ygkn3w" path="res://Assets/Audio/Music/Tracks/Track 4_C.wav" id="14_hc7r0"]
 [ext_resource type="AudioStream" uid="uid://cp00cgjcbl4un" path="res://Assets/Audio/Music/Tracks/Track 4_D.wav" id="15_bo57w"]
-[ext_resource type="AudioStream" uid="uid://cscee8nxpmatj" path="res://Assets/Audio/Music/Fills/Fill 1.wav" id="17_knyyj"]
-[ext_resource type="AudioStream" uid="uid://cyqiofo2rxlqj" path="res://Assets/Audio/Music/Fills/Fill 2.wav" id="18_4e8v3"]
-[ext_resource type="AudioStream" uid="uid://uyffheadki3i" path="res://Assets/Audio/Music/Fills/Fill 3.wav" id="19_md4lg"]
-[ext_resource type="AudioStream" uid="uid://bndigfegx8cfd" path="res://Assets/Audio/Music/Fills/Fill 4.wav" id="20_ccwyb"]
-[ext_resource type="AudioStream" uid="uid://q654521kyu7h" path="res://Assets/Audio/Music/Fills/Fill 5.wav" id="21_3clkn"]
-[ext_resource type="AudioStream" uid="uid://bo5sy6yuoip68" path="res://Assets/Audio/Music/Fills/Fill 6.wav" id="22_hpsl2"]
-[ext_resource type="AudioStream" uid="uid://b4bih3mqb56ek" path="res://Assets/Audio/Music/Fills/Fill 7.wav" id="23_clf6b"]
-[ext_resource type="AudioStream" uid="uid://ci4splx28rtho" path="res://Assets/Audio/Music/Fills/Fill 8.wav" id="24_tso0d"]
-[ext_resource type="AudioStream" uid="uid://b3pwotopllh27" path="res://Assets/Audio/Music/Fills/Fill 9.wav" id="25_hva2u"]
-[ext_resource type="AudioStream" uid="uid://doiji28kkb828" path="res://Assets/Audio/Music/Fills/Fill 10.wav" id="26_462tb"]
-[ext_resource type="AudioStream" uid="uid://m61aiqs8s6s1" path="res://Assets/Audio/Music/Fills/FailSound.wav" id="27_4e8v3"]
-
-[sub_resource type="Resource" id="Resource_1aouw"]
-script = ExtResource("2_q3b56")
-tracks = Array[AudioStream]([ExtResource("2_6m88t")])
-metadata/_custom_type_script = "uid://s4frj7oy6eh"
-
-[sub_resource type="Resource" id="Resource_2x8gl"]
-script = ExtResource("2_q3b56")
-tracks = Array[AudioStream]([ExtResource("3_ikl7l"), ExtResource("4_ikl7l"), ExtResource("5_hmpdo")])
-metadata/_custom_type_script = "uid://s4frj7oy6eh"
-
-[sub_resource type="Resource" id="Resource_pbuwk"]
-script = ExtResource("2_q3b56")
-tracks = Array[AudioStream]([ExtResource("6_hxoep"), ExtResource("7_sqg44")])
-metadata/_custom_type_script = "uid://s4frj7oy6eh"
-
-[sub_resource type="Resource" id="Resource_cawdq"]
-script = ExtResource("2_q3b56")
-tracks = Array[AudioStream]([ExtResource("8_mhghk"), ExtResource("9_i03bm"), ExtResource("10_q3b56"), ExtResource("11_j7o0d")])
-metadata/_custom_type_script = "uid://s4frj7oy6eh"
-
-[sub_resource type="Resource" id="Resource_4m5f8"]
-script = ExtResource("2_q3b56")
-tracks = Array[AudioStream]([ExtResource("12_t3xlo"), ExtResource("13_l6m5y"), ExtResource("14_hc7r0"), ExtResource("15_bo57w")])
-metadata/_custom_type_script = "uid://s4frj7oy6eh"
 
 [sub_resource type="AudioStreamPlaylist" id="AudioStreamPlaylist_ikl7l"]
 stream_count = 1
@@ -139,9 +104,9 @@ Vector2i(3, 4): {
 [node name="MusicManager" type="Node" unique_id=1863380187]
 process_mode = 3
 script = ExtResource("1_a0ngj")
-tracks = Array[ExtResource("2_q3b56")]([SubResource("Resource_1aouw"), SubResource("Resource_2x8gl"), SubResource("Resource_pbuwk"), SubResource("Resource_cawdq"), SubResource("Resource_4m5f8")])
-fills = Array[AudioStream]([ExtResource("17_knyyj"), ExtResource("18_4e8v3"), ExtResource("19_md4lg"), ExtResource("20_ccwyb"), ExtResource("21_3clkn"), ExtResource("22_hpsl2"), ExtResource("23_clf6b"), ExtResource("24_tso0d"), ExtResource("25_hva2u"), ExtResource("26_462tb")])
-fail_riffs = Array[AudioStream]([ExtResource("27_4e8v3")])
+tracksets = Dictionary[StringName, ExtResource("2_md4lg")]({
+&"default": ExtResource("3_mhghk")
+})
 
 [node name="Track1" type="AudioStreamPlayer" parent="." unique_id=1408430976]
 unique_name_in_owner = true

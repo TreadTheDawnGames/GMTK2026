@@ -5,13 +5,10 @@
 extends Node
 
 
-
-@export var tracks : Array[Intensity] = []
-@export var fills : Array[AudioStream] = []
-@export var fail_riffs : Array[AudioStream] = []
-
-var bpm : float = 120
-var beats_per_measure : int = 4
+@export var tracksets : Dictionary[StringName, Trackset] = {}
+var _current_trackset : Trackset
+#var bpm : float = 120
+#var beats_per_measure : int = 4
 
 @onready var track_1: AudioStreamPlayer = %Track1
 @onready var track_2: AudioStreamPlayer = %Track2
@@ -19,7 +16,7 @@ var beats_per_measure : int = 4
 
 var music_intensity : int = 0 : 
 	set(value):
-		music_intensity = clamp(value, 0, tracks.size()-1)
+		music_intensity = clamp(value, 0, _current_trackset.get_size()-1)
 
 var current_intensity : int = 0
 var fill_playing : bool = false
@@ -27,7 +24,9 @@ var fill_playing : bool = false
 var started:bool = false
 
 func initialize():
-	Conductor.set_song(tracks[0].first(), bpm, beats_per_measure)
+	change_to_trackset(&"default")
+	
+	Conductor.set_song(_current_trackset.get_first_track(), _current_trackset.bpm, _current_trackset.beats_per_measure)
 	Conductor.play()
 	dim_music_for_dialog(false, 1.0, 0.8*2)
 	
@@ -45,7 +44,7 @@ func get_beats_remaining() -> int:
 
 func _transition_to():
 	Conductor.last_reported_beat = -1
-	Conductor.set_song(tracks[music_intensity].pick_random(), bpm, beats_per_measure)
+	Conductor.set_song(_current_trackset.get_track_for_intensity(music_intensity), _current_trackset.bpm, _current_trackset.beats_per_measure)
 	Conductor.play()
 	current_intensity = music_intensity
 
@@ -62,17 +61,16 @@ func _transition_to():
 		#set_intensity_on_beat(music_intensity)
 		#print("music intensity: ", music_intensity)
 
-var fill_overlap : int = 3
 
 func _play_fill(_beat_number : int = 0):
-	if get_beats_remaining() <= fill_overlap and not fill_playing:
+	if get_beats_remaining() <= _current_trackset.fill_offset and not fill_playing:
 		fill_playing = true
 		if music_intensity >= current_intensity:
-			track_1.stream = fills.pick_random() 
+			track_1.stream = _current_trackset.get_positive_fill()
 		#else:
 			#track_1.stream = fail_riffs.pick_random() 
 		
-		play_song_from_beat(fill_overlap-get_beats_remaining(), Conductor.sec_per_beat)
+		play_song_from_beat(_current_trackset.fill_offset-get_beats_remaining(), Conductor.sec_per_beat)
 		await track_1.finished
 		fill_playing = false
 		
@@ -85,7 +83,7 @@ func dim_music_for_dialog(do_dim : bool, tween_length_dimming : float = 1.0, twe
 
 func force_play_fill(stream : AudioStream = null):
 	fill_playing = true
-	track_1.stream = stream if stream else fills.pick_random()
+	track_1.stream = stream if stream else _current_trackset.get_positive_fill()
 	
 	play_song_from_beat(fill_overlap-get_beats_remaining(), Conductor.sec_per_beat)
 	await track_1.finished
@@ -118,12 +116,15 @@ func play_song_from_beat(beat:float, sec_per_beat : float):
 func set_intensity_after_measure(intensity : int):
 	music_intensity = intensity
 	
-	while int(Conductor.current_beat) % beats_per_measure != 0:
+	while int(Conductor.current_beat) % _current_trackset.beats_per_measure != 0:
 		await Conductor.beat
 	#force_play_fill(fail_riffs.pick_random() if fail_riffs.size() > 0 else null)
 	
 	Conductor.last_reported_beat = -1
-	Conductor.set_song(tracks[music_intensity].pick_random(), bpm, beats_per_measure)
+	Conductor.set_song(_current_trackset.get_track_for_intensity(music_intensity), _current_trackset.bpm, _current_trackset.beats_per_measure)
 	Conductor.play()
 	current_intensity = music_intensity
 	pass
+
+func change_to_trackset(trackset_name : StringName):
+	_current_trackset = tracksets[trackset_name]
