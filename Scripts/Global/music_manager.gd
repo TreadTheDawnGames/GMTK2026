@@ -85,7 +85,7 @@ func force_play_fill(stream : AudioStream = null):
 	fill_playing = true
 	track_1.stream = stream if stream else _current_trackset.get_positive_fill()
 	
-	play_song_from_beat(fill_overlap-get_beats_remaining(), Conductor.sec_per_beat)
+	play_song_from_beat(_current_trackset.fill_overlap-get_beats_remaining(), Conductor.sec_per_beat)
 	await track_1.finished
 	fill_playing = false
 
